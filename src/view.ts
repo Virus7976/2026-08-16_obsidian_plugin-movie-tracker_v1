@@ -14,6 +14,7 @@ import type { Entry } from "./types";
 import { renderPosterGrid, renderRowList } from "./render/grid";
 import { DetailScreen } from "./ui/detail";
 import { RateScreen } from "./ui/rate";
+import { DiscoverScreen } from "./ui/discoverView";
 import { paintUpNext } from "./render/upnext";
 import { paintUpcoming } from "./render/calendar";
 import { paintStats } from "./render/stats";
@@ -24,10 +25,11 @@ import { renderStarsStatic } from "./ui/stars";
 
 export const REEL_VIEW = "reel-view";
 
-type Tab = "library" | "rate" | "upnext" | "diary" | "stats";
+type Tab = "library" | "discover" | "rate" | "upnext" | "diary" | "stats";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
 	{ id: "library", label: "Library", icon: "layout-grid" },
+	{ id: "discover", label: "Discover", icon: "compass" },
 	{ id: "rate", label: "Rate", icon: "star" },
 	{ id: "upnext", label: "Up next", icon: "play" },
 	{ id: "diary", label: "Diary", icon: "calendar-days" },
@@ -73,6 +75,8 @@ export class ReelView extends ItemView {
 	private detail: DetailScreen | null = null;
 	/** Kept across repaints so the queue position and skips survive. */
 	private rateScreen: RateScreen | null = null;
+	/** Kept across repaints so rows aren't refetched on every tab switch. */
+	private discoverScreen: DiscoverScreen | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -178,6 +182,9 @@ export class ReelView extends ItemView {
 		if (this.tab === "library") {
 			this.paintFilters();
 			this.paintLibrary();
+		} else if (this.tab === "discover") {
+			if (!this.discoverScreen) this.discoverScreen = new DiscoverScreen(this.plugin);
+			this.discoverScreen.render(this.bodyEl);
 		} else if (this.tab === "rate") {
 			if (!this.rateScreen) this.rateScreen = new RateScreen(this.plugin);
 			this.rateScreen.render(this.bodyEl);

@@ -2634,3 +2634,223 @@ input.reel-input {
 	margin-right: auto;
 	width: 100%;
 }
+
+/* ================================================================== *
+ * v0.7 — Discover
+ * ================================================================== */
+
+.reel-discover {
+	display: flex;
+	flex-direction: column;
+	gap: 26px;
+	max-width: 1400px;
+	margin: 0 auto;
+	padding-bottom: 24px;
+}
+
+.reel-discover-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+/* A recommendation with no stated reason is indistinguishable from an ad. */
+.reel-discover-note {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.45;
+	max-width: 62ch;
+}
+
+/* ---------------- rows ---------------- */
+
+.reel-drow {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.reel-drow-head {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.reel-drow-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 700;
+}
+
+.reel-drow-reason {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-drow-nav {
+	margin-left: auto;
+	display: flex;
+	gap: 4px;
+}
+
+.reel-drow-arrow {
+	width: 30px;
+	height: 30px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+/* Horizontal strip. Scroll snapping makes a drag land on a card rather
+   than halfway between two, which is what makes it feel deliberate. */
+.reel-drow-strip {
+	display: flex;
+	gap: 12px;
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding-bottom: 6px;
+	scroll-snap-type: x proximity;
+	-webkit-overflow-scrolling: touch;
+	scroll-padding-left: 2px;
+}
+
+.reel-drow-strip::-webkit-scrollbar {
+	height: 8px;
+}
+
+.reel-drow-strip::-webkit-scrollbar-thumb {
+	background: var(--background-modifier-border);
+	border-radius: 4px;
+}
+
+/* ---------------- cards ---------------- */
+
+.reel-dcard {
+	flex: 0 0 132px;
+	width: 132px;
+	scroll-snap-align: start;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-touch-callout: none;
+}
+
+.reel-dcard:active .reel-dcard-poster {
+	transform: scale(0.97);
+}
+
+.reel-dcard-poster {
+	position: relative;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-secondary);
+	transition: transform 120ms ease;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.reel-dcard-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-dcard-score {
+	position: absolute;
+	bottom: 5px;
+	left: 5px;
+	padding: 2px 6px;
+	border-radius: 5px;
+	background: rgba(0, 0, 0, 0.75);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-dcard-type {
+	position: absolute;
+	top: 5px;
+	right: 5px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.75);
+	color: #fff;
+	font-size: 10px;
+	font-weight: 700;
+}
+
+.reel-dcard-title {
+	margin-top: 6px;
+	font-size: var(--font-ui-smaller);
+	line-height: 1.25;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-dcard-year {
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+@media (min-width: 900px) {
+	.reel-dcard {
+		flex: 0 0 150px;
+		width: 150px;
+	}
+}
+
+/* ---------------- preview ---------------- */
+
+.reel-preview-head {
+	display: flex;
+	gap: 16px;
+	margin-bottom: 12px;
+}
+
+.reel-preview-poster {
+	flex: 0 0 96px;
+	width: 96px;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.reel-preview-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-preview-body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.reel-preview-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.reel-preview-overview {
+	color: var(--text-muted);
+	line-height: 1.55;
+	font-size: var(--font-ui-small);
+	max-height: 30vh;
+	overflow-y: auto;
+}

@@ -175,6 +175,65 @@ export class TmdbClient {
 			.filter((r) => r.media_type === "movie" || r.media_type === "tv");
 	}
 
+	/**
+	 * "More like this", straight from TMDB.
+	 *
+	 * `/recommendations` is curated from viewing patterns rather than metadata
+	 * similarity, so it suggests things that feel related rather than things
+	 * that merely share a genre — which is why it beats `/similar` as the seed
+	 * for a "because you liked X" row.
+	 */
+	async recommendations(id: number, kind: "movie" | "tv"): Promise<TmdbSearchResult[]> {
+		const data = await this.cached(`rec-${kind}-${id}`, () =>
+			this.request<{ results?: TmdbSearchResult[] }>(`/${kind}/${id}/recommendations`, {})
+		);
+		return (data.results ?? []).map((r) => ({ ...r, media_type: r.media_type ?? kind }));
+	}
+
+	/** Filtered discovery: genre, decade, minimum score. */
+	async discoverBy(opts: {
+		type: "movie" | "tv";
+		genreId?: number;
+		decade?: number;
+		minRating?: number;
+	}): Promise<TmdbSearchResult[]> {
+		const params: Record<string, string> = {
+			sort_by: "popularity.desc",
+			// Without a vote floor the results are dominated by obscure titles
+			// with a single perfect score, which reads as broken.
+			"vote_count.gte": "200",
+		};
+		if (opts.genreId) params.with_genres = String(opts.genreId);
+		if (opts.minRating) params["vote_average.gte"] = String(opts.minRating);
+		if (opts.decade) {
+			const from = `${opts.decade}-01-01`;
+			const to = `${opts.decade + 9}-12-31`;
+			if (opts.type === "movie") {
+				params["primary_release_date.gte"] = from;
+				params["primary_release_date.lte"] = to;
+			} else {
+				params["first_air_date.gte"] = from;
+				params["first_air_date.lte"] = to;
+			}
+		}
+
+		const key = `disc-${opts.type}-${opts.genreId ?? 0}-${opts.decade ?? 0}-${opts.minRating ?? 0}`;
+		const data = await this.cached(key, () =>
+			this.request<{ results?: TmdbSearchResult[] }>(`/discover/${opts.type}`, params)
+		);
+		return (data.results ?? []).map((r) => ({ ...r, media_type: r.media_type ?? opts.type }));
+	}
+
+	/** Genre name/id pairs. Immutable in practice, so cached permanently. */
+	async genreList(kind: "movie" | "tv"): Promise<{ id: number; name: string }[]> {
+		const data = await this.cached(
+			`genres-${kind}`,
+			() => this.request<{ genres?: { id: number; name: string }[] }>(`/genre/${kind}/list`, {}),
+			true
+		);
+		return data.genres ?? [];
+	}
+
 	async getFilm(id: number): Promise<TmdbFilm> {
 		return this.cached(
 			`movie-${id}`,

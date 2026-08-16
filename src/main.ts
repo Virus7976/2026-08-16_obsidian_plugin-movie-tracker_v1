@@ -7,6 +7,7 @@ import { NoteWriter } from "./notes";
 import { PosterStore } from "./posters";
 import { Importer } from "./importer";
 import { DtddClient, OmdbClient } from "./enrich";
+import { DiscoverEngine } from "./discover";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
 import { LogSheet } from "./ui/logSheet";
@@ -47,6 +48,7 @@ export default class ReelPlugin extends Plugin {
 	importer!: Importer;
 	omdb!: OmdbClient;
 	dtdd!: DtddClient;
+	discover!: DiscoverEngine;
 
 	private lastHidden = 0;
 
@@ -62,6 +64,7 @@ export default class ReelPlugin extends Plugin {
 		this.importer = new Importer(this);
 		this.omdb = new OmdbClient(this);
 		this.dtdd = new DtddClient(this);
+		this.discover = new DiscoverEngine(this);
 
 		addIcon("reel", REEL_ICON);
 
