@@ -36,6 +36,7 @@ import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { unlink } from "../library";
+import { compactCount } from "../util/format";
 import { ContentFlag, FLAG_LABELS } from "../content";
 
 /**
@@ -49,13 +50,6 @@ function flagEmoji(iso: string): string {
 	const code = iso.trim().toUpperCase();
 	if (!/^[A-Z]{2}$/.test(code)) return "";
 	return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
-}
-
-/** 1240000 → "1.2M". Vote counts are scale, not precision. */
-function compactCount(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-	if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-	return String(n);
 }
 
 const FILM_STATUSES = ["watched", "watchlist", "abandoned"];

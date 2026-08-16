@@ -3781,3 +3781,42 @@ input.reel-input {
 	color: var(--text-muted);
 	line-height: 1.25;
 }
+
+/* ---------------- list layout: inline metadata ---------------- */
+
+/*
+ * The full list carries what you would otherwise open a title to find out.
+ * `compact` stays deliberately bare — being scannable at a glance is the
+ * whole reason to pick it, and adding this there would defeat the choice.
+ */
+.reel-row-facts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+	margin-top: 3px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-row-people {
+	margin-top: 3px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-row-overview {
+	margin-top: 4px;
+	font-size: var(--font-ui-smaller);
+	line-height: 1.5;
+	color: var(--text-faint);
+	/* Two lines: enough to recognise a plot, not enough to turn a list of
+	   twenty titles into a page of prose. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}

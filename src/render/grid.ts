@@ -13,8 +13,10 @@ import type { Entry } from "../types";
 import { renderStarsStatic } from "../ui/stars";
 import { QuickRate } from "../ui/quickRate";
 import { lastWatchDate } from "./query";
-import { prettyDate } from "../util/dates";
+import { prettyDate, formatMinutes } from "../util/dates";
 import { rangeCount } from "../util/ranges";
+import { compactCount } from "../util/format";
+import { unlink } from "../library";
 
 /**
  * Tap opens the note; long-press (or right-click) quick-rates.
@@ -151,6 +153,32 @@ export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]
 		if (entry.rating != null) renderStarsStatic(meta, entry.rating);
 		if (entry.type === "tv" && entry.lastWatched) {
 			meta.createSpan({ text: `S${entry.lastWatched.season}E${entry.lastWatched.episode}` });
+		}
+
+		// The full list layout carries what you would otherwise open the title
+		// to find out. Compact deliberately does not — being scannable at a
+		// glance is the entire reason to choose it.
+		if (!compact) {
+			const facts = body.createDiv({ cls: "reel-row-facts" });
+			if (entry.runtime) facts.createSpan({ text: formatMinutes(entry.runtime) });
+			if (entry.type === "tv" && entry.totalEpisodes) {
+				facts.createSpan({ text: `${entry.totalEpisodes} episodes` });
+			}
+			if (entry.certification) facts.createSpan({ cls: "reel-badge cert", text: entry.certification });
+			if (entry.imdbRating != null) {
+				const votes = entry.imdbVotes ? ` (${compactCount(entry.imdbVotes)})` : "";
+				facts.createSpan({ cls: "reel-dim", text: `IMDb ${entry.imdbRating.toFixed(1)}${votes}` });
+			}
+			if (entry.metacritic != null) facts.createSpan({ cls: "reel-dim", text: `MC ${entry.metacritic}` });
+			if (!facts.childElementCount) facts.remove();
+
+			// Who made it, which is how most people recognise a title they have
+			// half-forgotten — more reliably than by its year.
+			const people = entry.type === "tv" ? entry.creators : entry.director;
+			const names = [...people.map(unlink), ...entry.cast.slice(0, 2).map(unlink)].filter(Boolean);
+			if (names.length) body.createDiv({ cls: "reel-row-people", text: names.join(" · ") });
+
+			if (entry.overview) body.createDiv({ cls: "reel-row-overview", text: entry.overview });
 		}
 
 		wireCell(plugin, row, entry, onSelect);

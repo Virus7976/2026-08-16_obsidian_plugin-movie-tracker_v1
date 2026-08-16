@@ -138,11 +138,11 @@ IMDb holds is a deep link at best.
 | Element | Source | Status |
 |---|---|---|
 | Numbered list with poster | Reel library | **partial** — grid, not numbered list |
-| Year · runtime · certificate · metascore inline | Reel entry | **buildable** |
-| Rating with vote count | OMDb | **buildable** |
+| Year · runtime · certificate · metascore inline | Reel entry | **done** — full list layout |
+| Rating with vote count | OMDb | **done** |
 | Inline Rate control | Reel | **done** (long-press quick rate) |
 | Mark as watched inline | Reel | **done** (Up next tick) |
-| Overview + Director + Stars in row | Reel entry | **buildable** — list layout exists |
+| Overview + Director + Stars in row | Reel entry | **done** — two-line clamp |
 
 ---
 
@@ -155,9 +155,7 @@ community reviews, and the content tab.
 
 Remaining, cheapest first:
 
-1. **List view with inline metadata** — year, runtime, certificate, score and
-   director on one row; the layout already exists for the compact grid.
-2. **Watch options per related card** — needs a providers fetch per related
+1. **Watch options per related card** — needs a providers fetch per related
    item, so it is by far the most expensive thing left.
 
 Correction to an earlier estimate: the IMDb vote count was listed as "already
