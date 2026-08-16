@@ -187,6 +187,14 @@ export class ReelView extends ItemView {
 	private searchEl: HTMLInputElement | null = null;
 	/** Where the list was when a detail screen was opened over it. */
 	private listScroll = 0;
+	/**
+	 * The tab a filtered view was launched from, so it can offer a way back.
+	 *
+	 * Tapping a stat drops you into the Library with filters you did not set
+	 * by hand, and the only route back was to notice which chips were lit,
+	 * clear them, and find the Stats tab again.
+	 */
+	private cameFrom: { tab: Tab; label: string } | null = null;
 
 	private clearSearch(): void {
 		if (!this.query) return;
@@ -214,7 +222,8 @@ export class ReelView extends ItemView {
 	 * The stats tiles count these sets; this is how you get from the count to
 	 * the titles behind it.
 	 */
-	filterByStatus(status: string | null): void {
+	filterByStatus(status: string | null, from?: string): void {
+		this.rememberOrigin(from);
 		this.tab = "library";
 		this.detail = null;
 		this.clearSearch();
@@ -224,7 +233,8 @@ export class ReelView extends ItemView {
 		this.paint();
 	}
 
-	searchFor(query: string): void {
+	searchFor(query: string, from?: string): void {
+		this.rememberOrigin(from);
 		this.tab = "library";
 		this.detail = null;
 		this.plugin.settings.lastTab = "library";
@@ -235,11 +245,19 @@ export class ReelView extends ItemView {
 		this.paint();
 	}
 
+	/** Note where a jump came from, so the destination can offer a way back. */
+	private rememberOrigin(from?: string): void {
+		const origin = TABS.find((t) => t.id === from);
+		this.cameFrom = origin ? { tab: origin.id as Tab, label: origin.label } : null;
+	}
+
 	showTab(tab: string): void {
 		if (!TABS.some((t) => t.id === tab)) return;
 		this.tab = tab as Tab;
 		this.detail = null;
 		this.clearSearch();
+		// Choosing a tab yourself is not a detour, so the breadcrumb goes.
+		this.cameFrom = null;
 		// Persisted here rather than by the caller, so every route into a tab
 		// remembers it — a command, a click, or anything added later.
 		this.plugin.settings.lastTab = tab;
@@ -331,6 +349,21 @@ export class ReelView extends ItemView {
 
 	private paintFilters(): void {
 		this.filterEl.removeClass("is-empty");
+
+		// A way back, when you arrived here by tapping a number somewhere else.
+		//
+		// Filters you did not set by hand are hard to undo: you have to work
+		// out which chips are lit, clear them, and then find your way back to
+		// the tab you came from. One button does all three.
+		if (this.cameFrom) {
+			const origin = this.cameFrom;
+			const crumb = this.filterEl.createDiv({ cls: "reel-crumb" });
+			const back = crumb.createEl("button", { cls: "reel-btn reel-crumb-btn", attr: { type: "button" } });
+			setIcon(back.createSpan(), "arrow-left");
+			back.createSpan({ text: `Back to ${origin.label}` });
+			back.addEventListener("click", () => this.showTab(origin.tab));
+		}
+
 		const bar = this.filterEl.createDiv({ cls: "reel-chips" });
 
 		const chip = (label: string, active: boolean, onClick: () => void) => {

@@ -166,19 +166,19 @@ export default class ReelPlugin extends Plugin {
 	}
 
 	/** Open the Library showing one status — used by the stats tiles. */
-	async openLibraryWithStatus(status: string | null): Promise<void> {
+	async openLibraryWithStatus(status: string | null, from?: string): Promise<void> {
 		await this.openView();
 		const leaf = this.app.workspace.getLeavesOfType(REEL_VIEW)[0];
 		const view = leaf?.view;
-		if (view instanceof ReelView) view.filterByStatus(status);
+		if (view instanceof ReelView) view.filterByStatus(status, from);
 	}
 
 	/** Open the Library filtered by a term — used by cast and genre taps. */
-	async openViewWithSearch(query: string): Promise<void> {
+	async openViewWithSearch(query: string, from?: string): Promise<void> {
 		await this.openView();
 		const leaf = this.app.workspace.getLeavesOfType(REEL_VIEW)[0];
 		const view = leaf?.view;
-		if (view instanceof ReelView) view.searchFor(query);
+		if (view instanceof ReelView) view.searchFor(query, from);
 	}
 
 	/**

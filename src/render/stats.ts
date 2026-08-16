@@ -125,13 +125,13 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		const distinct = new Set(watched.map((v) => v.entry.path)).size;
 		const rewatches = watched.filter((v) => v.rewatch).length;
 		tile("Films watched", String(watched.length), `${distinct} distinct · ${rewatches} rewatches`, () =>
-			void plugin.openLibraryWithStatus("watched")
+			void plugin.openLibraryWithStatus("watched", "stats")
 		);
 		tile("Hours of film", formatMinutes(filmMinutes));
 	}
 	if (shows.length) {
 		tile("Episodes", String(episodesSeen), `${shows.length} show${shows.length === 1 ? "" : "s"}`, () =>
-			void plugin.openLibraryWithStatus("watching")
+			void plugin.openLibraryWithStatus("watching", "stats")
 		);
 		if (episodeMinutes) tile("Hours of TV", formatMinutes(episodeMinutes));
 	}
@@ -174,7 +174,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			"On the watchlist",
 			String(watchlist),
 			rate > 0 ? `${Math.ceil(watchlist / rate)} months at this pace` : undefined,
-			() => void plugin.openLibraryWithStatus("watchlist")
+			() => void plugin.openLibraryWithStatus("watchlist", "stats")
 		);
 	}
 
@@ -314,28 +314,46 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		bars(charts, "Rating distribution", buckets);
 	}
 
+	/* ---- taste charts: what you have SEEN ------------------------------ */
+	//
+	// These describe your taste, so the watchlist has no business in them. A
+	// film you mean to watch tells you nothing about which directors you
+	// favour, and counting it says you like someone whose work you have never
+	// seen. Same bug as the superlatives once had, one section further down
+	// the page.
+	//
+	// A series counts once any episode is watched: you have formed a view on
+	// it by then, and waiting for a full run would exclude everything
+	// in progress.
+	const seenFilms = films.filter((e) => e.watched.length > 0);
+	const seenShows = shows.filter((e) => e.seasons.some((x) => rangeCount(x.watched) > 0));
+	const seenAll = [...seenFilms, ...seenShows];
+
 	// People are stored as wikilinks, so unwrap before counting or
 	// "[[People/X|X]]" and "X" tally separately.
-	if (films.length) {
-		tally(charts, "Top directors", films, (e) => e.director.map(unlink), undefined, undefined, plugin);
-		ratedBy(charts, "Directors you rate highest", films, (e) => e.director.map(unlink), 2, plugin);
-		tally(charts, "Top actors", films, (e) => e.cast.map(unlink), undefined, undefined, plugin);
+	if (seenFilms.length) {
+		tally(charts, "Top directors", seenFilms, (e) => e.director.map(unlink), undefined, undefined, plugin);
+		ratedBy(charts, "Directors you rate highest", seenFilms, (e) => e.director.map(unlink), 2, plugin);
+		tally(charts, "Top actors", seenFilms, (e) => e.cast.map(unlink), undefined, undefined, plugin);
 		// Recurring characters are mostly a franchise signal — the same part
 		// across several films is the interesting case, so require two.
-		tally(charts, "Recurring characters", films, (e) => e.characters, undefined, undefined, plugin);
+		tally(charts, "Recurring characters", seenFilms, (e) => e.characters, undefined, undefined, plugin);
 	}
-	if (shows.length) {
-		tally(charts, "Top creators", shows, (e) => e.creators.map(unlink), undefined, undefined, plugin);
-		tally(charts, "Top actors — TV", shows, (e) => e.cast.map(unlink), undefined, undefined, plugin);
+	if (seenShows.length) {
+		tally(charts, "Top creators", seenShows, (e) => e.creators.map(unlink), undefined, undefined, plugin);
+		tally(charts, "Top actors — TV", seenShows, (e) => e.cast.map(unlink), undefined, undefined, plugin);
 	}
 
-	tally(charts, "Genres", all, (e) => e.genres, 10, undefined, plugin);
-	ratedBy(charts, "Genres you rate highest", films, (e) => e.genres, 3, plugin);
-	tally(charts, "Top collections", all, (e) => (e.collection ? [e.collection] : []), undefined, undefined, plugin);
-	tally(charts, "Certifications", all, (e) => (e.certification ? [e.certification] : []), 8, 1, plugin);
+	tally(charts, "Genres", seenAll, (e) => e.genres, 10, undefined, plugin);
+	ratedBy(charts, "Genres you rate highest", seenFilms, (e) => e.genres, 3, plugin);
+	tally(charts, "Top collections", seenAll, (e) => (e.collection ? [e.collection] : []), undefined, undefined, plugin);
+	tally(charts, "Certifications", seenAll, (e) => (e.certification ? [e.certification] : []), 8, 1, plugin);
+	// Providers are the exception: "where can I stream the things in my
+	// library" is a practical question about the backlog too, not a statement
+	// about taste. The heading says so rather than leaving it inconsistent.
 	providerSplit(charts, all, plugin);
-	tally(charts, "Studios", all, (e) => e.productionCompanies, 6, undefined, plugin);
-	tally(charts, "Languages", all, (e) => (e.language ? [e.language] : []), 6, 1, plugin);
+	tally(charts, "Studios", seenAll, (e) => e.productionCompanies, 6, undefined, plugin);
+	tally(charts, "Languages", seenAll, (e) => (e.language ? [e.language] : []), 6, 1, plugin);
 
 	// Release years, distinct from "films per year" above: that counts when you
 	// watched, this counts when the film came out. A run of 2003s says
@@ -343,7 +361,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	tally(
 		charts,
 		"Top release years",
-		all,
+		seenAll,
 		(e) => {
 			const y = e.year ?? e.firstAirYear;
 			return y ? [String(y)] : [];
@@ -425,7 +443,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	}
 
 	const decades = new Map<string, number>();
-	for (const e of all) {
+	for (const e of seenAll) {
 		const y = e.year ?? e.firstAirYear;
 		if (y) {
 			const d = `${Math.floor(y / 10) * 10}s`;
@@ -493,7 +511,7 @@ function providerSplit(el: HTMLElement, rows: Entry[], plugin?: ReelPlugin): voi
 		}))
 		.sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
 		.slice(0, 12);
-	bars(el, "Streaming on", data, "", plugin);
+	bars(el, "Streaming on — whole library", data, "", plugin);
 }
 
 function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?: ReelPlugin): void {
@@ -533,7 +551,7 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 			row.setAttr("role", "button");
 			row.setAttr("tabindex", "0");
 			row.setAttr("aria-label", d.go ? `Show ${d.label} only` : `Show titles matching ${d.label}`);
-			const open = d.go ?? (() => void plugin.openViewWithSearch(d.search ?? d.label));
+			const open = d.go ?? (() => void plugin.openViewWithSearch(d.search ?? d.label, "stats"));
 			row.addEventListener("click", open);
 			row.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {
