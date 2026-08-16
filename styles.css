@@ -4183,3 +4183,11 @@ input.reel-input {
 		letter-spacing: 0.05em;
 	}
 }
+
+/* Where you can actually watch it — from the payload already fetched for
+   the trailer, so it costs nothing extra. */
+.reel-preview-providers {
+	margin-top: 8px;
+	font-size: var(--font-ui-smaller);
+	line-height: 1.4;
+}

@@ -18,7 +18,7 @@ import type { DiscoverRow, TasteProfile } from "../discover";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { renderStars } from "./stars";
-import { trailerUrl } from "../extract";
+import { trailerUrl, providerNames } from "../extract";
 
 interface Filters {
 	genreId: number | null;
@@ -754,17 +754,31 @@ class PreviewSheet extends Modal {
 	private async loadTrailer(slot: HTMLElement, isTv: boolean): Promise<void> {
 		try {
 			const meta = isTv ? await this.plugin.tmdb.getShow(this.item.id) : await this.plugin.tmdb.getFilm(this.item.id);
+
 			const url = trailerUrl(meta.videos?.results);
-			if (!url) return;
-			const play = slot.createEl("a", {
-				cls: "reel-btn mod-cta reel-trailer-btn",
-				text: "▶  Watch trailer",
-				href: url,
-			});
-			play.setAttr("target", "_blank");
-			play.setAttr("rel", "noopener");
+			if (url) {
+				const play = slot.createEl("a", {
+					cls: "reel-btn mod-cta reel-trailer-btn",
+					text: "▶  Watch trailer",
+					href: url,
+				});
+				play.setAttr("target", "_blank");
+				play.setAttr("rel", "noopener");
+			}
+
+			// Where you can actually watch it, from the payload already
+			// fetched for the trailer — so this costs nothing extra. Doing it
+			// per card in the related strip would have meant one request per
+			// title; doing it here puts the answer exactly where the decision
+			// gets made, for free.
+			const providers = providerNames(meta["watch/providers"], this.plugin.settings.region);
+			if (providers.length) {
+				const box = slot.createDiv({ cls: "reel-preview-providers" });
+				box.createSpan({ cls: "reel-dim", text: "Streaming on " });
+				box.createSpan({ text: providers.slice(0, 4).join(", ") });
+			}
 		} catch {
-			/* no trailer is not worth interrupting the sheet for */
+			/* neither a trailer nor a provider list is worth interrupting for */
 		}
 	}
 

@@ -109,7 +109,7 @@ IMDb holds is a deep link at best.
 |---|---|---|
 | Related films strip | TMDB `recommendations` | **done** |
 | "More like this" cards with rating + rate button | TMDB `similar` | **partial** — no inline rate |
-| Watch options per card | TMDB `watch/providers` | **buildable** |
+| Watch options per card | TMDB `watch/providers` | **done** — in the preview sheet, from the trailer fetch, no extra request |
 | Top picks (personalised) | Reel Discover | **done** (own tab) |
 | Mentions (retailer/podcast logos) | Moviebase-specific partnerships | **blocked** |
 
@@ -153,10 +153,20 @@ Ranked by value per unit of work, given what is already fetched.
 Done: keywords, tagline, IMDb vote count, official site, Letterboxd,
 community reviews, and the content tab.
 
-Remaining, cheapest first:
+Remaining:
 
-1. **Watch options per related card** — needs a providers fetch per related
-   item, so it is by far the most expensive thing left.
+Nothing on the buildable list. Watch options landed in the preview sheet
+rather than on each related card: the sheet already fetches the detail
+payload for the trailer, and that payload carries providers — so the answer
+appears exactly where the decision is made, for no extra request. Per-card
+would have cost one request per title to say the same thing worse.
+
+Three items stay **partial**, each for a reason outside the plugin:
+
+- Trailer duration and a play overlay — TMDB returns a video key, not a length.
+- Popularity trend arrow — TMDB gives a popularity float, with no rank or delta.
+- A "99+ photos" count badge — the count only arrives with the images, and
+  fetching them eagerly is the cost the lazy Photos tab exists to avoid.
 
 Correction to an earlier estimate: the IMDb vote count was listed as "already
 fetched, not displayed". It was fetched by OMDb and then thrown away — never
