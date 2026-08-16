@@ -21,6 +21,8 @@ import { todayISO, yearOf } from "../util/dates";
 
 export class PersonSheet extends Modal {
 	private busy = false;
+	/** Title id → a still of this person in it, where TMDB has one. */
+	private stills = new Map<number, string>();
 
 	constructor(
 		private plugin: ReelPlugin,
@@ -52,6 +54,22 @@ export class PersonSheet extends Modal {
 		}
 		// The sheet may have been dismissed while the request was in flight.
 		if (!this.contentEl.isConnected) return;
+
+		// Stills of this person in each title, where TMDB has them. Fetched
+		// alongside rather than before: the filmography is useful without
+		// them, so it must not wait on a bonus that often returns nothing.
+		const tagged = await this.plugin.tmdb.getPersonTaggedImages(this.personId);
+		if (!this.contentEl.isConnected) return;
+
+		for (const img of tagged) {
+			const id = img.media?.id;
+			if (!id || !img.file_path) continue;
+			// Landscape only. A tagged portrait is usually a red-carpet photo
+			// rather than a frame from the title, and it crops badly into a
+			// wide card.
+			if ((img.aspect_ratio ?? 0) < 1.2) continue;
+			if (!this.stills.has(id)) this.stills.set(id, img.file_path);
+		}
 
 		this.contentEl.empty();
 		this.renderHead(person);
@@ -137,9 +155,18 @@ export class PersonSheet extends Modal {
 			card.setAttr("tabindex", "0");
 			card.toggleClass("is-mine", !!mine);
 
+			// A still of them in it beats the marketing poster here: on one
+			// person's filmography you are looking at their work, not choosing
+			// what to watch. Falls back to the poster wherever TMDB has no
+			// tagged image, which is often.
+			const still = this.stills.get(c.id);
 			const poster = card.createDiv({ cls: "reel-person-credit-poster" });
+			poster.toggleClass("is-still", !!still);
 			this.plugin.posters.attach(poster, {
-				posterUrl: this.plugin.tmdb.posterUrl(c.poster_path, "w342") ?? undefined,
+				posterUrl:
+					(still
+						? this.plugin.tmdb.posterUrl(still, "w300")
+						: this.plugin.tmdb.posterUrl(c.poster_path, "w342")) ?? undefined,
 				title: c.title ?? c.name ?? "",
 			});
 			// A tick rather than a colour alone, so "I own this" survives a

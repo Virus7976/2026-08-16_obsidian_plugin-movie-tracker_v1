@@ -18,6 +18,8 @@ interface Viewing {
 	date: string;
 	rating?: number;
 	rewatch: boolean;
+	/** "S1E4" for a series entry. Absent for films, which have no episode. */
+	episode?: string;
 }
 
 export function registerDiaryBlock(plugin: ReelPlugin): void {
@@ -48,7 +50,7 @@ function parseOptions(source: string): DiaryOptions {
 	return opts;
 }
 
-/** Flatten every film's watch history into one dated stream. */
+/** Flatten watch history — films and series alike — into one dated stream. */
 export function viewings(entries: Entry[], year?: number): Viewing[] {
 	const out: Viewing[] = [];
 	for (const entry of entries) {
@@ -56,6 +58,31 @@ export function viewings(entries: Entry[], year?: number): Viewing[] {
 			if (!w.date) continue;
 			if (year && !w.date.startsWith(String(year))) continue;
 			out.push({ entry, date: w.date, rating: w.rating ?? undefined, rewatch: w.rewatch === true });
+		}
+
+		// Series had no way into the Diary at all.
+		//
+		// Only films keep a dated watch history. A series records progress as
+		// a range of episode numbers per season, which carries no dates, so a
+		// week of television left the Diary completely empty — reading as if
+		// the app had lost it rather than never having stored it.
+		//
+		// `last_watched` is the one date a series does keep, set whenever you
+		// tick an episode. So: one entry per series, not one per episode.
+		// Inventing dates for the other twenty episodes of a season you binged
+		// would be fabricating history, and a wrong date is worse than a
+		// missing one in the view whose entire job is recording when.
+		if (entry.type === "tv" && entry.lastWatched?.date) {
+			const date = entry.lastWatched.date;
+			if (!year || date.startsWith(String(year))) {
+				out.push({
+					entry,
+					date,
+					rating: entry.rating ?? undefined,
+					rewatch: false,
+					episode: `S${entry.lastWatched.season}E${entry.lastWatched.episode}`,
+				});
+			}
 		}
 	}
 	return out.sort((a, b) => b.date.localeCompare(a.date));
@@ -125,6 +152,9 @@ class DiaryBlock extends MarkdownRenderChild {
 			if (v.entry.year) title.createSpan({ cls: "reel-dim", text: ` ${v.entry.year}` });
 
 			const meta = body.createDiv({ cls: "reel-diary-meta" });
+			// The episode reads first: for a series, "S1E4" is the entry, and
+			// the title alone would make three weeks of a run look identical.
+			if (v.episode) meta.createSpan({ cls: "reel-badge", text: v.episode });
 			if (v.rating != null) renderStarsStatic(meta, v.rating);
 			if (v.rewatch) meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
 			meta.createSpan({ cls: "reel-dim", text: prettyDate(v.date) });

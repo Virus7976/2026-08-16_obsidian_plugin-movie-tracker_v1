@@ -163,6 +163,16 @@ export interface TmdbPerson {
 	};
 }
 
+/**
+ * An image a person is tagged in. `media` identifies the title it came from,
+ * which is the only reason this is more useful than a plain headshot.
+ */
+export interface TmdbTaggedImage {
+	file_path?: string;
+	aspect_ratio?: number;
+	media?: { id?: number; media_type?: string };
+}
+
 export interface TmdbPersonCredit extends TmdbSearchResult {
 	character?: string;
 	job?: string;
