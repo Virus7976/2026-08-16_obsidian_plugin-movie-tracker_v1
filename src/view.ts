@@ -166,8 +166,10 @@ export class ReelView extends ItemView {
 		this.bodyEl.empty();
 
 		if (this.detail) {
-			// The detail screen owns the whole body; filters and tabs would
-			// only be noise while you're looking at one title.
+			// Repaints are driven by the library 'changed' event, which fires
+			// once metadataCache has reparsed the file — so this is the moment
+			// a re-read is guaranteed to return what was just written.
+			this.detail.syncFromIndex();
 			this.detail.render(this.bodyEl);
 			return;
 		}

@@ -11,7 +11,7 @@
  * without a second tap, so the interaction is one thumb and one decision.
  */
 
-import { Notice, TFile } from "obsidian";
+import { Notice, Platform, TFile } from "obsidian";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { redact } from "../secrets";
@@ -106,6 +106,52 @@ export class RateScreen {
 
 		/* ---- the card --------------------------------------------------- */
 		const card = container.createDiv({ cls: "reel-rate-card" });
+
+		/**
+		 * Keyboard shortcuts, bound to the card rather than the document — the
+		 * listener dies with the element, so there is nothing to clean up and
+		 * no chance of it firing while you're typing somewhere else.
+		 *
+		 * 1–5 rate whole stars, shift+1–5 add a half.
+		 */
+		card.setAttr("tabindex", "0");
+		card.addEventListener("keydown", async (ev) => {
+			const file = this.fileFor(entry);
+			if (!file) return;
+
+			if (ev.key >= "1" && ev.key <= "5") {
+				ev.preventDefault();
+				const whole = Number(ev.key);
+				const value = ev.shiftKey ? whole - 0.5 : whole;
+				await this.plugin.notes.setRating(file, value);
+				this.handled.add(entry.path);
+				new Notice(`${entry.title}: ${value}★`);
+				this.advance(container, rows.length);
+				return;
+			}
+
+			switch (ev.key) {
+				case "ArrowRight":
+				case "s":
+					ev.preventDefault();
+					this.skipped.add(entry.path);
+					this.render(container);
+					break;
+				case "ArrowLeft":
+					ev.preventDefault();
+					this.index = Math.max(0, this.index - 1);
+					this.render(container);
+					break;
+				case "l":
+					ev.preventDefault();
+					await this.plugin.notes.toggleLiked(file);
+					this.render(container);
+					break;
+			}
+		});
+		// Focus the card so the shortcuts work without a click first. Only on
+		// desktop — focusing on a phone raises the keyboard over the poster.
+		if (!Platform.isMobile) window.setTimeout(() => card.focus(), 0);
 
 		const posterEl = card.createDiv({ cls: "reel-rate-poster" });
 		const src = this.plugin.posters.resourcePath(entry.poster);

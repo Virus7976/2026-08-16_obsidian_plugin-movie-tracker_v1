@@ -59,17 +59,22 @@ export class DetailScreen {
 	}
 
 	/**
-	 * Re-read from the index, then repaint.
+	 * Adopt the latest indexed version of this entry.
 	 *
-	 * Only safe once `metadataCache` has caught up with the write. Calling it
-	 * immediately after `processFrontMatter` reads the *previous* frontmatter
-	 * and paints stale values over the fresh ones — which is exactly why a
-	 * freshly rated episode appeared unrated.
+	 * Called by the view when the library reports a change — which happens
+	 * *after* `metadataCache` has reparsed the file. That event is the only
+	 * reliable signal that a re-read will return the values we just wrote;
+	 * this used to be a 120ms timer, which is a guess that quietly fails on a
+	 * slow disk or a large vault.
 	 */
-	private refreshFromIndex(): void {
+	syncFromIndex(): void {
 		const latest = this.plugin.library.byPath(this.entry.path);
 		if (latest) this.entry = latest;
-		this.rerender();
+	}
+
+	/** The path this screen is showing, so the view can tell if it still exists. */
+	get path(): string {
+		return this.entry.path;
 	}
 
 	render(container: HTMLElement): void {
@@ -284,7 +289,6 @@ export class DetailScreen {
 					if (!file) return;
 					await this.plugin.notes.markEpisode(file, next.season, next.episode);
 					new Notice(`S${next.season}E${next.episode} watched`);
-					window.setTimeout(() => this.refreshFromIndex(), 120);
 				});
 			}
 			act("Start a rewatch", false, async () => {
@@ -292,7 +296,6 @@ export class DetailScreen {
 				if (!file) return;
 				await this.plugin.notes.restartSeries(file, e.rating);
 				new Notice("Progress reset — previous run recorded");
-				window.setTimeout(() => this.refreshFromIndex(), 120);
 			});
 		}
 
@@ -305,7 +308,6 @@ export class DetailScreen {
 			try {
 				await this.plugin.notes.refreshMetadata(e);
 				new Notice("Metadata refreshed");
-				window.setTimeout(() => this.refreshFromIndex(), 200);
 			} catch (err) {
 				new Notice(`Reel: ${redact(err)}`);
 			}
@@ -396,7 +398,6 @@ export class DetailScreen {
 			if (!file || !episodes) return;
 			await this.plugin.notes.setSeasonRange(file, season, `1-${episodes.length}`);
 			new Notice(`Season ${season} marked watched`);
-			window.setTimeout(() => this.refreshFromIndex(), 120);
 		});
 		const clear = bulk.createEl("button", { cls: "reel-chip", text: "Clear" });
 		clear.addEventListener("click", async () => {
@@ -404,7 +405,6 @@ export class DetailScreen {
 			if (!file) return;
 			await this.plugin.notes.setSeasonRange(file, season, "");
 			new Notice(`Season ${season} cleared`);
-			window.setTimeout(() => this.refreshFromIndex(), 120);
 		});
 
 		for (const ep of episodes) {

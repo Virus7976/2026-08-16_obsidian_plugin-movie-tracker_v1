@@ -2391,3 +2391,20 @@ input.reel-input {
 		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 	}
 }
+
+/* Rate mode is keyboard-driven on desktop, so it needs a visible focus ring
+   — and one that doesn't look like an error state. */
+.reel-rate-card:focus-visible {
+	outline: 2px solid var(--interactive-accent, #7c3aed);
+	outline-offset: 3px;
+}
+
+.reel-rate-card:focus {
+	outline: none;
+}
+
+.reel-rate-hint {
+	text-align: center;
+	color: var(--text-faint);
+	font-size: 11px;
+}
