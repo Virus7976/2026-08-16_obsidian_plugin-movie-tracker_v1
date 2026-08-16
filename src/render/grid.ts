@@ -7,6 +7,7 @@
  */
 
 import { Notice, TFile } from "obsidian";
+import { redact } from "../secrets";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { renderStarsStatic } from "../ui/stars";
@@ -79,7 +80,14 @@ function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry, onSelect?
 			return;
 		}
 		const file = plugin.app.vault.getAbstractFileByPath(entry.path);
-		if (file instanceof TFile) plugin.app.workspace.getLeaf(false).openFile(file);
+		// void: opening a note is fire-and-forget here, but an unhandled
+		// rejection would otherwise surface as a console error with no context.
+		if (file instanceof TFile) {
+			void plugin.app.workspace
+				.getLeaf(false)
+				.openFile(file)
+				.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
+		}
 	});
 }
 

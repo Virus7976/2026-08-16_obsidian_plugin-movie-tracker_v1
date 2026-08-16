@@ -630,11 +630,6 @@ export class NoteWriter {
 	}
 }
 
-/** One decimal place — an average of half-star ratings needs no more. */
-function round1(n: number): number {
-	return Math.round(n * 10) / 10;
-}
-
 /** Nullable-to-undefined, since TMDB returns `null` for a missing imdb_id. */
 function str(value: unknown): string | undefined {
 	if (value == null) return undefined;

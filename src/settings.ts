@@ -292,8 +292,13 @@ export class ReelSettingTab extends PluginSettingTab {
 		if (store.hasStoredKey) {
 			new Setting(el)
 				.setName("Remove all keys")
-				.addButton((b) =>
-					b.setDestructive().setButtonText("Remove all").onClick(async () => {
+				.addButton((b) => {
+					// Not setDestructive(): that is @since 1.13.0, and raising
+					// minAppVersion from 1.7.2 would lock out five minor
+					// versions of users to colour one button. The plugin's own
+					// danger class is already themed the same way.
+					b.buttonEl.addClass("reel-btn-danger");
+					return b.setButtonText("Remove all").onClick(async () => {
 						// Marked destructive since it was written, and yet it
 						// fired on one tap.
 						const ok = await confirm(this.app, {
@@ -306,8 +311,8 @@ export class ReelSettingTab extends PluginSettingTab {
 						await store.clear();
 						new Notice("Reel: keys removed.");
 						this.display();
-					})
-				);
+					});
+				});
 		}
 
 		if (this.plugin.settings.keyMode === "plain") {

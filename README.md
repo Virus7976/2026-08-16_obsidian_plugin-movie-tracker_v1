@@ -37,7 +37,9 @@ watched:
   - {date: 2025-01-02, rating: 5, rewatch: true}
 ---
 
-Your review goes here, as plain markdown, below the card.
+## 11 March 2024 · ★★★★½
+
+The desert holds up. Second viewing and the sound design still does most of the work.
 ```
 
 The `watched` array is what makes rewatches work and what a diary view flattens over. It's append-only — logging a rewatch never rewrites history.
@@ -103,7 +105,7 @@ Everything about one title, and everything editable in place:
 
 Rows of posters built from what you've rated: **"Because you liked X"** from
 TMDB's recommendations, then trending, your top genre, acclaimed titles you've
-missed, and what's coming soon. Nothing already in your library appears, and
+missed, and upcoming releases. Nothing already in your library appears, and
 nothing you've dismissed.
 
 Every card carries its three answers inline — **+** to your watchlist, **✓**
