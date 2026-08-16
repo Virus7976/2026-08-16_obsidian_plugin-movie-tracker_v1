@@ -10,6 +10,15 @@
  * than a deeper fake.
  */
 
+/**
+ * Obsidian runs in a renderer where `window` exists; Node does not have one.
+ * The plugin deliberately uses `window.crypto` rather than `globalThis.crypto`
+ * so it keeps working in popout windows, so the test environment has to offer
+ * the same shape rather than the plugin bending to suit the tests.
+ */
+const g = globalThis as unknown as { window?: unknown };
+if (typeof g.window === "undefined") g.window = globalThis;
+
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
 	return Buffer.from(new Uint8Array(buffer)).toString("base64");
 }

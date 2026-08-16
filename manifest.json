@@ -1,9 +1,9 @@
 {
   "id": "reel",
   "name": "Reel",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "minAppVersion": "1.7.2",
-  "description": "Log films and series with TMDB metadata. Poster library, reviews, episode ratings, content filtering, Up Next and stats \u2014 all computed from frontmatter. Built for mobile.",
+  "description": "Log films and series with TMDB metadata. Poster library, reviews, episode ratings, content filtering, Up Next and stats — all computed from frontmatter. Built for mobile.",
   "author": "Virus7976",
   "authorUrl": "https://github.com/Virus7976",
   "isDesktopOnly": false
