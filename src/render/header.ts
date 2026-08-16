@@ -72,7 +72,7 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 
 	/* Poster */
 	const posterEl = card.createDiv({ cls: "reel-header-poster" });
-	const src = plugin.posters.resourcePath(entry.poster) ?? plugin.tmdb.posterUrl(null);
+	const src = plugin.posters.displayUrl(entry);
 	if (src) {
 		const img = posterEl.createEl("img", { attr: { src, alt: `${entry.title} poster`, loading: "lazy" } });
 		img.addEventListener("error", () => {

@@ -64,6 +64,18 @@ export class PosterStore {
 		return file instanceof TFile ? this.plugin.app.vault.getResourcePath(file) : null;
 	}
 
+	/**
+	 * The best available image for an entry.
+	 *
+	 * A local copy first, then whatever remote URL an import left behind. Notes
+	 * converted from another tracker carry `poster_url` and no local file, so
+	 * without this fallback an imported library is a wall of grey placeholders
+	 * until the backfill runs.
+	 */
+	displayUrl(entry: { poster?: string; posterUrl?: string }): string | null {
+		return this.resourcePath(entry.poster) ?? entry.posterUrl ?? null;
+	}
+
 	private async ensureFolder(): Promise<void> {
 		const vault = this.plugin.app.vault;
 		const parts = this.folder.split("/").filter(Boolean);

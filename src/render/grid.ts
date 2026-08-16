@@ -97,7 +97,7 @@ export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entr
 		cell.setAttr("aria-label", entry.title);
 
 		const posterEl = cell.createDiv({ cls: "reel-cell-poster" });
-		const src = plugin.posters.resourcePath(entry.poster);
+		const src = plugin.posters.displayUrl(entry);
 		if (src) {
 			const img = posterEl.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
 			img.addEventListener("error", () => {
@@ -142,7 +142,7 @@ export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]
 
 		if (!compact) {
 			const thumb = row.createDiv({ cls: "reel-row-thumb" });
-			const src = plugin.posters.resourcePath(entry.poster);
+			const src = plugin.posters.displayUrl(entry);
 			if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
 			else placeholder(thumb, entry);
 		}

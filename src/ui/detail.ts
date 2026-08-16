@@ -103,7 +103,7 @@ export class DetailScreen {
 		const hero = page.createDiv({ cls: "reel-hero" });
 
 		const posterEl = hero.createDiv({ cls: "reel-hero-poster" });
-		const src = this.plugin.posters.resourcePath(e.poster);
+		const src = this.plugin.posters.displayUrl(e);
 		if (src) posterEl.createEl("img", { attr: { src, alt: "" } });
 		else {
 			posterEl.addClass("is-empty");
@@ -311,6 +311,37 @@ export class DetailScreen {
 			} catch (err) {
 				new Notice(`Reel: ${redact(err)}`);
 			}
+		});
+
+		// Removing a title meant leaving the plugin and deleting the note by
+		// hand. It takes two taps rather than one, and it goes to whatever
+		// trash Obsidian is configured to use rather than vanishing: a rating
+		// you can't undo is an annoyance, a note you can't recover is not.
+		const remove = actions.createEl("button", { cls: "reel-btn reel-btn-danger", text: "Remove" });
+		remove.addEventListener("click", () => {
+			if (remove.dataset.confirming !== "true") {
+				remove.dataset.confirming = "true";
+				remove.setText("Delete note?");
+				// Reverts on its own, so a stray tap doesn't leave a live
+				// delete button sitting there waiting to be hit.
+				window.setTimeout(() => {
+					if (!remove.isConnected) return;
+					remove.dataset.confirming = "false";
+					remove.setText("Remove");
+				}, 4000);
+				return;
+			}
+			void (async () => {
+				const file = this.file;
+				if (!file) return;
+				try {
+					await this.plugin.app.fileManager.trashFile(file);
+					new Notice(`${e.title} moved to trash`);
+					this.onBack();
+				} catch (err) {
+					new Notice(`Reel: ${redact(err)}`);
+				}
+			})();
 		});
 	}
 

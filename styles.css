@@ -2943,3 +2943,23 @@ input.reel-input {
 		min-height: 38px;
 	}
 }
+
+/* A destructive action shouldn't look like the three beside it. */
+.reel-btn-danger {
+	color: var(--text-error, #dc2626);
+	border-color: var(--background-modifier-border);
+}
+
+.reel-btn-danger[data-confirming="true"] {
+	background: var(--text-error, #dc2626);
+	color: var(--text-on-accent, #fff);
+	border-color: transparent;
+	font-weight: 700;
+}
+
+.reel-rate-hint {
+	text-align: center;
+	color: var(--text-faint);
+	font-size: 11px;
+	padding-top: 4px;
+}

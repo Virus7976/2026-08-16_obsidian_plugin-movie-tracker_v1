@@ -202,9 +202,11 @@ export class DiscoverEngine {
 	}
 
 	/**
-	 * Remove titles already in the library, duplicates, and anything your
-	 * content policy hides. Suggesting something you've filtered out is worse
-	 * than suggesting nothing.
+	 * Remove titles already in the library, duplicates, dismissals, and
+	 * anything without a poster — a poster-less card is a grey box.
+	 *
+	 * Not a content filter: see the note at the top of this file for why that
+	 * has to happen at the source.
 	 */
 	filterOut(items: TmdbSearchResult[]): TmdbSearchResult[] {
 		const seen = new Set<number>();

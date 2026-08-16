@@ -241,7 +241,7 @@ export class RateScreen {
 		if (!Platform.isMobile) window.setTimeout(() => card.focus(), 0);
 
 		const posterEl = card.createDiv({ cls: "reel-rate-poster" });
-		const src = this.plugin.posters.resourcePath(entry.poster);
+		const src = this.plugin.posters.displayUrl(entry);
 		if (src) posterEl.createEl("img", { attr: { src, alt: "" } });
 		else {
 			posterEl.addClass("is-empty");
@@ -309,6 +309,14 @@ export class RateScreen {
 				this.handled.add(entry.path);
 				new Notice(`${entry.title} marked watched`);
 				this.advance(container, rows.length);
+			});
+		}
+
+		// Shortcuts nobody is told about may as well not exist.
+		if (!Platform.isMobile) {
+			container.createDiv({
+				cls: "reel-rate-hint",
+				text: "1–5 to rate · shift for halves · ← → to move · s skip · l like",
 			});
 		}
 

@@ -143,12 +143,6 @@ export class TmdbClient {
 	}
 
 	/**
-	 * `append_to_response` is what keeps this to one request. Credits, keywords,
-	 * videos, certifications and providers all arrive in the same payload —
-	 * five extra endpoints' worth of data for zero extra round trips, which
-	 * matters on a phone far more than it does on a desktop.
-	 */
-	/**
 	 * Titles you haven't seen — the input to Discover.
 	 *
 	 * Cached like anything else, so flicking between the queues doesn't spend a
@@ -196,13 +190,25 @@ export class TmdbClient {
 		genreId?: number;
 		decade?: number;
 		minRating?: number;
+		page?: number;
 	}): Promise<TmdbSearchResult[]> {
 		const params: Record<string, string> = {
 			sort_by: "popularity.desc",
 			// Without a vote floor the results are dominated by obscure titles
 			// with a single perfect score, which reads as broken.
 			"vote_count.gte": "200",
+			include_adult: "false",
 		};
+
+		// Certification can only be filtered at the source: discover results
+		// carry no certification field, so there is nothing to filter locally
+		// without a detail request per title. TMDB will do it for us, but only
+		// for films and only with a region.
+		const maxCert = this.plugin.settings.maxCertification;
+		if (maxCert && opts.type === "movie") {
+			params.certification_country = this.plugin.settings.region;
+			params["certification.lte"] = maxCert;
+		}
 		if (opts.genreId) params.with_genres = String(opts.genreId);
 		if (opts.minRating) params["vote_average.gte"] = String(opts.minRating);
 		if (opts.decade) {
@@ -217,7 +223,10 @@ export class TmdbClient {
 			}
 		}
 
-		const key = `disc-${opts.type}-${opts.genreId ?? 0}-${opts.decade ?? 0}-${opts.minRating ?? 0}`;
+		// The cache key has to include the certification limit, or changing it
+		// would return the previous, unfiltered results.
+		const key = `disc-${opts.type}-${opts.genreId ?? 0}-${opts.decade ?? 0}-${opts.minRating ?? 0}-${maxCert ?? "any"}-p${opts.page ?? 1}`;
+		if (opts.page && opts.page > 1) params.page = String(opts.page);
 		const data = await this.cached(key, () =>
 			this.request<{ results?: TmdbSearchResult[] }>(`/discover/${opts.type}`, params)
 		);
@@ -234,6 +243,12 @@ export class TmdbClient {
 		return data.genres ?? [];
 	}
 
+	/**
+	 * `append_to_response` is what keeps this to one request. Credits, keywords,
+	 * videos, certifications and providers all arrive in the same payload —
+	 * five extra endpoints' worth of data for zero extra round trips, which
+	 * matters on a phone far more than it does on a desktop.
+	 */
 	async getFilm(id: number): Promise<TmdbFilm> {
 		return this.cached(
 			`movie-${id}`,

@@ -117,7 +117,7 @@ class DiaryBlock extends MarkdownRenderChild {
 			row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
 
 			const thumb = row.createDiv({ cls: "reel-diary-thumb" });
-			const src = this.plugin.posters.resourcePath(v.entry.poster);
+			const src = this.plugin.posters.displayUrl(v.entry);
 			if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
 			else {
 				thumb.addClass("is-empty");

@@ -90,8 +90,12 @@ class UpNextPainter {
 		el.empty();
 		if (this.heading) el.createDiv({ cls: "reel-block-title", text: "Up next" });
 
-		let rows = this.plugin.visible(this.plugin.library.inProgress());
-		if (this.limit) rows = rows.slice(0, this.limit);
+		const everything = this.plugin.visible(this.plugin.library.inProgress());
+		// Up Next answers "what do I watch tonight", so a long tail of shows
+		// you last touched months ago is noise. The rest stay one tap away.
+		const cap = this.limit ?? 12;
+		let rows = everything.slice(0, cap);
+		const hidden = everything.length - rows.length;
 
 		if (!rows.length) {
 			el.createDiv({ cls: "reel-empty", text: "Nothing in progress. Add a series and tick an episode." });
@@ -99,12 +103,21 @@ class UpNextPainter {
 		}
 
 		const list = el.createDiv({ cls: "reel-upnext" });
+		if (hidden > 0) {
+			const more = el.createDiv({ cls: "reel-block-count" });
+			const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${hidden} more` });
+			btn.addEventListener("click", () => {
+				rows = everything;
+				this.limit = everything.length;
+				this.render();
+			});
+		}
 		for (const entry of rows) {
 			const next = this.plugin.upNext.nextFor(entry);
 			const row = list.createDiv({ cls: "reel-upnext-row" });
 
 			const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
-			const src = this.plugin.posters.resourcePath(entry.poster);
+			const src = this.plugin.posters.displayUrl(entry);
 			if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
 			else {
 				thumb.addClass("is-empty");

@@ -98,6 +98,12 @@ export class ReelView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
+		// Reopen where you left off — closing the view to check a note and
+		// coming back to the Library tab instead of Stats is a small, constant
+		// annoyance.
+		const saved = this.plugin.settings.lastTab as Tab;
+		if (TABS.some((t) => t.id === saved)) this.tab = saved;
+
 		this.contentEl.empty();
 		this.contentEl.addClass("reel-view");
 		this.build();
@@ -150,6 +156,8 @@ export class ReelView extends ItemView {
 			btn.createSpan({ cls: "reel-tab-label", text: t.label });
 			btn.addEventListener("click", () => {
 				this.tab = t.id;
+				this.plugin.settings.lastTab = t.id;
+				void this.plugin.saveSettings();
 				this.paint();
 			});
 			btn.dataset.tab = t.id;
@@ -393,7 +401,7 @@ export class ReelView extends ItemView {
 			row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
 
 			const thumb = row.createDiv({ cls: "reel-diary-thumb" });
-			const src = this.plugin.posters.resourcePath(v.entry.poster);
+			const src = this.plugin.posters.displayUrl(v.entry);
 			if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
 			else {
 				thumb.addClass("is-empty");

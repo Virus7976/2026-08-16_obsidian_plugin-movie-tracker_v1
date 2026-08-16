@@ -245,6 +245,7 @@ function toEntry(file: TFile, fm: Record<string, unknown>, seriesFolder: string)
 		nextAirDate: normaliseDate(fm.next_air_date),
 		genres: toStringArray(fm.genres),
 		poster: fm.poster ? String(fm.poster) : undefined,
+		posterUrl: fm.poster_url ? String(fm.poster_url) : undefined,
 		tmdbRating: numberOrUndef(fm.tmdb_rating),
 		status: String(fm.status ?? (type === "tv" ? "watching" : "watched")),
 		rating: numberOrUndef(fm.rating),

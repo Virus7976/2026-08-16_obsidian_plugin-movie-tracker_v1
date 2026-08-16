@@ -60,6 +60,8 @@ export interface Entry {
 	/** Both */
 	genres: string[];
 	poster?: string;
+	/** Remote poster from an import, until the backfill stores a local copy. */
+	posterUrl?: string;
 	tmdbRating?: number;
 	status: string;
 	rating?: number;

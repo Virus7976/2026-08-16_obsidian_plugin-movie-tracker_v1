@@ -36,6 +36,8 @@ export interface ReelSettings {
 	lastEpisodeCheck: string;
 	/** TMDB ids dismissed in Discover. "Not interested" has to stick. */
 	dismissedIds: number[];
+	/** The Reel view reopens where you left it. */
+	lastTab: string;
 
 	/* Content policy — see content.ts for what the data can and can't do */
 	hideFlags: string[];
@@ -77,6 +79,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dailyNoteFolder: "",
 	lastEpisodeCheck: "",
 	dismissedIds: [],
+	lastTab: "library",
 
 	hideFlags: [],
 	maxCertification: null,
@@ -549,6 +552,21 @@ export class ReelSettingTab extends PluginSettingTab {
 					this.plugin.settings.openNoteAfterCreate = v;
 					await this.plugin.saveSettings();
 				})
+			);
+
+		new Setting(el)
+			.setName("Dismissed suggestions")
+			.setDesc("Titles you marked 'not interested' in Discover. Clearing brings them back.")
+			.addButton((b) =>
+				b
+					.setButtonText(`Clear ${this.plugin.settings.dismissedIds.length}`)
+					.setDisabled(this.plugin.settings.dismissedIds.length === 0)
+					.onClick(async () => {
+						this.plugin.settings.dismissedIds = [];
+						await this.plugin.saveSettings();
+						new Notice("Reel: dismissed suggestions cleared.");
+						this.display();
+					})
 			);
 
 		new Setting(el)
