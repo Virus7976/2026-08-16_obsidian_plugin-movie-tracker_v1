@@ -16,8 +16,6 @@ import { renderStarsStatic } from "../ui/stars";
 import { LogSheet } from "../ui/logSheet";
 import { SeasonSheet } from "../ui/seasonSheet";
 
-const rendered = new WeakSet<HTMLElement>();
-
 export function registerHeaderProcessor(plugin: ReelPlugin): void {
 	plugin.registerMarkdownPostProcessor((el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
 		if (!ctx.sourcePath) return;
@@ -31,8 +29,13 @@ export function registerHeaderProcessor(plugin: ReelPlugin): void {
 		// Anchor to the preview section so the card sits above everything, not
 		// above whichever paragraph happened to render first.
 		const section = el.closest(".markdown-preview-section") ?? el.parentElement;
-		if (!(section instanceof HTMLElement) || rendered.has(section)) return;
-		rendered.add(section);
+		if (!(section instanceof HTMLElement)) return;
+
+		// Ask the DOM whether a card is already there, rather than remembering
+		// the element in a WeakSet. Obsidian re-renders a section while you
+		// type and wipes its children; a remembered element would stay
+		// "already done" forever and leave the note card-less until reload.
+		if (section.querySelector(":scope > .reel-header")) return;
 
 		const card = createDiv({ cls: "reel-header" });
 		buildCard(plugin, card, entry, file);

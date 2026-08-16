@@ -15,13 +15,16 @@ import { registerUpNextBlock, UpNextService } from "./render/upnext";
 import { redact } from "./secrets";
 import { todayISO } from "./util/dates";
 
-const REEL_ICON = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-<circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" stroke-width="8"/>
+/**
+ * `addIcon` takes the *contents* of an SVG, not an `<svg>` element — Obsidian
+ * supplies the wrapper itself, on a 0 0 100 100 viewBox. Passing a full element
+ * nests one svg inside another, which renders at the wrong size.
+ */
+const REEL_ICON = `<circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" stroke-width="8"/>
 <circle cx="50" cy="30" r="9" fill="currentColor"/>
 <circle cx="50" cy="70" r="9" fill="currentColor"/>
 <circle cx="30" cy="50" r="9" fill="currentColor"/>
-<circle cx="70" cy="50" r="9" fill="currentColor"/>
-</svg>`;
+<circle cx="70" cy="50" r="9" fill="currentColor"/>`;
 
 const NEW_EPISODE_CHECK_KEY = "reel-last-episode-check";
 
