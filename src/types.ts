@@ -17,6 +17,14 @@ export interface SeasonProgress {
 	n: number;
 	watched?: string;
 	rating?: number;
+	total?: number;
+	/**
+	 * Per-episode ratings, keyed by episode number: `{3: 5, 7: 4.5}`. A sparse
+	 * map rather than an array, because you rate a handful of standouts, not
+	 * all 62 — and a sparse YAML map stays readable where a mostly-null array
+	 * would not.
+	 */
+	episode_ratings?: Record<string, number>;
 }
 
 export interface LastWatched {
@@ -56,6 +64,22 @@ export interface Entry {
 	status: string;
 	rating?: number;
 	liked?: boolean;
+	/** Rich metadata */
+	cast: string[];
+	overview?: string;
+	trailer?: string;
+	budget?: number;
+	revenue?: number;
+	collection?: string;
+	productionCompanies: string[];
+	providers: string[];
+	language?: string;
+	popularity?: number;
+	certification?: string;
+	contentFlags: string[];
+	lists: string[];
+	/** File creation time, so `sort: added` means something. */
+	added: number;
 }
 
 /* ---------- TMDB response subsets (only the fields we actually read) ---------- */
@@ -77,6 +101,17 @@ export interface TmdbCrew {
 	name: string;
 }
 
+export interface TmdbVideo {
+	site?: string;
+	type?: string;
+	key?: string;
+	official?: boolean;
+}
+
+export interface TmdbProviderBlock {
+	results?: Record<string, { flatrate?: { provider_name: string }[]; free?: { provider_name: string }[] }>;
+}
+
 export interface TmdbFilm {
 	id: number;
 	title: string;
@@ -85,8 +120,18 @@ export interface TmdbFilm {
 	genres?: { id: number; name: string }[];
 	poster_path?: string | null;
 	vote_average?: number;
+	popularity?: number;
+	original_language?: string;
 	overview?: string;
+	budget?: number;
+	revenue?: number;
+	belongs_to_collection?: { name?: string } | null;
+	production_companies?: { name: string }[];
 	credits?: { crew?: TmdbCrew[]; cast?: { name: string }[] };
+	keywords?: { keywords?: { name: string }[] };
+	videos?: { results?: TmdbVideo[] };
+	release_dates?: unknown;
+	"watch/providers"?: TmdbProviderBlock;
 }
 
 export interface TmdbSeason {
@@ -110,7 +155,14 @@ export interface TmdbShow {
 	seasons?: TmdbSeason[];
 	next_episode_to_air?: { air_date?: string; season_number?: number; episode_number?: number } | null;
 	created_by?: { name: string }[];
-	aggregate_credits?: { crew?: TmdbCrew[] };
+	aggregate_credits?: { crew?: TmdbCrew[]; cast?: { name: string }[] };
+	popularity?: number;
+	original_language?: string;
+	production_companies?: { name: string }[];
+	keywords?: { results?: { name: string }[] };
+	videos?: { results?: TmdbVideo[] };
+	content_ratings?: unknown;
+	"watch/providers"?: TmdbProviderBlock;
 }
 
 export interface TmdbEpisode {

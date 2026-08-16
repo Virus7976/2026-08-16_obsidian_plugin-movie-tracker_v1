@@ -15,6 +15,9 @@ import { rangeCount } from "../util/ranges";
 import { renderStarsStatic } from "../ui/stars";
 import { LogSheet } from "../ui/logSheet";
 import { SeasonSheet } from "../ui/seasonSheet";
+import { ListPicker } from "../ui/listPicker";
+import { unlink } from "../library";
+import { ContentFlag, FLAG_LABELS } from "../content";
 
 export function registerHeaderProcessor(plugin: ReelPlugin): void {
 	plugin.registerMarkdownPostProcessor((el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
@@ -100,6 +103,12 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 	}
 	if (entry.tmdbRating) facts.createSpan({ cls: "reel-dim", text: `TMDB ${entry.tmdbRating}` });
 
+	if (entry.cast.length) {
+		const cast = body.createDiv({ cls: "reel-header-cast" });
+		cast.createSpan({ cls: "reel-dim", text: "Cast: " });
+		cast.createSpan({ text: entry.cast.slice(0, 5).map(unlink).join(", ") });
+	}
+
 	if (entry.genres.length) {
 		const genres = body.createDiv({ cls: "reel-header-genres" });
 		entry.genres.slice(0, 4).forEach((g) => genres.createSpan({ cls: "reel-chip static", text: g }));
@@ -109,6 +118,26 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 	renderStarsStatic(ratingRow, entry.rating);
 	if (entry.liked) ratingRow.createSpan({ cls: "reel-heart is-on static", text: "♥" });
 	ratingRow.createSpan({ cls: `reel-badge status-${entry.status}`, text: entry.status });
+	if (entry.certification) ratingRow.createSpan({ cls: "reel-badge cert", text: entry.certification });
+
+	if (entry.contentFlags.length) {
+		const flags = body.createDiv({ cls: "reel-header-flags" });
+		flags.createSpan({ cls: "reel-dim", text: "Contains: " });
+		for (const f of entry.contentFlags) {
+			flags.createSpan({ cls: "reel-badge flag", text: FLAG_LABELS[f as ContentFlag] ?? f });
+		}
+	}
+
+	if (entry.providers.length) {
+		const p = body.createDiv({ cls: "reel-header-facts" });
+		p.createSpan({ cls: "reel-dim", text: "Streaming: " });
+		p.createSpan({ text: entry.providers.slice(0, 4).join(", ") });
+	}
+
+	if (entry.lists.length) {
+		const l = body.createDiv({ cls: "reel-header-genres" });
+		entry.lists.forEach((name) => l.createSpan({ cls: "reel-chip static", text: name }));
+	}
 
 	/* Watch history / season strip */
 	if (entry.type === "film") {
@@ -157,6 +186,12 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 			}, true);
 		}
 		act("Edit rating", () => new LogSheet(plugin.app, plugin, { file, entry }).open());
+	}
+
+	act("Lists", () => new ListPicker(plugin.app, plugin, entry, file).open());
+
+	if (entry.trailer) {
+		act("Trailer", () => window.open(entry.trailer, "_blank"));
 	}
 
 	act("Refresh from TMDB", async () => {

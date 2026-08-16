@@ -1088,3 +1088,343 @@ input.reel-input {
 	background: var(--background-modifier-error);
 	color: var(--text-normal);
 }
+
+/* ================================================================== *
+ * v0.2 — view, diary, search, content flags, episode ratings
+ * ================================================================== */
+
+/* ---------------- the Reel view ---------------- */
+
+.reel-view {
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+}
+
+.reel-view-header {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 10px 12px calc(10px) 12px;
+	padding-left: max(12px, env(safe-area-inset-left));
+	padding-right: max(12px, env(safe-area-inset-right));
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.reel-search-wrap {
+	position: relative;
+	flex: 1;
+	display: flex;
+	align-items: center;
+}
+
+.reel-search-icon {
+	position: absolute;
+	left: 10px;
+	color: var(--text-faint);
+	display: flex;
+	pointer-events: none;
+}
+
+.reel-search-input {
+	margin-bottom: 0 !important;
+	padding-left: 34px !important;
+	padding-right: 34px !important;
+}
+
+/* The native search clear affordance is tiny and inconsistent across
+   platforms, so it's suppressed in favour of a real 44px target. */
+.reel-search-input::-webkit-search-cancel-button {
+	display: none;
+}
+
+.reel-search-clear {
+	position: absolute;
+	right: 2px;
+	width: 32px;
+	height: 32px;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.reel-add-btn {
+	flex: 0 0 auto;
+	min-width: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 0 14px;
+}
+
+/* Tab bar. On a phone it sits at the bottom, under the thumb, the way
+   every native app puts its primary navigation. */
+.reel-tabs {
+	display: flex;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	flex: 0 0 auto;
+}
+
+.reel-tab {
+	flex: 1;
+	min-height: 48px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-bottom: 2px solid transparent;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-tab.is-active {
+	color: var(--text-accent);
+	border-bottom-color: var(--interactive-accent);
+}
+
+.reel-tab-icon {
+	display: flex;
+}
+
+.reel-tab-label {
+	font-size: 11px;
+}
+
+.reel-view-filters {
+	flex: 0 0 auto;
+	padding: 0 12px;
+	padding-left: max(12px, env(safe-area-inset-left));
+}
+
+.reel-view-body {
+	flex: 1;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	padding: 8px 12px calc(24px + env(safe-area-inset-bottom));
+	padding-left: max(12px, env(safe-area-inset-left));
+	padding-right: max(12px, env(safe-area-inset-right));
+}
+
+.reel-sortbar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding-bottom: 8px;
+}
+
+.reel-select {
+	flex: 1;
+	min-height: 36px;
+	border-radius: var(--reel-radius);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	border: 1px solid var(--background-modifier-border);
+	padding: 0 8px;
+	font-size: var(--font-ui-small);
+}
+
+@media (max-width: 700px) {
+	.reel-tabs {
+		order: 3;
+		border-bottom: none;
+		border-top: 1px solid var(--background-modifier-border);
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+
+	.reel-view {
+		flex-direction: column;
+	}
+
+	.reel-view-body {
+		order: 2;
+	}
+
+	.reel-view-filters {
+		order: 1;
+	}
+
+	.reel-tab.is-active {
+		border-bottom-color: transparent;
+		border-top: 2px solid var(--interactive-accent);
+		margin-top: -2px;
+	}
+}
+
+/* ---------------- diary ---------------- */
+
+.reel-diary {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.reel-diary-month {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--background-primary);
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding: 10px 0 4px;
+}
+
+.reel-diary-row {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	min-height: 56px;
+	padding: 6px 4px;
+	border-radius: var(--reel-radius);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-diary-row:active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-diary-day {
+	flex: 0 0 24px;
+	text-align: center;
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-diary-thumb {
+	flex: 0 0 36px;
+	width: 36px;
+	aspect-ratio: 2 / 3;
+	border-radius: 4px;
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.reel-diary-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-diary-body {
+	flex: 1;
+	min-width: 0;
+}
+
+.reel-diary-title {
+	font-size: var(--font-ui-small);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-diary-meta {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+/* ---------------- episode ratings ---------------- */
+
+.reel-episode {
+	align-items: flex-start;
+	padding: 8px 4px;
+}
+
+.reel-episode-stars {
+	margin-top: 2px;
+}
+
+.reel-stars.is-compact .reel-star {
+	width: 30px;
+	height: 36px;
+	font-size: 24px;
+}
+
+.reel-episode-tick {
+	margin-top: 4px;
+	flex: 0 0 30px;
+	width: 30px;
+	height: 30px;
+	cursor: pointer;
+}
+
+/* ---------------- content flags ---------------- */
+
+.reel-flag-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 16px;
+}
+
+.reel-badge.flag {
+	background: var(--background-modifier-error);
+	color: var(--text-normal);
+}
+
+.reel-badge.cert {
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+	font-weight: 600;
+}
+
+.reel-cell-cert {
+	position: absolute;
+	top: 4px;
+	left: 4px;
+	font-size: 10px;
+	font-weight: 700;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.6);
+	color: #fff;
+}
+
+.reel-header-flags,
+.reel-header-cast {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	align-items: center;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-header-cast {
+	line-height: 1.35;
+}
+
+/* ---------------- review box ---------------- */
+
+.reel-textarea {
+	min-height: 96px;
+	padding: 10px 12px !important;
+	line-height: 1.5;
+	resize: vertical;
+	font-family: inherit;
+}
+
+/* ---------------- settings ---------------- */
+
+.reel-flag-setting {
+	border-bottom: none;
+	padding-bottom: 0;
+}

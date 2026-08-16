@@ -1,9 +1,16 @@
 /**
- * The log sheet — the screen you actually touch most.
+ * The log sheet — the screen you touch most.
  *
- * On a phone it's a bottom sheet: everything that matters sits in the lower
- * two-thirds, within thumb reach, and nothing depends on hover. Date defaults
- * to today because that's right nine times out of ten.
+ * Shaped against the tracker this replaces, whose dialog put a thin slider
+ * rating and a stack of dropdowns in a box floating mid-screen. Here:
+ *
+ *   - it's a bottom sheet, so every control is in thumb reach and nothing
+ *     hides behind the keyboard
+ *   - the rating is ten 44px star halves, not a slider you have to land on
+ *   - the date defaults to today with one-tap shortcuts, because typing a date
+ *     on a phone is the worst possible way to enter one
+ *   - the review box is right there, so writing a review is part of logging
+ *     rather than a separate trip to the note
  */
 
 import { App, Modal, Notice, Platform, TFile } from "obsidian";
@@ -20,10 +27,8 @@ interface PendingAdd {
 }
 
 interface LogSheetOptions {
-	/** Logging an existing note. */
 	file?: TFile;
 	entry?: Entry;
-	/** Creating a new note from a search result. */
 	pending?: PendingAdd;
 	watchlist?: boolean;
 }
@@ -32,6 +37,7 @@ export class LogSheet extends Modal {
 	private date = todayISO();
 	private rating: number | undefined;
 	private liked = false;
+	private review = "";
 	private asWatchlist: boolean;
 	private busy = false;
 
@@ -60,15 +66,11 @@ export class LogSheet extends Modal {
 		contentEl.createEl("h3", { cls: "reel-log-title", text: title });
 
 		const sub = contentEl.createDiv({ cls: "reel-log-sub" });
-		if (isTv) {
-			sub.setText(isNew ? "Adding a series — track episodes from its note." : "Series");
-		} else if (rewatchCount > 0) {
-			sub.setText(`Rewatch — ${rewatchCount} previous viewing${rewatchCount === 1 ? "" : "s"}`);
-		} else {
-			sub.setText("First viewing");
-		}
+		if (isTv) sub.setText(isNew ? "Adding a series — track episodes from its note." : "Series");
+		else if (rewatchCount > 0) sub.setText(`Rewatch — ${rewatchCount} previous viewing${rewatchCount === 1 ? "" : "s"}`);
+		else sub.setText("First viewing");
 
-		/* ---- watchlist toggle ---------------------------------------- */
+		/* ---- watched / watchlist ------------------------------------- */
 		const modeRow = contentEl.createDiv({ cls: "reel-seg" });
 		const logBtn = modeRow.createEl("button", { cls: "reel-seg-btn", text: isTv ? "Watching" : "Watched" });
 		const listBtn = modeRow.createEl("button", { cls: "reel-seg-btn", text: "Watchlist" });
@@ -86,34 +88,43 @@ export class LogSheet extends Modal {
 			paintMode();
 		});
 
-		/* ---- details ------------------------------------------------- */
 		const detailsEl = contentEl.createDiv({ cls: "reel-log-details" });
 
+		/* ---- date ---------------------------------------------------- */
 		if (!isTv) {
 			const dateRow = detailsEl.createDiv({ cls: "reel-field" });
 			dateRow.createDiv({ cls: "reel-field-label", text: "Watched on" });
+			const quick = dateRow.createDiv({ cls: "reel-quick-dates" });
 			const dateInput = dateRow.createEl("input", {
 				cls: "reel-input",
 				attr: { type: "date", value: this.date },
 			});
 			dateInput.addEventListener("change", () => {
 				this.date = dateInput.value || todayISO();
+				paintChips();
 			});
 
-			const quick = dateRow.createDiv({ cls: "reel-quick-dates" });
+			const chips: { el: HTMLButtonElement; iso: string }[] = [];
 			const shortcut = (label: string, offsetDays: number) => {
+				const d = new Date();
+				d.setDate(d.getDate() - offsetDays);
+				const iso = toLocalISO(d);
 				const b = quick.createEl("button", { cls: "reel-chip", text: label });
 				b.addEventListener("click", () => {
-					const d = new Date();
-					d.setDate(d.getDate() - offsetDays);
-					this.date = d.toISOString().slice(0, 10);
-					dateInput.value = this.date;
+					this.date = iso;
+					dateInput.value = iso;
+					paintChips();
 				});
+				chips.push({ el: b, iso });
 			};
+			const paintChips = () => chips.forEach((c) => c.el.toggleClass("is-active", c.iso === this.date));
 			shortcut("Today", 0);
 			shortcut("Yesterday", 1);
+			shortcut("2 days ago", 2);
+			paintChips();
 		}
 
+		/* ---- rating -------------------------------------------------- */
 		const ratingRow = detailsEl.createDiv({ cls: "reel-field" });
 		ratingRow.createDiv({ cls: "reel-field-label", text: "Rating" });
 		const ratingValue = ratingRow.createDiv({ cls: "reel-rating-row" });
@@ -124,8 +135,12 @@ export class LogSheet extends Modal {
 				readout.setText(v != null ? `${v}` : "—");
 			},
 		});
-		const readout = ratingValue.createSpan({ cls: "reel-rating-readout", text: this.rating != null ? `${this.rating}` : "—" });
+		const readout = ratingValue.createSpan({
+			cls: "reel-rating-readout",
+			text: this.rating != null ? `${this.rating}` : "—",
+		});
 
+		/* ---- liked --------------------------------------------------- */
 		const likeRow = detailsEl.createDiv({ cls: "reel-field reel-field-inline" });
 		likeRow.createDiv({ cls: "reel-field-label", text: "Liked" });
 		const heart = likeRow.createEl("button", { cls: "reel-heart", text: "♥" });
@@ -136,7 +151,29 @@ export class LogSheet extends Modal {
 		});
 		paintHeart();
 
-		if (this.opts.entry && this.opts.entry.watched.length) {
+		/* ---- review -------------------------------------------------- */
+		if (this.plugin.settings.askForReview) {
+			const reviewRow = detailsEl.createDiv({ cls: "reel-field" });
+			reviewRow.createDiv({ cls: "reel-field-label", text: "Review" });
+			const box = reviewRow.createEl("textarea", {
+				cls: "reel-input reel-textarea",
+				attr: {
+					rows: "4",
+					placeholder: "What did you think? Appended to the note under a dated heading.",
+					enterkeyhint: "enter",
+				},
+			});
+			box.addEventListener("input", () => {
+				this.review = box.value;
+				// Grow with the text so long reviews don't happen in a 4-line
+				// porthole, but stop before the sheet eats the screen.
+				box.style.height = "auto";
+				box.style.height = `${Math.min(box.scrollHeight, 240)}px`;
+			});
+		}
+
+		/* ---- history ------------------------------------------------- */
+		if (this.opts.entry?.watched.length) {
 			const hist = detailsEl.createDiv({ cls: "reel-field" });
 			hist.createDiv({ cls: "reel-field-label", text: "History" });
 			const list = hist.createDiv({ cls: "reel-history" });
@@ -170,6 +207,7 @@ export class LogSheet extends Modal {
 				rating: this.rating,
 				liked: this.liked,
 				watchlist: this.asWatchlist,
+				review: this.asWatchlist ? undefined : this.review,
 			};
 
 			let file: TFile | null = null;
@@ -186,8 +224,7 @@ export class LogSheet extends Modal {
 				new Notice(`Reel: added ${p.title}.`);
 			} else if (this.opts.file) {
 				file = this.opts.file;
-				const isTv = this.opts.entry?.type === "tv";
-				if (isTv) {
+				if (this.opts.entry?.type === "tv") {
 					await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
 						if (this.asWatchlist) fm.status = "watchlist";
 						else if (fm.status === "watchlist") fm.status = "watching";
@@ -195,6 +232,9 @@ export class LogSheet extends Modal {
 						if (this.liked) fm.liked = true;
 						else delete fm.liked;
 					});
+					if (payload.review?.trim()) {
+						await this.plugin.notes.appendReview(file, this.date, this.rating, payload.review);
+					}
 				} else {
 					await this.plugin.notes.logFilm(file, payload);
 				}
@@ -219,4 +259,12 @@ export class LogSheet extends Modal {
 	onClose(): void {
 		this.contentEl.empty();
 	}
+}
+
+/** Local date, not UTC — `toISOString()` would shift the day west of Greenwich. */
+function toLocalISO(d: Date): string {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	return `${y}-${m}-${day}`;
 }

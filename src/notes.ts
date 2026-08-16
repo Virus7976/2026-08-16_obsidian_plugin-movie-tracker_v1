@@ -1,19 +1,25 @@
 /**
  * Note creation and mutation.
  *
- * Every write to an existing note goes through `processFrontMatter`, which
- * parses the YAML, hands us the object, and reserialises only that block. The
- * body is never touched — so the plugin cannot clobber your writing, no matter
- * what it does to the metadata.
+ * Two write paths, with different guarantees:
+ *
+ *   Frontmatter — always via `processFrontMatter`, which reparses the YAML and
+ *   reserialises only that block. The body is untouchable from here.
+ *
+ *   Reviews — via `vault.append`, which can only add to the end of the file.
+ *   Not `modify`, which takes whole-file content and could therefore replace
+ *   your writing if anything upstream were ever wrong. Append cannot, by
+ *   construction, destroy an existing review.
  */
 
 import { Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type ReelPlugin from "./main";
-import { clampRating } from "./util/ratings";
+import { clampRating, starString } from "./util/ratings";
 import { addToRange, contiguousProgress, rangeCount } from "./util/ranges";
 import { nextShowStatus } from "./util/status";
-import { normaliseDate, todayISO, yearOf } from "./util/dates";
+import { normaliseDate, prettyDate, todayISO, yearOf } from "./util/dates";
 import type { Entry, SeasonProgress, TmdbFilm, TmdbShow, WatchEvent } from "./types";
+import { applyFields, filmFields, showFields, ExtractOptions } from "./extract";
 import { redact } from "./secrets";
 
 export interface LogPayload {
@@ -22,10 +28,21 @@ export interface LogPayload {
 	liked?: boolean;
 	watchlist?: boolean;
 	rewatch?: boolean;
+	review?: string;
 }
 
 export class NoteWriter {
 	constructor(private plugin: ReelPlugin) {}
+
+	private get extractOpts(): ExtractOptions {
+		const s = this.plugin.settings;
+		return {
+			linkPeople: s.linkPeople,
+			peopleFolder: s.peopleFolder,
+			castLimit: s.castLimit,
+			region: s.region,
+		};
+	}
 
 	/* ------------------------------------------------------------------ */
 	/* Creation                                                            */
@@ -33,11 +50,8 @@ export class NoteWriter {
 
 	async createFilm(meta: TmdbFilm, log: LogPayload): Promise<TFile> {
 		const year = yearOf(meta.release_date);
-		const folder = this.plugin.settings.filmFolder;
-		const path = await this.uniquePath(folder, this.filmBasename(meta.title, year));
-
+		const path = await this.uniquePath(this.plugin.settings.filmFolder, this.filmBasename(meta.title, year));
 		const poster = await this.plugin.posters.cache(meta.id, "film", meta.poster_path);
-		const directors = (meta.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
 
 		const file = await this.createNote(path);
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
@@ -45,11 +59,8 @@ export class NoteWriter {
 			fm.type = "film";
 			fm.title = meta.title;
 			if (year) fm.year = year;
-			if (directors.length) fm.director = directors;
-			if (meta.runtime) fm.runtime = meta.runtime;
-			fm.genres = (meta.genres ?? []).map((g) => g.name);
+			applyFields(fm, filmFields(meta, this.extractOpts));
 			if (poster) fm.poster = poster;
-			if (meta.vote_average) fm.tmdb_rating = round1(meta.vote_average);
 
 			if (log.watchlist) {
 				fm.status = "watchlist";
@@ -64,18 +75,16 @@ export class NoteWriter {
 			if (log.liked) fm.liked = true;
 		});
 
+		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
+		await this.linkFromDailyNote(file);
 		return file;
 	}
 
 	async createShow(meta: TmdbShow, log: LogPayload): Promise<TFile> {
-		const folder = this.plugin.settings.seriesFolder;
-		const path = await this.uniquePath(folder, sanitize(meta.name));
-
+		const path = await this.uniquePath(this.plugin.settings.seriesFolder, sanitize(meta.name));
 		const poster = await this.plugin.posters.cache(meta.id, "tv", meta.poster_path);
-		const creators = (meta.created_by ?? []).map((c) => c.name);
 
-		// Season 0 is TMDB's "Specials" bucket — real seasons only.
-		const seasons = (meta.seasons ?? []).filter((s) => s.season_number > 0);
+		const seasons = (meta.seasons ?? []).filter((s) => this.plugin.settings.includeSpecials || s.season_number > 0);
 
 		const file = await this.createNote(path);
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
@@ -84,30 +93,42 @@ export class NoteWriter {
 			fm.title = meta.name;
 			const fay = yearOf(meta.first_air_date);
 			if (fay) fm.first_air_year = fay;
-			if (creators.length) fm.creators = creators;
-			fm.status = log.watchlist ? "watchlist" : "watching";
-			if (meta.status) fm.show_status = meta.status;
-			const runtime = meta.episode_run_time?.[0];
-			if (runtime) fm.episode_runtime = runtime;
-			if (meta.number_of_episodes) fm.total_episodes = meta.number_of_episodes;
-			fm.genres = (meta.genres ?? []).map((g) => g.name);
+			applyFields(fm, showFields(meta, this.extractOpts));
 			if (poster) fm.poster = poster;
-			if (meta.vote_average) fm.tmdb_rating = round1(meta.vote_average);
-			// Season shells carry the episode count so progress maths needs no
-			// further requests. `watched` stays empty until you tick something.
+			fm.status = log.watchlist ? "watchlist" : "watching";
 			fm.seasons = seasons.map((s) => ({ n: s.season_number, watched: "", total: s.episode_count ?? 0 }));
 			if (log.liked) fm.liked = true;
 			if (log.rating != null) fm.rating = clampRating(log.rating);
 		});
 
+		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
+		await this.linkFromDailyNote(file);
 		return file;
 	}
 
 	/* ------------------------------------------------------------------ */
-	/* Mutation                                                            */
+	/* Reviews                                                             */
 	/* ------------------------------------------------------------------ */
 
-	/** Append a viewing to a film. Second and later entries are rewatches. */
+	/**
+	 * Append a dated review to the note body.
+	 *
+	 * One heading per viewing, so a rewatch adds a second review rather than
+	 * overwriting the first — which is the whole reason the watch history is an
+	 * array. Uses `append`, so no code path here can remove text.
+	 */
+	async appendReview(file: TFile, date: string, rating: number | undefined, text: string): Promise<void> {
+		const body = text.trim();
+		if (!body) return;
+		const stars = rating != null ? ` · ${starString(rating)}` : "";
+		const block = `\n\n## ${prettyDate(date) || date}${stars}\n\n${body}\n`;
+		await this.plugin.app.vault.append(file, block);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Mutation — films                                                    */
+	/* ------------------------------------------------------------------ */
+
 	async logFilm(file: TFile, log: LogPayload): Promise<void> {
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
 			const history: WatchEvent[] = Array.isArray(fm.watched) ? [...fm.watched] : [];
@@ -128,24 +149,24 @@ export class NoteWriter {
 
 			fm.watched = history;
 			fm.status = "watched";
-			// `rating` mirrors the most recent viewing that carried one, so the
-			// grid and stats can read a single field.
-			const lastRated = [...history].reverse().find((h) => h.rating != null);
+			const lastRated = [...history].reverse().find((h) => h && typeof h === "object" && h.rating != null);
 			if (lastRated?.rating != null) fm.rating = lastRated.rating;
-			if (log.liked != null) fm.liked = log.liked;
+			if (log.liked === true) fm.liked = true;
+			else if (log.liked === false) delete fm.liked;
 		});
+
+		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
+		await this.linkFromDailyNote(file);
 	}
 
-	/** Mark one episode watched: extend the range, move `last_watched`. */
+	/* ------------------------------------------------------------------ */
+	/* Mutation — series                                                   */
+	/* ------------------------------------------------------------------ */
+
 	async markEpisode(file: TFile, season: number, episode: number, date = todayISO()): Promise<void> {
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
-			const seasons: SeasonProgress[] = Array.isArray(fm.seasons) ? [...fm.seasons] : [];
-			let row = seasons.find((s) => Number(s.n) === season);
-			if (!row) {
-				row = { n: season, watched: "" };
-				seasons.push(row);
-				seasons.sort((a, b) => Number(a.n) - Number(b.n));
-			}
+			const seasons = this.seasonRows(fm);
+			const row = this.seasonRow(seasons, season);
 			row.watched = addToRange(row.watched, episode);
 			fm.seasons = seasons;
 			fm.last_watched = { season, episode, date };
@@ -154,37 +175,105 @@ export class NoteWriter {
 		});
 	}
 
-	/** Set a whole season's range at once — used by the episode checklist. */
 	async setSeasonRange(file: TFile, season: number, range: string, date = todayISO()): Promise<void> {
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
-			const seasons: SeasonProgress[] = Array.isArray(fm.seasons) ? [...fm.seasons] : [];
-			let row = seasons.find((s) => Number(s.n) === season);
-			if (!row) {
-				row = { n: season };
-				seasons.push(row);
-				seasons.sort((a, b) => Number(a.n) - Number(b.n));
-			}
+			const seasons = this.seasonRows(fm);
+			const row = this.seasonRow(seasons, season);
 			row.watched = range;
 			fm.seasons = seasons;
 			const furthest = contiguousProgress(range);
 			if (furthest > 0) fm.last_watched = { season, episode: furthest, date };
-			// Ticking episodes starts a watchlisted show, mirroring markEpisode.
-			// Clearing a season must not, hence the count check.
 			if (rangeCount(range) > 0 && (fm.status === "watchlist" || !fm.status)) fm.status = "watching";
 			this.settleShowStatus(fm, seasons);
 		});
 	}
 
 	/**
-	 * Flip to `completed` once every episode TMDB knows about is ticked, and
-	 * back to `watching` when a returning series gains a season. The set of
-	 * statuses this must not touch lives in `nextShowStatus`.
+	 * Rate one episode. Rating implies watching it — nobody rates an episode
+	 * they haven't seen, and making them tick it separately is a second tap for
+	 * no information.
 	 */
+	async rateEpisode(file: TFile, season: number, episode: number, rating: number | null): Promise<void> {
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const seasons = this.seasonRows(fm);
+			const row = this.seasonRow(seasons, season);
+			const ratings: Record<string, number> = { ...(row.episode_ratings ?? {}) };
+
+			if (rating == null) {
+				delete ratings[String(episode)];
+			} else {
+				ratings[String(episode)] = clampRating(rating);
+				row.watched = addToRange(row.watched, episode);
+				fm.last_watched = { season, episode, date: todayISO() };
+				if (fm.status === "watchlist" || !fm.status) fm.status = "watching";
+			}
+
+			if (Object.keys(ratings).length) row.episode_ratings = ratings;
+			else delete row.episode_ratings;
+
+			fm.seasons = seasons;
+			this.settleShowStatus(fm, seasons);
+		});
+	}
+
+	async setSeasonRating(file: TFile, season: number, rating: number | null): Promise<void> {
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const seasons = this.seasonRows(fm);
+			const row = this.seasonRow(seasons, season);
+			if (rating == null) delete row.rating;
+			else row.rating = clampRating(rating);
+			fm.seasons = seasons;
+		});
+	}
+
+	/**
+	 * Record a completed run of a series and reset progress for a rewatch.
+	 * Films have had this since day one via `watched[]`; shows had no way to
+	 * say "I've seen all of this twice", which was an odd asymmetry.
+	 */
+	async restartSeries(file: TFile, rating?: number): Promise<void> {
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const seasons = this.seasonRows(fm);
+			const runs: WatchEvent[] = Array.isArray(fm.watched) ? [...fm.watched] : [];
+			runs.push({
+				date: todayISO(),
+				rewatch: runs.length > 0,
+				...(rating != null ? { rating: clampRating(rating) } : {}),
+			});
+			fm.watched = runs;
+			for (const s of seasons) {
+				s.watched = "";
+				delete s.episode_ratings;
+			}
+			fm.seasons = seasons;
+			delete fm.last_watched;
+			fm.status = "watching";
+		});
+	}
+
+	private seasonRows(fm: Record<string, unknown>): SeasonProgress[] {
+		return Array.isArray(fm.seasons) ? [...(fm.seasons as SeasonProgress[])] : [];
+	}
+
+	private seasonRow(seasons: SeasonProgress[], n: number): SeasonProgress {
+		let row = seasons.find((s) => Number(s.n) === n);
+		if (!row) {
+			row = { n, watched: "" };
+			seasons.push(row);
+			seasons.sort((a, b) => Number(a.n) - Number(b.n));
+		}
+		return row;
+	}
+
 	private settleShowStatus(fm: Record<string, unknown>, seasons: SeasonProgress[]): void {
 		const watched = seasons.reduce((sum, s) => sum + rangeCount(s.watched), 0);
 		const next = nextShowStatus(String(fm.status ?? ""), watched, Number(fm.total_episodes ?? 0));
 		if (next) fm.status = next;
 	}
+
+	/* ------------------------------------------------------------------ */
+	/* Shared mutation                                                     */
+	/* ------------------------------------------------------------------ */
 
 	async setStatus(file: TFile, status: string): Promise<void> {
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
@@ -200,10 +289,6 @@ export class NoteWriter {
 			}
 			const value = clampRating(rating);
 			fm.rating = value;
-			// Keep the newest viewing in step, so history and headline agree.
-			// Only rewrite an entry that is actually an object: spreading a
-			// hand-written `- 2024-03-11` string would explode it into
-			// character-indexed keys and destroy the entry.
 			if (Array.isArray(fm.watched) && fm.watched.length) {
 				const history = [...fm.watched];
 				const last = history[history.length - 1];
@@ -225,49 +310,137 @@ export class NoteWriter {
 		return next;
 	}
 
-	/** Refresh TMDB-owned fields, leaving everything you entered alone. */
+	/* ------------------------------------------------------------------ */
+	/* Lists                                                               */
+	/* ------------------------------------------------------------------ */
+
+	async setLists(file: TFile, lists: string[]): Promise<void> {
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const clean = [...new Set(lists.map((l) => l.trim()).filter(Boolean))].sort();
+			if (clean.length) fm.lists = clean;
+			else delete fm.lists;
+		});
+	}
+
+	async addToList(file: TFile, list: string): Promise<void> {
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const existing = Array.isArray(fm.lists) ? fm.lists.map(String) : [];
+			fm.lists = [...new Set([...existing, list.trim()])].filter(Boolean).sort();
+		});
+	}
+
+	async removeFromList(file: TFile, list: string): Promise<void> {
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const existing: string[] = Array.isArray(fm.lists) ? fm.lists.map(String) : [];
+			const next = existing.filter((l: string) => l !== list);
+			if (next.length) fm.lists = next;
+			else delete fm.lists;
+		});
+	}
+
+	/** Add or remove a content flag by hand, overriding what TMDB implied. */
+	async toggleContentFlag(file: TFile, flag: string): Promise<boolean> {
+		let on = false;
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const existing: string[] = Array.isArray(fm.content_flags) ? fm.content_flags.map(String) : [];
+			on = !existing.includes(flag);
+			const next = on ? [...existing, flag] : existing.filter((f: string) => f !== flag);
+			if (next.length) fm.content_flags = [...new Set(next)].sort();
+			else delete fm.content_flags;
+		});
+		return on;
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Refresh                                                             */
+	/* ------------------------------------------------------------------ */
+
 	async refreshMetadata(entry: Entry): Promise<void> {
 		const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
 		if (!(file instanceof TFile)) return;
+
+		// Never let a refresh overwrite what you decided.
+		const preserve = ["status", "rating", "liked", "watched", "lists"];
 
 		if (entry.type === "tv") {
 			const meta = await this.plugin.tmdb.refreshShow(entry.tmdbId);
 			const poster = await this.plugin.posters.cache(meta.id, "tv", meta.poster_path);
 			await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
-				if (meta.status) fm.show_status = meta.status;
-				if (meta.number_of_episodes) fm.total_episodes = meta.number_of_episodes;
-				if (meta.next_episode_to_air?.air_date) fm.next_air_date = meta.next_episode_to_air.air_date;
-				else delete fm.next_air_date;
+				applyFields(fm, showFields(meta, this.extractOpts), { preserve });
+				if (!meta.next_episode_to_air?.air_date) delete fm.next_air_date;
 				if (poster && !fm.poster) fm.poster = poster;
 
-				// Merge new seasons in without touching existing progress.
-				const known: SeasonProgress[] = Array.isArray(fm.seasons) ? [...fm.seasons] : [];
+				const known = this.seasonRows(fm);
 				for (const s of meta.seasons ?? []) {
-					if (s.season_number <= 0) continue;
+					if (!this.plugin.settings.includeSpecials && s.season_number <= 0) continue;
 					const row = known.find((k) => Number(k.n) === s.season_number);
-					if (row) (row as SeasonProgress & { total?: number }).total = s.episode_count ?? 0;
-					else known.push({ n: s.season_number, watched: "", ...{ total: s.episode_count ?? 0 } });
+					if (row) row.total = s.episode_count ?? 0;
+					else known.push({ n: s.season_number, watched: "", total: s.episode_count ?? 0 });
 				}
 				known.sort((a, b) => Number(a.n) - Number(b.n));
 				fm.seasons = known;
-
-				// A finished show that gains a season has to leave `completed`,
-				// or `inProgress()` filters it out and it never returns to Up
-				// Next — the exact case the new-episode check exists to catch.
 				this.settleShowStatus(fm, known);
 			});
 		} else {
 			const meta = await this.plugin.tmdb.getFilm(entry.tmdbId);
 			const poster = await this.plugin.posters.cache(meta.id, "film", meta.poster_path);
 			await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
-				if (meta.runtime) fm.runtime = meta.runtime;
-				fm.genres = (meta.genres ?? []).map((g) => g.name);
-				if (meta.vote_average) fm.tmdb_rating = round1(meta.vote_average);
-				const directors = (meta.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
-				if (directors.length) fm.director = directors;
+				applyFields(fm, filmFields(meta, this.extractOpts), { preserve });
 				if (poster && !fm.poster) fm.poster = poster;
 			});
 		}
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Daily note                                                          */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Append a link to today's daily note, if one exists.
+	 *
+	 * Deliberately does not *create* the daily note: a tracker inventing files
+	 * in someone's journal folder is exactly the kind of spread the folder
+	 * settings exist to prevent. No daily note today means nothing happens.
+	 */
+	private async linkFromDailyNote(file: TFile): Promise<void> {
+		if (!this.plugin.settings.linkFromDailyNote) return;
+		try {
+			const path = this.dailyNotePath();
+			if (!path) return;
+			const daily = this.plugin.app.vault.getAbstractFileByPath(path);
+			if (!(daily instanceof TFile)) return;
+
+			const link = this.plugin.app.fileManager.generateMarkdownLink(file, daily.path);
+			const existing = await this.plugin.app.vault.cachedRead(daily);
+			if (existing.includes(file.basename)) return; // already mentioned today
+
+			const prefix = this.plugin.settings.dailyNotePrefix || "- Watched";
+			await this.plugin.app.vault.append(daily, `\n${prefix} ${link}`);
+		} catch (e) {
+			console.warn("Reel: daily note link skipped —", redact(e));
+		}
+	}
+
+	/**
+	 * Resolve today's daily note path from the core plugin's own settings, so
+	 * the format and folder match whatever the user already configured. This
+	 * reaches past the public API, hence the defensive shape — if the internals
+	 * move, the feature quietly does nothing rather than throwing.
+	 */
+	private dailyNotePath(): string | null {
+		const internal = (
+			this.plugin.app as unknown as {
+				internalPlugins?: { getPluginById(id: string): { instance?: { options?: { folder?: string; format?: string } } } | null };
+			}
+		).internalPlugins;
+		const options = internal?.getPluginById("daily-notes")?.instance?.options;
+		const folder = (options?.folder ?? "").replace(/^\/+|\/+$/g, "");
+		const format = options?.format || "YYYY-MM-DD";
+		// Only the default ISO-ish format is supported without pulling in a date
+		// library; anything else is left alone rather than guessed at.
+		if (!/^YYYY-MM-DD$/.test(format)) return null;
+		const name = todayISO();
+		return normalizePath(folder ? `${folder}/${name}.md` : `${name}.md`);
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -290,7 +463,7 @@ export class NoteWriter {
 		}
 	}
 
-	private async ensureFolder(folder: string): Promise<void> {
+	async ensureFolder(folder: string): Promise<void> {
 		if (!folder) return;
 		const vault = this.plugin.app.vault;
 		const parts = normalizePath(folder).split("/").filter(Boolean);
@@ -329,10 +502,6 @@ function sanitize(name: string): string {
 			.trim()
 			.slice(0, 120) || "Untitled"
 	);
-}
-
-function round1(n: number): number {
-	return Math.round(n * 10) / 10;
 }
 
 export { sanitize, normaliseDate };

@@ -66,16 +66,31 @@ class UpNextBlock extends MarkdownRenderChild {
 
 	onload(): void {
 		this.containerEl.addClass("reel-block");
-		this.render();
-		this.registerEvent(this.plugin.library.on("changed", () => this.render()));
+		const paint = () => paintUpNext(this.plugin, this.containerEl, this.limit, true);
+		paint();
+		this.registerEvent(this.plugin.library.on("changed", paint));
 	}
+}
 
-	private render(): void {
+/** Shared by the code block and the Reel view. */
+export function paintUpNext(plugin: ReelPlugin, containerEl: HTMLElement, limit?: number, heading = false): void {
+	new UpNextPainter(plugin, containerEl, limit, heading).render();
+}
+
+class UpNextPainter {
+	constructor(
+		private plugin: ReelPlugin,
+		private containerEl: HTMLElement,
+		private limit?: number,
+		private heading = false
+	) {}
+
+	render(): void {
 		const el = this.containerEl;
 		el.empty();
-		el.createDiv({ cls: "reel-block-title", text: "Up next" });
+		if (this.heading) el.createDiv({ cls: "reel-block-title", text: "Up next" });
 
-		let rows = this.plugin.library.inProgress();
+		let rows = this.plugin.visible(this.plugin.library.inProgress());
 		if (this.limit) rows = rows.slice(0, this.limit);
 
 		if (!rows.length) {

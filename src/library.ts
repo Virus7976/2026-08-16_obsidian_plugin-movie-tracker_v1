@@ -18,6 +18,8 @@ import { rangeCount } from "./util/ranges";
 export class Library extends Events {
 	private entries = new Map<string, Entry>();
 	private ready = false;
+	/** Lowercased haystack per entry, built lazily and dropped on change. */
+	private searchCache = new Map<string, string>();
 
 	constructor(private plugin: ReelPlugin) {
 		super();
@@ -67,6 +69,7 @@ export class Library extends Events {
 
 	rebuild(): void {
 		this.entries.clear();
+		this.searchCache.clear();
 		for (const file of this.plugin.app.vault.getMarkdownFiles()) {
 			if (this.inScope(file.path)) this.upsert(file, true);
 		}
@@ -91,6 +94,7 @@ export class Library extends Events {
 			return;
 		}
 		this.entries.set(file.path, toEntry(file, fm, this.plugin.settings.seriesFolder));
+		this.searchCache.delete(file.path);
 		if (!quiet) this.emitChange();
 	}
 
@@ -134,6 +138,57 @@ export class Library extends Events {
 				return e.seasons.some((s) => rangeCount(s.watched) > 0);
 			})
 			.sort((a, b) => (b.lastWatched?.date ?? "").localeCompare(a.lastWatched?.date ?? ""));
+	}
+
+	/**
+	 * Free-text search across title, people, genres and collection.
+	 *
+	 * A plain substring scan over a prebuilt lowercase haystack. At a few
+	 * thousand titles that is under a millisecond, so the search box can filter
+	 * on every keystroke without debouncing — which is what makes it feel
+	 * instant rather than laggy on a phone.
+	 */
+	search(query: string, pool?: Entry[]): Entry[] {
+		const q = query.trim().toLowerCase();
+		const rows = pool ?? this.all();
+		if (!q) return rows;
+		const terms = q.split(/\s+/).filter(Boolean);
+		return rows.filter((e) => {
+			const hay = this.haystack(e);
+			return terms.every((t) => hay.includes(t));
+		});
+	}
+
+	private haystack(e: Entry): string {
+		let hay = this.searchCache.get(e.path);
+		if (hay == null) {
+			hay = [
+				e.title,
+				e.basename,
+				String(e.year ?? e.firstAirYear ?? ""),
+				...e.director,
+				...e.creators,
+				...e.cast,
+				...e.genres,
+				...e.lists,
+				e.collection ?? "",
+				e.certification ?? "",
+			]
+				.join(" ")
+				// Strip wikilink syntax so searching "Villeneuve" still matches
+				// `[[People/Denis Villeneuve|Denis Villeneuve]]`.
+				.replace(/[[\]|]/g, " ")
+				.toLowerCase();
+			this.searchCache.set(e.path, hay);
+		}
+		return hay;
+	}
+
+	/** Every list name in use, for chips and the "add to list" picker. */
+	lists(): string[] {
+		const set = new Set<string>();
+		for (const e of this.entries.values()) e.lists.forEach((l) => set.add(l));
+		return [...set].sort();
 	}
 
 	/** Distinct genres across the library, for the filter chips. */
@@ -193,7 +248,34 @@ function toEntry(file: TFile, fm: Record<string, unknown>, seriesFolder: string)
 		status: String(fm.status ?? (type === "tv" ? "watching" : "watched")),
 		rating: numberOrUndef(fm.rating),
 		liked: fm.liked === true,
+		cast: toStringArray(fm.cast),
+		overview: fm.overview ? String(fm.overview) : undefined,
+		trailer: fm.trailer ? String(fm.trailer) : undefined,
+		budget: numberOrUndef(fm.budget),
+		revenue: numberOrUndef(fm.revenue),
+		collection: fm.collection ? String(fm.collection) : undefined,
+		productionCompanies: toStringArray(fm.production_companies),
+		providers: toStringArray(fm.providers),
+		language: fm.language ? String(fm.language) : undefined,
+		popularity: numberOrUndef(fm.popularity),
+		certification: fm.certification ? String(fm.certification) : undefined,
+		contentFlags: toStringArray(fm.content_flags),
+		lists: toStringArray(fm.lists),
+		// The real creation time, so `sort: added` is chronological rather than
+		// the alphabetical-by-path it used to silently be.
+		added: file.stat?.ctime ?? 0,
 	};
+}
+
+/** Strip `[[Folder/Name|Name]]` down to `Name` for display and grouping. */
+export function unlink(value: string): string {
+	const m = String(value).match(/^\[\[([^\]]+)\]\]$/);
+	if (!m) return String(value).trim();
+	const inner = m[1];
+	const pipe = inner.lastIndexOf("|");
+	const text = pipe >= 0 ? inner.slice(pipe + 1) : inner;
+	const slash = text.lastIndexOf("/");
+	return (slash >= 0 ? text.slice(slash + 1) : text).trim();
 }
 
 function numberOrUndef(v: unknown): number | undefined {

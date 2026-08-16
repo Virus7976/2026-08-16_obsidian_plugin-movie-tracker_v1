@@ -15,6 +15,8 @@
 
 import type { Entry } from "../types";
 import { rangeCount } from "../util/ranges";
+import { unlink } from "../library";
+import { certificationRank } from "../content";
 
 export type Layout = "poster-grid" | "list" | "compact";
 
@@ -36,7 +38,13 @@ interface Filter {
 	value: string;
 }
 
-const OPS = [">=", "<=", "!=", "=", ">", "<", "contains"];
+// Word operators need surrounding spaces so a title containing "in" or
+// "excludes" can't be mistaken for one. Longest-first, so ">=" wins over ">".
+// "not in" must precede "in", or `certification not in R` parses as field
+// "certification not" with operator "in" and silently matches nothing.
+const SYMBOL_OPS = [">=", "<=", "!=", "="];
+const WORD_OPS = ["contains", "excludes", "includes", "not in", "in"];
+const OPS = [...SYMBOL_OPS, ">", "<", ...WORD_OPS];
 
 export function parseQuery(source: string, defaults: Partial<Query> = {}): Query {
 	const q: Query = {
@@ -104,23 +112,46 @@ export function parseQuery(source: string, defaults: Partial<Query> = {}): Query
 
 function parseFilters(value: string, errors: string[]): Filter[] {
 	const out: Filter[] = [];
-	for (const clause of value.split(",")) {
+	// `in` takes a list, so its values are separated by `|` rather than `,`:
+	//   filter: certification in G|PG|PG-13
+	for (const clause of splitClauses(value)) {
 		const c = clause.trim();
 		if (!c) continue;
-		const op = OPS.find((o) => c.toLowerCase().includes(o === "contains" ? " contains " : o));
+		const lower = c.toLowerCase();
+
+		let op: string | undefined;
+		let at = -1;
+		for (const candidate of OPS) {
+			const token = WORD_OPS.includes(candidate) ? ` ${candidate} ` : candidate;
+			const idx = lower.indexOf(token);
+			if (idx > 0) {
+				op = candidate;
+				at = idx;
+				break;
+			}
+		}
+
 		if (!op) {
-			errors.push(`Filter needs an operator (= != > < >= <= contains): "${c}"`);
+			errors.push(`Filter needs an operator (= != > < >= <= contains excludes in): "${c}"`);
 			continue;
 		}
-		const token = op === "contains" ? " contains " : op;
-		const at = c.toLowerCase().indexOf(token);
+
+		const token = WORD_OPS.includes(op) ? ` ${op} ` : op;
 		out.push({
 			field: c.slice(0, at).trim().toLowerCase(),
 			op,
-			value: c.slice(at + token.length).trim().replace(/^["']|["']$/g, ""),
+			value: c
+				.slice(at + token.length)
+				.trim()
+				.replace(/^["']|["']$/g, ""),
 		});
 	}
 	return out;
+}
+
+/** Split on commas that aren't inside a bracketed list. */
+function splitClauses(value: string): string[] {
+	return value.split(",").map((s) => s.trim());
 }
 
 /* -------------------------------------------------------------------- */
@@ -137,15 +168,39 @@ export function applyQuery(entries: Entry[], q: Query): Entry[] {
 
 function matches(entry: Entry, f: Filter): boolean {
 	const raw = fieldValue(entry, f.field);
-	if (raw == null) return false;
+
+	// `excludes` and `not in` must succeed on a missing field: "no content
+	// flags recorded" has to pass `content excludes sex`, or every unflagged
+	// title would vanish from a filtered library.
+	if (raw == null) return f.op === "excludes" || f.op === "!=" || f.op === "not in";
+
+	const listValues = () => f.value.split("|").map((v) => v.trim().toLowerCase()).filter(Boolean);
 
 	if (Array.isArray(raw)) {
+		const hay = raw.map((v) => unlink(String(v)).toLowerCase());
 		const needle = f.value.toLowerCase();
-		const hit = raw.some((v) => String(v).toLowerCase() === needle);
-		const partial = raw.some((v) => String(v).toLowerCase().includes(needle));
-		if (f.op === "contains") return partial;
-		if (f.op === "!=") return !hit;
-		return hit;
+		const exact = hay.includes(needle);
+		const partial = hay.some((v) => v.includes(needle));
+		switch (f.op) {
+			case "contains":
+			case "includes":
+				return partial;
+			case "excludes":
+				return !partial;
+			case "in":
+				return hay.some((v) => listValues().includes(v));
+			case "not in":
+				return !hay.some((v) => listValues().includes(v));
+			case "!=":
+				return !exact;
+			default:
+				return exact;
+		}
+	}
+
+	if (f.op === "in" || f.op === "not in") {
+		const hit = listValues().includes(String(raw).toLowerCase());
+		return f.op === "in" ? hit : !hit;
 	}
 
 	if (typeof raw === "number") {
@@ -196,6 +251,29 @@ function fieldValue(e: Entry, field: string): string | number | string[] | undef
 		case "show_status": return e.showStatus;
 		case "watched": return lastWatchDate(e);
 		case "episodes": return e.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
+		case "cast":
+		case "actor":
+		case "actors": return e.cast;
+		case "collection": return e.collection;
+		case "provider":
+		case "providers":
+		case "available": return e.providers;
+		case "language": return e.language;
+		case "popularity": return e.popularity;
+		case "certification":
+		case "cert":
+		case "rated": return e.certification;
+		case "content":
+		case "content_flags":
+		case "flags": return e.contentFlags;
+		case "list":
+		case "lists": return e.lists;
+		case "company":
+		case "studio": return e.productionCompanies;
+		case "budget": return e.budget;
+		case "revenue": return e.revenue;
+		case "added": return e.added;
+		case "overview": return e.overview;
 		default: return undefined;
 	}
 }
@@ -222,7 +300,11 @@ export function sortEntries(rows: Entry[], field: string, dir: 1 | -1): Entry[] 
 function sortKey(e: Entry, field: string): string | number | undefined {
 	switch (field) {
 		case "watched": return lastWatchDate(e);
-		case "added": return e.path;
+		// Real creation time. This used to return e.path, which sorted
+		// alphabetically while claiming to be chronological.
+		case "added": return e.added;
+		case "popularity": return e.popularity;
+		case "certification": return certificationRank(e.certification) ?? undefined;
 		case "title": return e.title.replace(/^(the|a|an)\s+/i, "");
 		case "year": return e.year ?? e.firstAirYear;
 		case "rating": return e.rating;

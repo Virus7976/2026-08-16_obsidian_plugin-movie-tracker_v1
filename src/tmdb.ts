@@ -142,17 +142,28 @@ export class TmdbClient {
 			.slice(0, 20);
 	}
 
+	/**
+	 * `append_to_response` is what keeps this to one request. Credits, keywords,
+	 * videos, certifications and providers all arrive in the same payload —
+	 * five extra endpoints' worth of data for zero extra round trips, which
+	 * matters on a phone far more than it does on a desktop.
+	 */
 	async getFilm(id: number): Promise<TmdbFilm> {
 		return this.cached(
 			`movie-${id}`,
-			() => this.request<TmdbFilm>(`/movie/${id}`, { append_to_response: "credits,watch/providers" }),
+			() =>
+				this.request<TmdbFilm>(`/movie/${id}`, {
+					append_to_response: "credits,watch/providers,keywords,videos,release_dates",
+				}),
 			true // a released film's credits and runtime don't change
 		);
 	}
 
 	async getShow(id: number): Promise<TmdbShow> {
 		const fetcher = () =>
-			this.request<TmdbShow>(`/tv/${id}`, { append_to_response: "aggregate_credits,watch/providers" });
+			this.request<TmdbShow>(`/tv/${id}`, {
+				append_to_response: "aggregate_credits,watch/providers,keywords,videos,content_ratings",
+			});
 		// A returning series gains episodes, so its record must expire.
 		const cacheKey = `tv-${id}`;
 		const hit = await this.readCache<TmdbShow>(cacheKey);
@@ -174,7 +185,7 @@ export class TmdbClient {
 	/** Force a refresh, bypassing the cache — used by the new-episode check. */
 	async refreshShow(id: number): Promise<TmdbShow> {
 		const data = await this.request<TmdbShow>(`/tv/${id}`, {
-			append_to_response: "aggregate_credits,watch/providers",
+			append_to_response: "aggregate_credits,watch/providers,keywords,videos,content_ratings",
 		});
 		await this.writeCache(`tv-${id}`, data, data.status === "Ended" || data.status === "Canceled");
 		return data;

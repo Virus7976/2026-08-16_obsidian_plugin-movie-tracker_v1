@@ -12,12 +12,19 @@ import { clampRating, MAX_STARS } from "../util/ratings";
 export interface StarsOptions {
 	value?: number;
 	readonly?: boolean;
+	/**
+	 * Smaller targets for dense lists — episode rows, where five full-size
+	 * stars per row would push the title off screen. Still 36px tall, which
+	 * stays above the threshold for a reliable tap.
+	 */
+	compact?: boolean;
 	onChange?: (value: number | undefined) => void;
 }
 
 export function renderStars(parent: HTMLElement, opts: StarsOptions = {}): HTMLElement {
 	const root = parent.createDiv({ cls: "reel-stars" });
 	if (opts.readonly) root.addClass("is-readonly");
+	if (opts.compact) root.addClass("is-compact");
 	let value = opts.value != null ? clampRating(opts.value) : undefined;
 
 	const paint = () => {

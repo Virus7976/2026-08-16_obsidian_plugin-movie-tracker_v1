@@ -214,11 +214,50 @@ npm test
 
 51 assertions over the range parser, rating maths, date handling and the query engine — the pure logic where an off-by-one would quietly corrupt watch history.
 
+## What's new in 0.2
+
+Built in response to "everything this is missing that other apps have":
+
+- **Reel view** — a real tab (ribbon icon), with Library / Up next / Diary / Stats, a search box, filter chips and a sort menu. On a phone the tab bar sits at the bottom, under your thumb.
+- **Search** across title, director, cast, genre, collection and list. No debounce — the haystack is prebuilt, so it filters on every keystroke.
+- **Diary** — every viewing, newest first, grouped by month. Rewatches get their own row.
+- **Reviews** — a review box in the log sheet. Appended to the note under a dated heading, via `vault.append`, so no code path here can overwrite what you wrote.
+- **Episode ratings** — stars on every episode row. Rating one marks it watched.
+- **Series rewatches** — *Start a rewatch* records the completed run and resets progress.
+- **Rich metadata** — cast, overview, trailer, budget, revenue, collection, studios, streaming providers, language, popularity, certification. Still one API call per title.
+- **Content filtering** — hide by flag (sex, nudity, swearing, violence, gore, drugs, horror) or by certification. See the honesty note below.
+- **People as links** — `[[Movies/People/Denis Villeneuve|Denis Villeneuve]]`, so directors and actors get backlinks and graph nodes.
+- **Lists** — membership in frontmatter, so a list can never desync from its members.
+- **Upcoming** — a calendar of returning shows.
+- **Analytics** — top actors, directors, collections, studios, certifications, providers, by-month, by-decade, busiest day.
+- **Importer** — converts notes from the old tracker in place.
+- **Specials** — season 0, optional.
+- Fixed: `sort: added` sorted by filename while claiming to be chronological.
+
+## Content filtering — what it can and can't do
+
+Read this before relying on it.
+
+TMDB has **no structured content-advisory data**. There is no field saying "this film contains 14 uses of strong language". What exists is:
+
+1. **Certification** (G / PG / PG-13 / R / NC-17, TV-14, TV-MA). From a ratings board, present for most released titles. This is the dependable signal.
+2. **Keywords**. Crowd-sourced free text. Specific when present ("female nudity", "sex scene"), but coverage is patchy — a film full of sex may carry no relevant keyword at all.
+
+So a title with **no flags means "nothing was tagged", not "nothing is there"**. Certification is the filter to lean on; flags are a bonus. The settings screen says this too, because a filter that quietly under-reports is worse than none — you'd trust it and get caught out.
+
+Flags are written to `content_flags`, where you can correct them by hand. Refreshes merge rather than overwrite, so a flag you add stays added.
+
+```
+filter: content excludes sex, certification not in R|NC-17
+```
+
 ## Not built
 
-- **Letterboxd import.** Dropped from scope. The CSV route is `diary.csv` + `ratings.csv` matched title+year against TMDB, throttled ~250 ms/request; roughly four minutes for 800 films. Straightforward to add later.
-- **Watch providers.** Fetched and cached, not yet displayed.
-- **Live Preview header card.** Reading view only.
+- **Scrobbling** (Trakt/Simkl style, where Plex tells it what you watched). A plugin has no network listener; this is structurally impossible here.
+- **Social** — reviews from other people, followers. Out of scope by choice.
+- **Other media types** — books, games. Different product.
+- **Manual list ordering** — lists are sets, sorted by whatever sort you pick.
+- **Live Preview header card** — reading view only.
 
 ## Licence
 

@@ -1,6 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type ReelPlugin from "./main";
 import { KeyMode, SecretBlob, maskSecret } from "./secrets";
+import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
 
 export interface ReelSettings {
 	/* Credentials — see credentials.ts. Only one of keyPlain / keyBlob is ever set. */
@@ -12,6 +13,23 @@ export interface ReelSettings {
 	filmFolder: string;
 	seriesFolder: string;
 	posterFolder: string;
+	peopleFolder: string;
+
+	/* Metadata */
+	linkPeople: boolean;
+	castLimit: number;
+	region: string;
+	includeSpecials: boolean;
+
+	/* Reviews and daily notes */
+	askForReview: boolean;
+	linkFromDailyNote: boolean;
+	dailyNotePrefix: string;
+
+	/* Content policy — see content.ts for what the data can and can't do */
+	hideFlags: string[];
+	maxCertification: string | null;
+	hideUnrated: boolean;
 
 	/* Behaviour */
 	posterQuality: "w185" | "w342" | "w500";
@@ -33,6 +51,20 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	filmFolder: "Movies",
 	seriesFolder: "Series",
 	posterFolder: "Movies/_posters",
+	peopleFolder: "Movies/People",
+
+	linkPeople: true,
+	castLimit: 10,
+	region: "US",
+	includeSpecials: false,
+
+	askForReview: true,
+	linkFromDailyNote: false,
+	dailyNotePrefix: "- Watched",
+
+	hideFlags: [],
+	maxCertification: null,
+	hideUnrated: false,
 
 	posterQuality: "w342",
 	downloadPosters: true,
@@ -62,7 +94,19 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		this.renderCredentials(containerEl);
 		this.renderFolders(containerEl);
+		this.renderMetadata(containerEl);
+		this.renderReviews(containerEl);
+		this.renderContent(containerEl);
 		this.renderBehaviour(containerEl);
+	}
+
+	/** The live content policy, read by every surface that lists titles. */
+	get policy(): ContentPolicy {
+		return {
+			hideFlags: this.plugin.settings.hideFlags as ContentFlag[],
+			maxCertification: this.plugin.settings.maxCertification,
+			hideUnrated: this.plugin.settings.hideUnrated,
+		};
 	}
 
 	/* ---------------------------------------------------------------- */
@@ -194,7 +238,8 @@ export class ReelSettingTab extends PluginSettingTab {
 	private renderFolders(el: HTMLElement): void {
 		new Setting(el).setName("Folders").setHeading();
 
-		const folder = (name: string, desc: string, key: "filmFolder" | "seriesFolder" | "posterFolder") =>
+		type FolderKey = "filmFolder" | "seriesFolder" | "posterFolder" | "peopleFolder";
+		const folder = (name: string, desc: string, key: FolderKey) =>
 			new Setting(el)
 				.setName(name)
 				.setDesc(desc)
@@ -209,6 +254,158 @@ export class ReelSettingTab extends PluginSettingTab {
 		folder("Films folder", "One note per film.", "filmFolder");
 		folder("Series folder", "One note per show — not per season or episode.", "seriesFolder");
 		folder("Poster folder", "Shared by films and series.", "posterFolder");
+		folder(
+			"People folder",
+			"Where director and cast links point. Naming the folder explicitly is what stops person notes appearing in your vault root when you tap an unresolved link.",
+			"peopleFolder"
+		);
+
+		el.createDiv({
+			cls: "reel-callout",
+			text:
+				"Everything Reel writes lives under these four folders and its own plugin folder. " +
+				"It never creates notes anywhere else — the daily-note link, if you turn it on, only appends to a note you already have.",
+		});
+	}
+
+	private renderMetadata(el: HTMLElement): void {
+		new Setting(el).setName("Metadata").setHeading();
+
+		new Setting(el)
+			.setName("Link people and use wikilinks")
+			.setDesc(
+				"Store directors and cast as [[People/Name|Name]] rather than plain text, so they appear in the graph and get backlinks. This is the thing Letterboxd cannot do."
+			)
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.linkPeople).onChange(async (v) => {
+					this.plugin.settings.linkPeople = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Cast members to keep")
+			.setDesc("Top-billed order, as TMDB returns it.")
+			.addSlider((s) =>
+				s
+					.setLimits(0, 25, 1)
+					.setValue(this.plugin.settings.castLimit)
+					.setDynamicTooltip()
+					.onChange(async (v) => {
+						this.plugin.settings.castLimit = v;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(el)
+			.setName("Region")
+			.setDesc("Drives which certification and streaming providers are stored. Two-letter country code.")
+			.addText((t) =>
+				t.setValue(this.plugin.settings.region).onChange(async (v) => {
+					this.plugin.settings.region = v.trim().toUpperCase().slice(0, 2) || "US";
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Track specials")
+			.setDesc("Include season 0 — Christmas episodes, OVAs, and the like.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.includeSpecials).onChange(async (v) => {
+					this.plugin.settings.includeSpecials = v;
+					await this.plugin.saveSettings();
+				})
+			);
+	}
+
+	private renderReviews(el: HTMLElement): void {
+		new Setting(el).setName("Reviews").setHeading();
+
+		new Setting(el)
+			.setName("Ask for a review when logging")
+			.setDesc("Adds a review box to the log sheet. Reviews are appended to the note body under a dated heading — never overwriting what's already there.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.askForReview).onChange(async (v) => {
+					this.plugin.settings.askForReview = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Link from today's daily note")
+			.setDesc("Appends a link when you log something. Only if today's daily note already exists — Reel will not create one.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.linkFromDailyNote).onChange(async (v) => {
+					this.plugin.settings.linkFromDailyNote = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Daily note line prefix")
+			.addText((t) =>
+				t.setValue(this.plugin.settings.dailyNotePrefix).onChange(async (v) => {
+					this.plugin.settings.dailyNotePrefix = v || "- Watched";
+					await this.plugin.saveSettings();
+				})
+			);
+	}
+
+	private renderContent(el: HTMLElement): void {
+		new Setting(el).setName("Content filtering").setHeading();
+
+		el.createDiv({
+			cls: "reel-callout",
+			text:
+				"Read this before relying on it. TMDB has no structured content-advisory data. Certification (R, PG-13, TV-MA) comes from a ratings board and is dependable. " +
+				"Flags are inferred from crowd-sourced keywords, so they under-report: no flag means nothing was tagged, not that nothing is there. " +
+				"You can add or remove flags on any note by hand, and a refresh will not undo your edits.",
+		});
+
+		new Setting(el)
+			.setName("Hide titles flagged with")
+			.setDesc("Applies across the library, Up Next and search.")
+			.setClass("reel-flag-setting");
+
+		const flagRow = el.createDiv({ cls: "reel-flag-row" });
+		for (const flag of CONTENT_FLAGS) {
+			const chip = flagRow.createEl("button", { cls: "reel-chip", text: FLAG_LABELS[flag] });
+			const paint = () => chip.toggleClass("is-active", this.plugin.settings.hideFlags.includes(flag));
+			chip.addEventListener("click", async () => {
+				const set = new Set(this.plugin.settings.hideFlags);
+				if (set.has(flag)) set.delete(flag);
+				else set.add(flag);
+				this.plugin.settings.hideFlags = [...set];
+				await this.plugin.saveSettings();
+				paint();
+				this.plugin.library.rebuild();
+			});
+			paint();
+		}
+
+		new Setting(el)
+			.setName("Maximum certification")
+			.setDesc("Hide anything rated above this.")
+			.addDropdown((d) => {
+				d.addOption("", "No limit");
+				for (const cert of knownCertifications()) d.addOption(cert, cert);
+				d.setValue(this.plugin.settings.maxCertification ?? "").onChange(async (v) => {
+					this.plugin.settings.maxCertification = v || null;
+					await this.plugin.saveSettings();
+					this.plugin.library.rebuild();
+				});
+			});
+
+		new Setting(el)
+			.setName("Also hide unrated titles")
+			.setDesc("Strict mode. An unrated title is unknown, not safe — turn this on if that distinction matters to you.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.hideUnrated).onChange(async (v) => {
+					this.plugin.settings.hideUnrated = v;
+					await this.plugin.saveSettings();
+					this.plugin.library.rebuild();
+				})
+			);
 	}
 
 	private renderBehaviour(el: HTMLElement): void {

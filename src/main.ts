@@ -1,19 +1,26 @@
-import { Notice, Plugin, TFile, addIcon } from "obsidian";
+import { Notice, Plugin, TFile, WorkspaceLeaf, addIcon } from "obsidian";
 import { DEFAULT_SETTINGS, ReelSettingTab, ReelSettings } from "./settings";
 import { CredentialStore, MissingKeyError } from "./credentials";
 import { TmdbClient } from "./tmdb";
 import { Library } from "./library";
 import { NoteWriter } from "./notes";
 import { PosterStore } from "./posters";
+import { Importer } from "./importer";
 import { SearchModal } from "./ui/searchModal";
 import { LogSheet } from "./ui/logSheet";
 import { SeasonSheet } from "./ui/seasonSheet";
+import { ListPicker } from "./ui/listPicker";
 import { registerHeaderProcessor } from "./render/header";
 import { registerLibraryBlocks } from "./render/library";
 import { registerStatsBlock } from "./render/stats";
 import { registerUpNextBlock, UpNextService } from "./render/upnext";
+import { registerDiaryBlock } from "./render/diary";
+import { registerCalendarBlock } from "./render/calendar";
+import { REEL_VIEW, ReelView } from "./view";
+import { policyBreach, ContentPolicy } from "./content";
 import { redact } from "./secrets";
 import { todayISO } from "./util/dates";
+import type { Entry } from "./types";
 
 /**
  * `addIcon` takes the *contents* of an SVG, not an `<svg>` element — Obsidian
@@ -36,6 +43,9 @@ export default class ReelPlugin extends Plugin {
 	notes!: NoteWriter;
 	posters!: PosterStore;
 	upNext!: UpNextService;
+	importer!: Importer;
+
+	private lastHidden = 0;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -46,11 +56,12 @@ export default class ReelPlugin extends Plugin {
 		this.notes = new NoteWriter(this);
 		this.posters = new PosterStore(this);
 		this.upNext = new UpNextService(this);
+		this.importer = new Importer(this);
 
 		addIcon("reel", REEL_ICON);
 
-		// The index needs a resolved metadata cache. On a cold start that isn't
-		// ready during onload, so defer — `onLayoutReady` fires once it is.
+		this.registerView(REEL_VIEW, (leaf: WorkspaceLeaf) => new ReelView(leaf, this));
+
 		this.app.workspace.onLayoutReady(() => {
 			this.library.load();
 			if (this.settings.checkNewEpisodes) void this.checkNewEpisodes();
@@ -60,9 +71,13 @@ export default class ReelPlugin extends Plugin {
 		registerLibraryBlocks(this);
 		registerStatsBlock(this);
 		registerUpNextBlock(this);
+		registerDiaryBlock(this);
+		registerCalendarBlock(this);
 
 		this.registerCommands();
-		this.registerRibbon();
+
+		const ribbon = this.addRibbonIcon("reel", "Reel", () => this.openView());
+		ribbon.addClass("reel-ribbon");
 
 		this.addSettingTab(new ReelSettingTab(this.app, this));
 	}
@@ -72,42 +87,89 @@ export default class ReelPlugin extends Plugin {
 	}
 
 	/* ------------------------------------------------------------------ */
+	/* Content policy                                                      */
+	/* ------------------------------------------------------------------ */
 
-	private registerRibbon(): void {
-		// Also reachable from the mobile toolbar — Obsidian surfaces ribbon
-		// actions there, so this single registration covers both.
-		const el = this.addRibbonIcon("reel", "Reel: log a film or series", () => {
-			this.openSearch();
-		});
-		el.addClass("reel-ribbon");
+	get policy(): ContentPolicy {
+		return {
+			hideFlags: this.settings.hideFlags as ContentPolicy["hideFlags"],
+			maxCertification: this.settings.maxCertification,
+			hideUnrated: this.settings.hideUnrated,
+		};
+	}
+
+	/**
+	 * Apply the content policy to any list of titles. Every surface that shows
+	 * titles routes through here, so turning a filter on hides consistently
+	 * rather than in some views and not others.
+	 */
+	visible(entries: Entry[]): Entry[] {
+		const policy = this.policy;
+		if (!policy.hideFlags.length && !policy.maxCertification && !policy.hideUnrated) {
+			this.lastHidden = 0;
+			return entries;
+		}
+		const kept = entries.filter((e) => policyBreach(e, policy) == null);
+		this.lastHidden = entries.length - kept.length;
+		return kept;
+	}
+
+	/** How many titles the last `visible()` call removed, for the UI to admit to. */
+	hiddenCount(): number {
+		return this.lastHidden;
+	}
+
+	/* ------------------------------------------------------------------ */
+
+	async openView(): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(REEL_VIEW);
+		if (existing.length) {
+			await this.app.workspace.revealLeaf(existing[0]);
+			return;
+		}
+		// On a phone the main area is the only sensible place; a sidebar leaf
+		// would open in a drawer the user then has to swipe away.
+		const leaf = this.app.workspace.getLeaf(true);
+		await leaf.setViewState({ type: REEL_VIEW, active: true });
+		await this.app.workspace.revealLeaf(leaf);
+	}
+
+	openSearch(opts: { watchlist?: boolean } = {}): void {
+		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
+			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
+			return;
+		}
+		new SearchModal(this.app, this, opts).open();
+	}
+
+	private currentEntry() {
+		const file = this.app.workspace.getActiveFile();
+		return file ? this.library.byPath(file.path) : undefined;
+	}
+
+	private withEntry(checking: boolean, fn: (entry: Entry, file: TFile) => void, needTv = false): boolean {
+		const entry = this.currentEntry();
+		if (!entry) return false;
+		if (needTv && entry.type !== "tv") return false;
+		if (!checking) {
+			const file = this.app.vault.getAbstractFileByPath(entry.path);
+			if (file instanceof TFile) fn(entry, file);
+		}
+		return true;
 	}
 
 	private registerCommands(): void {
-		this.addCommand({
-			id: "log",
-			name: "Log a film or series",
-			icon: "reel",
-			callback: () => this.openSearch(),
-		});
+		this.addCommand({ id: "open-view", name: "Open Reel", icon: "reel", callback: () => void this.openView() });
 
-		this.addCommand({
-			id: "add-watchlist",
-			name: "Add to watchlist",
-			callback: () => this.openSearch({ watchlist: true }),
-		});
+		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });
+
+		this.addCommand({ id: "add-watchlist", name: "Add to watchlist", callback: () => this.openSearch({ watchlist: true }) });
 
 		this.addCommand({
 			id: "log-current",
 			name: "Log the current note",
-			checkCallback: (checking) => {
-				const entry = this.currentEntry();
-				if (!entry) return false;
-				if (!checking) {
-					const file = this.app.vault.getAbstractFileByPath(entry.path);
-					if (file instanceof TFile) new LogSheet(this.app, this, { file, entry }).open();
-				}
-				return true;
-			},
+			checkCallback: (checking) =>
+				this.withEntry(checking, (entry, file) => new LogSheet(this.app, this, { file, entry }).open()),
 		});
 
 		this.addCommand({
@@ -133,48 +195,67 @@ export default class ReelPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-season",
-			name: "Open season checklist",
-			checkCallback: (checking) => {
-				const entry = this.currentEntry();
-				if (!entry || entry.type !== "tv") return false;
-				if (!checking) {
-					const season = this.upNext.nextFor(entry)?.season ?? entry.seasons[0]?.n ?? 1;
-					new SeasonSheet(this.app, this, entry, season).open();
-				}
-				return true;
-			},
+			name: "Rate episodes / open season checklist",
+			checkCallback: (checking) =>
+				this.withEntry(
+					checking,
+					(entry) => {
+						const season = this.upNext.nextFor(entry)?.season ?? entry.seasons[0]?.n ?? 1;
+						new SeasonSheet(this.app, this, entry, season).open();
+					},
+					true
+				),
+		});
+
+		this.addCommand({
+			id: "restart-series",
+			name: "Start a rewatch of this series",
+			checkCallback: (checking) =>
+				this.withEntry(
+					checking,
+					(entry, file) => {
+						void this.notes
+							.restartSeries(file, entry.rating)
+							.then(() => new Notice("Reel: progress reset — previous run recorded."))
+							.catch((e) => new Notice(`Reel: ${redact(e)}`));
+					},
+					true
+				),
+		});
+
+		this.addCommand({
+			id: "add-review",
+			name: "Add a review to the current note",
+			checkCallback: (checking) =>
+				this.withEntry(checking, (entry, file) => new LogSheet(this.app, this, { file, entry }).open()),
+		});
+
+		this.addCommand({
+			id: "manage-lists",
+			name: "Add to a list",
+			checkCallback: (checking) =>
+				this.withEntry(checking, (entry, file) => new ListPicker(this.app, this, entry, file).open()),
 		});
 
 		this.addCommand({
 			id: "toggle-liked",
 			name: "Toggle liked",
-			checkCallback: (checking) => {
-				const entry = this.currentEntry();
-				if (!entry) return false;
-				if (!checking) {
-					const file = this.app.vault.getAbstractFileByPath(entry.path);
-					if (file instanceof TFile) {
-						void this.notes.toggleLiked(file).then((on) => new Notice(on ? "Reel: liked." : "Reel: unliked."));
-					}
-				}
-				return true;
-			},
+			checkCallback: (checking) =>
+				this.withEntry(checking, (_entry, file) => {
+					void this.notes.toggleLiked(file).then((on) => new Notice(on ? "Reel: liked." : "Reel: unliked."));
+				}),
 		});
 
 		this.addCommand({
 			id: "refresh-metadata",
 			name: "Refresh metadata from TMDB",
-			checkCallback: (checking) => {
-				const entry = this.currentEntry();
-				if (!entry) return false;
-				if (!checking) {
+			checkCallback: (checking) =>
+				this.withEntry(checking, (entry) => {
 					void this.notes
 						.refreshMetadata(entry)
 						.then(() => new Notice("Reel: metadata refreshed."))
 						.catch((e) => new Notice(`Reel: ${redact(e)}`));
-				}
-				return true;
-			},
+				}),
 		});
 
 		this.addCommand({
@@ -184,6 +265,31 @@ export default class ReelPlugin extends Plugin {
 				try {
 					const n = await this.posters.backfill();
 					new Notice(`Reel: cached ${n} poster${n === 1 ? "" : "s"}.`);
+				} catch (e) {
+					new Notice(`Reel: ${redact(e)}`);
+				}
+			},
+		});
+
+		this.addCommand({
+			id: "import-legacy",
+			name: "Import notes from another tracker",
+			callback: async () => {
+				try {
+					const report = await this.importer.run();
+					if (!report.scanned) {
+						new Notice("Reel: found no notes to convert.");
+						return;
+					}
+					const scale = report.scaleHalved
+						? " Ratings were treated as out of 10 and halved."
+						: " Ratings were treated as already out of 5.";
+					new Notice(
+						`Reel: converted ${report.converted} of ${report.scanned} notes.${scale}` +
+							(report.skipped ? ` ${report.skipped} skipped.` : ""),
+						12000
+					);
+					if (report.errors.length) console.warn("Reel: import issues —", report.errors);
 				} catch (e) {
 					new Notice(`Reel: ${redact(e)}`);
 				}
@@ -213,40 +319,19 @@ export default class ReelPlugin extends Plugin {
 		});
 	}
 
-	private openSearch(opts: { watchlist?: boolean } = {}): void {
-		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
-			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
-			return;
-		}
-		new SearchModal(this.app, this, opts).open();
-	}
-
-	private currentEntry() {
-		const file = this.app.workspace.getActiveFile();
-		return file ? this.library.byPath(file.path) : undefined;
-	}
-
 	/* ------------------------------------------------------------------ */
 
-	/**
-	 * Once a day, refresh shows TMDB still marks as returning so Up Next can
-	 * badge them. Throttled and sequential — this runs at startup and must not
-	 * saturate a phone's connection.
-	 */
 	private async checkNewEpisodes(): Promise<void> {
 		const last = window.localStorage.getItem(NEW_EPISODE_CHECK_KEY);
 		if (last === todayISO()) return;
 
-		const returning = this.library
-			.shows()
-			.filter((s) => s.showStatus === "Returning Series" && s.status !== "dropped");
+		const returning = this.library.shows().filter((s) => s.showStatus === "Returning Series" && s.status !== "dropped");
 		if (!returning.length) {
 			window.localStorage.setItem(NEW_EPISODE_CHECK_KEY, todayISO());
 			return;
 		}
 
-		// Silent by design: no key, no check, no nag. The user will hit the
-		// prompt when they deliberately do something instead.
+		// Silent by design: no key, no check, no nag.
 		if (!this.credentials.isUnlocked && this.settings.keyMode !== "plain") return;
 
 		for (const show of returning) {
