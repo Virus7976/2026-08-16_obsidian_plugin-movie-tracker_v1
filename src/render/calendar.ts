@@ -32,14 +32,38 @@ class CalendarBlock extends MarkdownRenderChild {
 
 	onload(): void {
 		this.containerEl.addClass("reel-block");
-		this.render();
-		this.registerEvent(this.plugin.library.on("changed", () => this.render()));
+		const paint = () => paintUpcoming(this.plugin, this.containerEl, this.withinDays, true);
+		paint();
+		this.registerEvent(this.plugin.library.on("changed", paint));
 	}
+}
 
-	private render(): void {
+/**
+ * Shared by the code block and the Up next tab.
+ *
+ * `quiet` returns without rendering anything when there's nothing scheduled —
+ * an empty "Upcoming" heading under a populated Up Next list is just noise.
+ */
+export function paintUpcoming(
+	plugin: ReelPlugin,
+	containerEl: HTMLElement,
+	withinDays?: number,
+	showEmpty = false
+): void {
+	new CalendarPainter(plugin, containerEl, withinDays, showEmpty).render();
+}
+
+class CalendarPainter {
+	constructor(
+		private plugin: ReelPlugin,
+		private containerEl: HTMLElement,
+		private withinDays?: number,
+		private showEmpty = false
+	) {}
+
+	render(): void {
 		const el = this.containerEl;
 		el.empty();
-		el.createDiv({ cls: "reel-block-title", text: "Upcoming" });
 
 		const today = todayISO();
 		const rows = this.plugin
@@ -53,10 +77,14 @@ class CalendarBlock extends MarkdownRenderChild {
 			.sort((a, b) => (a.nextAirDate ?? "").localeCompare(b.nextAirDate ?? ""));
 
 		if (!rows.length) {
-			el.createDiv({ cls: "reel-empty", text: "Nothing scheduled. Only shows TMDB lists as returning appear here." });
+			if (this.showEmpty) {
+				el.createDiv({ cls: "reel-block-title", text: "Upcoming" });
+				el.createDiv({ cls: "reel-empty", text: "Nothing scheduled. Only shows TMDB lists as returning appear here." });
+			}
 			return;
 		}
 
+		el.createDiv({ cls: "reel-block-title", text: "Upcoming" });
 		const list = el.createDiv({ cls: "reel-upnext" });
 		for (const entry of rows) list.appendChild(this.row(entry, today));
 	}

@@ -15,6 +15,7 @@ import { renderPosterGrid, renderRowList } from "./render/grid";
 import { DetailScreen } from "./ui/detail";
 import { RateScreen } from "./ui/rate";
 import { paintUpNext } from "./render/upnext";
+import { paintUpcoming } from "./render/calendar";
 import { paintStats } from "./render/stats";
 import { viewings } from "./render/diary";
 import { sortEntries } from "./render/query";
@@ -64,6 +65,7 @@ export class ReelView extends ItemView {
 	private typeFilter: "all" | "film" | "tv" = "all";
 	private statusFilter: string | null = null;
 	private genreFilter: string | null = null;
+	private listFilter: string | null = null;
 	private sort = "watched";
 	/** Secondary sort, applied when the primary ties. */
 	private sort2 = "";
@@ -182,6 +184,9 @@ export class ReelView extends ItemView {
 			this.rateScreen.render(this.bodyEl);
 		} else if (this.tab === "upnext") {
 			paintUpNext(this.plugin, this.bodyEl);
+			// Upcoming lives here rather than in its own tab: "what am I part
+			// way through" and "what's about to air" are the same question.
+			paintUpcoming(this.plugin, this.bodyEl.createDiv({ cls: "reel-upcoming-section" }));
 		} else if (this.tab === "diary") {
 			this.paintDiary();
 		} else {
@@ -222,6 +227,18 @@ export class ReelView extends ItemView {
 			for (const g of genres.slice(0, 14)) {
 				chip(g, this.genreFilter === g, () => {
 					this.genreFilter = this.genreFilter === g ? null : g;
+				});
+			}
+		}
+
+		// Until now a title could be added to a list and then never seen
+		// again — there was nowhere that showed one.
+		const lists = this.plugin.library.lists();
+		if (lists.length) {
+			bar.createSpan({ cls: "reel-chip-sep", text: "·" });
+			for (const name of lists) {
+				chip(`☰ ${name}`, this.listFilter === name, () => {
+					this.listFilter = this.listFilter === name ? null : name;
 				});
 			}
 		}
@@ -273,6 +290,7 @@ export class ReelView extends ItemView {
 		if (this.typeFilter !== "all") rows = rows.filter((e) => e.type === this.typeFilter);
 		if (this.statusFilter) rows = rows.filter((e) => e.status === this.statusFilter);
 		if (this.genreFilter) rows = rows.filter((e) => e.genres.includes(this.genreFilter!));
+		if (this.listFilter) rows = rows.filter((e) => e.lists.includes(this.listFilter!));
 		rows = this.plugin.library.search(this.query, rows);
 		// Secondary sort first, primary second: a stable sort preserves the
 		// earlier order within ties, so sorting by the tiebreaker first is what
