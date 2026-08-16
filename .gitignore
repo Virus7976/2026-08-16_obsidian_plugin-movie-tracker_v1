@@ -1,7 +1,7 @@
 # Build output
 main.js
 *.js.map
-tests/.selftest.cjs
+tests/.*.cjs
 
 # Dependencies
 node_modules/

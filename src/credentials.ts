@@ -149,30 +149,56 @@ export class CredentialStore {
 		return true;
 	}
 
-	/** Re-encrypt / move the stored key when the mode changes. */
+	/**
+	 * Re-encrypt / move the stored key when the mode changes.
+	 *
+	 * The stored key is the only copy — there is no recovery — so nothing is
+	 * discarded until the re-store has actually succeeded. Both prompts
+	 * involved (unlocking the old key, choosing a new passphrase) can be
+	 * cancelled, and a cancel must leave the existing key exactly as it was
+	 * rather than destroying it as a side effect of touching a dropdown.
+	 */
 	async migrateTo(next: KeyMode): Promise<void> {
 		const s = this.plugin.settings;
 		const prev = s.keyMode;
 		if (prev === next) return;
 
+		const prevPlain = s.keyPlain;
+		const prevBlob = s.keyBlob;
+		const hadKey = this.hasStoredKey;
+
 		let key: string | null = this.plaintext;
-		if (!key && this.hasStoredKey) {
+		if (!key && hadKey) {
 			try {
 				key = await this.get();
 			} catch {
-				key = null; // locked and the user declined — just switch modes
+				// Locked and the user declined. Abort — switching the mode now
+				// would strand a key we can no longer read.
+				new Notice("Reel: couldn't unlock the existing key, so the storage mode is unchanged.");
+				return;
 			}
 		}
 
 		s.keyMode = next;
 		s.keyPlain = null;
 		s.keyBlob = null;
-		await this.plugin.saveSettings();
 
 		if (key) {
 			const ok = await this.store(key);
-			if (!ok) new Notice("Reel: mode changed, but the key wasn't saved. Re-enter it in settings.");
+			if (!ok) {
+				// Re-store was cancelled — put everything back.
+				s.keyMode = prev;
+				s.keyPlain = prevPlain;
+				s.keyBlob = prevBlob;
+				await this.plugin.saveSettings();
+				new Notice("Reel: storage mode unchanged — the key was left as it was.");
+				return;
+			}
+			return; // store() already saved
 		}
+
+		// Nothing was stored to begin with; just record the new mode.
+		if (!hadKey) await this.plugin.saveSettings();
 	}
 
 	/** Wipe everything, on disk and in memory. */
