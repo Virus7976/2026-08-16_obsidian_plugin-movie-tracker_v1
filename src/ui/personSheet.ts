@@ -155,23 +155,35 @@ export class PersonSheet extends Modal {
 			card.setAttr("tabindex", "0");
 			card.toggleClass("is-mine", !!mine);
 
-			// A still of them in it beats the marketing poster here: on one
-			// person's filmography you are looking at their work, not choosing
-			// what to watch. Falls back to the poster wherever TMDB has no
-			// tagged image, which is often.
+			// Poster and still side by side, not one instead of the other.
+			// They answer different questions — the poster is how you
+			// recognise the title, the still is what you came to this screen
+			// for. Swapping one for the other made well-known films harder to
+			// pick out of the grid.
 			const still = this.stills.get(c.id);
-			const poster = card.createDiv({ cls: "reel-person-credit-poster" });
-			poster.toggleClass("is-still", !!still);
+			const shots = card.createDiv({ cls: "reel-person-credit-shots" });
+			shots.toggleClass("has-still", !!still);
+
+			const poster = shots.createDiv({ cls: "reel-person-credit-poster" });
 			this.plugin.posters.attach(poster, {
-				posterUrl:
-					(still
-						? this.plugin.tmdb.posterUrl(still, "w300")
-						: this.plugin.tmdb.posterUrl(c.poster_path, "w342")) ?? undefined,
+				posterUrl: this.plugin.tmdb.posterUrl(c.poster_path, "w342") ?? undefined,
 				title: c.title ?? c.name ?? "",
 			});
 			// A tick rather than a colour alone, so "I own this" survives a
 			// glance and does not depend on seeing two cards side by side.
 			if (mine) poster.createSpan({ cls: "reel-person-credit-tick", text: "✓" });
+
+			if (still) {
+				const shot = shots.createDiv({ cls: "reel-person-credit-still" });
+				const img = shot.createEl("img", {
+					attr: { src: this.plugin.tmdb.posterUrl(still, "w300") ?? "", alt: "", loading: "lazy", decoding: "async" },
+				});
+				// A broken still must not leave a grey slab beside the poster.
+				img.addEventListener("error", () => {
+					shot.remove();
+					shots.removeClass("has-still");
+				});
+			}
 
 			card.createDiv({ cls: "reel-person-credit-title", text: c.title ?? c.name ?? "Untitled" });
 			const year = yearOf(c.release_date ?? c.first_air_date);
@@ -179,20 +191,67 @@ export class PersonSheet extends Modal {
 			const sub = [year ? String(year) : "", role].filter(Boolean).join(" · ");
 			if (sub) card.createDiv({ cls: "reel-person-credit-sub", text: sub });
 
-			const open = () => {
-				if (mine) {
-					this.close();
-					void this.plugin.openDetail(mine);
-				} else {
-					void this.add(c);
-				}
-			};
+			// Tapping inspects; it does not act.
+			//
+			// It used to add straight to the watchlist, which is a write you
+			// cannot see coming from a poster in a grid — and the thing you
+			// actually want on a filmography is "what did they play in this".
+			// Adding is still one tap, but it is now a button that says so.
+			const open = () => this.toggleRole(card, c, mine, role);
 			card.addEventListener("click", open);
 			card.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {
 					ev.preventDefault();
 					open();
 				}
+			});
+		}
+	}
+
+	/**
+	 * Expand a credit to show the role, with the actions spelled out.
+	 *
+	 * Only one panel is open at a time — a grid with six expanded cards is
+	 * harder to read than the grid was, and you are comparing one credit
+	 * against the rest, not several against each other.
+	 */
+	private toggleRole(
+		card: HTMLElement,
+		credit: TmdbPersonCredit,
+		mine: ReturnType<typeof this.plugin.library.byTmdbId>,
+		role: string
+	): void {
+		const existing = card.querySelector(".reel-person-role-panel");
+		card.doc.querySelectorAll(".reel-person-role-panel").forEach((el) => el.remove());
+		card.doc.querySelectorAll(".reel-person-credit.is-open").forEach((el) => el.removeClass("is-open"));
+		// A second tap on the same card closes it, rather than reopening it.
+		if (existing) return;
+
+		card.addClass("is-open");
+		const panel = card.createDiv({ cls: "reel-person-role-panel" });
+
+		if (role) {
+			panel.createDiv({ cls: "reel-person-role-label", text: credit.character ? "Played" : "Worked as" });
+			panel.createDiv({ cls: "reel-person-role-value", text: role });
+		} else {
+			panel.createDiv({ cls: "reel-dim", text: "No role recorded for this credit." });
+		}
+
+		if (credit.overview) panel.createDiv({ cls: "reel-person-role-overview", text: credit.overview });
+
+		const actions = panel.createDiv({ cls: "reel-person-role-actions" });
+		if (mine) {
+			const openIt = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open in your library" });
+			openIt.addEventListener("click", (ev) => {
+				ev.stopPropagation();
+				this.close();
+				void this.plugin.openDetail(mine);
+			});
+		} else {
+			const add = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
+			add.addEventListener("click", (ev) => {
+				ev.stopPropagation();
+				void this.add(credit);
 			});
 		}
 	}
