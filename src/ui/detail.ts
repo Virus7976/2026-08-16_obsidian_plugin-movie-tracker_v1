@@ -17,7 +17,15 @@
 
 import { Notice, TFile, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
-import type { Entry, TmdbEpisode } from "../types";
+import type {
+	Entry,
+	TmdbEpisode,
+	TmdbFilm,
+	TmdbShow,
+	TmdbCastMember,
+	TmdbCrew,
+	TmdbSearchResult,
+} from "../types";
 import { redact } from "../secrets";
 import { formatMinutes, prettyDate } from "../util/dates";
 import { formatRange, parseRange, rangeCount } from "../util/ranges";
@@ -180,6 +188,19 @@ export class DetailScreen {
 		if (imdb) link("IMDb", imdb, "imdb");
 		link("TMDB", tmdbUrl(e.tmdbId, e.type), "tmdb");
 
+		// IMDb's parental guide, deep-linked rather than reproduced. The
+		// severity bands and per-item notes are community-maintained and have
+		// no public API; scraping them would break the first time IMDb touched
+		// their markup. A link is always current and always complete.
+		if (imdb) link("Parents guide", `${imdb}parentalguide`, "guide");
+
+		// JustWatch resolves "where can I actually watch this" across every
+		// service, which the providers list only approximates. Their paths are
+		// lowercase country codes, and the region is already a setting — this
+		// must not be hardcoded to wherever the author happens to live.
+		const region = (this.plugin.settings.region || "US").toLowerCase();
+		link("JustWatch", `https://www.justwatch.com/${region}/search?q=${encodeURIComponent(e.title)}`, "justwatch");
+
 		/* ---- columns ---------------------------------------------------- */
 		const cols = page.createDiv({ cls: "reel-detail-cols" });
 		const side = cols.createDiv({ cls: "reel-detail-side" });
@@ -191,6 +212,254 @@ export class DetailScreen {
 
 		if (isTv) this.renderSeasons(main);
 		else this.renderHistory(main);
+
+		// Everything TMDB knows, behind tabs. Loaded lazily so the screen you
+		// came for — rating, status, progress — paints immediately and the
+		// reference material arrives a moment later.
+		void this.renderFacets(main, isTv);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Facets — everything TMDB knows, behind tabs                         */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Cast, crew, production details, genres, releases and related titles.
+	 *
+	 * Tabbed rather than stacked because this is reference material: you come
+	 * looking for one specific thing, and five collapsed sections beat one
+	 * very long scroll. The payload is the same cached `getFilm`/`getShow`
+	 * response the rest of the plugin uses, so opening this costs nothing
+	 * after the first time.
+	 */
+	private async renderFacets(main: HTMLElement, isTv: boolean): Promise<void> {
+		const wrap = main.createDiv({ cls: "reel-facets" });
+		wrap.createDiv({ cls: "reel-loading", text: "Loading details…", attr: { role: "status" } });
+
+		let meta: TmdbFilm | TmdbShow;
+		try {
+			meta = isTv ? await this.plugin.tmdb.getShow(this.entry.tmdbId) : await this.plugin.tmdb.getFilm(this.entry.tmdbId);
+		} catch (e) {
+			wrap.empty();
+			wrap.createDiv({ cls: "reel-error", text: redact(e) });
+			return;
+		}
+		// The screen may have been closed, or another title opened, while the
+		// request was in flight.
+		if (!wrap.isConnected) return;
+		wrap.empty();
+
+		const film = isTv ? undefined : (meta as TmdbFilm);
+		const cast = (isTv ? (meta as TmdbShow).aggregate_credits?.cast : film?.credits?.cast) ?? [];
+		const crew = (isTv ? (meta as TmdbShow).aggregate_credits?.crew : film?.credits?.crew) ?? [];
+		const related = meta.recommendations?.results ?? [];
+
+		const tabs: { id: string; label: string; render: (el: HTMLElement) => void }[] = [];
+
+		if (cast.length) tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
+		if (crew.length) tabs.push({ id: "crew", label: "Crew", render: (el) => this.renderPeople(el, crew, false) });
+		tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
+		if (meta.genres?.length) tabs.push({ id: "genre", label: "Genre", render: (el) => this.renderGenres(el, meta.genres ?? []) });
+		if (film?.release_dates?.results?.length) {
+			tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film) });
+		}
+		if (related.length) tabs.push({ id: "related", label: "Related", render: (el) => this.renderRelated(el, related) });
+
+		if (!tabs.length) return;
+
+		const bar = wrap.createDiv({ cls: "reel-facet-tabs" });
+		const body = wrap.createDiv({ cls: "reel-facet-body" });
+		const buttons: HTMLElement[] = [];
+
+		const show = (i: number) => {
+			buttons.forEach((b, n) => b.toggleClass("is-active", n === i));
+			body.empty();
+			tabs[i].render(body);
+		};
+
+		tabs.forEach((t, i) => {
+			const b = bar.createEl("button", { cls: "reel-facet-tab", text: t.label, attr: { type: "button" } });
+			buttons.push(b);
+			b.addEventListener("click", () => show(i));
+		});
+		show(0);
+	}
+
+	/**
+	 * A list of people with headshots.
+	 *
+	 * Tapping one searches your own library for them, which is the question
+	 * you actually have standing on this screen — "what else of theirs have I
+	 * seen?" — rather than opening a biography you did not ask for.
+	 */
+	private renderPeople(el: HTMLElement, people: (TmdbCastMember | TmdbCrew)[], asCast: boolean): void {
+		const list = el.createDiv({ cls: "reel-people" });
+		for (const p of people.slice(0, 40)) {
+			const row = list.createDiv({ cls: "reel-person" });
+			row.setAttr("role", "button");
+			row.setAttr("tabindex", "0");
+
+			const shot = row.createDiv({ cls: "reel-person-shot" });
+			const src = this.plugin.tmdb.posterUrl(p.profile_path, "w185");
+			if (src) {
+				const img = shot.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+				img.addEventListener("error", () => {
+					img.remove();
+					shot.addClass("is-empty");
+					shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+				});
+			} else {
+				shot.addClass("is-empty");
+				shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+			}
+
+			const body = row.createDiv({ cls: "reel-person-body" });
+			body.createDiv({ cls: "reel-person-name", text: p.name });
+			const sub = asCast
+				? ((p as TmdbCastMember).character ?? (p as TmdbCastMember).roles?.[0]?.character ?? "")
+				: ((p as TmdbCrew).job ?? "");
+			if (sub) body.createDiv({ cls: "reel-person-role", text: sub });
+
+			const open = () => void this.plugin.openViewWithSearch(p.name);
+			row.addEventListener("click", open);
+			row.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key === "Enter" || ev.key === " ") {
+					ev.preventDefault();
+					open();
+				}
+			});
+		}
+	}
+
+	/** Studios, country, language, alternative titles, and the money. */
+	private renderFacts(el: HTMLElement, meta: TmdbFilm | TmdbShow, isTv: boolean): void {
+		const film = isTv ? undefined : (meta as TmdbFilm);
+		const group = (label: string, values: string[]) => {
+			if (!values.length) return;
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: label });
+			for (const v of values) box.createDiv({ cls: "reel-facet-value", text: v });
+		};
+
+		group("Studios", (meta.production_companies ?? []).map((c) => c.name).filter(Boolean));
+		group("Country", (film?.production_countries ?? []).map((c) => c.name ?? "").filter(Boolean));
+		group(
+			"Language",
+			(film?.spoken_languages ?? []).map((l) => l.english_name ?? l.name ?? "").filter(Boolean)
+		);
+
+		if (film && (film.budget || film.revenue)) {
+			const money = (n?: number) => (n ? `$${n.toLocaleString()}` : "not reported");
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: "Box office" });
+			box.createDiv({ cls: "reel-facet-value", text: `Budget — ${money(film.budget)}` });
+			box.createDiv({ cls: "reel-facet-value", text: `Revenue — ${money(film.revenue)}` });
+			if (film.budget && film.revenue) {
+				const x = film.revenue / film.budget;
+				box.createDiv({ cls: "reel-facet-value", text: `Returned ${x.toFixed(1)}× its budget` });
+			}
+		}
+
+		// Alternative titles are how you find a film you know under another
+		// name, so the local one is worth surfacing before the rest.
+		const alts = (film?.alternative_titles?.titles ?? [])
+			.filter((t) => t.title)
+			.slice(0, 8)
+			.map((t) => (t.iso_3166_1 ? `${t.title} (${t.iso_3166_1})` : (t.title ?? "")));
+		group("Also known as", alts);
+	}
+
+	private renderGenres(el: HTMLElement, genres: { name: string }[]): void {
+		const box = el.createDiv({ cls: "reel-facet-group" });
+		box.createDiv({ cls: "reel-facet-label", text: "Genre" });
+		const chips = box.createDiv({ cls: "reel-chips" });
+		for (const g of genres) {
+			const chip = chips.createEl("button", { cls: "reel-chip", text: g.name, attr: { type: "button" } });
+			// Genres are a filter in your own library, not a lookup.
+			chip.addEventListener("click", () => void this.plugin.openViewWithSearch(g.name));
+		}
+	}
+
+	/** Per-country release dates, grouped by kind, as TMDB reports them. */
+	private renderReleases(el: HTMLElement, film: TmdbFilm): void {
+		const KIND: Record<number, string> = {
+			1: "Premiere",
+			2: "Theatrical limited",
+			3: "Theatrical",
+			4: "Digital",
+			5: "Physical",
+			6: "TV",
+		};
+		const rows: { kind: string; country: string; date?: string; cert?: string; note?: string }[] = [];
+		for (const r of film.release_dates?.results ?? []) {
+			for (const d of r.release_dates ?? []) {
+				rows.push({
+					kind: KIND[d.type ?? 3] ?? "Release",
+					country: r.iso_3166_1 ?? "",
+					date: d.release_date,
+					cert: d.certification || undefined,
+					note: d.note || undefined,
+				});
+			}
+		}
+		if (!rows.length) {
+			el.createDiv({ cls: "reel-empty", text: "No release dates recorded." });
+			return;
+		}
+
+		// Your own region first — it is the only row most people are looking
+		// for, and it is otherwise buried alphabetically among fifty others.
+		const mine = (this.plugin.settings.region || "US").toUpperCase();
+		rows.sort((a, b) => {
+			if (a.country === mine && b.country !== mine) return -1;
+			if (b.country === mine && a.country !== mine) return 1;
+			return (a.date ?? "").localeCompare(b.date ?? "");
+		});
+
+		for (const kind of Object.values(KIND)) {
+			const group = rows.filter((r) => r.kind === kind);
+			if (!group.length) continue;
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: kind });
+			for (const r of group.slice(0, 30)) {
+				const line = box.createDiv({ cls: "reel-release-row" });
+				line.createSpan({ cls: "reel-release-date", text: r.date ? prettyDate(r.date.slice(0, 10)) : "—" });
+				line.createSpan({ cls: "reel-release-country", text: r.country });
+				if (r.cert) line.createSpan({ cls: "reel-badge cert", text: r.cert });
+				if (r.note) line.createSpan({ cls: "reel-dim", text: r.note });
+			}
+		}
+	}
+
+	/** Titles TMDB associates with this one — the "what next" question. */
+	private renderRelated(el: HTMLElement, rows: TmdbSearchResult[]): void {
+		const strip = el.createDiv({ cls: "reel-related" });
+		for (const r of rows.slice(0, 20)) {
+			const card = strip.createDiv({ cls: "reel-related-card" });
+			card.setAttr("role", "button");
+			card.setAttr("tabindex", "0");
+			const poster = card.createDiv({ cls: "reel-related-poster" });
+			this.plugin.posters.attach(poster, {
+				posterUrl: this.plugin.tmdb.posterUrl(r.poster_path, "w342") ?? undefined,
+				title: r.title ?? r.name ?? "",
+			});
+			card.createDiv({ cls: "reel-related-title", text: r.title ?? r.name ?? "Untitled" });
+
+			// Already yours? Open it. Otherwise offer to add it — the two
+			// things you might want, without a third screen in between.
+			const open = () => {
+				const mine = this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film");
+				if (mine) void this.plugin.openDetail(mine);
+				else this.plugin.openSearch({ query: r.title ?? r.name ?? "" });
+			};
+			card.addEventListener("click", open);
+			card.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key === "Enter" || ev.key === " ") {
+					ev.preventDefault();
+					open();
+				}
+			});
+		}
 	}
 
 	/** Mean of every episode rating across all seasons, or null if none. */

@@ -3060,3 +3060,218 @@ input.reel-input {
 	padding: 0;
 	min-height: 0;
 }
+
+/* ---------------- detail facets ---------------- */
+
+/*
+ * Cast / Crew / Details / Genre / Releases / Related.
+ *
+ * Tabs rather than stacked sections: this is reference material you come to
+ * with one question, and five collapsed panels beat a very long scroll.
+ */
+.reel-facets {
+	margin-top: 20px;
+	border-top: 1px solid var(--background-modifier-border);
+	padding-top: 4px;
+}
+
+.reel-facet-tabs {
+	display: flex;
+	gap: 2px;
+	overflow-x: auto;
+	scrollbar-width: none;
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 12px;
+}
+
+.reel-facet-tabs::-webkit-scrollbar {
+	display: none;
+}
+
+.reel-facet-tab {
+	flex: 0 0 auto;
+	background: none;
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+	padding: 10px 14px;
+	min-height: 44px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	cursor: pointer;
+	/* The underline is the selected state, so it must not shift the row when
+	   it appears — a transparent one is always present. */
+	border-bottom: 2px solid transparent;
+}
+
+.reel-facet-tab.is-active {
+	color: var(--text-normal);
+	border-bottom-color: var(--interactive-accent);
+}
+
+.reel-facet-group {
+	margin-bottom: 16px;
+}
+
+.reel-facet-label {
+	font-size: var(--font-ui-smaller);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-faint);
+	margin-bottom: 6px;
+}
+
+.reel-facet-value {
+	padding: 7px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-small);
+}
+
+.reel-facet-value:last-child {
+	border-bottom: none;
+}
+
+/* ---- people ---- */
+
+.reel-people {
+	display: flex;
+	flex-direction: column;
+}
+
+.reel-person {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 4px;
+	border-radius: var(--reel-radius);
+	cursor: pointer;
+	min-height: 56px;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-person:hover,
+.reel-person:focus-visible {
+	background: var(--background-modifier-hover);
+	outline: none;
+}
+
+.reel-person-shot {
+	flex: 0 0 44px;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-person-shot img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-person-shot.is-empty .reel-placeholder-text {
+	font-size: var(--font-ui-smaller);
+	font-weight: 700;
+	color: var(--text-faint);
+	text-transform: uppercase;
+}
+
+.reel-person-body {
+	min-width: 0;
+}
+
+.reel-person-name {
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-person-role {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ---- releases ---- */
+
+.reel-release-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-small);
+}
+
+.reel-release-row:last-child {
+	border-bottom: none;
+}
+
+.reel-release-date {
+	color: var(--text-muted);
+	min-width: 96px;
+}
+
+.reel-release-country {
+	font-weight: 600;
+}
+
+/* ---- related ---- */
+
+.reel-related {
+	display: flex;
+	align-items: stretch;
+	gap: 12px;
+	overflow-x: auto;
+	padding-bottom: 6px;
+	scroll-snap-type: x proximity;
+	-webkit-overflow-scrolling: touch;
+}
+
+.reel-related-card {
+	flex: 0 0 108px;
+	width: 108px;
+	scroll-snap-align: start;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-related-card:active .reel-related-poster {
+	transform: scale(0.97);
+}
+
+.reel-related-poster {
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 120ms ease;
+}
+
+.reel-related-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-related-title {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.3;
+	color: var(--text-muted);
+}

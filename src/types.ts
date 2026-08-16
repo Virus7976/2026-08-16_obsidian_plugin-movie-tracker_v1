@@ -120,6 +120,10 @@ export interface TmdbSearchResult {
 export interface TmdbCrew {
 	job?: string;
 	name: string;
+	/** Headshot path, as on cast. Often absent below the top billing. */
+	profile_path?: string | null;
+	id?: number;
+	department?: string;
 }
 
 /**
@@ -130,6 +134,23 @@ export interface TmdbCastMember {
 	name: string;
 	character?: string;
 	roles?: { character?: string }[];
+	/** Headshot path. Absent for plenty of people — the UI falls back to initials. */
+	profile_path?: string | null;
+	id?: number;
+	order?: number;
+}
+
+/** One country's release for a film, from the release_dates append. */
+export interface TmdbReleaseDate {
+	certification?: string;
+	release_date?: string;
+	/** TMDB's numeric kind: 1 premiere, 2 limited, 3 theatrical, 4 digital, 5 physical, 6 TV. */
+	type?: number;
+	note?: string;
+}
+
+export interface TmdbReleaseDates {
+	results?: { iso_3166_1?: string; release_dates?: TmdbReleaseDate[] }[];
 }
 
 export interface TmdbVideo {
@@ -161,10 +182,15 @@ export interface TmdbFilm {
 	credits?: { crew?: TmdbCrew[]; cast?: TmdbCastMember[] };
 	keywords?: { keywords?: { name: string }[] };
 	videos?: { results?: TmdbVideo[] };
-	release_dates?: unknown;
+	release_dates?: TmdbReleaseDates;
 	external_ids?: { imdb_id?: string | null };
 	imdb_id?: string | null;
 	"watch/providers"?: TmdbProviderBlock;
+	production_countries?: { iso_3166_1?: string; name?: string }[];
+	spoken_languages?: { english_name?: string; name?: string }[];
+	alternative_titles?: { titles?: { iso_3166_1?: string; title?: string }[] };
+	recommendations?: { results?: TmdbSearchResult[] };
+	homepage?: string;
 }
 
 export interface TmdbSeason {
@@ -197,6 +223,9 @@ export interface TmdbShow {
 	content_ratings?: unknown;
 	external_ids?: { imdb_id?: string | null };
 	"watch/providers"?: TmdbProviderBlock;
+	recommendations?: { results?: TmdbSearchResult[] };
+	alternative_titles?: { results?: { iso_3166_1?: string; title?: string }[] };
+	homepage?: string;
 }
 
 export interface TmdbEpisode {

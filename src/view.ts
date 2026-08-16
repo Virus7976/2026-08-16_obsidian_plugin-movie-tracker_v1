@@ -201,6 +201,24 @@ export class ReelView extends ItemView {
 	 * stacks a second one that lives until the view unloads. Five uses of the
 	 * per-tab commands and every change would repaint six times.
 	 */
+	/**
+	 * Jump to the Library filtered by a term — a cast member, a genre.
+	 *
+	 * Tapping an actor on the detail screen asks "what else of theirs have I
+	 * seen?", and the library search already answers exactly that across
+	 * cast, director and genre. Reusing it beats a second lookup screen.
+	 */
+	searchFor(query: string): void {
+		this.tab = "library";
+		this.detail = null;
+		this.plugin.settings.lastTab = "library";
+		void this.plugin.saveSettings();
+		this.paint();
+		this.query = query;
+		if (this.searchEl) this.searchEl.value = query;
+		this.paint();
+	}
+
 	showTab(tab: string): void {
 		if (!TABS.some((t) => t.id === tab)) return;
 		this.tab = tab as Tab;

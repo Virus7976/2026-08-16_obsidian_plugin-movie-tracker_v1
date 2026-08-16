@@ -157,6 +157,14 @@ export default class ReelPlugin extends Plugin {
 		if (view instanceof ReelView) view.openDetail(entry);
 	}
 
+	/** Open the Library filtered by a term — used by cast and genre taps. */
+	async openViewWithSearch(query: string): Promise<void> {
+		await this.openView();
+		const leaf = this.app.workspace.getLeavesOfType(REEL_VIEW)[0];
+		const view = leaf?.view;
+		if (view instanceof ReelView) view.searchFor(query);
+	}
+
 	/**
 	 * Find, confirm, then remove. Lives here rather than in either caller so
 	 * the command and the settings button cannot drift apart — a confirmation

@@ -254,7 +254,11 @@ export class TmdbClient {
 			`movie-${id}`,
 			() =>
 				this.request<TmdbFilm>(`/movie/${id}`, {
-					append_to_response: "credits,watch/providers,keywords,videos,release_dates,external_ids",
+					// recommendations and alternative_titles ride along for free:
+					// append_to_response is still a single HTTP request, and
+					// the detail screen wants both the moment it opens.
+					append_to_response:
+						"credits,watch/providers,keywords,videos,release_dates,external_ids,recommendations,alternative_titles",
 				}),
 			true // a released film's credits and runtime don't change
 		);
@@ -263,7 +267,8 @@ export class TmdbClient {
 	async getShow(id: number): Promise<TmdbShow> {
 		const fetcher = () =>
 			this.request<TmdbShow>(`/tv/${id}`, {
-				append_to_response: "aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids",
+				append_to_response:
+					"aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids,recommendations,alternative_titles",
 			});
 		// A returning series gains episodes, so its record must expire.
 		const cacheKey = `tv-${id}`;
