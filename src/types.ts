@@ -163,20 +163,13 @@ export interface TmdbPerson {
 	};
 }
 
-/**
- * An image a person is tagged in. `media` identifies the title it came from,
- * which is the only reason this is more useful than a plain headshot.
- */
-export interface TmdbTaggedImage {
-	file_path?: string;
-	aspect_ratio?: number;
-	media?: { id?: number; media_type?: string };
-}
-
 export interface TmdbPersonCredit extends TmdbSearchResult {
 	character?: string;
 	job?: string;
 	popularity?: number;
+	/** A frame from the title — the credit carries it, so it costs nothing. */
+	backdrop_path?: string | null;
+	genre_ids?: number[];
 }
 
 /** One country's release for a film, from the release_dates append. */

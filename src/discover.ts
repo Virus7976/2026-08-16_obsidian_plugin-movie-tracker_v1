@@ -275,6 +275,44 @@ export class DiscoverEngine {
 		return this.filterOut(items);
 	}
 
+	/**
+	 * "Something like this one."
+	 *
+	 * TMDB's recommendations are drawn from what people who watched one title
+	 * went on to watch, which is a better answer to "like X" than metadata
+	 * similarity — it catches tone and register, not just a shared genre tag.
+	 *
+	 * The remaining filters then narrow that set rather than widening it, so
+	 * "an action comedy like X" means titles like X that are *also* action
+	 * comedies, not a mixture of the two ideas. Filtering locally is the only
+	 * option: /recommendations takes no genre or decade parameters.
+	 */
+	async like(
+		seed: { id: number; type: "movie" | "tv" },
+		filters: { genreIds?: number[]; decade?: number | null; minRating?: number | null } = {}
+	): Promise<TmdbSearchResult[]> {
+		const items = await this.plugin.tmdb.recommendations(seed.id, seed.type);
+
+		const wanted = filters.genreIds ?? [];
+		const filtered = items.filter((item) => {
+			// Recommendations carry genre_ids rather than full genre objects.
+			const ids = (item as { genre_ids?: number[] }).genre_ids ?? [];
+			// Every named genre must be present — "action comedy" means both,
+			// which is the whole point of naming two.
+			if (wanted.length && !wanted.every((g) => ids.includes(g))) return false;
+
+			if (filters.minRating && (item.vote_average ?? 0) < filters.minRating) return false;
+
+			if (filters.decade) {
+				const year = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
+				if (!year || year < filters.decade || year >= filters.decade + 10) return false;
+			}
+			return true;
+		});
+
+		return this.filterOut(filtered);
+	}
+
 	/** One row, filtered against the library and your content policy. */
 	private row(id: string, title: string, items: TmdbSearchResult[], reason?: string): DiscoverRow {
 		return { id, title, reason, items: this.filterOut(items) };

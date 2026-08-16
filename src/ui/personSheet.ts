@@ -21,8 +21,6 @@ import { todayISO, yearOf } from "../util/dates";
 
 export class PersonSheet extends Modal {
 	private busy = false;
-	/** Title id → a still of this person in it, where TMDB has one. */
-	private stills = new Map<number, string>();
 
 	constructor(
 		private plugin: ReelPlugin,
@@ -54,22 +52,6 @@ export class PersonSheet extends Modal {
 		}
 		// The sheet may have been dismissed while the request was in flight.
 		if (!this.contentEl.isConnected) return;
-
-		// Stills of this person in each title, where TMDB has them. Fetched
-		// alongside rather than before: the filmography is useful without
-		// them, so it must not wait on a bonus that often returns nothing.
-		const tagged = await this.plugin.tmdb.getPersonTaggedImages(this.personId);
-		if (!this.contentEl.isConnected) return;
-
-		for (const img of tagged) {
-			const id = img.media?.id;
-			if (!id || !img.file_path) continue;
-			// Landscape only. A tagged portrait is usually a red-carpet photo
-			// rather than a frame from the title, and it crops badly into a
-			// wide card.
-			if ((img.aspect_ratio ?? 0) < 1.2) continue;
-			if (!this.stills.has(id)) this.stills.set(id, img.file_path);
-		}
 
 		this.contentEl.empty();
 		this.renderHead(person);
@@ -155,16 +137,10 @@ export class PersonSheet extends Modal {
 			card.setAttr("tabindex", "0");
 			card.toggleClass("is-mine", !!mine);
 
-			// Poster and still side by side, not one instead of the other.
-			// They answer different questions — the poster is how you
-			// recognise the title, the still is what you came to this screen
-			// for. Swapping one for the other made well-known films harder to
-			// pick out of the grid.
-			const still = this.stills.get(c.id);
-			const shots = card.createDiv({ cls: "reel-person-credit-shots" });
-			shots.toggleClass("has-still", !!still);
-
-			const poster = shots.createDiv({ cls: "reel-person-credit-poster" });
+			// The grid stays clean posters — that is what makes sixty titles
+			// scannable. The frame from the film belongs in the expanded panel,
+			// where there is room for it and where you have asked for detail.
+			const poster = card.createDiv({ cls: "reel-person-credit-poster" });
 			this.plugin.posters.attach(poster, {
 				posterUrl: this.plugin.tmdb.posterUrl(c.poster_path, "w342") ?? undefined,
 				title: c.title ?? c.name ?? "",
@@ -173,17 +149,6 @@ export class PersonSheet extends Modal {
 			// glance and does not depend on seeing two cards side by side.
 			if (mine) poster.createSpan({ cls: "reel-person-credit-tick", text: "✓" });
 
-			if (still) {
-				const shot = shots.createDiv({ cls: "reel-person-credit-still" });
-				const img = shot.createEl("img", {
-					attr: { src: this.plugin.tmdb.posterUrl(still, "w300") ?? "", alt: "", loading: "lazy", decoding: "async" },
-				});
-				// A broken still must not leave a grey slab beside the poster.
-				img.addEventListener("error", () => {
-					shot.remove();
-					shots.removeClass("has-still");
-				});
-			}
 
 			card.createDiv({ cls: "reel-person-credit-title", text: c.title ?? c.name ?? "Untitled" });
 			const year = yearOf(c.release_date ?? c.first_air_date);
@@ -229,6 +194,31 @@ export class PersonSheet extends Modal {
 
 		card.addClass("is-open");
 		const panel = card.createDiv({ cls: "reel-person-role-panel" });
+
+		// A frame from the film, here rather than on the card.
+		//
+		// It started on the card and was wrong there: sixty backdrops make a
+		// grid unscannable, and the poster is what you recognise a title by.
+		// This is the moment you have asked for detail, so this is where the
+		// picture earns its space.
+		//
+		// It is the title's backdrop, which comes free on the credit. TMDB has
+		// no reliable way to get a still of *this person* in *this title* —
+		// tagged_images returns nothing for most people and alternate poster
+		// art for the rest — so this is a scene from the film, not a
+		// guaranteed shot of them, and it is labelled accordingly.
+		if (credit.backdrop_path) {
+			const shot = panel.createDiv({ cls: "reel-person-role-still" });
+			const img = shot.createEl("img", {
+				attr: {
+					src: this.plugin.tmdb.posterUrl(credit.backdrop_path, "w500") ?? "",
+					alt: "",
+					loading: "lazy",
+					decoding: "async",
+				},
+			});
+			img.addEventListener("error", () => shot.remove());
+		}
 
 		if (role) {
 			panel.createDiv({ cls: "reel-person-role-label", text: credit.character ? "Played" : "Worked as" });

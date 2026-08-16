@@ -5,6 +5,15 @@ import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
 import { KEY_LABELS, KeyBundle, KeyName } from "./credentials";
 
+/** What you think of a person, used to weight what gets recommended. */
+export interface PersonOpinion {
+	name: string;
+	liked?: boolean;
+	rating?: number;
+	/** "Acting" or "Directing" — decides which TMDB credit field to search. */
+	department?: string;
+}
+
 export interface ReelSettings {
 	/* Credentials — see credentials.ts. Only one of keyPlain / keyBlob is ever set. */
 	keyMode: KeyMode;
@@ -37,6 +46,15 @@ export interface ReelSettings {
 	lastEpisodeCheck: string;
 	/** TMDB ids dismissed in Discover. "Not interested" has to stick. */
 	dismissedIds: number[];
+	/**
+	 * People you have liked or rated, keyed by TMDB person id.
+	 *
+	 * Kept in settings rather than as notes: a person is not something you
+	 * watch, so giving them a note would put non-titles in your film folders
+	 * and into every query that reads them. This is a preference about how
+	 * recommendations should lean, which is exactly what settings are for.
+	 */
+	people: Record<string, PersonOpinion>;
 	/** The Reel view reopens where you left it. */
 	lastTab: string;
 
@@ -80,6 +98,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dailyNoteFolder: "",
 	lastEpisodeCheck: "",
 	dismissedIds: [],
+	people: {},
 	lastTab: "library",
 
 	hideFlags: [],

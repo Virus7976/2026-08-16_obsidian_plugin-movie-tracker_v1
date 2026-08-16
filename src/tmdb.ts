@@ -26,7 +26,6 @@ import type {
 	TmdbPerson,
 	TmdbSearchResult,
 	TmdbShow,
-	TmdbTaggedImage,
 } from "./types";
 
 const API = "https://api.themoviedb.org/3";
@@ -295,30 +294,6 @@ export class TmdbClient {
 		return this.cached(`person-${id}`, () =>
 			this.request<TmdbPerson>(`/person/${id}`, { append_to_response: "combined_credits" })
 		);
-	}
-
-	/**
-	 * Images a person is tagged in, each carrying the title it came from.
-	 *
-	 * This is what turns a filmography from a wall of posters into "here they
-	 * are in it" — a still of the actual performance rather than the marketing
-	 * art, which is the more useful image when you are looking at one person's
-	 * work rather than choosing what to watch.
-	 *
-	 * Treated as a bonus throughout. TMDB has signalled this endpoint as
-	 * legacy, coverage is patchy even where it works, and every caller must
-	 * still look right with an empty result — so failure returns nothing
-	 * rather than propagating.
-	 */
-	async getPersonTaggedImages(id: number): Promise<TmdbTaggedImage[]> {
-		try {
-			const data = await this.cached(`tagged-${id}`, () =>
-				this.request<{ results?: TmdbTaggedImage[] }>(`/person/${id}/tagged_images`, {})
-			);
-			return data.results ?? [];
-		} catch {
-			return [];
-		}
 	}
 
 	/**
