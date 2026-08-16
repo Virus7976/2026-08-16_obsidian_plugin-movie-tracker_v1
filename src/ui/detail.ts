@@ -818,7 +818,7 @@ export class DetailScreen {
 					await this.plugin.notes.setRating(file, v ?? null);
 					this.entry = { ...this.entry, rating: v };
 					flash(starRow);
-					new Notice(v == null ? "Rating cleared" : `Rated ${v}`);
+					this.plugin.undo.offer(v == null ? "Rating cleared" : `Rated ${v}`);
 				} catch (err) {
 					new Notice(`Reel: ${redact(err)}`);
 				}
@@ -915,14 +915,14 @@ export class DetailScreen {
 					const file = this.file;
 					if (!file) return;
 					await this.plugin.notes.markEpisode(file, next.season, next.episode);
-					new Notice(`S${next.season}E${next.episode} watched`);
+					this.plugin.undo.offer(`S${next.season}E${next.episode} watched`);
 				});
 			}
 			act("Start a rewatch", false, async () => {
 				const file = this.file;
 				if (!file) return;
 				await this.plugin.notes.restartSeries(file, e.rating);
-				new Notice("Progress reset — previous run recorded");
+				this.plugin.undo.offer("Progress reset — previous run recorded");
 			});
 		}
 
@@ -1077,14 +1077,15 @@ export class DetailScreen {
 			const file = this.file;
 			if (!file || !episodes) return;
 			await this.plugin.notes.setSeasonRange(file, season, `1-${episodes.length}`);
-			new Notice(`Season ${season} marked watched`);
+			this.plugin.undo.offer(`Season ${season} marked watched`);
 		});
 		const clear = bulk.createEl("button", { cls: "reel-chip", text: "Clear" });
 		clear.addEventListener("click", async () => {
 			const file = this.file;
 			if (!file) return;
 			await this.plugin.notes.setSeasonRange(file, season, "");
-			new Notice(`Season ${season} cleared`);
+			// The one bulk action that throws away every tick in a season.
+			this.plugin.undo.offer(`Season ${season} cleared`);
 		});
 
 		for (const ep of episodes) {
@@ -1138,7 +1139,7 @@ export class DetailScreen {
 						epRow.addClass("is-watched");
 					}
 					await this.plugin.notes.rateEpisode(file, season, n, v ?? null);
-					new Notice(v == null ? `S${season}E${n} cleared` : `S${season}E${n} rated ${v}`);
+					this.plugin.undo.offer(v == null ? `S${season}E${n} cleared` : `S${season}E${n} rated ${v}`);
 				},
 			});
 

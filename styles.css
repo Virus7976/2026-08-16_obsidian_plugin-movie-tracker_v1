@@ -4393,3 +4393,49 @@ input.reel-input {
 		flex-basis: 34px;
 	}
 }
+
+/* ------------------------------------------------------------------ */
+/* Undo                                                                */
+/* ------------------------------------------------------------------ */
+
+/* The notice becomes a row: what happened on the left, the way to take it
+   back on the right. Obsidian's own notice styling assumes text only, so the
+   layout has to be set here rather than inherited. */
+.reel-undo-notice {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	justify-content: space-between;
+}
+
+/* Full-height and 44px wide so it can be hit with a thumb without aiming —
+   this button exists because a mis-tap already happened, and a small target
+   would be an odd thing to answer that with. */
+.reel-undo-btn {
+	flex: 0 0 auto;
+	min-height: 34px;
+	padding: 0 14px;
+	border-radius: var(--reel-radius);
+	border: 1px solid var(--background-modifier-border-hover);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.reel-undo-btn:hover {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+	color: var(--text-normal);
+}
+
+.reel-undo-btn:active {
+	transform: scale(0.96);
+}
+
+.reel-undo-btn[disabled] {
+	opacity: 0.5;
+	cursor: default;
+}

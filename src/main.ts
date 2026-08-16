@@ -8,6 +8,7 @@ import { PosterStore } from "./posters";
 import { Importer } from "./importer";
 import { DtddClient, OmdbClient } from "./enrich";
 import { DiscoverEngine } from "./discover";
+import { UndoService } from "./undo";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
 import { LogSheet } from "./ui/logSheet";
@@ -50,6 +51,7 @@ export default class ReelPlugin extends Plugin {
 	omdb!: OmdbClient;
 	dtdd!: DtddClient;
 	discover!: DiscoverEngine;
+	undo!: UndoService;
 
 
 	async onload(): Promise<void> {
@@ -65,6 +67,10 @@ export default class ReelPlugin extends Plugin {
 		this.omdb = new OmdbClient(this);
 		this.dtdd = new DtddClient(this);
 		this.discover = new DiscoverEngine(this);
+		this.undo = new UndoService(this);
+		// Steps hold a path, and a path stops meaning anything the moment the
+		// note behind it is renamed or deleted.
+		this.undo.watch();
 
 		addIcon("reel", REEL_ICON);
 
@@ -263,6 +269,19 @@ export default class ReelPlugin extends Plugin {
 			});
 		}
 
+		// Named after what it would actually do, so the palette tells you
+		// whether pressing it is safe before you press it.
+		this.addCommand({
+			id: "undo",
+			name: "Undo the last change",
+			checkCallback: (checking) => {
+				const last = this.undo.last;
+				if (!last) return false;
+				if (!checking) void this.undo.undo();
+				return true;
+			},
+		});
+
 		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });
 
 		this.addCommand({ id: "add-watchlist", name: "Add to watchlist", callback: () => this.openSearch({ watchlist: true }) });
@@ -287,7 +306,7 @@ export default class ReelPlugin extends Plugin {
 					if (file instanceof TFile) {
 						void this.notes
 							.markEpisode(file, next.season, next.episode, todayISO())
-							.then(() => new Notice(`Reel: S${next.season}E${next.episode} watched.`))
+							.then(() => this.undo.offer(`S${next.season}E${next.episode} watched`))
 							.catch((e) => new Notice(`Reel: ${redact(e)}`));
 					}
 				}
@@ -318,7 +337,7 @@ export default class ReelPlugin extends Plugin {
 					(entry, file) => {
 						void this.notes
 							.restartSeries(file, entry.rating)
-							.then(() => new Notice("Reel: progress reset — previous run recorded."))
+							.then(() => this.undo.offer("Progress reset — previous run recorded"))
 							.catch((e) => new Notice(`Reel: ${redact(e)}`));
 					},
 					true
@@ -344,7 +363,7 @@ export default class ReelPlugin extends Plugin {
 			name: "Toggle liked",
 			checkCallback: (checking) =>
 				this.withEntry(checking, (_entry, file) => {
-					void this.notes.toggleLiked(file).then((on) => new Notice(on ? "Reel: liked." : "Reel: unliked."));
+					void this.notes.toggleLiked(file).then((on) => this.undo.offer(on ? "Liked" : "Unliked"));
 				}),
 		});
 

@@ -161,7 +161,11 @@ export class SeasonSheet extends Modal {
 		const file = this.app.vault.getAbstractFileByPath(this.entry.path);
 		if (!(file instanceof TFile)) return;
 		try {
-			await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			// Through NoteWriter rather than straight to processFrontMatter, so
+			// this save is undoable like every other. It is the one that can
+			// discard the most in a single press: untick a run of episodes and
+			// their ratings go with them.
+			await this.plugin.notes.edit(file, `the season ${this.season} changes`, (fm) => {
 				const seasons = Array.isArray(fm.seasons) ? [...fm.seasons] : [];
 				let row = seasons.find((s: { n: number }) => Number(s.n) === this.season);
 				if (!row) {
@@ -196,7 +200,7 @@ export class SeasonSheet extends Modal {
 				const next = nextShowStatus(String(fm.status ?? ""), totalWatched, Number(fm.total_episodes ?? 0));
 				if (next) fm.status = next;
 			});
-			new Notice(`Reel: season ${this.season} updated.`);
+			this.plugin.undo.offer(`Season ${this.season} updated`);
 		} catch (e) {
 			new Notice(`Reel: ${redact(e)}`);
 		}

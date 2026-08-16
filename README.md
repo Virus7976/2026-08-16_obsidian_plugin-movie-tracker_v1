@@ -149,6 +149,29 @@ you actually rate rather than merely watch, current streak, films per month, how
 long your watchlist is at your current pace, day-of-week patterns, superlatives,
 and series progress.
 
+## Undo
+
+Every action in Reel is one tap, which is the point of it and also how you rate
+the wrong film, tick an episode on the show above the one you meant, or add
+something from a Discover row you were only scrolling past. So the notice that
+confirms an action carries an **Undo** button, and the palette has *Undo the
+last change* for after it fades. The last twenty changes are held for the
+session.
+
+What that covers, and what it deliberately doesn't:
+
+| | |
+|---|---|
+| Ratings, likes, statuses, episode ticks, season changes, lists, content flags | fully reversible — the whole frontmatter block is snapshotted before the edit and written back |
+| Adding a title | reversible; the note moves to the trash, so Obsidian or the OS can still bring it back |
+| Reviews | **not** reversible, and no undo is offered. They're appended with `vault.append`, which cannot remove text — the same property that means no bug in Reel can eat something you wrote |
+| Deleting a title | already goes to the trash, and asks first |
+
+Undoing writes the old block back verbatim, so anything else that changed the
+same note in between — your own edit, another plugin, a late enrichment — is
+overwritten. That's why the stack is short and doesn't survive a restart: an
+undo offered tomorrow would be claiming more than it can support.
+
 ## Code blocks
 
 The same data, embeddable in any note:
@@ -182,6 +205,7 @@ Filterable fields: `status` `type` `title` `year` `decade` `rating`
 | Command | Notes |
 |---|---|
 | Open library / discover / rate / up next / diary / stats | one per tab |
+| Undo the last change | hidden from the palette when there is nothing to undo |
 | Log a film or series | |
 | Add to watchlist | |
 | Log the current note | only on a Reel note |
@@ -292,7 +316,7 @@ Design-level, not afterthoughts:
 npm test
 ```
 
-373 assertions over ten suites:
+426 assertions over eleven suites:
 
 | Suite | Covers |
 |---|---|
@@ -306,6 +330,7 @@ npm test
 | library | the index every surface reads from |
 | notes | the write path — reviews stay append-only, titles stay filesystem-safe |
 | posters | which cached posters reach the trash, and which are never candidates |
+| undo | snapshot depth, restore in place, and the no-op guard |
 
 The bias is toward code that writes or deletes something. The pure logic is covered because an off-by-one there quietly corrupts watch history; the prune and importer suites exist because those are the two places Reel changes files you already own.
 

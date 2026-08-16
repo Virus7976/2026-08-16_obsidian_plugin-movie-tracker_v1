@@ -317,7 +317,7 @@ export class PersonSheet extends Modal {
 		this.busy = true;
 		try {
 			await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist: true });
-			new Notice(`Added ${item.title ?? item.name ?? "it"} to your watchlist`);
+			this.plugin.undo.offer(`Added ${item.title ?? item.name ?? "it"} to your watchlist`);
 			// Repaint so the tick appears against what you just added.
 			this.contentEl.empty();
 			await this.load();

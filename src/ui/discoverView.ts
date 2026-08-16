@@ -241,7 +241,9 @@ export class DiscoverScreen {
 	private async quickAdd(item: TmdbSearchResult, watchlist: boolean, container: HTMLElement): Promise<void> {
 		try {
 			await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist });
-			new Notice(watchlist ? "Added to your watchlist" : "Added as watched");
+			// Quick mode is a swipe-speed interaction, which makes it the single
+			// easiest place to add the title you were only scrolling past.
+			this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
 			this.handled.add(item.id);
 			this.render(container);
 		} catch (e) {
@@ -670,7 +672,7 @@ export class DiscoverScreen {
 
 		button("plus", "Add to watchlist", "add", async () => {
 			await this.add(item, true);
-			new Notice(`${title} → watchlist`);
+			this.plugin.undo.offer(`${title} → watchlist`);
 			this.handled.add(item.id);
 			this.render(container);
 		});
@@ -738,7 +740,7 @@ class SeenSheet extends Modal {
 		this.busy = true;
 		try {
 			await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: false, rating });
-			new Notice(rating != null ? `Added — rated ${rating}` : "Added as watched");
+			this.plugin.undo.offer(rating != null ? `Added — rated ${rating}` : "Added as watched");
 			this.onDone();
 			this.close();
 		} catch (e) {
@@ -868,7 +870,7 @@ class PreviewSheet extends Modal {
 
 		try {
 			await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist });
-			new Notice(watchlist ? "Added to your watchlist" : "Added as watched");
+			this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
 			this.onAdded();
 			this.close();
 		} catch (e) {

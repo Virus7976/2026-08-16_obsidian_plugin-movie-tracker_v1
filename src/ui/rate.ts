@@ -178,7 +178,7 @@ export class RateScreen {
 				if (!file) return;
 				await this.plugin.notes.setStatus(file, "watchlist");
 				this.handled.add(entry.path);
-				new Notice(`${entry.title} moved to the watchlist`);
+				this.plugin.undo.offer(`${entry.title} moved to the watchlist`);
 				this.advance(container, rows.length);
 			});
 		} else {
@@ -188,7 +188,7 @@ export class RateScreen {
 				if (entry.type === "tv") await this.plugin.notes.setStatus(file, "watching");
 				else await this.plugin.notes.logFilm(file, { date: todayISO(), rating: entry.rating });
 				this.handled.add(entry.path);
-				new Notice(`${entry.title} marked watched`);
+				this.plugin.undo.offer(`${entry.title} marked watched`);
 				this.advance(container, rows.length);
 			});
 		}

@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Note creation and mutation.
  *
  * Two write paths, with different guarantees:
  *
- *   Frontmatter — always via `processFrontMatter`, which reparses the YAML and
+ *   Frontmatter â€” always via `processFrontMatter`, which reparses the YAML and
  *   reserialises only that block. The body is untouchable from here.
  *
- *   Reviews — via `vault.append`, which can only add to the end of the file.
+ *   Reviews â€” via `vault.append`, which can only add to the end of the file.
  *   Not `modify`, which takes whole-file content and could therefore replace
  *   your writing if anything upstream were ever wrong. Append cannot, by
  *   construction, destroy an existing review.
@@ -24,6 +24,7 @@ import { applyFields, filmFields, showFields, ExtractOptions } from "./extract";
 import { applyDerived, derive } from "./bases";
 import { topicHolds } from "./enrich";
 import { redact } from "./secrets";
+import { cloneFrontmatter, unchanged, type Snapshot } from "./util/undo";
 
 export interface LogPayload {
 	date: string;
@@ -81,6 +82,7 @@ export class NoteWriter {
 
 		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
 		await this.linkFromDailyNote(file);
+		this.plugin.undo.recordCreation(file, `adding ${meta.title}`);
 		// Enrichment runs after the note exists, so a slow or missing
 		// third-party service delays extra fields rather than the note itself.
 		void this.enrich(file, { title: meta.title, year, imdbId: str(meta.external_ids?.imdb_id ?? meta.imdb_id) });
@@ -111,6 +113,7 @@ export class NoteWriter {
 
 		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
 		await this.linkFromDailyNote(file);
+		this.plugin.undo.recordCreation(file, `adding ${meta.name}`);
 		void this.enrich(file, {
 			title: meta.name,
 			year: yearOf(meta.first_air_date),
@@ -122,8 +125,8 @@ export class NoteWriter {
 	/**
 	 * Create a note from a search or discovery result.
 	 *
-	 * Four call sites were each doing this dance — fetch the right detail
-	 * endpoint, branch on media type, build the payload — which is four places
+	 * Four call sites were each doing this dance â€” fetch the right detail
+	 * endpoint, branch on media type, build the payload â€” which is four places
 	 * to forget something like the review or the rating.
 	 */
 	async createFromResult(
@@ -136,8 +139,8 @@ export class NoteWriter {
 		//
 		// Nothing checked this before: every route into here created a note,
 		// and uniquePath politely named the second one "The Odyssey 2". You
-		// end up with a split history — half your viewings on one note, half
-		// on the other — and no indication anything went wrong.
+		// end up with a split history â€” half your viewings on one note, half
+		// on the other â€” and no indication anything went wrong.
 		const existing = this.plugin.library.byTmdbId(item.id, type);
 		if (existing) {
 			const file = this.plugin.app.vault.getAbstractFileByPath(existing.path);
@@ -171,7 +174,7 @@ export class NoteWriter {
 	/**
 	 * Fold a log payload into a note that already exists.
 	 *
-	 * Reached when you add something already in your library — from Discover,
+	 * Reached when you add something already in your library â€” from Discover,
 	 * from search, from a shared link. Adding a viewing is the useful reading
 	 * of that action; creating a second note never is.
 	 */
@@ -190,7 +193,7 @@ export class NoteWriter {
 			await this.logFilm(file, log);
 		}
 		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
-		new Notice(`Reel: added a viewing to ${entry.title}.`);
+		this.plugin.undo.offer(`Added a viewing to ${entry.title}`);
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -201,23 +204,49 @@ export class NoteWriter {
 	 * Append a dated review to the note body.
 	 *
 	 * One heading per viewing, so a rewatch adds a second review rather than
-	 * overwriting the first — which is the whole reason the watch history is an
+	 * overwriting the first â€” which is the whole reason the watch history is an
 	 * array. Uses `append`, so no code path here can remove text.
 	 */
 	async appendReview(file: TFile, date: string, rating: number | undefined, text: string): Promise<void> {
 		const body = text.trim();
 		if (!body) return;
-		const stars = rating != null ? ` · ${starString(rating)}` : "";
+		const stars = rating != null ? ` Â· ${starString(rating)}` : "";
 		const block = `\n\n## ${prettyDate(date) || date}${stars}\n\n${body}\n`;
 		await this.plugin.app.vault.append(file, block);
 	}
 
 	/* ------------------------------------------------------------------ */
-	/* Mutation — films                                                    */
+	/* Undoable frontmatter edits                                          */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Make a frontmatter change that can be taken back.
+	 *
+	 * The snapshot is taken *inside* the same callback that makes the change,
+	 * which is the only place the pre-state is knowable for certain: the
+	 * metadata cache lags writes, so reading it here would sometimes hand back
+	 * the result of the previous edit and undo would jump two steps.
+	 *
+	 * A mutation that changed nothing records nothing. Otherwise tapping the
+	 * star you had already set would push a no-op onto the stack, and the undo
+	 * you actually wanted would be one press further down than it looks.
+	 */
+	async edit(file: TFile, label: string, mutate: (fm: Record<string, unknown>) => void): Promise<void> {
+		let before: Snapshot | undefined;
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			const snapshot = cloneFrontmatter(fm) as Snapshot;
+			mutate(fm);
+			if (!unchanged(fm, snapshot)) before = snapshot;
+		});
+		if (before) this.plugin.undo.record(file, label, before);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Mutation â€” films                                                    */
 	/* ------------------------------------------------------------------ */
 
 	async logFilm(file: TFile, log: LogPayload): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `the change to ${file.basename}`, (fm) => {
 			if (log.watchlist) {
 				fm.status = "watchlist";
 				if (log.liked != null) fm.liked = log.liked;
@@ -246,11 +275,11 @@ export class NoteWriter {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/* Mutation — series                                                   */
+	/* Mutation â€” series                                                   */
 	/* ------------------------------------------------------------------ */
 
 	async markEpisode(file: TFile, season: number, episode: number, date = todayISO()): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `marking S${season}E${episode} watched`, (fm) => {
 			const seasons = this.seasonRows(fm);
 			const row = this.seasonRow(seasons, season);
 			row.watched = addToRange(row.watched, episode);
@@ -263,7 +292,7 @@ export class NoteWriter {
 	}
 
 	async setSeasonRange(file: TFile, season: number, range: string, date = todayISO()): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `the change to season ${season}`, (fm) => {
 			const seasons = this.seasonRows(fm);
 			const row = this.seasonRow(seasons, season);
 			row.watched = range;
@@ -277,12 +306,13 @@ export class NoteWriter {
 	}
 
 	/**
-	 * Rate one episode. Rating implies watching it — nobody rates an episode
+	 * Rate one episode. Rating implies watching it â€” nobody rates an episode
 	 * they haven't seen, and making them tick it separately is a second tap for
 	 * no information.
 	 */
 	async rateEpisode(file: TFile, season: number, episode: number, rating: number | null): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		const what = rating == null ? `clearing the S${season}E${episode} rating` : `rating S${season}E${episode}`;
+		await this.edit(file, what, (fm) => {
 			const { seasons, average } = computeEpisodeRating(this.seasonRows(fm), season, episode, rating);
 			fm.seasons = seasons;
 
@@ -312,7 +342,7 @@ export class NoteWriter {
 	}
 
 	async setSeasonRating(file: TFile, season: number, rating: number | null): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `the season ${season} rating`, (fm) => {
 			const seasons = this.seasonRows(fm);
 			const row = this.seasonRow(seasons, season);
 			if (rating == null) delete row.rating;
@@ -327,7 +357,10 @@ export class NoteWriter {
 	 * say "I've seen all of this twice", which was an odd asymmetry.
 	 */
 	async restartSeries(file: TFile, rating?: number): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		// The one mutation that discards a lot at once â€” every ticked episode
+		// and every episode rating across the whole series. It is the action
+		// most worth being able to take back.
+		await this.edit(file, `restarting ${file.basename}`, (fm) => {
 			const seasons = this.seasonRows(fm);
 			const runs: WatchEvent[] = Array.isArray(fm.watched) ? [...fm.watched] : [];
 			runs.push({
@@ -349,7 +382,7 @@ export class NoteWriter {
 
 	/**
 	 * Recompute the flattened Bases properties from whatever the frontmatter
-	 * now says. Called at the end of every mutation that could move them —
+	 * now says. Called at the end of every mutation that could move them â€”
 	 * the single place they're kept in step with the real data.
 	 */
 	private refreshDerived(fm: Record<string, unknown>): void {
@@ -380,7 +413,7 @@ export class NoteWriter {
 	 *
 	 * Adding six titles from Discover in ten seconds used to start six
 	 * enrichments at once, against two free-tier APIs. They now queue behind
-	 * each other, which costs nothing noticeable — enrichment is already
+	 * each other, which costs nothing noticeable â€” enrichment is already
 	 * background work that no screen waits on.
 	 */
 	private enrichQueue: Promise<unknown> = Promise.resolve();
@@ -479,13 +512,13 @@ export class NoteWriter {
 	/* ------------------------------------------------------------------ */
 
 	async setStatus(file: TFile, status: string): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `setting ${file.basename} to ${status}`, (fm) => {
 			fm.status = status;
 			// Marking a film watched has to record *that you watched it*, not
 			// merely relabel it. The Diary, the streak, hours-watched and every
 			// per-year chart read the `watched` array, so a note saying
 			// "status: watched" with an empty history is invisible to all of
-			// them — it reads as a film nobody has ever seen.
+			// them â€” it reads as a film nobody has ever seen.
 			if (fm.type !== "tv" && status === "watched") this.ensureViewing(fm);
 			this.refreshDerived(fm);
 		});
@@ -495,7 +528,7 @@ export class NoteWriter {
 	 * Guarantee at least one viewing on a film that claims to have been seen.
 	 *
 	 * Dated today, because today is when you said so and a guessed date would
-	 * be worse than an honest one. Only ever adds — an existing history is
+	 * be worse than an honest one. Only ever adds â€” an existing history is
 	 * never touched.
 	 */
 	private ensureViewing(fm: Record<string, unknown>): void {
@@ -508,7 +541,8 @@ export class NoteWriter {
 	}
 
 	async setRating(file: TFile, rating: number | null): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		const what = rating == null ? `clearing the rating on ${file.basename}` : `rating ${file.basename}`;
+		await this.edit(file, what, (fm) => {
 			if (rating == null) {
 				delete fm.rating;
 				return;
@@ -525,7 +559,7 @@ export class NoteWriter {
 			} else if (fm.type !== "tv" && fm.status !== "watchlist") {
 				// Rating a film you have no recorded viewing of. You cannot
 				// have rated something you never saw, so the rating is the
-				// evidence — record the viewing rather than leaving a score
+				// evidence â€” record the viewing rather than leaving a score
 				// floating above an empty history that the Diary and every
 				// stat will ignore.
 				fm.status = "watched";
@@ -537,7 +571,7 @@ export class NoteWriter {
 
 	async toggleLiked(file: TFile): Promise<boolean> {
 		let next = false;
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `the like on ${file.basename}`, (fm) => {
 			next = !fm.liked;
 			if (next) fm.liked = true;
 			else delete fm.liked;
@@ -550,7 +584,7 @@ export class NoteWriter {
 	/* ------------------------------------------------------------------ */
 
 	async setLists(file: TFile, lists: string[]): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `the list change on ${file.basename}`, (fm) => {
 			const clean = [...new Set(lists.map((l) => l.trim()).filter(Boolean))].sort();
 			if (clean.length) fm.lists = clean;
 			else delete fm.lists;
@@ -558,14 +592,14 @@ export class NoteWriter {
 	}
 
 	async addToList(file: TFile, list: string): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `adding ${file.basename} to ${list}`, (fm) => {
 			const existing = Array.isArray(fm.lists) ? fm.lists.map(String) : [];
 			fm.lists = [...new Set([...existing, list.trim()])].filter(Boolean).sort();
 		});
 	}
 
 	async removeFromList(file: TFile, list: string): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `removing ${file.basename} from ${list}`, (fm) => {
 			const existing: string[] = Array.isArray(fm.lists) ? fm.lists.map(String) : [];
 			const next = existing.filter((l: string) => l !== list);
 			if (next.length) fm.lists = next;
@@ -576,7 +610,7 @@ export class NoteWriter {
 	/** Add or remove a content flag by hand, overriding what TMDB implied. */
 	async toggleContentFlag(file: TFile, flag: string): Promise<boolean> {
 		let on = false;
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+		await this.edit(file, `the "${flag}" flag on ${file.basename}`, (fm) => {
 			const existing: string[] = Array.isArray(fm.content_flags) ? fm.content_flags.map(String) : [];
 			on = !existing.includes(flag);
 			const next = on ? [...existing, flag] : existing.filter((f: string) => f !== flag);
@@ -651,7 +685,7 @@ export class NoteWriter {
 			const prefix = this.plugin.settings.dailyNotePrefix || "- Watched";
 			await this.plugin.app.vault.append(daily, `\n${prefix} ${link}`);
 		} catch (e) {
-			console.warn("Reel: daily note link skipped —", redact(e));
+			console.warn("Reel: daily note link skipped â€”", redact(e));
 		}
 	}
 
@@ -730,7 +764,7 @@ function str(value: unknown): string | undefined {
 	return s || undefined;
 }
 
-/** Strip characters no filesystem — Windows included — will accept. */
+/** Strip characters no filesystem â€” Windows included â€” will accept. */
 function sanitize(name: string): string {
 	return (
 		name

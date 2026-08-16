@@ -233,11 +233,11 @@ export class LogSheet extends Modal {
 					{ id: p.id, media_type: p.type === "tv" ? "tv" : "movie" },
 					payload
 				);
-				new Notice(`Reel: added ${p.title}.`);
+				this.plugin.undo.offer(`Added ${p.title}`);
 			} else if (this.opts.file) {
 				file = this.opts.file;
 				if (this.opts.entry?.type === "tv") {
-					await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+					await this.plugin.notes.edit(file, `the change to ${file.basename}`, (fm) => {
 						if (this.asWatchlist) fm.status = "watchlist";
 						else if (fm.status === "watchlist") fm.status = "watching";
 						if (this.rating != null) fm.rating = this.rating;
@@ -250,7 +250,7 @@ export class LogSheet extends Modal {
 				} else {
 					await this.plugin.notes.logFilm(file, payload);
 				}
-				new Notice("Reel: saved.");
+				this.plugin.undo.offer("Saved");
 			}
 
 			this.close();

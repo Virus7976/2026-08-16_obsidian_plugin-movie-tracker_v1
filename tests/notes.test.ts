@@ -52,6 +52,11 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 
 	const folders = new Set<string>();
 	let fetched = 0;
+	// Every mutation is supposed to leave a way back. Recording the labels here
+	// means the tests can assert that, rather than only that the frontmatter
+	// came out right — a mutation that edits correctly but records nothing is
+	// still a bug, and an invisible one.
+	const undone: string[] = [];
 
 	const plugin = {
 		app: {
@@ -107,6 +112,11 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 			},
 		},
 		posters: { cache: async () => null },
+		undo: {
+			record: (file: TFile, label: string) => undone.push(label),
+			recordCreation: (file: TFile, label: string) => undone.push(label),
+			offer: () => {},
+		},
 		tmdb: {
 			getFilm: async (id: number) => {
 				fetched++;
@@ -127,6 +137,7 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 		exists: (path: string) => files.has(path),
 		count: () => files.size,
 		fetches: () => fetched,
+		undoable: () => undone,
 	};
 }
 
@@ -309,6 +320,52 @@ async function main(): Promise<void> {
 		eq(v.count(), 1, "a double tap creates one note, not two");
 		eq(a.path, b.path, "and both callers get the same file");
 		eq(v.fetches(), 1, "with a single fetch between them");
+	}
+
+	/* ---- every mutation leaves a way back ---- */
+
+	{
+		// The failure this guards against is silent: the frontmatter comes out
+		// correct, nothing throws, and the undo simply is not there when the
+		// mis-tap happens.
+		const v = makeVault([
+			{ path: "Movies/Dune (2021).md", fm: { tmdb_id: 1, type: "film", title: "Dune", status: "watchlist" } },
+		]);
+		const file = v.file("Movies/Dune (2021).md");
+
+		await v.notes.setRating(file, 4.5);
+		eq(v.undoable().length, 1, "rating a film is undoable");
+
+		await v.notes.toggleLiked(file);
+		eq(v.undoable().length, 2, "so is liking it");
+
+		await v.notes.setStatus(file, "watched");
+		eq(v.undoable().length, 3, "so is a status change");
+	}
+
+	{
+		// A tap that changes nothing must not push a step. Otherwise pressing
+		// the star you had already set buries the undo you actually wanted one
+		// press deeper, which is exactly when you would reach for it.
+		const v = makeVault([
+			{ path: "Movies/Dune (2021).md", fm: { tmdb_id: 1, type: "film", title: "Dune", rating: 4.5, status: "watched", watched: [{ date: "2025-01-02", rating: 4.5 }] } },
+		]);
+		const file = v.file("Movies/Dune (2021).md");
+		// Twice, and the assertion is on the second. The first still has work
+		// to do — it backfills the derived Bases properties — so testing a
+		// fixture "already at 4.5" would only prove the fixture was incomplete.
+		await v.notes.setRating(file, 4.5);
+		const after = v.undoable().length;
+		await v.notes.setRating(file, 4.5);
+		eq(v.undoable().length, after, "setting the rating it already had records nothing");
+	}
+
+	{
+		// Adding something from Discover is the easiest action to do by
+		// accident, so it is the one that most needs taking back.
+		const v = makeVault();
+		await v.notes.createFromResult({ id: 550, media_type: "movie" }, { date: "2026-08-16", watchlist: true });
+		eq(v.undoable(), ["adding Fetched Film"], "a new note is undoable, named after what was added");
 	}
 }
 

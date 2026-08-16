@@ -76,7 +76,7 @@ export class ListPicker extends Modal {
 			create(); // don't lose a name typed but not submitted
 			try {
 				await this.plugin.notes.setLists(this.file, [...this.selected]);
-				new Notice("Reel: lists updated.");
+				this.plugin.undo.offer("Lists updated");
 			} catch (e) {
 				new Notice(`Reel: ${redact(e)}`);
 			}
