@@ -11,6 +11,7 @@ import { Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type ReelPlugin from "./main";
 import { clampRating } from "./util/ratings";
 import { addToRange, contiguousProgress, rangeCount } from "./util/ranges";
+import { nextShowStatus } from "./util/status";
 import { normaliseDate, todayISO, yearOf } from "./util/dates";
 import type { Entry, SeasonProgress, TmdbFilm, TmdbShow, WatchEvent } from "./types";
 import { redact } from "./secrets";
@@ -167,22 +168,22 @@ export class NoteWriter {
 			fm.seasons = seasons;
 			const furthest = contiguousProgress(range);
 			if (furthest > 0) fm.last_watched = { season, episode: furthest, date };
+			// Ticking episodes starts a watchlisted show, mirroring markEpisode.
+			// Clearing a season must not, hence the count check.
+			if (rangeCount(range) > 0 && (fm.status === "watchlist" || !fm.status)) fm.status = "watching";
 			this.settleShowStatus(fm, seasons);
 		});
 	}
 
 	/**
 	 * Flip to `completed` once every episode TMDB knows about is ticked, and
-	 * back to `watching` if you add a season later. Never overrides a
-	 * deliberate `dropped` or `paused`.
+	 * back to `watching` when a returning series gains a season. The set of
+	 * statuses this must not touch lives in `nextShowStatus`.
 	 */
 	private settleShowStatus(fm: Record<string, unknown>, seasons: SeasonProgress[]): void {
-		const status = String(fm.status ?? "");
-		if (status === "dropped" || status === "paused") return;
-		const total = Number(fm.total_episodes ?? 0);
-		if (!total) return;
 		const watched = seasons.reduce((sum, s) => sum + rangeCount(s.watched), 0);
-		fm.status = watched >= total ? "completed" : "watching";
+		const next = nextShowStatus(String(fm.status ?? ""), watched, Number(fm.total_episodes ?? 0));
+		if (next) fm.status = next;
 	}
 
 	async setStatus(file: TFile, status: string): Promise<void> {
@@ -200,10 +201,16 @@ export class NoteWriter {
 			const value = clampRating(rating);
 			fm.rating = value;
 			// Keep the newest viewing in step, so history and headline agree.
+			// Only rewrite an entry that is actually an object: spreading a
+			// hand-written `- 2024-03-11` string would explode it into
+			// character-indexed keys and destroy the entry.
 			if (Array.isArray(fm.watched) && fm.watched.length) {
 				const history = [...fm.watched];
-				history[history.length - 1] = { ...history[history.length - 1], rating: value };
-				fm.watched = history;
+				const last = history[history.length - 1];
+				if (last && typeof last === "object" && !Array.isArray(last)) {
+					history[history.length - 1] = { ...last, rating: value };
+					fm.watched = history;
+				}
 			}
 		});
 	}
@@ -243,6 +250,11 @@ export class NoteWriter {
 				}
 				known.sort((a, b) => Number(a.n) - Number(b.n));
 				fm.seasons = known;
+
+				// A finished show that gains a season has to leave `completed`,
+				// or `inProgress()` filters it out and it never returns to Up
+				// Next — the exact case the new-episode check exists to catch.
+				this.settleShowStatus(fm, known);
 			});
 		} else {
 			const meta = await this.plugin.tmdb.getFilm(entry.tmdbId);

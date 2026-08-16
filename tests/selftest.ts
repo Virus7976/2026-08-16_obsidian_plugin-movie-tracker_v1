@@ -5,6 +5,7 @@ import {
 import { clampRating, starString } from "../src/util/ratings";
 import { formatMinutes, normaliseDate, prettyDate, yearOf } from "../src/util/dates";
 import { parseQuery, applyQuery, sortEntries } from "../src/render/query";
+import { nextShowStatus } from "../src/util/status";
 import type { Entry } from "../src/types";
 
 let pass = 0, fail = 0;
@@ -58,6 +59,24 @@ eq(prettyDate("2025-01-02"), "2 Jan 2025", "prettyDate");
 eq(formatMinutes(155), "2h 35m", "minutes");
 eq(formatMinutes(47), "47m", "minutes short");
 eq(formatMinutes(120), "2h", "minutes exact");
+
+/* ---- show status transitions ---- */
+// null means "leave the existing status alone".
+eq(nextShowStatus("watching", 62, 62), "completed", "last episode completes the show");
+eq(nextShowStatus("watching", 61, 62), "watching", "still going");
+// The regression that mattered: a finished show gains a season, total_episodes
+// grows, and it must leave `completed` — otherwise inProgress() filters it out
+// and it never returns to Up Next.
+eq(nextShowStatus("completed", 62, 71), "watching", "new season reopens a completed show");
+eq(nextShowStatus("completed", 62, 62), "completed", "completed stays completed");
+// And the trap in fixing that: a watchlisted show has 0 watched, so the naive
+// rule would promote every one of them to `watching` on the daily refresh.
+eq(nextShowStatus("watchlist", 0, 62), null, "watchlist is never auto-promoted");
+eq(nextShowStatus("dropped", 3, 62), null, "dropped is left alone");
+eq(nextShowStatus("paused", 3, 62), null, "paused is left alone");
+eq(nextShowStatus("watching", 0, 0), null, "unknown total draws no conclusion");
+eq(nextShowStatus(undefined, 5, 10), "watching", "missing status still settles");
+eq(nextShowStatus("watching", 70, 62), "completed", "over-count still completes");
 
 /* ---- query ---- */
 const q = parseQuery("filter: status = watched, year >= 2020\nsort: watched desc\nlayout: poster-grid");
