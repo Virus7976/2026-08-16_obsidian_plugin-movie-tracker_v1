@@ -208,6 +208,22 @@ export class ReelView extends ItemView {
 	 * seen?", and the library search already answers exactly that across
 	 * cast, director and genre. Reusing it beats a second lookup screen.
 	 */
+	/**
+	 * Jump to the Library showing one status — watchlist, watched, unrated.
+	 *
+	 * The stats tiles count these sets; this is how you get from the count to
+	 * the titles behind it.
+	 */
+	filterByStatus(status: string | null): void {
+		this.tab = "library";
+		this.detail = null;
+		this.clearSearch();
+		this.statusFilter = status;
+		this.plugin.settings.lastTab = "library";
+		void this.plugin.saveSettings();
+		this.paint();
+	}
+
 	searchFor(query: string): void {
 		this.tab = "library";
 		this.detail = null;

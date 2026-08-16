@@ -92,11 +92,31 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	);
 
 	const tiles = el.createDiv({ cls: "reel-tiles" });
-	const tile = (label: string, value: string, sub?: string) => {
+
+	/**
+	 * A headline number.
+	 *
+	 * `go` makes it a control. Once the charts became clickable, a tile that
+	 * looked identical and did nothing was the odd one out — and half the
+	 * counts here name a set you would obviously want to see.
+	 */
+	const tile = (label: string, value: string, sub?: string, go?: () => void) => {
 		const t = tiles.createDiv({ cls: "reel-tile" });
 		t.createDiv({ cls: "reel-tile-value", text: value });
 		t.createDiv({ cls: "reel-tile-label", text: label });
 		if (sub) t.createDiv({ cls: "reel-tile-sub", text: sub });
+		if (!go) return;
+		t.addClass("is-clickable");
+		t.setAttr("role", "button");
+		t.setAttr("tabindex", "0");
+		t.setAttr("aria-label", `${label} — ${value}. Show them.`);
+		t.addEventListener("click", go);
+		t.addEventListener("keydown", (ev: KeyboardEvent) => {
+			if (ev.key === "Enter" || ev.key === " ") {
+				ev.preventDefault();
+				go();
+			}
+		});
 	};
 
 	const rated = watched.map((v) => v.rating ?? v.entry.rating).filter((r): r is number => r != null);
@@ -104,11 +124,15 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	if (films.length) {
 		const distinct = new Set(watched.map((v) => v.entry.path)).size;
 		const rewatches = watched.filter((v) => v.rewatch).length;
-		tile("Films watched", String(watched.length), `${distinct} distinct · ${rewatches} rewatches`);
+		tile("Films watched", String(watched.length), `${distinct} distinct · ${rewatches} rewatches`, () =>
+			void plugin.openLibraryWithStatus("watched")
+		);
 		tile("Hours of film", formatMinutes(filmMinutes));
 	}
 	if (shows.length) {
-		tile("Episodes", String(episodesSeen), `${shows.length} show${shows.length === 1 ? "" : "s"}`);
+		tile("Episodes", String(episodesSeen), `${shows.length} show${shows.length === 1 ? "" : "s"}`, () =>
+			void plugin.openLibraryWithStatus("watching")
+		);
 		if (episodeMinutes) tile("Hours of TV", formatMinutes(episodeMinutes));
 	}
 	if (rated.length) {
@@ -146,11 +170,16 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	if (watchlist) {
 		// At your current pace, how long is the backlog?
 		const rate = perMonth ? watched.length / perMonth : 0;
-		tile("On the watchlist", String(watchlist), rate > 0 ? `${Math.ceil(watchlist / rate)} months at this pace` : undefined);
+		tile(
+			"On the watchlist",
+			String(watchlist),
+			rate > 0 ? `${Math.ceil(watchlist / rate)} months at this pace` : undefined,
+			() => void plugin.openLibraryWithStatus("watchlist")
+		);
 	}
 
 	const unrated = films.filter((e) => e.rating == null && e.watched.length).length;
-	if (unrated) tile("Unrated", String(unrated), "tap Rate to fix");
+	if (unrated) tile("Unrated", String(unrated), "tap to rate them", () => void plugin.openTab("rate"));
 
 	// Breadth, as opposed to the depth the top-N charts show. "195 actors" is
 	// the number the old tracker put front and centre, and the charts alone
@@ -178,21 +207,30 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	const topRated = seen.filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
 	const mostRewatched = seen.filter((e) => e.watched.length > 1).sort((a, b) => b.watched.length - a.watched.length)[0];
 
-	const facts: { label: string; value: string }[] = [];
-	if (topRated.length) facts.push({ label: "Highest rated", value: `${topRated[0].title} — ${topRated[0].rating}★` });
+	const facts: { label: string; value: string; entry?: Entry }[] = [];
+	if (topRated.length) {
+		facts.push({ label: "Highest rated", value: `${topRated[0].title} — ${topRated[0].rating}★`, entry: topRated[0] });
+	}
 	if (topRated.length > 1) {
 		const worst = topRated[topRated.length - 1];
-		facts.push({ label: "Lowest rated", value: `${worst.title} — ${worst.rating}★` });
+		facts.push({ label: "Lowest rated", value: `${worst.title} — ${worst.rating}★`, entry: worst });
 	}
-	if (longest) facts.push({ label: "Longest", value: `${longest.title} — ${formatMinutes(longest.runtime ?? 0)}` });
+	if (longest) {
+		facts.push({ label: "Longest", value: `${longest.title} — ${formatMinutes(longest.runtime ?? 0)}`, entry: longest });
+	}
 	if (mostRewatched) {
-		facts.push({ label: "Most rewatched", value: `${mostRewatched.title} — ${mostRewatched.watched.length}×` });
+		facts.push({
+			label: "Most rewatched",
+			value: `${mostRewatched.title} — ${mostRewatched.watched.length}×`,
+			entry: mostRewatched,
+		});
 	}
 	const biggestDivergence = paired.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
 	if (biggestDivergence && Math.abs(biggestDivergence.delta) >= 1) {
 		facts.push({
 			label: biggestDivergence.delta > 0 ? "You liked far more than most" : "You liked far less than most",
 			value: biggestDivergence.entry.title,
+			entry: biggestDivergence.entry,
 		});
 	}
 
@@ -202,6 +240,21 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			const row = box.createDiv({ cls: "reel-fact" });
 			row.createDiv({ cls: "reel-fact-label", text: f.label });
 			row.createDiv({ cls: "reel-fact-value", text: f.value });
+			// Each superlative names one title, so it should open that title.
+			if (!f.entry) continue;
+			const entry = f.entry;
+			row.addClass("is-clickable");
+			row.setAttr("role", "button");
+			row.setAttr("tabindex", "0");
+			row.setAttr("aria-label", `${f.label}: ${entry.title}. Open it.`);
+			const open = () => void plugin.openDetail(entry);
+			row.addEventListener("click", open);
+			row.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key === "Enter" || ev.key === " ") {
+					ev.preventDefault();
+					open();
+				}
+			});
 		}
 	}
 
