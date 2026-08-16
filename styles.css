@@ -4202,3 +4202,73 @@ input.reel-input {
 .reel-chip-seed.is-active {
 	font-style: normal;
 }
+
+/* ---------------- stats: thumbnails and clickable rows ---------------- */
+
+/*
+ * A poster per row, from the vault's own cache.
+ *
+ * Twenty bar charts is a page of arithmetic. One thumbnail turns
+ * "Drama (7)" back into films you remember watching, and it costs nothing —
+ * these are the same local images the library grid uses.
+ */
+.reel-stats .reel-chart-row {
+	/* thumb · label · track · value */
+	grid-template-columns: auto minmax(0, 7rem) 1fr auto;
+}
+
+.reel-chart-thumb {
+	width: 26px;
+	height: 39px;
+	border-radius: 3px;
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 26px;
+}
+
+.reel-chart-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-chart-thumb.is-empty .reel-placeholder-text {
+	font-size: 9px;
+	font-weight: 700;
+	color: var(--text-faint);
+	text-transform: uppercase;
+}
+
+/* Every bar answers "which ones were those?" — so every bar is a control. */
+.reel-stats .reel-chart-row.is-clickable {
+	cursor: pointer;
+	border-radius: var(--reel-radius);
+	margin: 0 -6px;
+	padding-left: 6px;
+	padding-right: 6px;
+}
+
+.reel-stats .reel-chart-row.is-clickable:hover {
+	background: var(--background-modifier-hover);
+}
+
+.reel-stats .reel-chart-row.is-clickable:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+@media (max-width: 700px) {
+	.reel-stats .reel-chart-row {
+		grid-template-columns: auto minmax(0, 5rem) 1fr auto;
+		gap: 6px;
+	}
+
+	.reel-chart-thumb {
+		width: 22px;
+		height: 33px;
+		flex-basis: 22px;
+	}
+}

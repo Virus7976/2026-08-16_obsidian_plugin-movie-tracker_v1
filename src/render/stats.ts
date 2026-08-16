@@ -243,25 +243,25 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	// People are stored as wikilinks, so unwrap before counting or
 	// "[[People/X|X]]" and "X" tally separately.
 	if (films.length) {
-		tally(charts, "Top directors", films, (e) => e.director.map(unlink));
-		ratedBy(charts, "Directors you rate highest", films, (e) => e.director.map(unlink));
-		tally(charts, "Top actors", films, (e) => e.cast.map(unlink));
+		tally(charts, "Top directors", films, (e) => e.director.map(unlink), undefined, undefined, plugin);
+		ratedBy(charts, "Directors you rate highest", films, (e) => e.director.map(unlink), 2, plugin);
+		tally(charts, "Top actors", films, (e) => e.cast.map(unlink), undefined, undefined, plugin);
 		// Recurring characters are mostly a franchise signal — the same part
 		// across several films is the interesting case, so require two.
-		tally(charts, "Recurring characters", films, (e) => e.characters);
+		tally(charts, "Recurring characters", films, (e) => e.characters, undefined, undefined, plugin);
 	}
 	if (shows.length) {
-		tally(charts, "Top creators", shows, (e) => e.creators.map(unlink));
-		tally(charts, "Top actors — TV", shows, (e) => e.cast.map(unlink));
+		tally(charts, "Top creators", shows, (e) => e.creators.map(unlink), undefined, undefined, plugin);
+		tally(charts, "Top actors — TV", shows, (e) => e.cast.map(unlink), undefined, undefined, plugin);
 	}
 
-	tally(charts, "Genres", all, (e) => e.genres, 10);
-	ratedBy(charts, "Genres you rate highest", films, (e) => e.genres, 3);
-	tally(charts, "Top collections", all, (e) => (e.collection ? [e.collection] : []));
-	tally(charts, "Certifications", all, (e) => (e.certification ? [e.certification] : []), 8, 1);
-	providerSplit(charts, all);
-	tally(charts, "Studios", all, (e) => e.productionCompanies, 6);
-	tally(charts, "Languages", all, (e) => (e.language ? [e.language] : []), 6, 1);
+	tally(charts, "Genres", all, (e) => e.genres, 10, undefined, plugin);
+	ratedBy(charts, "Genres you rate highest", films, (e) => e.genres, 3, plugin);
+	tally(charts, "Top collections", all, (e) => (e.collection ? [e.collection] : []), undefined, undefined, plugin);
+	tally(charts, "Certifications", all, (e) => (e.certification ? [e.certification] : []), 8, 1, plugin);
+	providerSplit(charts, all, plugin);
+	tally(charts, "Studios", all, (e) => e.productionCompanies, 6, undefined, plugin);
+	tally(charts, "Languages", all, (e) => (e.language ? [e.language] : []), 6, 1, plugin);
 
 	// Release years, distinct from "films per year" above: that counts when you
 	// watched, this counts when the film came out. A run of 2003s says
@@ -369,7 +369,13 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			.sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0))
 			.slice(0, 10);
 		if (inProgress.length) {
-			bars(charts, "Series progress (%)", inProgress.map((s) => ({ label: s.title, n: s.progress ?? 0 })));
+			bars(
+				charts,
+				"Series progress (%)",
+				inProgress.map((s) => ({ label: s.title, n: s.progress ?? 0, entry: s, search: s.title })),
+				"",
+				plugin
+			);
 		}
 	}
 }
@@ -379,6 +385,10 @@ interface Bar {
 	n: number;
 	/** Optional second line, e.g. the film/series split under a provider. */
 	note?: string;
+	/** A title from this row, so the chart can show a poster rather than a bar alone. */
+	entry?: Entry;
+	/** What tapping the row searches for. Defaults to the label. */
+	search?: string;
 }
 
 /**
@@ -388,7 +398,7 @@ interface Bar {
  * carrying my films or my shows", which is the question behind deciding what
  * to keep paying for.
  */
-function providerSplit(el: HTMLElement, rows: Entry[]): void {
+function providerSplit(el: HTMLElement, rows: Entry[], plugin?: ReelPlugin): void {
 	const counts = new Map<string, { films: number; shows: number }>();
 	for (const e of rows) {
 		for (const p of e.providers) {
@@ -407,10 +417,10 @@ function providerSplit(el: HTMLElement, rows: Entry[]): void {
 		}))
 		.sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
 		.slice(0, 12);
-	bars(el, "Streaming on", data);
+	bars(el, "Streaming on", data, "", plugin);
 }
 
-function bars(el: HTMLElement, title: string, data: Bar[], suffix = ""): void {
+function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?: ReelPlugin): void {
 	if (!data.length) return;
 	const max = Math.max(...data.map((d) => d.n), 1);
 	const box = el.createDiv({ cls: "reel-chart" });
@@ -418,6 +428,18 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = ""): void {
 	const body = box.createDiv({ cls: "reel-chart-body" });
 	for (const d of data) {
 		const row = body.createDiv({ cls: "reel-chart-row" });
+
+		// A poster from something the row is actually about.
+		//
+		// Twenty bar charts is a page of arithmetic; one thumbnail per row
+		// turns "Drama (7)" back into films you remember watching. These come
+		// from the vault's own poster cache, so they cost nothing and work
+		// offline like the rest of this page.
+		if (plugin && d.entry) {
+			const thumb = row.createDiv({ cls: "reel-chart-thumb" });
+			plugin.posters.attach(thumb, d.entry);
+		}
+
 		// Full text in a tooltip, since a truncated director or title is
 		// otherwise unrecoverable on desktop.
 		const label = row.createDiv({ cls: "reel-chart-label", text: d.label });
@@ -426,6 +448,23 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = ""): void {
 		const track = row.createDiv({ cls: "reel-chart-track" });
 		track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
 		row.createDiv({ cls: "reel-chart-value", text: `${d.n}${suffix}` });
+
+		// Every bar answers a question you can only otherwise ask by hand:
+		// "which seven were the dramas?" Tapping runs that search.
+		if (plugin && d.search) {
+			row.addClass("is-clickable");
+			row.setAttr("role", "button");
+			row.setAttr("tabindex", "0");
+			row.setAttr("aria-label", `Show titles matching ${d.label}`);
+			const open = () => void plugin.openViewWithSearch(d.search ?? d.label);
+			row.addEventListener("click", open);
+			row.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key === "Enter" || ev.key === " ") {
+					ev.preventDefault();
+					open();
+				}
+			});
+		}
 	}
 }
 
@@ -435,7 +474,8 @@ function tally(
 	rows: Entry[],
 	pick: (e: Entry) => string[],
 	limit = 8,
-	minCount = 2
+	minCount = 2,
+	plugin?: ReelPlugin
 ): void {
 	// "Appears at least twice" keeps a large library's charts meaningful, but
 	// it empties them entirely for a small one — every director has exactly
@@ -443,13 +483,23 @@ function tally(
 	// titles listed is more useful than a blank page.
 	const floor = rows.length < 5 ? 1 : minCount;
 	const count = new Map<string, number>();
-	for (const e of rows) for (const value of pick(e)) if (value) count.set(value, (count.get(value) ?? 0) + 1);
+	// The best-rated title carrying each value, so the row's poster is one you
+	// thought highly of rather than whichever happened to be indexed first.
+	const face = new Map<string, Entry>();
+	for (const e of rows) {
+		for (const value of pick(e)) {
+			if (!value) continue;
+			count.set(value, (count.get(value) ?? 0) + 1);
+			const held = face.get(value);
+			if (!held || (e.rating ?? 0) > (held.rating ?? 0)) face.set(value, e);
+		}
+	}
 	const top = [...count.entries()]
 		.filter(([, n]) => n >= floor)
 		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
 		.slice(0, limit)
-		.map(([label, n]) => ({ label, n }));
-	bars(el, title, top);
+		.map(([label, n]) => ({ label, n, entry: face.get(label), search: label }));
+	bars(el, title, top, "", plugin);
 }
 
 /**
@@ -457,8 +507,18 @@ function tally(
  * you happen to have watched most. Needs a minimum sample, or one five-star
  * film puts an unknown director at the top of the chart.
  */
-function ratedBy(el: HTMLElement, title: string, rows: Entry[], pick: (e: Entry) => string[], min = 2): void {
+function ratedBy(
+	el: HTMLElement,
+	title: string,
+	rows: Entry[],
+	pick: (e: Entry) => string[],
+	min = 2,
+	plugin?: ReelPlugin
+): void {
 	const sums = new Map<string, { total: number; n: number }>();
+	// Best-rated title per key, so a "rate highest" chart shows a poster you
+	// actually rated highly rather than an arbitrary one.
+	const face = new Map<string, Entry>();
 	for (const e of rows) {
 		if (e.rating == null) continue;
 		for (const key of pick(e)) {
@@ -467,14 +527,23 @@ function ratedBy(el: HTMLElement, title: string, rows: Entry[], pick: (e: Entry)
 			cur.total += e.rating;
 			cur.n++;
 			sums.set(key, cur);
+			const held = face.get(key);
+			if (!held || (e.rating ?? 0) > (held.rating ?? 0)) face.set(key, e);
 		}
 	}
 	const top = [...sums.entries()]
 		.filter(([, v]) => v.n >= min)
-		.map(([label, v]) => ({ label: `${label} (${v.n})`, n: Math.round((v.total / v.n) * 10) / 10 }))
+		.map(([label, v]) => ({
+			label: `${label} (${v.n})`,
+			n: Math.round((v.total / v.n) * 10) / 10,
+			entry: face.get(label),
+			// The label carries a count in brackets — searching that string
+			// would match nothing, so the search uses the bare key.
+			search: label,
+		}))
 		.sort((a, b) => b.n - a.n)
 		.slice(0, 8);
-	bars(el, title, top, "★");
+	bars(el, title, top, "★", plugin);
 }
 
 /** Consecutive days up to today (or yesterday) with at least one viewing. */
