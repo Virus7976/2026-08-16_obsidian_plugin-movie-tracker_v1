@@ -110,10 +110,9 @@ class UpNextPainter {
 				thumb.addClass("is-empty");
 				thumb.createSpan({ text: entry.title.slice(0, 2) });
 			}
-			thumb.addEventListener("click", async () => {
-				const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
-				if (file instanceof TFile) await this.plugin.app.workspace.getLeaf(false).openFile(file);
-			});
+			// Opens the detail screen rather than the raw note — the note in
+			// Live Preview shows frontmatter, not the season strip.
+			thumb.addEventListener("click", () => void this.plugin.openDetail(entry));
 
 			const body = row.createDiv({ cls: "reel-upnext-body" });
 			const title = body.createDiv({ cls: "reel-upnext-title" });
@@ -122,13 +121,17 @@ class UpNextPainter {
 				title.createSpan({ cls: "reel-badge new", text: "New" });
 			}
 
+			const total = entry.totalEpisodes ?? 0;
+			const seen = entry.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
+
 			const meta = body.createDiv({ cls: "reel-upnext-meta" });
 			if (next) meta.createSpan({ cls: "reel-upnext-ep", text: `S${next.season}E${next.episode}` });
 			else meta.createSpan({ cls: "reel-dim", text: "All caught up" });
+			// How far through, in words as well as a bar — a 3px bar alone is
+			// not readable at a glance, and the count is the useful number.
+			if (total) meta.createSpan({ cls: "reel-dim", text: `${seen}/${total} · ${Math.round((seen / total) * 100)}%` });
 			if (entry.lastWatched?.date) meta.createSpan({ cls: "reel-dim", text: prettyDate(entry.lastWatched.date) });
 
-			const total = entry.totalEpisodes ?? 0;
-			const seen = entry.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
 			if (total) {
 				const bar = body.createDiv({ cls: "reel-progress" });
 				bar.setCssProps({ "--reel-fill": String(Math.min(1, seen / total)) });

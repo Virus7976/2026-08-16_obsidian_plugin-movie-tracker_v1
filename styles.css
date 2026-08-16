@@ -2266,3 +2266,128 @@ input.reel-input {
 		gap: 2px;
 	}
 }
+
+/* ================================================================== *
+ * v0.7 — consistent widths across every screen
+ * ================================================================== */
+
+/* Every screen in the view had the same problem the detail screen did:
+   content stretched to whatever the window was. A 44px poster on a row
+   2000px wide reads as broken. Lists cap narrow, the poster grid caps
+   wide, and both centre. */
+
+.reel-view-header,
+.reel-view-filters {
+	max-width: 1400px;
+	margin-left: auto;
+	margin-right: auto;
+	width: 100%;
+}
+
+.reel-view-body > * {
+	max-width: 1400px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.reel-tabs {
+	max-width: 900px;
+	margin: 0 auto;
+	width: 100%;
+}
+
+/* Lists read badly when very wide — the eye has to travel from a poster
+   on the far left to a button on the far right. */
+.reel-upnext,
+.reel-diary,
+.reel-list,
+.reel-rate {
+	max-width: 920px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.reel-detail {
+	max-width: none;
+}
+
+/* ---------------- up next ---------------- */
+
+.reel-upnext-row {
+	padding: 10px;
+	gap: 14px;
+}
+
+.reel-upnext-thumb {
+	flex: 0 0 54px;
+	width: 54px;
+	cursor: pointer;
+}
+
+.reel-upnext-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+}
+
+.reel-upnext-meta {
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	margin-top: 2px;
+}
+
+.reel-progress {
+	height: 5px;
+	border-radius: 3px;
+}
+
+@media (min-width: 700px) {
+	.reel-upnext-thumb {
+		flex: 0 0 68px;
+		width: 68px;
+	}
+}
+
+/* ---------------- diary ---------------- */
+
+.reel-diary-row {
+	padding: 8px 6px;
+	gap: 12px;
+}
+
+.reel-diary-thumb {
+	flex: 0 0 44px;
+	width: 44px;
+}
+
+.reel-diary-title {
+	font-size: var(--font-ui-medium);
+}
+
+.reel-diary-month {
+	padding: 14px 0 6px;
+	font-size: var(--font-ui-small);
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 4px;
+}
+
+/* ---------------- stats ---------------- */
+
+.reel-tiles {
+	max-width: 1400px;
+}
+
+@media (min-width: 900px) {
+	.reel-tiles {
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	}
+}
+
+/* ---------------- poster grid ---------------- */
+
+/* Cap the column count so a wide monitor doesn't produce sixteen tiny
+   posters per row. */
+@media (min-width: 900px) {
+	.reel-grid {
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+}
