@@ -34,6 +34,8 @@ export interface ReelSettings {
 	dailyNoteFolder: string;
 	/** Last day the returning-series refresh ran, per vault. */
 	lastEpisodeCheck: string;
+	/** TMDB ids dismissed in Discover. "Not interested" has to stick. */
+	dismissedIds: number[];
 
 	/* Content policy — see content.ts for what the data can and can't do */
 	hideFlags: string[];
@@ -74,6 +76,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dailyNotePrefix: "- Watched",
 	dailyNoteFolder: "",
 	lastEpisodeCheck: "",
+	dismissedIds: [],
 
 	hideFlags: [],
 	maxCertification: null,

@@ -2854,3 +2854,92 @@ input.reel-input {
 	max-height: 30vh;
 	overflow-y: auto;
 }
+
+/* ---------------- discover: filters, grid, card actions ---------------- */
+
+.reel-discover-filters {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-bottom: 6px;
+}
+
+.reel-discover-filters .reel-chips {
+	position: static;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	align-items: center;
+}
+
+/* Filtered results are a grid, not strips — you're comparing a set rather
+   than skimming a shelf. */
+.reel-dgrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+	gap: 16px 12px;
+}
+
+@media (min-width: 900px) {
+	.reel-dgrid {
+		grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
+		justify-content: center;
+	}
+}
+
+.reel-dgrid .reel-dcard {
+	flex: none;
+	width: auto;
+}
+
+/* Three decisions per card. Always visible — hover-only controls don't
+   exist on a phone, and this is the commonest interaction on the screen. */
+.reel-dcard-actions {
+	display: flex;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+.reel-dcard-btn {
+	flex: 1;
+	min-height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-muted);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	transition: transform 100ms ease;
+}
+
+.reel-dcard-btn:active {
+	transform: scale(0.92);
+}
+
+.reel-dcard-btn.add {
+	color: var(--text-on-accent, #fff);
+	background: var(--interactive-accent, #7c3aed);
+	border-color: transparent;
+}
+
+.reel-dcard-btn.seen {
+	color: var(--color-green, #16a34a);
+	border-color: var(--color-green, #16a34a);
+}
+
+.reel-dcard-btn.skip {
+	color: var(--text-faint);
+}
+
+.reel-dcard-poster {
+	cursor: pointer;
+}
+
+/* Phones get bigger targets — 32px is fine with a mouse, tight with a thumb. */
+@media (max-width: 620px) {
+	.reel-dcard-btn {
+		min-height: 38px;
+	}
+}

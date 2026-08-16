@@ -1,13 +1,14 @@
 /**
  * The Discover screen.
  *
- * Rows of horizontally-scrolling posters, the shape every streaming service
- * converged on for a reason: browsing is lateral. You skim a row, stop at
- * something, and only then want detail. A vertical list makes you scroll past
- * everything you're not interested in.
+ * Two modes behind one filter bar. **For you** builds rows from your ratings;
+ * picking a genre, decade or minimum score switches to a filtered grid. The
+ * default is personal, because a tracker that knows what you've rated should
+ * use that before making you specify anything.
  *
- * Tapping a poster opens a preview rather than adding it — deciding needs the
- * overview and the score, and an accidental tap should cost nothing.
+ * Every card carries its three decisions inline — watchlist, seen, not
+ * interested — because opening a sheet to say "no" is the wrong cost for the
+ * commonest answer. The sheet is still there when you want the overview first.
  */
 
 import { Modal, Notice, Platform, setIcon } from "obsidian";
@@ -16,76 +17,153 @@ import type { TmdbSearchResult } from "../types";
 import type { DiscoverRow, TasteProfile } from "../discover";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
+import { renderStars } from "./stars";
+
+interface Filters {
+	genreId: number | null;
+	genreName: string | null;
+	decade: number | null;
+	minRating: number | null;
+	type: "movie" | "tv";
+}
+
+const EMPTY: Filters = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
 
 export class DiscoverScreen {
 	private rows: DiscoverRow[] | null = null;
 	private profile: TasteProfile | null = null;
+	private results: TmdbSearchResult[] | null = null;
+	private genres: { id: number; name: string }[] = [];
+	private filters: Filters = { ...EMPTY };
 	private loading = false;
 	private error: string | null = null;
-	/** Added this session, so a card can disappear without a full reload. */
-	private added = new Set<number>();
+	private handled = new Set<number>();
 
 	constructor(private plugin: ReelPlugin) {}
 
-	/** Drop everything so the next paint refetches — used by the reload button. */
+	private get filtered(): boolean {
+		return this.filters.genreId != null || this.filters.decade != null || this.filters.minRating != null;
+	}
+
 	reset(): void {
 		this.rows = null;
 		this.profile = null;
+		this.results = null;
 		this.error = null;
-		this.added.clear();
+		this.handled.clear();
 	}
 
 	render(container: HTMLElement): void {
 		container.empty();
 		container.addClass("reel-discover");
 
+		this.paintFilters(container);
+
 		if (this.error) {
 			container.createDiv({ cls: "reel-error", text: this.error });
 			const retry = container.createEl("button", { cls: "reel-btn", text: "Try again" });
 			retry.addEventListener("click", () => {
-				this.reset();
+				this.error = null;
 				this.render(container);
 			});
 			return;
 		}
 
+		if (this.filtered) this.paintResults(container);
+		else this.paintForYou(container);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Filter bar                                                          */
+	/* ------------------------------------------------------------------ */
+
+	private paintFilters(container: HTMLElement): void {
+		const wrap = container.createDiv({ cls: "reel-discover-filters" });
+
+		const row1 = wrap.createDiv({ cls: "reel-chips" });
+		const chip = (parent: HTMLElement, label: string, active: boolean, onClick: () => void) => {
+			const b = parent.createEl("button", { cls: "reel-chip", text: label });
+			b.toggleClass("is-active", active);
+			b.addEventListener("click", () => {
+				onClick();
+				this.results = null;
+				this.render(container);
+			});
+			return b;
+		};
+
+		// "For you" is a real choice, not just the absence of filters.
+		chip(row1, "For you", !this.filtered, () => {
+			this.filters = { ...EMPTY, type: this.filters.type };
+		});
+		chip(row1, "Films", this.filters.type === "movie", () => (this.filters.type = "movie"));
+		chip(row1, "Series", this.filters.type === "tv", () => (this.filters.type = "tv"));
+
+		row1.createSpan({ cls: "reel-chip-sep", text: "·" });
+
+		// The genre list has to be fetched; until it arrives, show nothing
+		// rather than a row that pops in and shifts everything down.
+		if (!this.genres.length) {
+			void this.plugin.tmdb
+				.genreList(this.filters.type)
+				.then((list) => {
+					this.genres = list;
+					this.render(container);
+				})
+				.catch(() => {
+					/* genre filtering is optional; the rows still work */
+				});
+		}
+
+		for (const g of this.genres) {
+			chip(row1, g.name, this.filters.genreId === g.id, () => {
+				const on = this.filters.genreId === g.id;
+				this.filters.genreId = on ? null : g.id;
+				this.filters.genreName = on ? null : g.name;
+			});
+		}
+
+		const row2 = wrap.createDiv({ cls: "reel-chips" });
+		row2.createSpan({ cls: "reel-dim", text: "Decade" });
+		const nowDecade = Math.floor(new Date().getFullYear() / 10) * 10;
+		for (let d = nowDecade; d >= 1950; d -= 10) {
+			chip(row2, `${d}s`, this.filters.decade === d, () => {
+				this.filters.decade = this.filters.decade === d ? null : d;
+			});
+		}
+
+		row2.createSpan({ cls: "reel-chip-sep", text: "·" });
+		row2.createSpan({ cls: "reel-dim", text: "At least" });
+		for (const r of [6, 7, 8]) {
+			chip(row2, `${r}+`, this.filters.minRating === r, () => {
+				this.filters.minRating = this.filters.minRating === r ? null : r;
+			});
+		}
+
+		if (this.filtered) {
+			const clear = row2.createEl("button", { cls: "reel-chip", text: "✕ Clear" });
+			clear.addEventListener("click", () => {
+				this.filters = { ...EMPTY, type: this.filters.type };
+				this.results = null;
+				this.render(container);
+			});
+		}
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* For you                                                             */
+	/* ------------------------------------------------------------------ */
+
+	private paintForYou(container: HTMLElement): void {
 		if (!this.rows) {
 			container.createDiv({ cls: "reel-loading", text: "Finding things for you…" });
 			if (this.loading) return;
 			this.loading = true;
-			void this.load(container);
+			void this.loadRows(container);
 			return;
 		}
 
-		this.paintHeader(container);
-
-		if (!this.rows.length) {
-			container.createDiv({ cls: "reel-empty", text: "Nothing to suggest right now." });
-			return;
-		}
-
-		for (const row of this.rows) this.paintRow(container, row);
-	}
-
-	private async load(container: HTMLElement): Promise<void> {
-		try {
-			const profile = await this.plugin.discover.taste();
-			const rows = await this.plugin.discover.rows(profile);
-			this.profile = profile;
-			this.rows = rows;
-		} catch (e) {
-			this.error = redact(e);
-		} finally {
-			this.loading = false;
-			this.render(container);
-		}
-	}
-
-	private paintHeader(container: HTMLElement): void {
 		const head = container.createDiv({ cls: "reel-discover-head" });
-
-		// Say what the suggestions are based on. A recommendation with no
-		// stated reason is indistinguishable from an advert.
 		if (this.profile?.sparse) {
 			head.createDiv({
 				cls: "reel-discover-note",
@@ -97,16 +175,35 @@ export class DiscoverScreen {
 				text: `Based on your ratings — mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`,
 			});
 		}
-
 		const reload = head.createEl("button", { cls: "reel-chip", text: "Refresh" });
 		reload.addEventListener("click", () => {
 			this.reset();
 			this.render(container);
 		});
+
+		const visible = this.rows.filter((r) => r.items.some((i) => !this.handled.has(i.id)));
+		if (!visible.length) {
+			container.createDiv({ cls: "reel-empty", text: "Nothing left to suggest — try a genre above." });
+			return;
+		}
+		for (const row of visible) this.paintRow(container, row);
+	}
+
+	private async loadRows(container: HTMLElement): Promise<void> {
+		try {
+			const profile = await this.plugin.discover.taste();
+			this.rows = await this.plugin.discover.rows(profile);
+			this.profile = profile;
+		} catch (e) {
+			this.error = redact(e);
+		} finally {
+			this.loading = false;
+			this.render(container);
+		}
 	}
 
 	private paintRow(container: HTMLElement, row: DiscoverRow): void {
-		const items = row.items.filter((i) => !this.added.has(i.id));
+		const items = row.items.filter((i) => !this.handled.has(i.id));
 		if (!items.length) return;
 
 		const section = container.createDiv({ cls: "reel-drow" });
@@ -117,19 +214,71 @@ export class DiscoverScreen {
 		const strip = section.createDiv({ cls: "reel-drow-strip" });
 		for (const item of items) strip.appendChild(this.card(item, container));
 
-		// Arrows for desktop, where there's no touch scrolling. Hidden on a
-		// phone, where dragging is the obvious thing to do.
 		if (!Platform.isMobile) {
 			const nav = head.createDiv({ cls: "reel-drow-nav" });
-			const scrollBy = (delta: number) => strip.scrollBy({ left: delta, behavior: "smooth" });
+			const by = (delta: number) => strip.scrollBy({ left: delta, behavior: "smooth" });
 			const left = nav.createEl("button", { cls: "reel-drow-arrow" });
 			setIcon(left, "chevron-left");
-			left.addEventListener("click", () => scrollBy(-600));
+			left.addEventListener("click", () => by(-600));
 			const right = nav.createEl("button", { cls: "reel-drow-arrow" });
 			setIcon(right, "chevron-right");
-			right.addEventListener("click", () => scrollBy(600));
+			right.addEventListener("click", () => by(600));
 		}
 	}
+
+	/* ------------------------------------------------------------------ */
+	/* Filtered results                                                    */
+	/* ------------------------------------------------------------------ */
+
+	private paintResults(container: HTMLElement): void {
+		if (!this.results) {
+			container.createDiv({ cls: "reel-loading", text: "Searching…" });
+			if (this.loading) return;
+			this.loading = true;
+			void this.plugin.discover
+				.search({
+					type: this.filters.type,
+					genreId: this.filters.genreId ?? undefined,
+					decade: this.filters.decade ?? undefined,
+					minRating: this.filters.minRating ?? undefined,
+				})
+				.then((items) => {
+					this.results = items;
+				})
+				.catch((e: unknown) => {
+					this.error = redact(e);
+				})
+				.finally(() => {
+					this.loading = false;
+					this.render(container);
+				});
+			return;
+		}
+
+		const items = this.results.filter((i) => !this.handled.has(i.id));
+		const label = [
+			this.filters.minRating ? `${this.filters.minRating}+` : "",
+			this.filters.genreName ?? "",
+			this.filters.type === "tv" ? "series" : "films",
+			this.filters.decade ? `from the ${this.filters.decade}s` : "",
+		]
+			.filter(Boolean)
+			.join(" ");
+
+		container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
+
+		if (!items.length) {
+			container.createDiv({ cls: "reel-empty", text: "Nothing matches — try a wider filter." });
+			return;
+		}
+
+		const grid = container.createDiv({ cls: "reel-dgrid" });
+		for (const item of items) grid.appendChild(this.card(item, container));
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Cards                                                               */
+	/* ------------------------------------------------------------------ */
 
 	private card(item: TmdbSearchResult, container: HTMLElement): HTMLElement {
 		const isTv = item.media_type === "tv";
@@ -137,42 +286,144 @@ export class DiscoverScreen {
 		const year = yearOf(isTv ? item.first_air_date : item.release_date);
 
 		const card = createDiv({ cls: "reel-dcard" });
-		card.setAttr("role", "button");
-		card.setAttr("tabindex", "0");
-		card.setAttr("aria-label", title);
 
 		const posterEl = card.createDiv({ cls: "reel-dcard-poster" });
+		posterEl.setAttr("role", "button");
+		posterEl.setAttr("tabindex", "0");
+		posterEl.setAttr("aria-label", `${title} — details`);
 		const src = this.plugin.tmdb.posterUrl(item.poster_path, "w342");
 		if (src) posterEl.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-
-		if (item.vote_average) {
-			posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
-		}
+		if (item.vote_average) posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
 		if (isTv) posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
+
+		const openPreview = () =>
+			new PreviewSheet(this.plugin, item, () => {
+				this.handled.add(item.id);
+				this.render(container);
+			}).open();
+		posterEl.addEventListener("click", openPreview);
+		posterEl.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") openPreview();
+		});
 
 		card.createDiv({ cls: "reel-dcard-title", text: title });
 		if (year) card.createDiv({ cls: "reel-dcard-year", text: String(year) });
 
-		const open = () => new PreviewSheet(this.plugin, item, () => {
-			this.added.add(item.id);
-			this.render(container);
-		}).open();
+		// The three decisions, inline. Opening a sheet to say "no" is the
+		// wrong cost for the commonest answer.
+		const actions = card.createDiv({ cls: "reel-dcard-actions" });
 
-		card.addEventListener("click", open);
-		card.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") open();
+		const button = (icon: string, label: string, cls: string, fn: () => Promise<void> | void) => {
+			const b = actions.createEl("button", { cls: `reel-dcard-btn ${cls}` });
+			setIcon(b, icon);
+			b.setAttr("aria-label", `${label}: ${title}`);
+			b.setAttr("title", label);
+			b.addEventListener("click", (e) => {
+				e.stopPropagation();
+				void Promise.resolve(fn());
+			});
+			return b;
+		};
+
+		button("plus", "Add to watchlist", "add", async () => {
+			await this.add(item, true);
+			new Notice(`${title} → watchlist`);
+			this.handled.add(item.id);
+			this.render(container);
+		});
+
+		button("check", "Seen it — rate now", "seen", () => {
+			new SeenSheet(this.plugin, item, () => {
+				this.handled.add(item.id);
+				this.render(container);
+			}).open();
+		});
+
+		button("x", "Not interested", "skip", async () => {
+			await this.plugin.discover.dismiss(item.id);
+			this.handled.add(item.id);
+			this.render(container);
 		});
 
 		return card;
 	}
+
+	private async add(item: TmdbSearchResult, watchlist: boolean, rating?: number): Promise<void> {
+		const payload = { date: todayISO(), watchlist, rating };
+		if (item.media_type === "tv") {
+			const meta = await this.plugin.tmdb.getShow(item.id);
+			await this.plugin.notes.createShow(meta, payload);
+		} else {
+			const meta = await this.plugin.tmdb.getFilm(item.id);
+			await this.plugin.notes.createFilm(meta, payload);
+		}
+	}
 }
 
-/**
- * Preview before committing.
- *
- * Deciding needs the overview and the score, so tapping a poster shows those
- * rather than adding it outright — an accidental tap costs nothing.
- */
+/* ------------------------------------------------------------------ */
+
+/** Marking something seen usually means you have an opinion about it. */
+class SeenSheet extends Modal {
+	private busy = false;
+
+	constructor(
+		private plugin: ReelPlugin,
+		private item: TmdbSearchResult,
+		private onDone: () => void
+	) {
+		super(plugin.app);
+	}
+
+	onOpen(): void {
+		const { contentEl, modalEl } = this;
+		modalEl.addClass("reel-modal");
+		if (Platform.isPhone) modalEl.addClass("reel-sheet");
+
+		const isTv = this.item.media_type === "tv";
+		const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
+
+		contentEl.createEl("h3", { cls: "reel-log-title", text: title });
+		contentEl.createDiv({ cls: "reel-log-sub", text: "Adding as watched. Rate it now, or skip." });
+
+		const starRow = contentEl.createDiv({ cls: "reel-rating-row big centred" });
+		renderStars(starRow, {
+			onChange: (v) => void this.save(v),
+		});
+
+		const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+		const noRating = actions.createEl("button", { cls: "reel-btn", text: "Add without rating" });
+		noRating.addEventListener("click", () => void this.save(undefined));
+		const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+		cancel.addEventListener("click", () => this.close());
+	}
+
+	private async save(rating: number | undefined): Promise<void> {
+		if (this.busy) return;
+		this.busy = true;
+		try {
+			const payload = { date: todayISO(), watchlist: false, rating };
+			if (this.item.media_type === "tv") {
+				const meta = await this.plugin.tmdb.getShow(this.item.id);
+				await this.plugin.notes.createShow(meta, payload);
+			} else {
+				const meta = await this.plugin.tmdb.getFilm(this.item.id);
+				await this.plugin.notes.createFilm(meta, payload);
+			}
+			new Notice(rating != null ? `Added — rated ${rating}` : "Added as watched");
+			this.onDone();
+			this.close();
+		} catch (e) {
+			new Notice(`Reel: ${redact(e)}`);
+			this.busy = false;
+		}
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+/** Preview before committing — for when you want the overview first. */
 class PreviewSheet extends Modal {
 	private busy = false;
 
@@ -215,8 +466,13 @@ class PreviewSheet extends Modal {
 		later.addEventListener("click", () => void this.add(true, later));
 		const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it" });
 		seen.addEventListener("click", () => void this.add(false, seen));
-		const close = actions.createEl("button", { cls: "reel-btn", text: "Not for me" });
-		close.addEventListener("click", () => this.close());
+		const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested" });
+		nope.addEventListener("click", () => {
+			void this.plugin.discover.dismiss(this.item.id).then(() => {
+				this.onAdded();
+				this.close();
+			});
+		});
 	}
 
 	private async add(watchlist: boolean, button: HTMLButtonElement): Promise<void> {

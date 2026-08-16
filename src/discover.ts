@@ -180,6 +180,22 @@ export class DiscoverEngine {
 		return rows.filter((r): r is DiscoverRow => r != null && r.items.length > 0);
 	}
 
+	/** Stop suggesting something. Persisted, so it stays gone. */
+	async dismiss(id: number): Promise<void> {
+		if (this.plugin.settings.dismissedIds.includes(id)) return;
+		// Bounded: an unbounded ignore-list would grow forever in data.json for
+		// no benefit, and the oldest dismissals are the least relevant.
+		const next = [...this.plugin.settings.dismissedIds, id].slice(-500);
+		this.plugin.settings.dismissedIds = next;
+		await this.plugin.saveSettings();
+	}
+
+	/** A single filtered search — the manual counterpart to the taste rows. */
+	async search(filters: DiscoverFilters): Promise<TmdbSearchResult[]> {
+		const items = await this.plugin.tmdb.discoverBy(filters);
+		return this.filterOut(items);
+	}
+
 	/** One row, filtered against the library and your content policy. */
 	private row(id: string, title: string, items: TmdbSearchResult[], reason?: string): DiscoverRow {
 		return { id, title, reason, items: this.filterOut(items) };
@@ -198,6 +214,7 @@ export class DiscoverEngine {
 			seen.add(item.id);
 			const type = item.media_type === "tv" ? "tv" : "film";
 			if (this.plugin.library.byTmdbId(item.id, type)) continue;
+			if (this.plugin.settings.dismissedIds.includes(item.id)) continue;
 			if (!item.poster_path) continue; // a poster-less card is a grey box
 			out.push(item);
 		}
