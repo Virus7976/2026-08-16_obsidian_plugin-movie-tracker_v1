@@ -464,7 +464,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			bars(
 				charts,
 				"Series progress (%)",
-				inProgress.map((s) => ({ label: s.title, n: s.progress ?? 0, entry: s, search: s.title })),
+				inProgress.map((s) => ({ label: s.title, n: s.progress ?? 0, entries: [s], search: s.title })),
 				"",
 				plugin
 			);
@@ -477,8 +477,8 @@ interface Bar {
 	n: number;
 	/** Optional second line, e.g. the film/series split under a provider. */
 	note?: string;
-	/** A title from this row, so the chart can show a poster rather than a bar alone. */
-	entry?: Entry;
+	/** Every title behind this row, so the posters themselves become the chart. */
+	entries?: Entry[];
 	/** What tapping the row searches for. Defaults to the label. */
 	search?: string;
 	/** An action for rows whose answer is not a library search — a year rescopes the page. */
@@ -523,25 +523,36 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 	for (const d of data) {
 		const row = body.createDiv({ cls: "reel-chart-row" });
 
-		// A poster from something the row is actually about.
+		// Label and number on one line, posters underneath.
 		//
-		// Twenty bar charts is a page of arithmetic; one thumbnail per row
-		// turns "Drama (7)" back into films you remember watching. These come
-		// from the vault's own poster cache, so they cost nothing and work
-		// offline like the rest of this page.
-		if (plugin && d.entry) {
-			const thumb = row.createDiv({ cls: "reel-chart-thumb" });
-			plugin.posters.attach(thumb, d.entry);
-		}
-
-		// Full text in a tooltip, since a truncated director or title is
-		// otherwise unrecoverable on desktop.
-		const label = row.createDiv({ cls: "reel-chart-label", text: d.label });
+		// A single thumbnail beside a thin bar left most of the row empty and
+		// told you nothing about the other four films. Showing every title the
+		// row counts turns the chart into the thing it is describing — the
+		// posters are the bar, and their number is the count.
+		const head = row.createDiv({ cls: "reel-chart-head" });
+		const label = head.createDiv({ cls: "reel-chart-label", text: d.label });
 		label.setAttr("title", d.note ? `${d.label} — ${d.note}` : d.label);
 		if (d.note) label.createDiv({ cls: "reel-chart-sub", text: d.note });
-		const track = row.createDiv({ cls: "reel-chart-track" });
-		track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
-		row.createDiv({ cls: "reel-chart-value", text: `${d.n}${suffix}` });
+		head.createDiv({ cls: "reel-chart-value", text: `${d.n}${suffix}` });
+
+		const posters = plugin ? (d.entries ?? []) : [];
+		if (posters.length) {
+			const strip = row.createDiv({ cls: "reel-chart-strip" });
+			// Capped: a prolific director would otherwise push every other row
+			// off the screen, and the count is already stated above.
+			for (const e of posters.slice(0, 8)) {
+				const thumb = strip.createDiv({ cls: "reel-chart-thumb" });
+				plugin?.posters.attach(thumb, e);
+			}
+			if (posters.length > 8) {
+				strip.createDiv({ cls: "reel-chart-more", text: `+${posters.length - 8}` });
+			}
+		} else {
+			// No posters to show — a date bucket, a rating band — so the bar
+			// stays, since something has to carry the comparison.
+			const track = row.createDiv({ cls: "reel-chart-track" });
+			track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
+		}
 
 		// Every bar answers a question you can only otherwise ask by hand:
 		// "which seven were the dramas?" Tapping runs that search — or, where
@@ -577,23 +588,24 @@ function tally(
 	// one film until you own five. Below that, show singles: seeing your two
 	// titles listed is more useful than a blank page.
 	const floor = rows.length < 5 ? 1 : minCount;
-	const count = new Map<string, number>();
-	// The best-rated title carrying each value, so the row's poster is one you
-	// thought highly of rather than whichever happened to be indexed first.
-	const face = new Map<string, Entry>();
+	// Every title carrying each value, best-rated first — the posters are the
+	// chart now, so the row needs the whole set rather than one representative.
+	const held = new Map<string, Entry[]>();
 	for (const e of rows) {
 		for (const value of pick(e)) {
 			if (!value) continue;
-			count.set(value, (count.get(value) ?? 0) + 1);
-			const held = face.get(value);
-			if (!held || (e.rating ?? 0) > (held.rating ?? 0)) face.set(value, e);
+			const list = held.get(value) ?? [];
+			list.push(e);
+			held.set(value, list);
 		}
 	}
-	const top = [...count.entries()]
-		.filter(([, n]) => n >= floor)
-		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+	for (const list of held.values()) list.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+
+	const top = [...held.entries()]
+		.filter(([, list]) => list.length >= floor)
+		.sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
 		.slice(0, limit)
-		.map(([label, n]) => ({ label, n, entry: face.get(label), search: label }));
+		.map(([label, list]) => ({ label, n: list.length, entries: list, search: label }));
 	bars(el, title, top, "", plugin);
 }
 
@@ -611,9 +623,8 @@ function ratedBy(
 	plugin?: ReelPlugin
 ): void {
 	const sums = new Map<string, { total: number; n: number }>();
-	// Best-rated title per key, so a "rate highest" chart shows a poster you
-	// actually rated highly rather than an arbitrary one.
-	const face = new Map<string, Entry>();
+	// Every rated title per key, best first — the posters carry the row.
+	const held = new Map<string, Entry[]>();
 	for (const e of rows) {
 		if (e.rating == null) continue;
 		for (const key of pick(e)) {
@@ -622,16 +633,19 @@ function ratedBy(
 			cur.total += e.rating;
 			cur.n++;
 			sums.set(key, cur);
-			const held = face.get(key);
-			if (!held || (e.rating ?? 0) > (held.rating ?? 0)) face.set(key, e);
+			const list = held.get(key) ?? [];
+			list.push(e);
+			held.set(key, list);
 		}
 	}
+	for (const list of held.values()) list.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+
 	const top = [...sums.entries()]
 		.filter(([, v]) => v.n >= min)
 		.map(([label, v]) => ({
 			label: `${label} (${v.n})`,
 			n: Math.round((v.total / v.n) * 10) / 10,
-			entry: face.get(label),
+			entries: held.get(label),
 			// The label carries a count in brackets — searching that string
 			// would match nothing, so the search uses the bare key.
 			search: label,

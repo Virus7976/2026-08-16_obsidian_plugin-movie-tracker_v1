@@ -3931,15 +3931,7 @@ input.reel-input {
 	margin-bottom: 10px;
 }
 
-.reel-stats .reel-chart-row {
-	display: grid;
-	/* A fixed label column so every bar in a chart starts at the same x —
-	   ragged bar starts make two charts impossible to compare. */
-	grid-template-columns: minmax(0, 7.5rem) 1fr auto;
-	align-items: center;
-	gap: 10px;
-	padding: 3px 0;
-}
+
 
 .reel-stats .reel-chart-track {
 	height: 8px;
@@ -3993,11 +3985,6 @@ input.reel-input {
 
 	/* Narrower label column: 7.5rem of a 375px screen left almost nothing for
 	   the bar itself, so the chart stopped communicating anything. */
-	.reel-stats .reel-chart-row {
-		grid-template-columns: minmax(0, 5.5rem) 1fr auto;
-		gap: 8px;
-	}
-
 	.reel-stats .reel-facts {
 		padding: 2px 12px;
 	}
@@ -4212,10 +4199,7 @@ input.reel-input {
  * "Drama (7)" back into films you remember watching, and it costs nothing —
  * these are the same local images the library grid uses.
  */
-.reel-stats .reel-chart-row {
-	/* thumb · label · track · value */
-	grid-template-columns: auto minmax(0, 7rem) 1fr auto;
-}
+
 
 .reel-chart-thumb {
 	width: 26px;
@@ -4261,11 +4245,6 @@ input.reel-input {
 }
 
 @media (max-width: 700px) {
-	.reel-stats .reel-chart-row {
-		grid-template-columns: auto minmax(0, 5rem) 1fr auto;
-		gap: 6px;
-	}
-
 	.reel-chart-thumb {
 		width: 22px;
 		height: 33px;
@@ -4313,4 +4292,104 @@ input.reel-input {
 	min-height: 34px;
 	padding: 0 12px;
 	font-size: var(--font-ui-smaller);
+}
+
+/* ---------------- stats rows: posters are the chart ---------------- */
+
+/*
+ * A label and a number on one line, then every title the row counts.
+ *
+ * The previous layout put a thin bar and a single thumbnail on one line,
+ * which left most of the row empty and said nothing about the other four
+ * films. Showing the set turns the chart into the thing it describes: the
+ * posters are the bar, and how many there are is the count.
+ */
+.reel-stats .reel-chart-row {
+	display: block;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.reel-stats .reel-chart-row:last-child {
+	border-bottom: none;
+}
+
+.reel-chart-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 6px;
+}
+
+.reel-stats .reel-chart-label {
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-stats .reel-chart-value {
+	flex: 0 0 auto;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-chart-strip {
+	display: flex;
+	gap: 5px;
+	align-items: flex-end;
+	flex-wrap: wrap;
+}
+
+.reel-chart-thumb {
+	width: 38px;
+	height: 57px;
+	border-radius: 4px;
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 38px;
+}
+
+.reel-chart-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-chart-thumb.is-empty .reel-placeholder-text {
+	font-size: 10px;
+	font-weight: 700;
+	color: var(--text-faint);
+	text-transform: uppercase;
+}
+
+.reel-chart-more {
+	align-self: center;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	padding-left: 2px;
+}
+
+/* Rows with nothing to show a poster for — date buckets, rating bands —
+   keep the bar, since something has to carry the comparison. */
+.reel-stats .reel-chart-track {
+	height: 8px;
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+	overflow: hidden;
+}
+
+@media (max-width: 700px) {
+	.reel-chart-thumb {
+		width: 34px;
+		height: 51px;
+		flex-basis: 34px;
+	}
 }
