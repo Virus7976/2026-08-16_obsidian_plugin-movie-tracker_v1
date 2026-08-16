@@ -4166,3 +4166,29 @@ input.reel-input {
 	object-fit: cover;
 	display: block;
 }
+
+/* ---- person opinion: like and rate ---- */
+
+/*
+ * A heart and stars together. The heart is the fast yes you will actually
+ * use on a cast list; the rating is for the handful of people you feel
+ * strongly enough about to rank. Demanding stars for everyone you like
+ * would mean nothing ever gets recorded.
+ */
+.reel-person-opinion {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-top: 8px;
+}
+
+.reel-person-opinion .reel-heart-labelled {
+	min-height: 34px;
+	padding: 0 14px;
+}
+
+.reel-person-stars {
+	display: flex;
+	align-items: center;
+}

@@ -18,6 +18,8 @@ import type ReelPlugin from "../main";
 import type { TmdbPerson, TmdbPersonCredit } from "../types";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
+import { renderStars } from "./stars";
+import type { PersonOpinion } from "../settings";
 
 export class PersonSheet extends Modal {
 	private busy = false;
@@ -88,6 +90,8 @@ export class PersonSheet extends Modal {
 		else if (born) facts.push(`b. ${born}`);
 		if (facts.length) body.createDiv({ cls: "reel-dim", text: facts.join(" · ") });
 
+		this.renderOpinion(body, person);
+
 		if (person.biography?.trim()) {
 			const bio = person.biography.trim();
 			// Biographies run long. The opening paragraph places someone; the
@@ -103,6 +107,67 @@ export class PersonSheet extends Modal {
 				});
 			}
 		}
+	}
+
+	/**
+	 * Like or rate a person, which then leans your recommendations.
+	 *
+	 * Both, rather than one: a heart is a fast yes you will actually use on a
+	 * cast list, and a rating is for the handful of people you feel strongly
+	 * enough about to rank. Requiring stars for every actor you like would
+	 * mean nobody records anything.
+	 *
+	 * Stored under settings rather than as a note, because this is a
+	 * preference about how suggestions should lean — not a thing you watched.
+	 */
+	private renderOpinion(body: HTMLElement, person: TmdbPerson): void {
+		const key = String(person.id);
+		const store = this.plugin.settings.people;
+		const current = store[key];
+
+		const row = body.createDiv({ cls: "reel-person-opinion" });
+
+		const save = async (next: Partial<PersonOpinion>) => {
+			// Spread first, then the identity fields: an existing record must
+			// not be able to overwrite the name with a stale one.
+			const merged: PersonOpinion = {
+				...store[key],
+				...next,
+				name: person.name,
+				department: person.known_for_department,
+			};
+			// An opinion with nothing in it is not an opinion — drop the whole
+			// record so an unliked, unrated person stops weighting anything.
+			if (!merged.liked && merged.rating == null) delete store[key];
+			else store[key] = merged;
+			await this.plugin.saveSettings();
+		};
+
+		const heart = row.createEl("button", {
+			cls: "reel-heart reel-heart-labelled",
+			attr: { type: "button", "aria-pressed": String(!!current?.liked) },
+		});
+		const glyph = heart.createSpan({ cls: "reel-heart-glyph" });
+		const word = heart.createSpan({ cls: "reel-heart-word" });
+		const paintHeart = () => {
+			const liked = !!this.plugin.settings.people[key]?.liked;
+			heart.toggleClass("is-on", liked);
+			heart.setAttr("aria-pressed", String(liked));
+			heart.setAttr("aria-label", liked ? `${person.name} — liked` : `Like ${person.name}`);
+			glyph.setText(liked ? "♥" : "♡");
+			word.setText(liked ? "Liked" : "Like");
+		};
+		heart.addEventListener("click", () => {
+			void save({ liked: !this.plugin.settings.people[key]?.liked }).then(paintHeart);
+		});
+		paintHeart();
+
+		const stars = row.createDiv({ cls: "reel-person-stars" });
+		renderStars(stars, {
+			value: current?.rating,
+			compact: true,
+			onChange: (v) => void save({ rating: v ?? undefined }),
+		});
 	}
 
 	private renderCredits(person: TmdbPerson): void {

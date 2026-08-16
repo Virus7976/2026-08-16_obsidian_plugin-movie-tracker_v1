@@ -181,6 +181,31 @@ export class DiscoverEngine {
 	async rows(profile: TasteProfile, type: "movie" | "tv" = "movie"): Promise<DiscoverRow[]> {
 		const jobs: Promise<DiscoverRow | null>[] = [];
 
+		// People you have explicitly liked or rated lead everything else.
+		//
+		// A stated opinion beats an inferred one: telling the app you like a
+		// director is a clearer signal than it noticing you watched three of
+		// their films. TMDB's with_cast and with_crew only exist on
+		// /discover/movie, so for series this row is simply absent rather than
+		// silently returning something else.
+		if (type === "movie") {
+			for (const person of this.favouritePeople()) {
+				jobs.push(
+					this.plugin.tmdb
+						.discoverBy({ type, withPerson: person.id, personAs: person.as })
+						.then((items) =>
+							this.row(
+								`person-${person.id}`,
+								person.as === "crew" ? `More from ${person.name}` : `More with ${person.name}`,
+								items,
+								"Someone you rated"
+							)
+						)
+						.catch(() => null)
+				);
+			}
+		}
+
 		// Personal rows first, when there's enough history to build them.
 		for (const seed of profile.seeds.slice(0, 3)) {
 			jobs.push(
@@ -273,6 +298,29 @@ export class DiscoverEngine {
 	async search(filters: DiscoverFilters, page = 1): Promise<TmdbSearchResult[]> {
 		const items = await this.plugin.tmdb.discoverBy({ ...filters, page });
 		return this.filterOut(items);
+	}
+
+	/**
+	 * People you have liked or rated, strongest first.
+	 *
+	 * A deliberate opinion outranks an inferred one: telling the app you like
+	 * a director is a clearer signal than it noticing you happened to watch
+	 * three of their films, so these lead the personalised rows.
+	 */
+	private favouritePeople(): { id: number; name: string; as: "cast" | "crew" }[] {
+		const people = this.plugin.settings.people ?? {};
+		return Object.entries(people)
+			.map(([id, o]) => ({
+				id: Number(id),
+				name: o.name,
+				rating: o.rating ?? (o.liked ? 4 : 0),
+				// Directing, Writing and Production are crew credits; everything
+				// else TMDB reports is effectively acting.
+				as: (o.department && o.department !== "Acting" ? "crew" : "cast") as "cast" | "crew",
+			}))
+			.filter((p) => Number.isFinite(p.id) && p.rating > 0)
+			.sort((a, b) => b.rating - a.rating)
+			.slice(0, 3);
 	}
 
 	/**

@@ -189,9 +189,14 @@ export class TmdbClient {
 	async discoverBy(opts: {
 		type: "movie" | "tv";
 		genreId?: number;
+		genreIds?: number[];
 		decade?: number;
 		minRating?: number;
 		page?: number;
+		/** A person id, so "more with this actor" is one query rather than a scan. */
+		withPerson?: number;
+		/** Which credit list to match: cast for actors, crew for directors. */
+		personAs?: "cast" | "crew";
 	}): Promise<TmdbSearchResult[]> {
 		const params: Record<string, string> = {
 			sort_by: "popularity.desc",
@@ -210,7 +215,21 @@ export class TmdbClient {
 			params.certification_country = this.plugin.settings.region;
 			params["certification.lte"] = maxCert;
 		}
-		if (opts.genreId) params.with_genres = String(opts.genreId);
+		// A comma is AND to TMDB, so several genres means "action *and* comedy"
+		// rather than either — which is what naming two of them asks for.
+		if (opts.genreIds?.length) params.with_genres = opts.genreIds.join(",");
+		else if (opts.genreId) params.with_genres = String(opts.genreId);
+
+		if (opts.withPerson) {
+			// with_cast and with_crew exist only on /discover/movie. For a
+			// series TMDB offers with_people on neither, so the caller falls
+			// back to the person's own credit list.
+			const field = opts.personAs === "crew" ? "with_crew" : "with_cast";
+			params[field] = String(opts.withPerson);
+			// A specific person is already a narrow query; the popularity floor
+			// would bury everything but their two best-known films.
+			delete params["vote_count.gte"];
+		}
 		if (opts.minRating) params["vote_average.gte"] = String(opts.minRating);
 		if (opts.decade) {
 			const from = `${opts.decade}-01-01`;
