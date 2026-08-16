@@ -186,7 +186,7 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 			if (total && seen >= total) pill.addClass("is-complete");
 			else if (seen > 0) pill.addClass("is-partial");
 			// Fill proportion as a CSS custom property — cheaper than a child bar.
-			pill.style.setProperty("--reel-fill", total ? String(Math.min(1, seen / total)) : "0");
+			pill.setCssProps({ "--reel-fill": total ? String(Math.min(1, seen / total)) : "0" });
 			pill.addEventListener("click", () => new SeasonSheet(plugin.app, plugin, entry, s.n).open());
 		}
 	}

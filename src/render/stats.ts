@@ -176,7 +176,7 @@ function bars(el: HTMLElement, title: string, data: Bar[]): void {
 		const row = body.createDiv({ cls: "reel-chart-row" });
 		row.createDiv({ cls: "reel-chart-label", text: d.label });
 		const track = row.createDiv({ cls: "reel-chart-track" });
-		track.createDiv({ cls: "reel-chart-fill" }).style.setProperty("--reel-fill", String(d.n / max));
+		track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
 		row.createDiv({ cls: "reel-chart-value", text: String(d.n) });
 	}
 }

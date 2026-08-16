@@ -131,7 +131,7 @@ class UpNextPainter {
 			const seen = entry.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
 			if (total) {
 				const bar = body.createDiv({ cls: "reel-progress" });
-				bar.style.setProperty("--reel-fill", String(Math.min(1, seen / total)));
+				bar.setCssProps({ "--reel-fill": String(Math.min(1, seen / total)) });
 				bar.setAttr("aria-label", `${seen} of ${total} episodes`);
 			}
 

@@ -67,22 +67,27 @@ plugins straight from a GitHub repo, without waiting for the community store.
 This is the fastest route and needs no review. Anyone you share the repo with
 gets the same.
 
-### Later — the community store
+### The community store
 
-Submit to [obsidian-releases](https://github.com/obsidianmd/obsidian-releases)
-by adding an entry to `community-plugins.json`. Once accepted, Reel appears in
-Community plugins and updates show up in Obsidian's own **Check for updates**,
-with no BRAT involved.
+Submission is **not** a pull request against `community-plugins.json` any more.
+It goes through the plugin directory:
 
-Before submitting, be aware of two things about this repo specifically:
+1. Sign in at <https://community.obsidian.md> with your Obsidian account.
+2. Link your GitHub account, which is how ownership of the repo is verified.
+3. Add the plugin through the directory interface.
 
-- **The plugin id is `reel`.** Ids must be globally unique across the store. It
-  is short and may well be taken; if so, you'll be asked to rename, which
-  changes the plugin folder name in every vault that already has it. Renaming
-  before you have users is much cheaper than after.
-- **Review takes weeks**, and reviewers check the manifest rules that
-  `preflight.mjs` already enforces, plus code style points like avoiding
-  `innerHTML` and not detaching leaves in `onunload`.
+The directory reads `manifest.json` **at the HEAD of the repo's default
+branch**, so that file must be committed and pushed before you submit — not
+merely present in a release.
+
+An automated check runs and tells you what to fix. Each round of fixes needs a
+**new release with a higher version**; you can't re-tag. Once the checks pass,
+Reel appears in Community plugins and updates arrive through Obsidian's own
+*Check for updates*, with no BRAT involved.
+
+The id `reel` was free as of the last check against the ~700 published plugins,
+so no rename is needed — but ids are first-come, so submitting sooner protects
+it.
 
 ## Version numbers
 

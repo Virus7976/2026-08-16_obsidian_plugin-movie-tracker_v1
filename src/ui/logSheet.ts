@@ -165,10 +165,11 @@ export class LogSheet extends Modal {
 			});
 			box.addEventListener("input", () => {
 				this.review = box.value;
-				// Grow with the text so long reviews don't happen in a 4-line
-				// porthole, but stop before the sheet eats the screen.
-				box.style.height = "auto";
-				box.style.height = `${Math.min(box.scrollHeight, 240)}px`;
+				// Reset to auto first so scrollHeight measures the content
+				// rather than the current box, then grow to fit — capped, so a
+				// long review can't push the sheet's buttons off screen.
+				box.setCssStyles({ height: "auto" });
+				box.setCssStyles({ height: `${Math.min(box.scrollHeight, 240)}px` });
 			});
 		}
 

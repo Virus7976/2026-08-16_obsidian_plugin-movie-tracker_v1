@@ -110,7 +110,7 @@ export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entr
 			const seen = entry.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
 			if (total && seen && seen < total) {
 				const bar = posterEl.createDiv({ cls: "reel-cell-progress" });
-				bar.style.setProperty("--reel-fill", String(seen / total));
+				bar.setCssProps({ "--reel-fill": String(seen / total) });
 			}
 		}
 

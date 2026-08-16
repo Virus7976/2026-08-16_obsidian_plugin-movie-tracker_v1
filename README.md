@@ -276,6 +276,41 @@ filter: content excludes sex, certification not in R|NC-17
 - **Manual list ordering** — lists are sets, sorted by whatever sort you pick.
 - **Live Preview header card** — reading view only.
 
+## Network use and your data
+
+Stated plainly, because a plugin that talks to the internet from inside your
+vault should say exactly what it sends and where.
+
+**Requests are made only when you act** — searching, adding a title, refreshing
+metadata, or opening a season. The one exception is a once-a-day refresh of
+shows TMDB lists as returning, which you can turn off.
+
+| Service | When | What is sent |
+|---|---|---|
+| **TMDB** | Search, add, refresh, open a season | Your search text, or a TMDB id. Plus your key. |
+| **TMDB images** | First time a poster is cached | A poster path. No key. |
+| **OMDb** *(optional)* | Enrichment | An IMDb id and your key. |
+| **DoesTheDogDie** *(optional)* | Enrichment | A title and year, and your key. |
+
+Nothing else leaves your machine. No analytics, no telemetry, no crash
+reporting, no identifiers. Your ratings, reviews, watch history and notes are
+never transmitted anywhere — they exist only as markdown in your vault.
+
+**What the plugin writes:** notes in your films and series folders, poster
+`.jpg` files in the poster folder, response caches under
+`.obsidian/plugins/reel/cache/`, and settings in
+`.obsidian/plugins/reel/data.json`. It appends to today's daily note only if
+you turn that on, and never creates one. Nothing is written outside those
+places.
+
+**Your API keys** are encrypted at rest by default. See
+[SECURITY.md](SECURITY.md) for the threat model, including what it does *not*
+protect against.
+
+**Third-party terms:** you supply your own keys, so their terms are between you
+and them. This product uses the TMDB API but is not endorsed or certified by
+TMDB.
+
 ## Licence
 
 MIT.
