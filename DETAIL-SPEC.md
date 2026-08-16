@@ -71,7 +71,7 @@ IMDb holds is a deep link at best.
 | Per-country dates grouped by kind | TMDB `release_dates` | **done** |
 | Certification per country | TMDB `release_dates` | **done** |
 | Note (IMAX, city) | TMDB `release_dates.note` | **done** |
-| Country flags | needs a flag asset or emoji from ISO code | **buildable** |
+| Country flags | regional indicator emoji from the ISO code | **done** |
 | Your own region sorted first | Reel setting | **done** |
 
 ## 6. Box office
@@ -154,12 +154,11 @@ community reviews, and the content tab.
 
 Remaining, cheapest first:
 
-1. **Country flags on releases** — derive emoji from the ISO code, no fetch.
-2. **Top-cast circular strip** — same data as the Cast tab, different layout.
-3. **Photos gallery** — new `/images` endpoint, high visual payoff.
-4. **List view with inline metadata** — year, runtime, certificate, score and
+1. **Top-cast circular strip** — same data as the Cast tab, different layout.
+2. **Photos gallery** — new `/images` endpoint, high visual payoff.
+3. **List view with inline metadata** — year, runtime, certificate, score and
    director on one row; the layout already exists for the compact grid.
-5. **Watch options per related card** — needs a providers fetch per related
+4. **Watch options per related card** — needs a providers fetch per related
    item, so it is by far the most expensive thing left.
 
 Correction to an earlier estimate: the IMDb vote count was listed as "already

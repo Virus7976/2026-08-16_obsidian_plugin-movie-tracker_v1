@@ -51,6 +51,7 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 	for (const n of notes) add(n.path, n.body ?? "", n.fm ?? {});
 
 	const folders = new Set<string>();
+	let fetched = 0;
 
 	const plugin = {
 		app: {
@@ -91,8 +92,31 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 			linkPeople: false,
 			castLimit: 10,
 		},
-		library: { rebuild: () => {}, refresh: () => {}, byPath: () => undefined },
+		library: {
+			rebuild: () => {},
+			refresh: () => {},
+			byPath: () => undefined,
+			// Indexed by tmdb id, which is how duplicate creation is caught.
+			byTmdbId: (id: number, type: string) => {
+				for (const row of files.values()) {
+					if (row.fm.tmdb_id === id && (row.fm.type ?? "film") === type) {
+						return { path: row.file.path, title: String(row.fm.title ?? ""), type };
+					}
+				}
+				return undefined;
+			},
+		},
 		posters: { cache: async () => null },
+		tmdb: {
+			getFilm: async (id: number) => {
+				fetched++;
+				return { id, title: "Fetched Film", release_date: "2026-01-01" };
+			},
+			getShow: async (id: number) => {
+				fetched++;
+				return { id, name: "Fetched Show", first_air_date: "2026-01-01", seasons: [] };
+			},
+		},
 	};
 
 	return {
@@ -101,6 +125,8 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 		body: (path: string) => files.get(path)?.body ?? "",
 		fm: (path: string) => files.get(path)?.fm ?? {},
 		exists: (path: string) => files.has(path),
+		count: () => files.size,
+		fetches: () => fetched,
 	};
 }
 
@@ -223,6 +249,66 @@ async function main(): Promise<void> {
 		ok(on, "a flag can be added by hand");
 		const off = await v.notes.toggleContentFlag(f, "violence");
 		ok(!off, "and removed again");
+	}
+
+	/* ---- one note per title, ever ---- */
+
+	{
+		// The bug this guards: adding a title you already own created a second
+		// note called "The Odyssey 2", splitting the watch history across two
+		// files with nothing to indicate it had happened.
+		const v = makeVault([
+			{ path: "Movies/The Odyssey.md", fm: { tmdb_id: 12345, type: "film", title: "The Odyssey", status: "watchlist" } },
+		]);
+		const before = v.count();
+		await v.notes.createFromResult({ id: 12345, media_type: "movie" }, { date: "2026-08-16" });
+		eq(v.count(), before, "adding a title already in the library creates no second note");
+		eq(v.fetches(), 0, "and does not spend a request fetching it again");
+	}
+
+	{
+		const v = makeVault([
+			{ path: "Movies/The Odyssey.md", fm: { tmdb_id: 12345, type: "film", title: "The Odyssey", status: "watchlist" } },
+		]);
+		await v.notes.createFromResult({ id: 12345, media_type: "movie" }, { date: "2026-08-16", rating: 4 });
+		const fm = v.fm("Movies/The Odyssey.md");
+		// The action still has to mean something — logging it onto the note
+		// that exists is the useful reading, not a silent no-op.
+		ok(Array.isArray(fm.watched) && (fm.watched as unknown[]).length === 1, "the viewing lands on the existing note");
+		eq(fm.rating, 4, "and so does the rating");
+	}
+
+	{
+		const v = makeVault([
+			{ path: "Series/The Office.md", fm: { tmdb_id: 2316, type: "tv", title: "The Office", status: "watchlist" } },
+		]);
+		const before = v.count();
+		await v.notes.createFromResult({ id: 2316, media_type: "tv" }, { date: "2026-08-16", rating: 5 });
+		eq(v.count(), before, "series are deduplicated too");
+		eq(v.fm("Series/The Office.md").status, "watching", "and a watchlist series flips to watching");
+	}
+
+	{
+		// Same id, different type: a film and a series can legitimately share
+		// a TMDB id, so the guard must key on both.
+		const v = makeVault([{ path: "Movies/Thing.md", fm: { tmdb_id: 777, type: "film", title: "Thing" } }]);
+		const before = v.count();
+		await v.notes.createFromResult({ id: 777, media_type: "tv" }, { date: "2026-08-16" });
+		eq(v.count(), before + 1, "a series with the same id as a film is not a duplicate");
+	}
+
+	{
+		// Two taps before the index catches up. Both miss the byTmdbId check,
+		// so the in-flight guard is the only thing standing between you and
+		// two notes.
+		const v = makeVault();
+		const [a, b] = await Promise.all([
+			v.notes.createFromResult({ id: 999, media_type: "movie" }, { date: "2026-08-16" }),
+			v.notes.createFromResult({ id: 999, media_type: "movie" }, { date: "2026-08-16" }),
+		]);
+		eq(v.count(), 1, "a double tap creates one note, not two");
+		eq(a.path, b.path, "and both callers get the same file");
+		eq(v.fetches(), 1, "with a single fetch between them");
 	}
 }
 

@@ -37,6 +37,19 @@ import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { unlink } from "../library";
 import { ContentFlag, FLAG_LABELS } from "../content";
 
+/**
+ * "GB" → 🇬🇧.
+ *
+ * Regional indicator symbols sit at a fixed offset from A–Z, so a flag is just
+ * the two letters shifted into that block. No asset, no lookup table, and it
+ * follows whatever flag set the reader's platform ships.
+ */
+function flagEmoji(iso: string): string {
+	const code = iso.trim().toUpperCase();
+	if (!/^[A-Z]{2}$/.test(code)) return "";
+	return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+
 /** 1240000 → "1.2M". Vote counts are scale, not precision. */
 function compactCount(n: number): string {
 	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
@@ -547,6 +560,8 @@ export class DetailScreen {
 			for (const r of group.slice(0, 30)) {
 				const line = box.createDiv({ cls: "reel-release-row" });
 				line.createSpan({ cls: "reel-release-date", text: r.date ? prettyDate(r.date.slice(0, 10)) : "—" });
+				const flag = flagEmoji(r.country);
+				if (flag) line.createSpan({ cls: "reel-release-flag", text: flag });
 				line.createSpan({ cls: "reel-release-country", text: r.country });
 				if (r.cert) line.createSpan({ cls: "reel-badge cert", text: r.cert });
 				if (r.note) line.createSpan({ cls: "reel-dim", text: r.note });

@@ -3373,3 +3373,8 @@ input.reel-input {
 	color: var(--text-muted);
 	margin-bottom: 6px;
 }
+
+.reel-release-flag {
+	font-size: 15px;
+	line-height: 1;
+}

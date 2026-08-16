@@ -12,7 +12,7 @@
  *   construction, destroy an existing review.
  */
 
-import { TFile, TFolder, normalizePath } from "obsidian";
+import { Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type ReelPlugin from "./main";
 import { clampRating, starString } from "./util/ratings";
 import { addToRange, contiguousProgress, rangeCount } from "./util/ranges";
@@ -130,12 +130,67 @@ export class NoteWriter {
 		item: { id: number; media_type?: string },
 		log: LogPayload
 	): Promise<TFile> {
-		if (item.media_type === "tv") {
-			const meta = await this.plugin.tmdb.getShow(item.id);
-			return this.createShow(meta, log);
+		const type = item.media_type === "tv" ? "tv" : "film";
+
+		// Never two notes for one title.
+		//
+		// Nothing checked this before: every route into here created a note,
+		// and uniquePath politely named the second one "The Odyssey 2". You
+		// end up with a split history — half your viewings on one note, half
+		// on the other — and no indication anything went wrong.
+		const existing = this.plugin.library.byTmdbId(item.id, type);
+		if (existing) {
+			const file = this.plugin.app.vault.getAbstractFileByPath(existing.path);
+			if (file instanceof TFile) {
+				// Not a silent no-op: you asked to log something, so log it
+				// onto the note that already exists.
+				await this.applyToExisting(file, existing, log);
+				return file;
+			}
 		}
-		const meta = await this.plugin.tmdb.getFilm(item.id);
-		return this.createFilm(meta, log);
+
+		// The index updates only after metadataCache reparses, so two taps in
+		// quick succession both miss the check above. This closes that window.
+		const key = `${type}-${item.id}`;
+		const pending = this.creating.get(key);
+		if (pending) return pending;
+
+		const job = (async () => {
+			if (type === "tv") {
+				const meta = await this.plugin.tmdb.getShow(item.id);
+				return this.createShow(meta, log);
+			}
+			const meta = await this.plugin.tmdb.getFilm(item.id);
+			return this.createFilm(meta, log);
+		})().finally(() => this.creating.delete(key));
+
+		this.creating.set(key, job);
+		return job;
+	}
+
+	/**
+	 * Fold a log payload into a note that already exists.
+	 *
+	 * Reached when you add something already in your library — from Discover,
+	 * from search, from a shared link. Adding a viewing is the useful reading
+	 * of that action; creating a second note never is.
+	 */
+	private async applyToExisting(file: TFile, entry: Entry, log: LogPayload): Promise<void> {
+		if (log.watchlist) {
+			new Notice(`Reel: ${entry.title} is already in your library.`);
+			return;
+		}
+		if (entry.type === "tv") {
+			await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+				if (fm.status === "watchlist") fm.status = "watching";
+				if (log.rating != null) fm.rating = log.rating;
+				if (log.liked) fm.liked = true;
+			});
+		} else {
+			await this.logFilm(file, log);
+		}
+		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
+		new Notice(`Reel: added a viewing to ${entry.title}.`);
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -329,6 +384,8 @@ export class NoteWriter {
 	 * background work that no screen waits on.
 	 */
 	private enrichQueue: Promise<unknown> = Promise.resolve();
+	/** In-flight creations, keyed type-id, so a double tap cannot make two notes. */
+	private creating = new Map<string, Promise<TFile>>();
 	private enrichDepth = 0;
 
 	async enrich(file: TFile, opts: { title: string; year?: number; imdbId?: string }): Promise<void> {
