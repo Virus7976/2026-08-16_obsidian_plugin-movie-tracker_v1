@@ -3329,3 +3329,47 @@ input.reel-input {
 	flex: 1;
 	min-width: 0;
 }
+
+/* ---- vote count under a score chip ---- */
+
+.reel-score-votes {
+	font-size: calc(var(--font-ui-smaller) * 0.85);
+	color: var(--text-faint);
+	line-height: 1.2;
+}
+
+/* ---- community reviews ---- */
+
+/*
+ * Excerpts only. These are other people's writing and often run to thousands
+ * of words; the opening is enough to decide whether to read the rest at the
+ * source, and republishing the whole thing is not this plugin's business.
+ */
+.reel-review {
+	padding: 12px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.reel-review:last-child {
+	border-bottom: none;
+}
+
+.reel-review-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 6px;
+}
+
+.reel-review-author {
+	font-weight: 600;
+	font-size: var(--font-ui-small);
+}
+
+.reel-review-body {
+	font-size: var(--font-ui-small);
+	line-height: 1.55;
+	color: var(--text-muted);
+	margin-bottom: 6px;
+}

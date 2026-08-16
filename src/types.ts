@@ -86,6 +86,8 @@ export interface Entry {
 	/** External scores */
 	imdbId?: string;
 	imdbRating?: number;
+	/** How many people voted — a 7.9 from 1.2M is not a 7.9 from 400. */
+	imdbVotes?: number;
 	metacritic?: number;
 	rottenTomatoes?: number;
 	/** File creation time, so `sort: added` means something. */
@@ -153,6 +155,16 @@ export interface TmdbReleaseDates {
 	results?: { iso_3166_1?: string; release_dates?: TmdbReleaseDate[] }[];
 }
 
+/** A community review from TMDB. Excerpted and linked, never reproduced whole. */
+export interface TmdbReview {
+	id?: string;
+	author?: string;
+	content?: string;
+	url?: string;
+	created_at?: string;
+	author_details?: { rating?: number | null; username?: string };
+}
+
 export interface TmdbVideo {
 	site?: string;
 	type?: string;
@@ -192,6 +204,7 @@ export interface TmdbFilm {
 	alternative_titles?: { titles?: { iso_3166_1?: string; title?: string }[] };
 	recommendations?: { results?: TmdbSearchResult[] };
 	homepage?: string;
+	reviews?: { results?: TmdbReview[]; total_results?: number };
 }
 
 export interface TmdbSeason {
@@ -228,6 +241,7 @@ export interface TmdbShow {
 	alternative_titles?: { results?: { iso_3166_1?: string; title?: string }[] };
 	homepage?: string;
 	tagline?: string;
+	reviews?: { results?: TmdbReview[]; total_results?: number };
 }
 
 export interface TmdbEpisode {

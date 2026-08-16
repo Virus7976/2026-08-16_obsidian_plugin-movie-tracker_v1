@@ -25,6 +25,7 @@ import type {
 	TmdbCastMember,
 	TmdbCrew,
 	TmdbSearchResult,
+	TmdbReview,
 } from "../types";
 import { redact } from "../secrets";
 import { formatMinutes, prettyDate } from "../util/dates";
@@ -35,6 +36,13 @@ import { ListPicker } from "./listPicker";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { unlink } from "../library";
 import { ContentFlag, FLAG_LABELS } from "../content";
+
+/** 1240000 → "1.2M". Vote counts are scale, not precision. */
+function compactCount(n: number): string {
+	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+	if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+	return String(n);
+}
 
 const FILM_STATUSES = ["watched", "watchlist", "abandoned"];
 const TV_STATUSES = ["watching", "completed", "watchlist", "paused", "dropped"];
@@ -151,7 +159,15 @@ export class DetailScreen {
 		if (e.rating != null) score("You", String(e.rating), "mine");
 		const epAvg = this.episodeAverage();
 		if (epAvg != null) score("Episodes", epAvg.toFixed(1), "mine");
-		if (e.imdbRating != null) score("IMDb", e.imdbRating.toFixed(1), "imdb");
+		if (e.imdbRating != null) {
+			// The sample size belongs with the score. 7.9 from 1.2M voters and
+			// 7.9 from 400 are different claims, and the number alone hides it.
+			score("IMDb", e.imdbRating.toFixed(1), "imdb");
+			if (e.imdbVotes) {
+				const chip = scores.lastElementChild;
+				chip?.createDiv({ cls: "reel-score-votes", text: compactCount(e.imdbVotes) });
+			}
+		}
 		if (e.metacritic != null) {
 			score("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad");
 		}
@@ -200,6 +216,9 @@ export class DetailScreen {
 		// must not be hardcoded to wherever the author happens to live.
 		const region = (this.plugin.settings.region || "US").toLowerCase();
 		link("JustWatch", `https://www.justwatch.com/${region}/search?q=${encodeURIComponent(e.title)}`, "justwatch");
+
+		// Letterboxd resolves a TMDB id directly, so no title guessing.
+		if (e.type === "film") link("Letterboxd", `https://letterboxd.com/tmdb/${e.tmdbId}/`, "letterboxd");
 
 		/* ---- columns ---------------------------------------------------- */
 		const cols = page.createDiv({ cls: "reel-detail-cols" });
@@ -268,6 +287,15 @@ export class DetailScreen {
 			tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film) });
 		}
 		if (related.length) tabs.push({ id: "related", label: "Related", render: (el) => this.renderRelated(el, related) });
+
+		const reviews = meta.reviews?.results ?? [];
+		if (reviews.length) {
+			tabs.push({
+				id: "reviews",
+				label: `Reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
+				render: (el) => this.renderReviews(el, reviews),
+			});
+		}
 
 		if (!tabs.length) return;
 
@@ -362,6 +390,14 @@ export class DetailScreen {
 				const x = film.revenue / film.budget;
 				box.createDiv({ cls: "reel-facet-value", text: `Returned ${x.toFixed(1)}× its budget` });
 			}
+		}
+
+		if (meta.homepage) {
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: "Official site" });
+			const a = box.createEl("a", { cls: "reel-facet-value reel-link", text: meta.homepage, href: meta.homepage });
+			a.setAttr("target", "_blank");
+			a.setAttr("rel", "noopener");
 		}
 
 		// Alternative titles are how you find a film you know under another
@@ -514,6 +550,38 @@ export class DetailScreen {
 				line.createSpan({ cls: "reel-release-country", text: r.country });
 				if (r.cert) line.createSpan({ cls: "reel-badge cert", text: r.cert });
 				if (r.note) line.createSpan({ cls: "reel-dim", text: r.note });
+			}
+		}
+	}
+
+	/**
+	 * Community reviews from TMDB.
+	 *
+	 * Excerpted and linked, never reproduced whole: these are other people's
+	 * writing, often thousands of words, and a tracker has no business
+	 * republishing them. The opening lines are enough to decide whether to
+	 * read the rest on TMDB.
+	 */
+	private renderReviews(el: HTMLElement, reviews: TmdbReview[]): void {
+		for (const r of reviews.slice(0, 6)) {
+			const box = el.createDiv({ cls: "reel-review" });
+
+			const head = box.createDiv({ cls: "reel-review-head" });
+			head.createSpan({ cls: "reel-review-author", text: r.author ?? r.author_details?.username ?? "Anonymous" });
+			const stars = r.author_details?.rating;
+			if (stars != null) head.createSpan({ cls: "reel-badge", text: `${stars}/10` });
+			if (r.created_at) head.createSpan({ cls: "reel-dim", text: prettyDate(r.created_at.slice(0, 10)) });
+
+			const body = (r.content ?? "").trim();
+			if (body) {
+				const excerpt = body.length > 320 ? `${body.slice(0, 320).trimEnd()}…` : body;
+				box.createDiv({ cls: "reel-review-body", text: excerpt });
+			}
+
+			if (r.url) {
+				const a = box.createEl("a", { cls: "reel-link", text: "Read on TMDB", href: r.url });
+				a.setAttr("target", "_blank");
+				a.setAttr("rel", "noopener");
 			}
 		}
 	}

@@ -357,6 +357,10 @@ export class NoteWriter {
 				this.plugin.omdb.fetchScores(opts.imdbId).then((scores) => {
 					if (!scores) return;
 					if (scores.imdbRating != null) patch.imdb_rating = scores.imdbRating;
+					// Fetched since the beginning and thrown away. A 7.9 from
+					// 1.2M voters and a 7.9 from 400 are not the same claim,
+					// and the count is the only thing that separates them.
+					if (scores.imdbVotes != null) patch.imdb_votes = scores.imdbVotes;
 					if (scores.metacritic != null) patch.metacritic = scores.metacritic;
 					if (scores.rottenTomatoes != null) patch.rotten_tomatoes = scores.rottenTomatoes;
 					if (scores.rated && !patch.certification) patch.certification_omdb = scores.rated;

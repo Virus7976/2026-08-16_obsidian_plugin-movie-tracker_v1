@@ -287,6 +287,7 @@ function toEntry(file: TFile, fm: Record<string, unknown>, seriesFolder: string)
 		lists: toStringArray(fm.lists),
 		imdbId: fm.imdb_id ? String(fm.imdb_id) : undefined,
 		imdbRating: numberOrUndef(fm.imdb_rating),
+		imdbVotes: numberOrUndef(fm.imdb_votes),
 		metacritic: numberOrUndef(fm.metacritic),
 		rottenTomatoes: numberOrUndef(fm.rotten_tomatoes),
 		lastWatchedDate: normaliseDate(fm.last_watched_date),

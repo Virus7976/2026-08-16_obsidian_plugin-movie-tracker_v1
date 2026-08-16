@@ -24,7 +24,7 @@ IMDb holds is a deep link at best.
 | Your rating / IMDb / Metacritic / RT / TMDB scores | TMDB + OMDb | **done** |
 | Trailer button | TMDB `videos` | **done** |
 | Trailer inline with duration + play overlay | TMDB `videos` has `key`; duration is not returned | **partial** — button only |
-| IMDb vote count ("1.2M") | OMDb `imdbVotes` — already fetched, not displayed | **buildable** |
+| IMDb vote count ("1.2M") | OMDb `imdbVotes` | **done** — was fetched then discarded; now stored and shown |
 | Popularity rank + trend arrow | TMDB `popularity` (a float, no rank or delta) | **partial** — no trend |
 | "1 VIDEO" / "99+ PHOTOS" counts | TMDB `videos`, `/images` endpoint | **buildable** |
 | Photo gallery | TMDB `/images` | **buildable** |
@@ -46,8 +46,8 @@ IMDb holds is a deep link at best.
 
 | Element | Source | Status |
 |---|---|---|
-| Keywords as chips | TMDB `keywords` — already stored | **buildable** |
-| Taglines | TMDB `tagline` field | **buildable** |
+| Keywords as chips | TMDB `keywords` | **done** — read from the payload, not stored per note |
+| Taglines | TMDB `tagline` | **done** |
 | Plot summary vs synopsis | TMDB has one `overview` | **blocked** |
 | Trivia | IMDb only | **blocked** — link |
 | Goofs | IMDb only | **blocked** — link |
@@ -61,7 +61,7 @@ IMDb holds is a deep link at best.
 | Languages | TMDB `spoken_languages` | **done** |
 | Also known as / alternative titles | TMDB `alternative_titles` | **done** |
 | Release date (primary) | TMDB | **done** |
-| Official site | TMDB `homepage` | **buildable** |
+| Official site | TMDB `homepage` | **done** |
 | Filming locations | IMDb only | **blocked** |
 
 ## 5. Releases
@@ -117,9 +117,9 @@ IMDb holds is a deep link at best.
 | Element | Source | Status |
 |---|---|---|
 | Your own review | Reel, appended to the note | **done** |
-| Community reviews | TMDB `reviews` | **buildable** |
+| Community reviews | TMDB `reviews` | **done** — excerpt + attribution + link, never reproduced whole |
 | Letterboxd popular reviews | no public API | **blocked** |
-| Review count | TMDB `reviews.total_results` | **buildable** |
+| Review count | TMDB `reviews.total_results` | **done** — on the tab label |
 
 ## 11. Links
 
@@ -129,8 +129,8 @@ IMDb holds is a deep link at best.
 | TMDB | id | **done** |
 | JustWatch | region + title search | **done** |
 | Parents guide | IMDb deep link | **done** |
-| Official site | TMDB `homepage` | **buildable** |
-| Letterboxd | slug from TMDB id | **buildable** |
+| Official site | TMDB `homepage` | **done** |
+| Letterboxd | `letterboxd.com/tmdb/{id}` | **done** — films only |
 
 ## 12. List view (IMDb lists screenshot)
 
@@ -149,18 +149,28 @@ IMDb holds is a deep link at best.
 
 Ranked by value per unit of work, given what is already fetched.
 
-1. **Keywords + tagline** — already in the payload, nothing new to fetch.
-2. **IMDb vote count** — already fetched via OMDb, simply not rendered.
-3. **Official site + Letterboxd links** — one field, one derived URL.
-4. **DTDD severity bands** — the parents guide substitute, and the closest
-   thing to the screenshot the user actually asked for. Data already
-   integrated; needs a band UI (mild / moderate / severe from vote ratio).
-5. **TMDB community reviews** — one appended field, a real gap against the
-   reference.
-6. **Photos gallery** — new endpoint, high visual payoff.
-7. **Country flags on releases** — cosmetic, derive emoji from ISO code.
-8. **Watch options per related card** — providers already fetched per title,
-   but needs a fetch per related item, so it is the most expensive item here.
+Done: keywords, tagline, IMDb vote count, official site, Letterboxd,
+community reviews, and the content tab.
+
+Remaining, cheapest first:
+
+1. **Country flags on releases** — derive emoji from the ISO code, no fetch.
+2. **Top-cast circular strip** — same data as the Cast tab, different layout.
+3. **Photos gallery** — new `/images` endpoint, high visual payoff.
+4. **List view with inline metadata** — year, runtime, certificate, score and
+   director on one row; the layout already exists for the compact grid.
+5. **Watch options per related card** — needs a providers fetch per related
+   item, so it is by far the most expensive thing left.
+
+Correction to an earlier estimate: the IMDb vote count was listed as "already
+fetched, not displayed". It was fetched by OMDb and then thrown away — never
+written to the note — so it needed a field on the entry and the index too, not
+just a render.
+
+The DTDD severity bands were dropped rather than built. Only topic names reach
+the note; the vote counts decide whether a topic qualifies and are discarded.
+Any band would have been invented, so the Content tab states what the data
+actually means and links to IMDb's graded guide instead.
 
 ## Explicitly not building
 

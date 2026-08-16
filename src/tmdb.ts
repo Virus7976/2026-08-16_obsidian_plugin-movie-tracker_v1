@@ -258,7 +258,7 @@ export class TmdbClient {
 					// append_to_response is still a single HTTP request, and
 					// the detail screen wants both the moment it opens.
 					append_to_response:
-						"credits,watch/providers,keywords,videos,release_dates,external_ids,recommendations,alternative_titles",
+						"credits,watch/providers,keywords,videos,release_dates,external_ids,recommendations,alternative_titles,reviews",
 				}),
 			true // a released film's credits and runtime don't change
 		);
@@ -268,7 +268,7 @@ export class TmdbClient {
 		const fetcher = () =>
 			this.request<TmdbShow>(`/tv/${id}`, {
 				append_to_response:
-					"aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids,recommendations,alternative_titles",
+					"aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids,recommendations,alternative_titles,reviews",
 			});
 		// A returning series gains episodes, so its record must expire.
 		const cacheKey = `tv-${id}`;
