@@ -1800,3 +1800,192 @@ input.reel-input {
 		font-size: 1.9em;
 	}
 }
+
+/* ================================================================== *
+ * v0.5 — rate mode, richer stats
+ * ================================================================== */
+
+/* ---------------- rate mode ---------------- */
+
+.reel-rate {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	align-items: stretch;
+}
+
+.reel-rate-count {
+	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-rate-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	text-align: center;
+	padding: 16px;
+	border-radius: var(--reel-radius);
+	background: var(--background-secondary);
+}
+
+.reel-rate-poster {
+	width: 190px;
+	max-width: 60vw;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-modifier-border);
+	cursor: pointer;
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+}
+
+.reel-rate-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-rate-title {
+	font-size: 1.3em;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.reel-rate-card .reel-header-facts {
+	justify-content: center;
+}
+
+.reel-rate-overview {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.5;
+	/* Four lines is enough to judge; more turns a rating card into reading. */
+	display: -webkit-box;
+	-webkit-line-clamp: 4;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	max-width: 46ch;
+}
+
+.reel-rating-row.centred {
+	justify-content: center;
+}
+
+.reel-rate-actions,
+.reel-rate-nav {
+	display: flex;
+	gap: 8px;
+}
+
+.reel-rate-actions .reel-btn,
+.reel-rate-nav .reel-btn {
+	flex: 1;
+}
+
+.reel-btn.is-liked {
+	color: var(--color-red, #dc2626);
+	border-color: var(--color-red, #dc2626);
+}
+
+.reel-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* Side by side once there's room, rather than a tall column on a monitor. */
+@media (min-width: 800px) {
+	.reel-rate-card {
+		flex-direction: row;
+		align-items: flex-start;
+		text-align: left;
+		gap: 20px;
+	}
+
+	.reel-rate-poster {
+		flex: 0 0 190px;
+		max-width: none;
+	}
+
+	.reel-rate-card .reel-header-facts {
+		justify-content: flex-start;
+	}
+
+	.reel-rating-row.centred {
+		justify-content: flex-start;
+	}
+}
+
+/* ---------------- stats ---------------- */
+
+/* Charts sit in a responsive grid instead of one long column, which on a
+   desktop meant scrolling past a screen of whitespace per chart. */
+.reel-chart-grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 18px;
+}
+
+@media (min-width: 760px) {
+	.reel-chart-grid {
+		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+	}
+}
+
+.reel-chart {
+	margin-bottom: 0;
+	padding: 12px;
+	border-radius: var(--reel-radius);
+	background: var(--background-secondary);
+}
+
+.reel-facts {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 2px;
+	margin-bottom: 16px;
+}
+
+@media (min-width: 620px) {
+	.reel-facts {
+		grid-template-columns: repeat(2, 1fr);
+		gap: 8px 20px;
+	}
+}
+
+.reel-fact {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.reel-fact-label {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+.reel-fact-value {
+	font-weight: 600;
+	text-align: right;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-stats .reel-chips {
+	margin-bottom: 10px;
+}
+
+/* Long labels (film titles in the series-progress chart) need more room
+   than a fixed 4.5em column allows. */
+.reel-chart-row {
+	grid-template-columns: minmax(4.5em, 8em) 1fr 3em;
+}

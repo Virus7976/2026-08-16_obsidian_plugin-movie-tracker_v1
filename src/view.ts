@@ -13,6 +13,7 @@ import type ReelPlugin from "./main";
 import type { Entry } from "./types";
 import { renderPosterGrid, renderRowList } from "./render/grid";
 import { DetailScreen } from "./ui/detail";
+import { RateScreen } from "./ui/rate";
 import { paintUpNext } from "./render/upnext";
 import { paintStats } from "./render/stats";
 import { viewings } from "./render/diary";
@@ -23,10 +24,11 @@ import { TFile } from "obsidian";
 
 export const REEL_VIEW = "reel-view";
 
-type Tab = "library" | "upnext" | "diary" | "stats";
+type Tab = "library" | "rate" | "upnext" | "diary" | "stats";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
 	{ id: "library", label: "Library", icon: "layout-grid" },
+	{ id: "rate", label: "Rate", icon: "star" },
 	{ id: "upnext", label: "Up next", icon: "play" },
 	{ id: "diary", label: "Diary", icon: "calendar-days" },
 	{ id: "stats", label: "Stats", icon: "bar-chart-3" },
@@ -68,6 +70,8 @@ export class ReelView extends ItemView {
 	private bodyEl!: HTMLElement;
 	/** Non-null when the detail screen is showing instead of the list. */
 	private detail: DetailScreen | null = null;
+	/** Kept across repaints so the queue position and skips survive. */
+	private rateScreen: RateScreen | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -171,6 +175,9 @@ export class ReelView extends ItemView {
 		if (this.tab === "library") {
 			this.paintFilters();
 			this.paintLibrary();
+		} else if (this.tab === "rate") {
+			if (!this.rateScreen) this.rateScreen = new RateScreen(this.plugin);
+			this.rateScreen.render(this.bodyEl);
 		} else if (this.tab === "upnext") {
 			paintUpNext(this.plugin, this.bodyEl);
 		} else if (this.tab === "diary") {

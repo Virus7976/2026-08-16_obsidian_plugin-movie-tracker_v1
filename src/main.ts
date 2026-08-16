@@ -139,6 +139,14 @@ export default class ReelPlugin extends Plugin {
 		await this.app.workspace.revealLeaf(leaf);
 	}
 
+	/** Open a title's detail screen in the Reel view, opening the view if needed. */
+	async openDetail(entry: Entry): Promise<void> {
+		await this.openView();
+		const leaf = this.app.workspace.getLeavesOfType(REEL_VIEW)[0];
+		const view = leaf?.view;
+		if (view instanceof ReelView) view.openDetail(entry);
+	}
+
 	openSearch(opts: { watchlist?: boolean } = {}): void {
 		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
 			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
