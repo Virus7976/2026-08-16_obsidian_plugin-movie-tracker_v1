@@ -32,7 +32,7 @@ import { formatRange, parseRange, rangeCount } from "../util/ranges";
 import { renderStars } from "./stars";
 import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
-import { imdbUrl, tmdbUrl } from "../extract";
+import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { unlink } from "../library";
 import { ContentFlag, FLAG_LABELS } from "../content";
 
@@ -259,6 +259,10 @@ export class DetailScreen {
 		if (cast.length) tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
 		if (crew.length) tabs.push({ id: "crew", label: "Crew", render: (el) => this.renderPeople(el, crew, false) });
 		tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
+		tabs.push({ id: "story", label: "Storyline", render: (el) => this.renderStoryline(el, meta) });
+		if (this.entry.contentTopics.length || this.entry.certification) {
+			tabs.push({ id: "content", label: "Content", render: (el) => this.renderContent(el) });
+		}
 		if (meta.genres?.length) tabs.push({ id: "genre", label: "Genre", render: (el) => this.renderGenres(el, meta.genres ?? []) });
 		if (film?.release_dates?.results?.length) {
 			tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film) });
@@ -367,6 +371,89 @@ export class DetailScreen {
 			.slice(0, 8)
 			.map((t) => (t.iso_3166_1 ? `${t.title} (${t.iso_3166_1})` : (t.title ?? "")));
 		group("Also known as", alts);
+	}
+
+	/** Tagline, full overview, and the keywords TMDB tags a title with. */
+	private renderStoryline(el: HTMLElement, meta: TmdbFilm | TmdbShow): void {
+		if (meta.tagline) el.createDiv({ cls: "reel-tagline", text: meta.tagline });
+		if (this.entry.overview) el.createDiv({ cls: "reel-facet-prose", text: this.entry.overview });
+
+		// Keywords are far more specific than genres — "heist", "unreliable
+		// narrator". They are fetched on every title but only ever used to
+		// derive content flags, never stored and never shown. Read straight
+		// from the payload here rather than adding a field to every note.
+		const keywords = keywordNames(meta);
+		if (keywords.length) {
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: "Keywords" });
+			const chips = box.createDiv({ cls: "reel-chips" });
+			for (const k of keywords.slice(0, 24)) {
+				const chip = chips.createEl("button", { cls: "reel-chip", text: k, attr: { type: "button" } });
+				chip.addEventListener("click", () => void this.plugin.openViewWithSearch(k));
+			}
+		}
+	}
+
+	/**
+	 * The parents-guide substitute.
+	 *
+	 * IMDb's own bands are not available through any API, so this derives the
+	 * same shape from DoesTheDogDie's community votes: what share of people
+	 * said a thing happens decides mild / moderate / severe. The vote counts
+	 * are shown rather than hidden, because a 3-vote "severe" and a 300-vote
+	 * one deserve different amounts of trust, and the link to IMDb's fuller
+	 * guide sits alongside.
+	 */
+	private renderContent(el: HTMLElement): void {
+		const e = this.entry;
+
+		if (e.certification) {
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: "Certificate" });
+			box.createDiv({ cls: "reel-facet-value", text: e.certification });
+		}
+
+		if (e.contentTopics.length) {
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: "Reported by viewers" });
+			// Deliberately not graded mild/moderate/severe. Only the topic
+			// names are stored — the vote counts are used to decide whether a
+			// topic qualifies at all and then discarded — so any severity band
+			// shown here would be invented. What these do mean is precise: a
+			// majority of voters, above a minimum sample, said it happens.
+			box.createDiv({
+				cls: "reel-dim",
+				text: "Topics a majority of DoesTheDogDie voters confirmed. Not severity-rated — IMDb's guide below grades them.",
+			});
+			for (const topic of e.contentTopics.slice(0, 40)) {
+				const row = box.createDiv({ cls: "reel-content-row" });
+				row.createSpan({ cls: "reel-band reported" });
+				row.createSpan({ cls: "reel-content-name", text: topic });
+			}
+		}
+
+		if (e.contentFlags.length) {
+			const box = el.createDiv({ cls: "reel-facet-group" });
+			box.createDiv({ cls: "reel-facet-label", text: "Flags on this note" });
+			const chips = box.createDiv({ cls: "reel-chips" });
+			for (const f of e.contentFlags) {
+				chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f as ContentFlag] ?? f });
+			}
+		}
+
+		const imdb = imdbUrl(e.imdbId);
+		if (imdb) {
+			const a = el.createEl("a", { cls: "reel-btn", text: "Full parents guide on IMDb", href: `${imdb}parentalguide` });
+			a.setAttr("target", "_blank");
+			a.setAttr("rel", "noopener");
+		}
+
+		if (!e.contentTopics.length) {
+			el.createDiv({
+				cls: "reel-dim",
+				text: "No community content notes yet — add a DoesTheDogDie key in settings to fetch them.",
+			});
+		}
 	}
 
 	private renderGenres(el: HTMLElement, genres: { name: string }[]): void {

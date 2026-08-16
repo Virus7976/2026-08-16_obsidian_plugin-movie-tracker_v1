@@ -71,7 +71,7 @@ function characterOf(c: TmdbCastMember): string {
 	return role?.character?.trim() ?? "";
 }
 
-function keywordNames(film: TmdbFilm | TmdbShow): string[] {
+export function keywordNames(film: TmdbFilm | TmdbShow): string[] {
 	// Films nest under `keywords.keywords`, shows under `keywords.results`.
 	// Same endpoint name, different shape — a genuine TMDB inconsistency.
 	const asFilm = (film as TmdbFilm).keywords?.keywords;

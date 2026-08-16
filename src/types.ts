@@ -188,6 +188,7 @@ export interface TmdbFilm {
 	"watch/providers"?: TmdbProviderBlock;
 	production_countries?: { iso_3166_1?: string; name?: string }[];
 	spoken_languages?: { english_name?: string; name?: string }[];
+	tagline?: string;
 	alternative_titles?: { titles?: { iso_3166_1?: string; title?: string }[] };
 	recommendations?: { results?: TmdbSearchResult[] };
 	homepage?: string;
@@ -226,6 +227,7 @@ export interface TmdbShow {
 	recommendations?: { results?: TmdbSearchResult[] };
 	alternative_titles?: { results?: { iso_3166_1?: string; title?: string }[] };
 	homepage?: string;
+	tagline?: string;
 }
 
 export interface TmdbEpisode {

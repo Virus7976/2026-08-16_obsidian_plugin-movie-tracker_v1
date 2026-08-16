@@ -3275,3 +3275,57 @@ input.reel-input {
 	line-height: 1.3;
 	color: var(--text-muted);
 }
+
+/* ---- storyline + content facets ---- */
+
+.reel-tagline {
+	font-style: italic;
+	font-size: var(--font-ui-medium);
+	color: var(--text-muted);
+	margin-bottom: 10px;
+}
+
+.reel-facet-prose {
+	font-size: var(--font-ui-small);
+	line-height: 1.55;
+	margin-bottom: 14px;
+}
+
+.reel-content-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-small);
+}
+
+.reel-content-row:last-child {
+	border-bottom: none;
+}
+
+/*
+ * A single band colour, not a severity scale.
+ *
+ * Only the topic names survive to the note — the vote counts are used to
+ * decide whether a topic qualifies and then discarded — so grading these
+ * mild/moderate/severe would be inventing a number. One neutral marker says
+ * "the community confirmed this" and nothing more.
+ */
+.reel-band {
+	flex: 0 0 4px;
+	width: 4px;
+	align-self: stretch;
+	min-height: 18px;
+	border-radius: 2px;
+	background: var(--text-faint);
+}
+
+.reel-band.reported {
+	background: var(--color-orange, var(--interactive-accent));
+}
+
+.reel-content-name {
+	flex: 1;
+	min-width: 0;
+}
