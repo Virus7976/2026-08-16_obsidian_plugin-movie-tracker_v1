@@ -155,32 +155,43 @@ Films per year, hours watched, top directors and creators, rating distribution, 
 
 ## Install
 
-### With BRAT — gets you automatic updates
+### From the community store
 
-[BRAT](https://github.com/TfTHacker/obsidian42-brat) installs plugins straight
-from GitHub and keeps them updated, so you never copy files by hand.
+Once accepted, Reel appears in **Settings → Community plugins → Browse**, and
+updates arrive through Obsidian's own *Check for updates*. No other plugin is
+involved. This is the intended route.
 
-1. Community plugins → install **Obsidian42 - BRAT**.
-2. BRAT → *Add a beta plugin for testing* → paste this repo's URL.
-3. In BRAT's settings, turn on *Auto-update plugins at startup*.
+### Straight into your vaults (development)
 
-New releases then appear in Obsidian on their own.
+Until then, build and copy in one command — no extra plugin required:
+
+```bash
+npm install          # first time only
+npm run install-local
+```
+
+That reads Obsidian's own vault list and copies `main.js`, `manifest.json` and
+`styles.css` into `.obsidian/plugins/reel/` in every vault it finds. Reload
+Obsidian (`Ctrl+R`) to pick up the change.
+
+```bash
+npm run install-local -- open              # only the vault currently open
+npm run install-local -- "My Vault"        # match by name
+```
+
+### With BRAT (optional)
+
+[BRAT](https://github.com/TfTHacker/obsidian42-brat) auto-updates plugins from
+a GitHub repo. Useful for other people testing pre-release builds; unnecessary
+if you're building locally or waiting for the store.
 
 ### Manually
 
-Download `main.js`, `manifest.json` and `styles.css` from the latest release
-into `<vault>/.obsidian/plugins/reel/`, then enable it in Community plugins.
+Download the three files from the latest release into
+`<vault>/.obsidian/plugins/reel/`.
 
-### From source
-
-```bash
-npm install && npm run build
-```
-
-Copy the same three files into `<vault>/.obsidian/plugins/reel/`. For
-development, `npm run dev` watches and rebuilds.
-
-Releasing is documented in [RELEASING.md](RELEASING.md).
+Releasing is documented in [RELEASING.md](RELEASING.md) and
+[PUBLISHING.md](PUBLISHING.md).
 
 ## How it's built
 

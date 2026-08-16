@@ -16,7 +16,9 @@
     "doctor": "node scripts/doctor.mjs",
     "publish": "node scripts/publish.mjs",
     "setup": "git config core.hooksPath .githooks && node scripts/doctor.mjs",
-    "connect": "node scripts/connect.mjs"
+    "connect": "node scripts/connect.mjs",
+    "install-local": "npm run build && node scripts/install.mjs",
+    "push-to-vault": "node scripts/install.mjs"
   },
   "keywords": [
     "obsidian",
