@@ -142,6 +142,33 @@ export interface TmdbCastMember {
 	order?: number;
 }
 
+/**
+ * A person and their filmography.
+ *
+ * `combined_credits` merges film and TV, which is what a filmography means —
+ * an actor who moved between the two would otherwise look half as prolific.
+ */
+export interface TmdbPerson {
+	id: number;
+	name: string;
+	biography?: string;
+	profile_path?: string | null;
+	known_for_department?: string;
+	birthday?: string | null;
+	deathday?: string | null;
+	place_of_birth?: string | null;
+	combined_credits?: {
+		cast?: TmdbPersonCredit[];
+		crew?: TmdbPersonCredit[];
+	};
+}
+
+export interface TmdbPersonCredit extends TmdbSearchResult {
+	character?: string;
+	job?: string;
+	popularity?: number;
+}
+
 /** One country's release for a film, from the release_dates append. */
 export interface TmdbReleaseDate {
 	certification?: string;

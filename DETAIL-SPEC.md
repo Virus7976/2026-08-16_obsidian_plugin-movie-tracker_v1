@@ -36,11 +36,12 @@ IMDb holds is a deep link at best.
 |---|---|---|
 | Cast list with headshots, name, character | TMDB `credits.cast.profile_path` | **done** |
 | Crew list with headshots, name, job | TMDB `credits.crew` | **done** |
-| Tap a person → what else of theirs you own | Reel library search | **done** |
+| Tap a person → their filmography | TMDB `/person` + `combined_credits` | **done** — titles you own are ticked |
 | Top-cast circular strip (IMDb style) | same data, different layout | **done** — above the tabs |
 | Director / Writer / Stars summary rows | TMDB `credits` | **partial** — director shown in hero |
 | "All cast & crew" full screen | TMDB `credits` | **done** (Cast/Crew tabs) |
 | Favourite a person (heart) | no Reel concept of a followed person | **buildable** — needs a design decision |
+| Person biography, birth year | TMDB `/person` | **done** |
 
 ## 3. Storyline / reference
 

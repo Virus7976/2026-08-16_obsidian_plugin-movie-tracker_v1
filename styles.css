@@ -3659,3 +3659,125 @@ input.reel-input {
 	height: 100%;
 	object-fit: cover;
 }
+
+/* ---------------- person sheet ---------------- */
+
+.reel-person-sheet .reel-person-head {
+	display: flex;
+	gap: 14px;
+	align-items: flex-start;
+	margin-bottom: 12px;
+}
+
+.reel-person-hero-shot {
+	flex: 0 0 88px;
+	width: 88px;
+	height: 88px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-person-hero-shot img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-person-hero-shot.is-empty .reel-placeholder-text {
+	font-size: var(--font-ui-medium);
+	font-weight: 700;
+	color: var(--text-faint);
+	text-transform: uppercase;
+}
+
+.reel-person-hero-name {
+	font-size: var(--font-ui-large);
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.reel-person-bio {
+	font-size: var(--font-ui-small);
+	line-height: 1.55;
+	color: var(--text-muted);
+	margin-bottom: 10px;
+}
+
+.reel-person-credits {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+	gap: 12px;
+	margin-top: 8px;
+}
+
+.reel-person-credit {
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	border-radius: var(--reel-radius);
+}
+
+.reel-person-credit:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.reel-person-credit-poster {
+	position: relative;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 5px;
+	transition: transform 120ms ease;
+}
+
+.reel-person-credit:active .reel-person-credit-poster {
+	transform: scale(0.97);
+}
+
+.reel-person-credit-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* Titles you own are dimmed and ticked, so the ones you have not seen are
+   what stands out — that is what a filmography is for. */
+.reel-person-credit.is-mine .reel-person-credit-poster img {
+	opacity: 0.45;
+}
+
+.reel-person-credit-tick {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.reel-person-credit-title {
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	line-height: 1.25;
+}
+
+.reel-person-credit-sub {
+	font-size: calc(var(--font-ui-smaller) * 0.9);
+	color: var(--text-muted);
+	line-height: 1.25;
+}

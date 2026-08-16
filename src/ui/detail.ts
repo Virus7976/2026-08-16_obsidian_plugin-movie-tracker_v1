@@ -33,6 +33,7 @@ import { formatRange, parseRange, rangeCount } from "../util/ranges";
 import { renderStars } from "./stars";
 import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
+import { PersonSheet } from "./personSheet";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { unlink } from "../library";
 import { ContentFlag, FLAG_LABELS } from "../content";
@@ -376,7 +377,7 @@ export class DetailScreen {
 			const part = p.character ?? p.roles?.[0]?.character ?? "";
 			if (part) cell.createDiv({ cls: "reel-caststrip-role", text: part });
 
-			const open = () => void this.plugin.openViewWithSearch(p.name);
+			const open = () => this.openPerson(p);
 			cell.addEventListener("click", open);
 			cell.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {
@@ -385,6 +386,19 @@ export class DetailScreen {
 				}
 			});
 		}
+	}
+
+	/**
+	 * Open a person's filmography.
+	 *
+	 * TMDB gives an id on credits, but not always — aggregate credits for a
+	 * show occasionally omit it. Without one there is no person to look up, so
+	 * fall back to searching your own library by name rather than doing
+	 * nothing at all.
+	 */
+	private openPerson(p: TmdbCastMember | TmdbCrew): void {
+		if (p.id) new PersonSheet(this.plugin, p.id, p.name).open();
+		else void this.plugin.openViewWithSearch(p.name);
 	}
 
 	/**
@@ -422,7 +436,7 @@ export class DetailScreen {
 				: ((p as TmdbCrew).job ?? "");
 			if (sub) body.createDiv({ cls: "reel-person-role", text: sub });
 
-			const open = () => void this.plugin.openViewWithSearch(p.name);
+			const open = () => this.openPerson(p);
 			row.addEventListener("click", open);
 			row.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {

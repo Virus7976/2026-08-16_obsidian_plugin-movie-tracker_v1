@@ -23,6 +23,7 @@ import { MissingKeyError } from "./credentials";
 import type {
 	TmdbEpisode,
 	TmdbFilm,
+	TmdbPerson,
 	TmdbSearchResult,
 	TmdbShow,
 } from "./types";
@@ -280,6 +281,21 @@ export class TmdbClient {
 	}
 
 	/** Episode titles for one season. Permanent cache once the show has ended. */
+	/**
+	 * A person and everything they have been in.
+	 *
+	 * `combined_credits` spans film and television in one request, which is
+	 * what a filmography actually means — splitting them would make an actor
+	 * who moved between the two look half as prolific as they are.
+	 *
+	 * Not immutable: a working actor gains credits.
+	 */
+	async getPerson(id: number): Promise<TmdbPerson> {
+		return this.cached(`person-${id}`, () =>
+			this.request<TmdbPerson>(`/person/${id}`, { append_to_response: "combined_credits" })
+		);
+	}
+
 	/**
 	 * Stills and backdrops for a title.
 	 *
