@@ -154,7 +154,11 @@ class UpNextPainter {
 
 		const actions = row.createDiv({ cls: "reel-upnext-actions" });
 		if (next) {
-			const tick = actions.createEl("button", { cls: "reel-tick", text: "✓" });
+			const tick = actions.createEl("button", {
+				cls: "reel-tick",
+				text: "✓",
+				attr: { type: "button" },
+			});
 			tick.setAttr("aria-label", `Mark S${next.season}E${next.episode} watched`);
 			tick.addEventListener("click", async (e) => {
 				e.stopPropagation();

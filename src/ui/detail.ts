@@ -433,6 +433,7 @@ export class DetailScreen {
 			if (total && seen >= total) pill.addClass("is-complete");
 			else if (seen > 0) pill.addClass("is-partial");
 			if (this.openSeason === s.n) pill.addClass("is-open");
+			pill.setAttr("aria-expanded", String(this.openSeason === s.n));
 			pill.setCssProps({ "--reel-fill": total ? String(Math.min(1, seen / total)) : "0" });
 			pill.addEventListener("click", () => {
 				this.openSeason = this.openSeason === s.n ? null : s.n;
@@ -446,7 +447,7 @@ export class DetailScreen {
 	private async renderEpisodes(wrap: HTMLElement, season: number): Promise<void> {
 		const e = this.entry;
 		const listEl = wrap.createDiv({ cls: "reel-episodes" });
-		listEl.createDiv({ cls: "reel-loading", text: `Loading season ${season}…` });
+		listEl.createDiv({ cls: "reel-loading", text: `Loading season ${season}…`, attr: { role: "status" } });
 
 		let episodes = this.episodeCache.get(season);
 		if (!episodes) {
@@ -500,6 +501,7 @@ export class DetailScreen {
 
 			const tick = epRow.createDiv({ cls: "reel-episode-tick" });
 			tick.createSpan({ text: "✓" });
+			tick.setAttr("aria-label", `Episode ${n}`);
 			tick.setAttr("role", "button");
 			tick.setAttr("aria-label", `Toggle episode ${n}`);
 			tick.addEventListener("click", async () => {

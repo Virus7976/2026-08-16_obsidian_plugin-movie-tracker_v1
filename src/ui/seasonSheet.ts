@@ -62,7 +62,7 @@ export class SeasonSheet extends Modal {
 
 		const bulk = contentEl.createDiv({ cls: "reel-season-bulk" });
 		const listEl = contentEl.createDiv({ cls: "reel-episodes" });
-		listEl.createDiv({ cls: "reel-loading", text: "Loading episodes…" });
+		listEl.createDiv({ cls: "reel-loading", text: "Loading episodes…", attr: { role: "status" } });
 
 		const ended = this.entry.showStatus === "Ended" || this.entry.showStatus === "Canceled";
 		try {
@@ -89,6 +89,7 @@ export class SeasonSheet extends Modal {
 			// stray tap on the stars.
 			const tick = row.createDiv({ cls: "reel-episode-tick" });
 			tick.createSpan({ text: "✓" });
+			tick.setAttr("aria-label", `Episode ${n}`);
 			tick.setAttr("role", "button");
 			tick.setAttr("aria-label", `Mark episode ${n} watched`);
 			tick.addEventListener("click", (e) => {

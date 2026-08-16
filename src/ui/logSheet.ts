@@ -143,8 +143,15 @@ export class LogSheet extends Modal {
 		/* ---- liked --------------------------------------------------- */
 		const likeRow = detailsEl.createDiv({ cls: "reel-field reel-field-inline" });
 		likeRow.createDiv({ cls: "reel-field-label", text: "Liked" });
-		const heart = likeRow.createEl("button", { cls: "reel-heart", text: "♥" });
-		const paintHeart = () => heart.toggleClass("is-on", this.liked);
+		const heart = likeRow.createEl("button", {
+			cls: "reel-heart",
+			text: "♥",
+			attr: { "aria-label": "Liked", "aria-pressed": "false", type: "button" },
+		});
+		const paintHeart = () => {
+			heart.toggleClass("is-on", this.liked);
+			heart.setAttr("aria-pressed", String(this.liked));
+		};
 		heart.addEventListener("click", () => {
 			this.liked = !this.liked;
 			paintHeart();

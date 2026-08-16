@@ -109,6 +109,9 @@ export class ReelView extends ItemView {
 
 		this.contentEl.empty();
 		this.contentEl.addClass("reel-view");
+		// registerDomEvent, not addEventListener: Obsidian unbinds it when the
+		// view closes, so reopening the tab can't stack duplicate handlers.
+		this.registerDomEvent(this.contentEl, "keydown", this.onKey);
 		this.build();
 		this.registerEvent(this.plugin.library.on("changed", () => this.paint()));
 	}
@@ -138,7 +141,12 @@ export class ReelView extends ItemView {
 			this.paint();
 		});
 		this.searchEl = search;
-		const clear = searchWrap.createEl("button", { cls: "reel-search-clear", text: "×" });
+		const clear = searchWrap.createEl("button", {
+			cls: "reel-search-clear",
+			text: "×",
+			// A screen reader otherwise announces this as "times".
+			attr: { "aria-label": "Clear search", type: "button" },
+		});
 		clear.addEventListener("click", () => {
 			search.value = "";
 			this.query = "";
@@ -225,6 +233,10 @@ export class ReelView extends ItemView {
 			// a re-read is guaranteed to return what was just written.
 			this.detail.syncFromIndex();
 			this.detail.render(this.bodyEl);
+			// The detail screen needs this more than the library does: rating
+			// episodes is the one thing you do repeatedly without leaving the
+			// screen, and each rating repaints it.
+			if (scroll > 0) this.bodyEl.scrollTop = scroll;
 			return;
 		}
 
@@ -356,6 +368,14 @@ export class ReelView extends ItemView {
 			this.paint();
 		});
 	}
+
+	/** Escape backs out of the detail screen, as it does from every modal. */
+	private onKey = (ev: KeyboardEvent): void => {
+		if (ev.key !== "Escape" || !this.detail) return;
+		ev.preventDefault();
+		this.detail = null;
+		this.paint();
+	};
 
 	openDetail(entry: Entry): void {
 		const from = TABS.find((t) => t.id === this.tab)?.label ?? "Library";
