@@ -2,23 +2,25 @@
  * The detail screen.
  *
  * Everything the note header card offered, moved somewhere you'll actually see
- * it. The card is a markdown post-processor, so it only renders in Reading
- * view — in Live Preview, which is what most people have open, it simply isn't
- * there. That made the trailer, the season strip, the rewatch button and the
- * links effectively invisible.
+ * it — the card is a markdown post-processor, so it only renders in Reading
+ * view, and in Live Preview it simply isn't there.
  *
- * Every control here writes immediately and confirms visibly. "Did that
- * register?" is the worst question a tracker can leave you asking, so each
- * change flashes the control it changed rather than relying on you noticing a
- * colour shift.
+ * Layout is a hero followed by two columns: your own data and the metadata on
+ * the left, seasons or watch history on the right. On a phone they stack. The
+ * page is width-capped, because a single column of content on a 2000px monitor
+ * strands the text in a ribbon on the left and stretches four buttons to 460px
+ * each.
+ *
+ * Every control writes immediately and confirms visibly. "Did that register?"
+ * is the worst question a tracker can leave you asking.
  */
 
 import { Notice, TFile, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
 import type { Entry, TmdbEpisode } from "../types";
 import { redact } from "../secrets";
-import { formatMinutes, prettyDate, todayISO } from "../util/dates";
-import { parseRange, rangeCount } from "../util/ranges";
+import { formatMinutes, prettyDate } from "../util/dates";
+import { formatRange, parseRange, rangeCount } from "../util/ranges";
 import { renderStars } from "./stars";
 import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
@@ -29,8 +31,8 @@ import { ContentFlag, FLAG_LABELS } from "../content";
 const FILM_STATUSES = ["watched", "watchlist", "abandoned"];
 const TV_STATUSES = ["watching", "completed", "watchlist", "paused", "dropped"];
 
-/** Brief green flash, so a silent write still reads as "that worked". */
-function confirm(el: HTMLElement): void {
+/** Brief flash, so a silent write still reads as "that worked". */
+function flash(el: HTMLElement): void {
 	el.addClass("reel-flash");
 	window.setTimeout(() => el.removeClass("reel-flash"), 600);
 }
@@ -38,6 +40,7 @@ function confirm(el: HTMLElement): void {
 export class DetailScreen {
 	private openSeason: number | null = null;
 	private episodeCache = new Map<number, TmdbEpisode[]>();
+	private rootEl: HTMLElement | null = null;
 
 	constructor(
 		private plugin: ReelPlugin,
@@ -50,20 +53,33 @@ export class DetailScreen {
 		return f instanceof TFile ? f : null;
 	}
 
-	/** Re-read from the index after a write, so the screen reflects the file. */
-	private refresh(container: HTMLElement): void {
+	/** Repaint using the current entry, without re-reading the index. */
+	private rerender(): void {
+		if (this.rootEl) this.render(this.rootEl);
+	}
+
+	/**
+	 * Re-read from the index, then repaint.
+	 *
+	 * Only safe once `metadataCache` has caught up with the write. Calling it
+	 * immediately after `processFrontMatter` reads the *previous* frontmatter
+	 * and paints stale values over the fresh ones — which is exactly why a
+	 * freshly rated episode appeared unrated.
+	 */
+	private refreshFromIndex(): void {
 		const latest = this.plugin.library.byPath(this.entry.path);
 		if (latest) this.entry = latest;
-		this.render(container);
+		this.rerender();
 	}
 
 	render(container: HTMLElement): void {
+		this.rootEl = container;
 		container.empty();
 		container.addClass("reel-detail");
 		const e = this.entry;
 		const isTv = e.type === "tv";
 
-		/* ---- top bar ------------------------------------------------- */
+		/* ---- top bar --------------------------------------------------- */
 		const bar = container.createDiv({ cls: "reel-detail-bar" });
 		const back = bar.createEl("button", { cls: "reel-btn reel-back" });
 		setIcon(back.createSpan(), "arrow-left");
@@ -76,9 +92,12 @@ export class DetailScreen {
 			if (file) await this.plugin.app.workspace.getLeaf(false).openFile(file);
 		});
 
-		/* ---- header -------------------------------------------------- */
-		const head = container.createDiv({ cls: "reel-detail-head" });
-		const posterEl = head.createDiv({ cls: "reel-detail-poster" });
+		const page = container.createDiv({ cls: "reel-detail-page" });
+
+		/* ---- hero ------------------------------------------------------ */
+		const hero = page.createDiv({ cls: "reel-hero" });
+
+		const posterEl = hero.createDiv({ cls: "reel-hero-poster" });
 		const src = this.plugin.posters.resourcePath(e.poster);
 		if (src) posterEl.createEl("img", { attr: { src, alt: "" } });
 		else {
@@ -86,41 +105,104 @@ export class DetailScreen {
 			posterEl.createSpan({ text: e.title.slice(0, 2) });
 		}
 
-		const info = head.createDiv({ cls: "reel-detail-info" });
-		const h = info.createDiv({ cls: "reel-detail-title" });
+		const body = hero.createDiv({ cls: "reel-hero-body" });
+
+		const h = body.createDiv({ cls: "reel-hero-title" });
 		h.createSpan({ text: e.title });
 		const year = e.year ?? e.firstAirYear;
 		if (year) h.createSpan({ cls: "reel-dim", text: ` ${year}` });
 
-		const facts = info.createDiv({ cls: "reel-header-facts" });
+		const sub = body.createDiv({ cls: "reel-hero-sub" });
 		const people = isTv ? e.creators : e.director;
-		if (people.length) facts.createSpan({ text: people.map(unlink).join(", ") });
-		if (!isTv && e.runtime) facts.createSpan({ text: formatMinutes(e.runtime) });
+		if (people.length) sub.createSpan({ text: people.map(unlink).join(", ") });
+		if (!isTv && e.runtime) sub.createSpan({ text: formatMinutes(e.runtime) });
 		if (isTv) {
 			const seen = e.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
-			facts.createSpan({ text: `${seen}/${e.totalEpisodes ?? "?"} episodes` });
+			sub.createSpan({ text: `${seen} of ${e.totalEpisodes ?? "?"} episodes` });
 		}
-		if (e.certification) facts.createSpan({ cls: "reel-badge cert", text: e.certification });
+		if (e.certification) sub.createSpan({ cls: "reel-badge cert", text: e.certification });
 
-		/* scores */
-		const scores = info.createDiv({ cls: "reel-scores" });
+		const scores = body.createDiv({ cls: "reel-scores" });
 		const score = (label: string, value: string, cls: string) => {
 			const chip = scores.createDiv({ cls: `reel-score ${cls}` });
 			chip.createDiv({ cls: "reel-score-value", text: value });
 			chip.createDiv({ cls: "reel-score-label", text: label });
 		};
 		if (e.rating != null) score("You", String(e.rating), "mine");
+		const epAvg = this.episodeAverage();
+		if (epAvg != null) score("Episodes", epAvg.toFixed(1), "mine");
 		if (e.imdbRating != null) score("IMDb", e.imdbRating.toFixed(1), "imdb");
-		if (e.metacritic != null) score("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad");
+		if (e.metacritic != null) {
+			score("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad");
+		}
 		if (e.rottenTomatoes != null) score("Tomatoes", `${e.rottenTomatoes}%`, e.rottenTomatoes >= 60 ? "fresh" : "rotten");
 		if (e.tmdbRating != null) score("TMDB", e.tmdbRating.toFixed(1), "");
 		if (!scores.childElementCount) scores.remove();
 
-		/* ---- editable controls --------------------------------------- */
-		const controls = container.createDiv({ cls: "reel-detail-controls" });
+		if (e.genres.length) {
+			const g = body.createDiv({ cls: "reel-hero-genres" });
+			e.genres.forEach((x) => g.createSpan({ cls: "reel-chip static", text: x }));
+		}
 
-		const ratingBox = controls.createDiv({ cls: "reel-control" });
-		ratingBox.createDiv({ cls: "reel-field-label", text: "Your rating" });
+		if (e.overview) body.createDiv({ cls: "reel-hero-overview", text: e.overview });
+
+		const links = body.createDiv({ cls: "reel-links" });
+
+		// The trailer was a small text link among two others and was missed
+		// entirely. It's the one link anyone actually wants, so it gets button
+		// weight and the others stay as links.
+		if (e.trailer) {
+			const play = links.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", href: e.trailer });
+			setIcon(play.createSpan(), "play");
+			play.createSpan({ text: "Watch trailer" });
+			play.setAttr("target", "_blank");
+			play.setAttr("rel", "noopener");
+		}
+
+		const link = (label: string, url: string, cls: string) => {
+			const a = links.createEl("a", { cls: `reel-link ${cls}`, text: label, href: url });
+			a.setAttr("target", "_blank");
+			a.setAttr("rel", "noopener");
+		};
+		const imdb = imdbUrl(e.imdbId);
+		if (imdb) link("IMDb", imdb, "imdb");
+		link("TMDB", tmdbUrl(e.tmdbId, e.type), "tmdb");
+
+		/* ---- columns ---------------------------------------------------- */
+		const cols = page.createDiv({ cls: "reel-detail-cols" });
+		const side = cols.createDiv({ cls: "reel-detail-side" });
+		const main = cols.createDiv({ cls: "reel-detail-main" });
+
+		this.renderControls(side);
+		this.renderActions(side);
+		this.renderMeta(side);
+
+		if (isTv) this.renderSeasons(main);
+		else this.renderHistory(main);
+	}
+
+	/** Mean of every episode rating across all seasons, or null if none. */
+	private episodeAverage(): number | null {
+		const values: number[] = [];
+		for (const s of this.entry.seasons) {
+			for (const v of Object.values(s.episode_ratings ?? {})) {
+				if (typeof v === "number") values.push(v);
+			}
+		}
+		if (!values.length) return null;
+		return values.reduce((a, b) => a + b, 0) / values.length;
+	}
+
+	/* ------------------------------------------------------------------ */
+
+	private renderControls(side: HTMLElement): void {
+		const e = this.entry;
+		const isTv = e.type === "tv";
+		const box = side.createDiv({ cls: "reel-panel" });
+		box.createDiv({ cls: "reel-panel-title", text: "Your entry" });
+
+		const ratingBox = box.createDiv({ cls: "reel-control" });
+		ratingBox.createDiv({ cls: "reel-field-label", text: "Rating" });
 		const starRow = ratingBox.createDiv({ cls: "reel-rating-row" });
 		renderStars(starRow, {
 			value: e.rating,
@@ -129,7 +211,8 @@ export class DetailScreen {
 				if (!file) return;
 				try {
 					await this.plugin.notes.setRating(file, v ?? null);
-					confirm(starRow);
+					this.entry = { ...this.entry, rating: v };
+					flash(starRow);
 					new Notice(v == null ? "Rating cleared" : `Rated ${v}`);
 				} catch (err) {
 					new Notice(`Reel: ${redact(err)}`);
@@ -137,7 +220,15 @@ export class DetailScreen {
 			},
 		});
 
-		const likeBox = controls.createDiv({ cls: "reel-control" });
+		const epAvg = this.episodeAverage();
+		if (isTv && epAvg != null) {
+			ratingBox.createDiv({
+				cls: "reel-hint",
+				text: `Episode average ${epAvg.toFixed(1)} — set automatically until you rate the series yourself.`,
+			});
+		}
+
+		const likeBox = box.createDiv({ cls: "reel-control" });
 		likeBox.createDiv({ cls: "reel-field-label", text: "Liked" });
 		const heart = likeBox.createEl("button", { cls: "reel-heart", text: e.liked ? "♥ Liked" : "♡ Like" });
 		heart.toggleClass("is-on", !!e.liked);
@@ -145,30 +236,35 @@ export class DetailScreen {
 			const file = this.file;
 			if (!file) return;
 			const on = await this.plugin.notes.toggleLiked(file);
-			// Repaint from the actual result, not an assumption about it.
+			this.entry = { ...this.entry, liked: on };
 			heart.setText(on ? "♥ Liked" : "♡ Like");
 			heart.toggleClass("is-on", on);
-			confirm(heart);
+			flash(heart);
 		});
 
-		const statusBox = controls.createDiv({ cls: "reel-control wide" });
+		const statusBox = box.createDiv({ cls: "reel-control" });
 		statusBox.createDiv({ cls: "reel-field-label", text: "Status" });
 		const statusRow = statusBox.createDiv({ cls: "reel-status-row" });
 		for (const status of isTv ? TV_STATUSES : FILM_STATUSES) {
 			const pill = statusRow.createEl("button", { cls: "reel-chip", text: status });
-			pill.toggleClass("is-active", e.status === status);
+			pill.toggleClass("is-active", this.entry.status === status);
 			pill.addEventListener("click", async () => {
 				const file = this.file;
 				if (!file) return;
 				await this.plugin.notes.setStatus(file, status);
+				this.entry = { ...this.entry, status };
 				statusRow.findAll(".reel-chip").forEach((c) => c.removeClass("is-active"));
 				pill.addClass("is-active");
-				confirm(pill);
+				flash(pill);
 			});
 		}
+	}
 
-		/* ---- primary actions ------------------------------------------ */
-		const actions = container.createDiv({ cls: "reel-detail-actions" });
+	private renderActions(side: HTMLElement): void {
+		const e = this.entry;
+		const isTv = e.type === "tv";
+		const box = side.createDiv({ cls: "reel-panel" });
+		const actions = box.createDiv({ cls: "reel-detail-actions" });
 		const act = (label: string, cta: boolean, fn: () => void) => {
 			const b = actions.createEl("button", { cls: `reel-btn${cta ? " mod-cta" : ""}`, text: label });
 			b.addEventListener("click", fn);
@@ -176,8 +272,6 @@ export class DetailScreen {
 		};
 
 		if (!isTv) {
-			// The label says what will happen, so logging a rewatch is one
-			// obvious button rather than something you have to know about.
 			act(e.watched.length ? "Log another watch" : "Log watch", true, () => {
 				const file = this.file;
 				if (file) new LogSheet(this.plugin.app, this.plugin, { file, entry: e }).open();
@@ -190,7 +284,7 @@ export class DetailScreen {
 					if (!file) return;
 					await this.plugin.notes.markEpisode(file, next.season, next.episode);
 					new Notice(`S${next.season}E${next.episode} watched`);
-					this.refresh(container);
+					window.setTimeout(() => this.refreshFromIndex(), 120);
 				});
 			}
 			act("Start a rewatch", false, async () => {
@@ -198,7 +292,7 @@ export class DetailScreen {
 				if (!file) return;
 				await this.plugin.notes.restartSeries(file, e.rating);
 				new Notice("Progress reset — previous run recorded");
-				this.refresh(container);
+				window.setTimeout(() => this.refreshFromIndex(), 120);
 			});
 		}
 
@@ -211,61 +305,43 @@ export class DetailScreen {
 			try {
 				await this.plugin.notes.refreshMetadata(e);
 				new Notice("Metadata refreshed");
-				this.refresh(container);
+				window.setTimeout(() => this.refreshFromIndex(), 200);
 			} catch (err) {
 				new Notice(`Reel: ${redact(err)}`);
 			}
 		});
+	}
 
-		/* ---- links ---------------------------------------------------- */
-		const links = container.createDiv({ cls: "reel-links" });
-		const link = (label: string, url: string, cls: string) => {
-			const a = links.createEl("a", { cls: `reel-link ${cls}`, text: label, href: url });
-			a.setAttr("target", "_blank");
-			a.setAttr("rel", "noopener");
-		};
-		if (e.trailer) link("▶ Trailer", e.trailer, "trailer");
-		const imdb = imdbUrl(e.imdbId);
-		if (imdb) link("IMDb", imdb, "imdb");
-		link("TMDB", tmdbUrl(e.tmdbId, e.type), "tmdb");
-
-		/* ---- overview ------------------------------------------------- */
-		if (e.overview) container.createDiv({ cls: "reel-detail-overview", text: e.overview });
-
-		if (e.genres.length) {
-			const g = container.createDiv({ cls: "reel-header-genres" });
-			e.genres.forEach((x) => g.createSpan({ cls: "reel-chip static", text: x }));
-		}
-
-		if (e.providers.length) {
-			const p = container.createDiv({ cls: "reel-header-facts" });
-			p.createSpan({ cls: "reel-dim", text: "Streaming: " });
-			p.createSpan({ text: e.providers.join(", ") });
-		}
-
+	/** Cast, streaming and flags as aligned rows rather than run-on lines. */
+	private renderMeta(side: HTMLElement): void {
+		const e = this.entry;
+		const rows: [string, string][] = [];
+		if (e.cast.length) rows.push(["Cast", e.cast.map(unlink).join(", ")]);
+		if (e.providers.length) rows.push(["Streaming", e.providers.join(", ")]);
+		if (e.collection) rows.push(["Collection", e.collection]);
+		if (e.productionCompanies.length) rows.push(["Studio", e.productionCompanies.slice(0, 3).join(", ")]);
+		if (e.lists.length) rows.push(["Lists", e.lists.join(", ")]);
 		if (e.contentFlags.length) {
-			const f = container.createDiv({ cls: "reel-header-flags" });
-			f.createSpan({ cls: "reel-dim", text: "Contains: " });
-			e.contentFlags.forEach((x) => f.createSpan({ cls: "reel-badge flag", text: FLAG_LABELS[x as ContentFlag] ?? x }));
+			rows.push(["Contains", e.contentFlags.map((f) => FLAG_LABELS[f as ContentFlag] ?? f).join(", ")]);
 		}
+		if (!rows.length) return;
 
-		if (e.cast.length) {
-			const c = container.createDiv({ cls: "reel-header-cast" });
-			c.createSpan({ cls: "reel-dim", text: "Cast: " });
-			c.createSpan({ text: e.cast.map(unlink).join(", ") });
+		const box = side.createDiv({ cls: "reel-panel" });
+		box.createDiv({ cls: "reel-panel-title", text: "Details" });
+		const dl = box.createDiv({ cls: "reel-meta" });
+		for (const [k, v] of rows) {
+			const row = dl.createDiv({ cls: "reel-meta-row" });
+			row.createDiv({ cls: "reel-meta-key", text: k });
+			row.createDiv({ cls: "reel-meta-value", text: v });
 		}
-
-		/* ---- seasons and episodes ------------------------------------- */
-		if (isTv) this.renderSeasons(container);
-		else this.renderHistory(container);
 	}
 
 	/* ------------------------------------------------------------------ */
 
-	private renderSeasons(container: HTMLElement): void {
+	private renderSeasons(main: HTMLElement): void {
 		const e = this.entry;
-		const wrap = container.createDiv({ cls: "reel-detail-section" });
-		wrap.createDiv({ cls: "reel-section-title", text: "Seasons" });
+		const wrap = main.createDiv({ cls: "reel-panel" });
+		wrap.createDiv({ cls: "reel-panel-title", text: "Seasons" });
 
 		const strip = wrap.createDiv({ cls: "reel-seasons" });
 		for (const s of e.seasons) {
@@ -274,22 +350,21 @@ export class DetailScreen {
 			const pill = strip.createDiv({ cls: "reel-season-pill" });
 			pill.createSpan({ cls: "reel-season-n", text: `S${s.n}` });
 			pill.createSpan({ cls: "reel-dim", text: total ? `${seen}/${total}` : String(seen) });
+			if (s.rating != null) pill.createSpan({ cls: "reel-season-rating", text: `${s.rating}★` });
 			if (total && seen >= total) pill.addClass("is-complete");
 			else if (seen > 0) pill.addClass("is-partial");
 			if (this.openSeason === s.n) pill.addClass("is-open");
 			pill.setCssProps({ "--reel-fill": total ? String(Math.min(1, seen / total)) : "0" });
 			pill.addEventListener("click", () => {
-				// Tapping the open season closes it, so the list is a toggle
-				// rather than something you can only ever open.
 				this.openSeason = this.openSeason === s.n ? null : s.n;
-				this.render(container);
+				this.rerender();
 			});
 		}
 
-		if (this.openSeason != null) void this.renderEpisodes(wrap, container, this.openSeason);
+		if (this.openSeason != null) void this.renderEpisodes(wrap, this.openSeason);
 	}
 
-	private async renderEpisodes(wrap: HTMLElement, root: HTMLElement, season: number): Promise<void> {
+	private async renderEpisodes(wrap: HTMLElement, season: number): Promise<void> {
 		const e = this.entry;
 		const listEl = wrap.createDiv({ cls: "reel-episodes" });
 		listEl.createDiv({ cls: "reel-loading", text: `Loading season ${season}…` });
@@ -310,7 +385,7 @@ export class DetailScreen {
 
 		const row = e.seasons.find((s) => s.n === season);
 		const watched = new Set(parseRange(row?.watched));
-		const ratings = row?.episode_ratings ?? {};
+		const ratings: Record<string, number> = { ...(row?.episode_ratings ?? {}) };
 
 		listEl.empty();
 
@@ -321,7 +396,15 @@ export class DetailScreen {
 			if (!file || !episodes) return;
 			await this.plugin.notes.setSeasonRange(file, season, `1-${episodes.length}`);
 			new Notice(`Season ${season} marked watched`);
-			this.refresh(root);
+			window.setTimeout(() => this.refreshFromIndex(), 120);
+		});
+		const clear = bulk.createEl("button", { cls: "reel-chip", text: "Clear" });
+		clear.addEventListener("click", async () => {
+			const file = this.file;
+			if (!file) return;
+			await this.plugin.notes.setSeasonRange(file, season, "");
+			new Notice(`Season ${season} cleared`);
+			window.setTimeout(() => this.refreshFromIndex(), 120);
 		});
 
 		for (const ep of episodes) {
@@ -336,39 +419,45 @@ export class DetailScreen {
 			tick.addEventListener("click", async () => {
 				const file = this.file;
 				if (!file) return;
-				const next = new Set(watched);
-				if (next.has(n)) next.delete(n);
-				else next.add(n);
-				const { formatRange } = await import("../util/ranges");
-				await this.plugin.notes.setSeasonRange(file, season, formatRange([...next]));
-				this.refresh(root);
+				if (watched.has(n)) watched.delete(n);
+				else watched.add(n);
+				epRow.toggleClass("is-watched", watched.has(n));
+				await this.plugin.notes.setSeasonRange(file, season, formatRange([...watched]));
 			});
 
-			const body = epRow.createDiv({ cls: "reel-episode-body" });
-			body.createDiv({ cls: "reel-episode-title", text: `${n}. ${ep.name ?? `Episode ${n}`}` });
-			const meta = body.createDiv({ cls: "reel-episode-meta" });
+			const epBody = epRow.createDiv({ cls: "reel-episode-body" });
+			epBody.createDiv({ cls: "reel-episode-title", text: `${n}. ${ep.name ?? `Episode ${n}`}` });
+			const meta = epBody.createDiv({ cls: "reel-episode-meta" });
 			if (ep.air_date) meta.createSpan({ text: prettyDate(ep.air_date) });
 			if (ep.runtime) meta.createSpan({ text: `${ep.runtime}m` });
 
-			renderStars(body.createDiv({ cls: "reel-episode-stars" }), {
+			// The stars own their own state. Re-rendering here would read the
+			// index before Obsidian has reparsed the file and paint the old
+			// value straight back over the new one.
+			renderStars(epRow.createDiv({ cls: "reel-episode-stars" }), {
 				value: ratings[String(n)],
 				compact: true,
 				onChange: async (v) => {
 					const file = this.file;
 					if (!file) return;
+					if (v == null) delete ratings[String(n)];
+					else {
+						ratings[String(n)] = v;
+						watched.add(n);
+						epRow.addClass("is-watched");
+					}
 					await this.plugin.notes.rateEpisode(file, season, n, v ?? null);
-					new Notice(v == null ? `S${season}E${n} rating cleared` : `S${season}E${n} rated ${v}`);
-					this.refresh(root);
+					new Notice(v == null ? `S${season}E${n} cleared` : `S${season}E${n} rated ${v}`);
 				},
 			});
 		}
 	}
 
-	private renderHistory(container: HTMLElement): void {
+	private renderHistory(main: HTMLElement): void {
 		const e = this.entry;
 		if (!e.watched.length) return;
-		const wrap = container.createDiv({ cls: "reel-detail-section" });
-		wrap.createDiv({ cls: "reel-section-title", text: `Watch history — ${e.watched.length}` });
+		const wrap = main.createDiv({ cls: "reel-panel" });
+		wrap.createDiv({ cls: "reel-panel-title", text: `Watch history — ${e.watched.length}` });
 		const list = wrap.createDiv({ cls: "reel-history" });
 		for (const w of [...e.watched].reverse()) {
 			const row = list.createDiv({ cls: "reel-history-row" });
@@ -378,5 +467,3 @@ export class DetailScreen {
 		}
 	}
 }
-
-export { todayISO };

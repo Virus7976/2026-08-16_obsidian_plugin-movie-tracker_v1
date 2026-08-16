@@ -227,6 +227,34 @@ export class NoteWriter {
 			else delete row.episode_ratings;
 
 			fm.seasons = seasons;
+
+			// A season's rating is the mean of its rated episodes, and the
+			// series rating follows from all of them. Rating episodes is a
+			// judgement about the show, so it should show up as one.
+			const seasonValues = Object.values(ratings).filter((x): x is number => typeof x === "number");
+			if (seasonValues.length) row.rating = round1(seasonValues.reduce((a, b) => a + b, 0) / seasonValues.length);
+			else delete row.rating;
+
+			const all: number[] = [];
+			for (const s of seasons) {
+				for (const v of Object.values(s.episode_ratings ?? {})) if (typeof v === "number") all.push(v);
+			}
+			if (all.length) {
+				const avg = round1(all.reduce((a, b) => a + b, 0) / all.length);
+				fm.episode_rating_avg = avg;
+				// Only fill the series rating when you haven't set one, or when
+				// the existing value was itself derived. A rating you chose by
+				// hand must not be overwritten by ticking through episodes.
+				const previous = Number(fm.episode_rating_avg_applied ?? NaN);
+				if (fm.rating == null || Number(fm.rating) === previous) {
+					fm.rating = clampRating(avg);
+					fm.episode_rating_avg_applied = clampRating(avg);
+				}
+			} else {
+				delete fm.episode_rating_avg;
+				delete fm.episode_rating_avg_applied;
+			}
+
 			this.settleShowStatus(fm, seasons);
 			this.refreshDerived(fm);
 		});
@@ -579,6 +607,11 @@ export class NoteWriter {
 		}
 		return candidate;
 	}
+}
+
+/** One decimal place — an average of half-star ratings needs no more. */
+function round1(n: number): number {
+	return Math.round(n * 10) / 10;
 }
 
 /** Nullable-to-undefined, since TMDB returns `null` for a missing imdb_id. */
