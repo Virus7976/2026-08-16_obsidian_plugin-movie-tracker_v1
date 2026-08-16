@@ -55,6 +55,23 @@ function parsePercent(value: string | undefined): number | undefined {
 export class OmdbClient {
 	constructor(private plugin: ReelPlugin) {}
 
+	/** One cheap request, so a mistyped key fails here rather than silently. */
+	async test(): Promise<{ ok: true } | { ok: false; error: string }> {
+		const key = await this.plugin.credentials.getOptional("omdb");
+		if (!key) return { ok: false, error: "No OMDb key saved." };
+		try {
+			const url = new URL("https://www.omdbapi.com/");
+			url.searchParams.set("i", "tt0111161");
+			url.searchParams.set("apikey", key);
+			const res = await requestUrl({ url: url.toString(), method: "GET", throw: false });
+			const data = res.json as OmdbResponse;
+			if (data.Response === "False") return { ok: false, error: data.Error ?? "OMDb rejected the key." };
+			return { ok: true };
+		} catch (e) {
+			return { ok: false, error: redact(e) };
+		}
+	}
+
 	async fetchScores(imdbId: string): Promise<OmdbScores | null> {
 		const key = await this.plugin.credentials.getOptional("omdb");
 		if (!key || !imdbId) return null;
@@ -168,6 +185,20 @@ interface DtddResponse {
 
 export class DtddClient {
 	constructor(private plugin: ReelPlugin) {}
+
+	async test(): Promise<{ ok: true } | { ok: false; error: string }> {
+		const key = await this.plugin.credentials.getOptional("dtdd");
+		if (!key) return { ok: false, error: "No DoesTheDogDie key saved." };
+		try {
+			const id = await this.findId("The Shawshank Redemption", 1994, key);
+			// A wrong key returns an error status rather than an empty result,
+			// which findId turns into null — so null here is inconclusive
+			// rather than proof the key is bad.
+			return id == null ? { ok: false, error: "No response — check the key." } : { ok: true };
+		} catch (e) {
+			return { ok: false, error: redact(e) };
+		}
+	}
 
 	/**
 	 * DTDD's search takes a title, not an IMDb id, so this is the one place a

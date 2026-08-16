@@ -93,12 +93,7 @@ class CalendarPainter {
 		const row = createDiv({ cls: "reel-upnext-row" });
 
 		const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
-		const src = this.plugin.posters.displayUrl(entry);
-		if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-		else {
-			thumb.addClass("is-empty");
-			thumb.createSpan({ text: entry.title.slice(0, 2) });
-		}
+		this.plugin.posters.attach(thumb, entry);
 
 		const body = row.createDiv({ cls: "reel-upnext-body" });
 		body.createDiv({ cls: "reel-upnext-title", text: entry.title });

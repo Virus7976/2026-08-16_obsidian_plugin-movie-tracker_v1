@@ -76,6 +76,34 @@ export class PosterStore {
 		return this.resourcePath(entry.poster) ?? entry.posterUrl ?? null;
 	}
 
+	/**
+	 * Draw a poster into a container, with the fallback built in.
+	 *
+	 * Six places were each doing this by hand and five of them forgot the
+	 * error case, which matters because an imported poster is a remote URL —
+	 * offline or a dead link left a blank box rather than the placeholder a
+	 * missing poster gets. One helper means the fallback can't be forgotten in
+	 * the next place that needs one.
+	 */
+	attach(parent: HTMLElement, entry: { poster?: string; posterUrl?: string; title: string }): void {
+		const src = this.displayUrl(entry);
+		const fallback = () => {
+			parent.addClass("is-empty");
+			parent.createSpan({ cls: "reel-placeholder-text", text: entry.title.slice(0, 2) });
+		};
+
+		if (!src) {
+			fallback();
+			return;
+		}
+
+		const img = parent.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+		img.addEventListener("error", () => {
+			img.remove();
+			fallback();
+		});
+	}
+
 	private async ensureFolder(): Promise<void> {
 		const vault = this.plugin.app.vault;
 		const parts = this.folder.split("/").filter(Boolean);

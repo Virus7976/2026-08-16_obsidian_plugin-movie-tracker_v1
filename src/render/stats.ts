@@ -68,7 +68,10 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	}
 
 	/* ---- year selector ------------------------------------------------ */
-	const years = [...new Set(viewings(films).map((v) => v.date.slice(0, 4)))].sort().reverse();
+	// Reuse the unfiltered pass rather than flattening every watch history a
+	// second time just to collect the years.
+	const allViewings = opts.year ? viewings(films) : watched;
+	const years = [...new Set(allViewings.map((v) => v.date.slice(0, 4)))].sort().reverse();
 	if (years.length > 1) {
 		const bar = el.createDiv({ cls: "reel-chips" });
 		const chip = (label: string, active: boolean, year?: number) => {

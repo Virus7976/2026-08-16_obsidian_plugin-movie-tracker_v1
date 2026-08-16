@@ -102,23 +102,19 @@ export class DiscoverScreen {
 		chip(row1, "For you", !this.filtered, () => {
 			this.filters = { ...EMPTY, type: this.filters.type };
 		});
-		chip(row1, "Films", this.filters.type === "movie", () => {
-			if (this.filters.type === "movie") return;
-			this.filters.type = "movie";
-			// Both have to be refetched: rows are built from the profile, and
-			// genre ids mean different things on the two endpoints.
-			this.rows = null;
-			this.genres = [];
-		});
-		chip(row1, "Series", this.filters.type === "tv", () => {
-			this.filters.type = "tv";
-			// Genre ids differ between films and shows, so the list has to be
-			// refetched rather than reused.
+		// Both directions must clear the genre: ids are per-endpoint, so a
+		// selection carried across would silently query the wrong genre. The
+		// previous version only cleared one way.
+		const setType = (next: "movie" | "tv") => {
+			if (this.filters.type === next) return;
+			this.filters.type = next;
 			this.rows = null;
 			this.genres = [];
 			this.filters.genreId = null;
 			this.filters.genreName = null;
-		});
+		};
+		chip(row1, "Films", this.filters.type === "movie", () => setType("movie"));
+		chip(row1, "Series", this.filters.type === "tv", () => setType("tv"));
 
 		row1.createSpan({ cls: "reel-chip-sep", text: "·" });
 
@@ -358,7 +354,14 @@ export class DiscoverScreen {
 		posterEl.setAttr("tabindex", "0");
 		posterEl.setAttr("aria-label", `${title} — details`);
 		const src = this.plugin.tmdb.posterUrl(item.poster_path, "w342");
-		if (src) posterEl.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
+		if (src) {
+			const img = posterEl.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
+			img.addEventListener("error", () => {
+				img.remove();
+				posterEl.addClass("is-empty");
+				posterEl.createSpan({ text: title.slice(0, 2) });
+			});
+		}
 		if (item.vote_average) posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
 		if (isTv) posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
 

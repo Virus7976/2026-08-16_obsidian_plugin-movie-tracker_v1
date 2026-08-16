@@ -531,7 +531,9 @@ export class DetailScreen {
 			// The stars own their own state. Re-rendering here would read the
 			// index before Obsidian has reparsed the file and paint the old
 			// value straight back over the new one.
-			renderStars(epRow.createDiv({ cls: "reel-episode-stars" }), {
+			const starWrap = epRow.createDiv({ cls: "reel-episode-stars" });
+			starWrap.setAttr("aria-label", `Rate episode ${n}`);
+			renderStars(starWrap, {
 				value: ratings[String(n)],
 				compact: true,
 				onChange: async (v) => {

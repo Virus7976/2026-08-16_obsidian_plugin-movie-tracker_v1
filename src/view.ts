@@ -473,12 +473,7 @@ export class ReelView extends ItemView {
 			row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
 
 			const thumb = row.createDiv({ cls: "reel-diary-thumb" });
-			const src = this.plugin.posters.displayUrl(v.entry);
-			if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-			else {
-				thumb.addClass("is-empty");
-				thumb.createSpan({ text: v.entry.title.slice(0, 2) });
-			}
+			this.plugin.posters.attach(thumb, v.entry);
 
 			const body = row.createDiv({ cls: "reel-diary-body" });
 			body.createDiv({ cls: "reel-diary-title", text: v.entry.title });

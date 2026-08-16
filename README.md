@@ -99,6 +99,26 @@ Everything about one title, and everything editable in place:
 - Cast, streaming providers, collection, studio, lists and content flags as
   aligned rows
 
+### Discover
+
+Rows of posters built from what you've rated: **"Because you liked X"** from
+TMDB's recommendations, then trending, your top genre, acclaimed titles you've
+missed, and what's coming soon. Nothing already in your library appears, and
+nothing you've dismissed.
+
+Every card carries its three answers inline — **+** to your watchlist, **✓**
+for seen (which asks for a rating there and then), **✕** for not interested,
+which persists. Tapping the poster previews it first.
+
+Filter by genre, decade, minimum score, and films vs series — that swaps the
+personalised rows for a grid, since you're then comparing a set rather than
+skimming a shelf. "For you" is its own chip, so letting it choose from your
+ratings is a deliberate choice rather than the absence of filters.
+
+It says what it's reading from — "based on your ratings, mostly comedy,
+thriller" — and if you haven't rated enough to personalise anything, it says
+that instead of dressing the popular list up as being about you.
+
 ### Rate
 
 One title at a time: poster, the essentials, big stars. Rating advances
@@ -159,6 +179,7 @@ Filterable fields: `status` `type` `title` `year` `decade` `rating`
 
 | Command | Notes |
 |---|---|
+| Open library / discover / rate / up next / diary / stats | one per tab |
 | Log a film or series | |
 | Add to watchlist | |
 | Log the current note | only on a Reel note |
@@ -169,6 +190,11 @@ Filterable fields: `status` `type` `title` `year` `decade` `rating`
 | Download missing posters | throttled 250 ms/request |
 | Lock the TMDB key | |
 | Rebuild the library index | |
+| Fetch ratings and content notes for this title | OMDb + DoesTheDogDie |
+| Fetch ratings and content notes for the whole library | throttled |
+| Create starter Bases views | five `.base` files |
+| Import notes from another tracker | converts in place |
+| Start a rewatch of this series | records the completed run |
 
 ## Setup
 

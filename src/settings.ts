@@ -243,13 +243,27 @@ export class ReelSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(el)
-			.setName("Test TMDB connection")
+			.setName("Test connections")
+			.setDesc("One small request per configured service, so a mistyped key fails here rather than silently.")
 			.addButton((b) =>
 				b.setButtonText("Test").onClick(async () => {
 					b.setDisabled(true).setButtonText("Testing…");
-					const result = await this.plugin.tmdb.testCredentials();
+					const lines: string[] = [];
+
+					const tmdb = await this.plugin.tmdb.testCredentials();
+					lines.push(tmdb.ok ? "TMDB works" : `TMDB: ${tmdb.error}`);
+
+					if (store.has("omdb")) {
+						const omdb = await this.plugin.omdb.test();
+						lines.push(omdb.ok ? "OMDb works" : `OMDb: ${omdb.error}`);
+					}
+					if (store.has("dtdd")) {
+						const dtdd = await this.plugin.dtdd.test();
+						lines.push(dtdd.ok ? "DoesTheDogDie works" : `DoesTheDogDie: ${dtdd.error}`);
+					}
+
 					b.setDisabled(false).setButtonText("Test");
-					new Notice(result.ok ? "Reel: TMDB key works." : `Reel: ${result.error}`);
+					new Notice(`Reel: ${lines.join(" · ")}`, 8000);
 					describe();
 				})
 			);
