@@ -1,7 +1,7 @@
 {
   "id": "reel",
   "name": "Reel",
-  "version": "0.7.35",
+  "version": "0.7.36",
   "minAppVersion": "1.7.2",
   "description": "Track films and series with TMDB metadata. Poster library, reviews, episode ratings, personalised discovery, content filtering, Up Next and stats — all computed from frontmatter. Built for mobile.",
   "author": "Virus7976",
