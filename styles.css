@@ -4102,3 +4102,84 @@ input.reel-input {
 	display: flex;
 	gap: 8px;
 }
+
+/* ---------------- credit rows ---------------- */
+
+/*
+ * Director / Writer / Stars, directly under the overview where every
+ * reference app puts them. Names are buttons: dead text here was the gap.
+ */
+.reel-credit-rows {
+	margin-top: 16px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.reel-credit-row {
+	display: flex;
+	gap: 12px;
+	align-items: baseline;
+	padding: 9px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-small);
+}
+
+.reel-credit-row:last-child {
+	border-bottom: none;
+}
+
+.reel-credit-label {
+	flex: 0 0 5.5rem;
+	font-weight: 700;
+	color: var(--text-normal);
+}
+
+.reel-credit-names {
+	min-width: 0;
+}
+
+/* A button styled as a link: it navigates, so it should not look like a
+   control, but it must still be a real button for keyboard and assistive use. */
+.reel-credit-name {
+	background: none;
+	border: none;
+	box-shadow: none;
+	padding: 0;
+	margin: 0;
+	min-height: 0;
+	height: auto;
+	width: auto;
+	font-size: inherit;
+	font-family: inherit;
+	color: var(--link-color, var(--text-accent));
+	cursor: pointer;
+	text-align: left;
+}
+
+.reel-credit-name:hover {
+	text-decoration: underline;
+	background: none;
+	box-shadow: none;
+}
+
+.reel-credit-name:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+
+@media (max-width: 700px) {
+	/* Label above names — 5.5rem of a narrow screen left three stars
+	   wrapping one word per line. */
+	.reel-credit-row {
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.reel-credit-label {
+		flex: none;
+		font-size: var(--font-ui-smaller);
+		color: var(--text-faint);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+}

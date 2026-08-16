@@ -286,6 +286,14 @@ export class DetailScreen {
 		// it behind a tap made the screen feel emptier than it is.
 		if (cast.length) this.renderCastStrip(wrap, cast);
 
+		// Director / Writer / Stars as named, tappable rows.
+		//
+		// Every reference app puts these directly under the overview, and they
+		// were the most conspicuous thing missing: the director was a grey
+		// subtitle you could not tap, and writers appeared nowhere at all
+		// unless you opened the Crew tab and scrolled.
+		this.renderCreditRows(wrap, cast, crew, isTv);
+
 		const tabs: { id: string; label: string; render: (el: HTMLElement) => void }[] = [];
 
 		if (cast.length) tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
@@ -330,6 +338,51 @@ export class DetailScreen {
 			b.addEventListener("click", () => show(i));
 		});
 		show(0);
+	}
+
+	/**
+	 * Director / Writer / Stars, as named rows of tappable names.
+	 *
+	 * The three questions everyone asks about a title before anything else,
+	 * and each name opens that person's filmography rather than being dead
+	 * text. Grouped by job so "Screenplay" and "Story" collapse into one
+	 * Writer row instead of three near-identical lines.
+	 */
+	private renderCreditRows(wrap: HTMLElement, cast: TmdbCastMember[], crew: TmdbCrew[], isTv: boolean): void {
+		const pick = (...jobs: string[]) =>
+			crew.filter((c) => c.job && jobs.includes(c.job)).filter((c, i, all) => all.findIndex((x) => x.name === c.name) === i);
+
+		const rows: { label: string; people: (TmdbCastMember | TmdbCrew)[] }[] = [];
+
+		// A series is "created by"; only a film has a single director worth
+		// naming, since episodes each have their own.
+		if (isTv) {
+			const creators = pick("Creator", "Executive Producer").slice(0, 3);
+			if (creators.length) rows.push({ label: creators.length > 1 ? "Creators" : "Creator", people: creators });
+		} else {
+			const directors = pick("Director");
+			if (directors.length) rows.push({ label: directors.length > 1 ? "Directors" : "Director", people: directors });
+		}
+
+		const writers = pick("Screenplay", "Writer", "Story", "Author").slice(0, 4);
+		if (writers.length) rows.push({ label: writers.length > 1 ? "Writers" : "Writer", people: writers });
+
+		const stars = cast.slice(0, 3);
+		if (stars.length) rows.push({ label: "Stars", people: stars });
+
+		if (!rows.length) return;
+
+		const box = wrap.createDiv({ cls: "reel-credit-rows" });
+		for (const row of rows) {
+			const line = box.createDiv({ cls: "reel-credit-row" });
+			line.createSpan({ cls: "reel-credit-label", text: row.label });
+			const names = line.createSpan({ cls: "reel-credit-names" });
+			row.people.forEach((p, i) => {
+				if (i) names.createSpan({ cls: "reel-dim", text: " · " });
+				const a = names.createEl("button", { cls: "reel-credit-name", text: p.name, attr: { type: "button" } });
+				a.addEventListener("click", () => this.openPerson(p));
+			});
+		}
 	}
 
 	/**
