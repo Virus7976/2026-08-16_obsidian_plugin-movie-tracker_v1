@@ -2452,3 +2452,71 @@ input.reel-input {
 	justify-content: center;
 	padding: 0 22px;
 }
+
+/* ================================================================== *
+ * v0.7 — stats at phone width
+ * ================================================================== */
+
+/* The facts list is the most readable part of the stats page, and it was
+   the part being cut off: nowrap + ellipsis on a single-column phone turns
+   "Highest rated — The Shawshank Redemption 5★" into an ellipsis. Below the
+   two-column breakpoint the label sits above the value and the value wraps. */
+@media (max-width: 619px) {
+	.reel-fact {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+	}
+
+	.reel-fact-value {
+		text-align: left;
+		white-space: normal;
+		overflow: visible;
+		text-overflow: clip;
+		line-height: 1.4;
+	}
+
+	/* A label column of up to 8em on a 375px screen leaves the bar about
+	   150px — and the series-progress chart labels are film titles, so they
+	   were unreadable. Label on its own line, bar full width beneath. */
+	.reel-chart-row {
+		grid-template-columns: 1fr 3em;
+		grid-template-areas:
+			"label label"
+			"track value";
+		gap: 3px 8px;
+		min-height: 0;
+		padding-bottom: 8px;
+	}
+
+	.reel-chart-label {
+		grid-area: label;
+		white-space: normal;
+		overflow: visible;
+		color: var(--text-normal);
+	}
+
+	.reel-chart-track {
+		grid-area: track;
+	}
+
+	.reel-chart-value {
+		grid-area: value;
+	}
+}
+
+/* Tiles stay readable rather than squeezing three across on a narrow phone. */
+@media (max-width: 400px) {
+	.reel-tiles {
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+	}
+
+	.reel-tile {
+		padding: 10px;
+	}
+
+	.reel-tile-value {
+		font-size: 1.35em;
+	}
+}

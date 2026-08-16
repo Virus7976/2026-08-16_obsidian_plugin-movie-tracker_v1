@@ -271,7 +271,10 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = ""): void {
 	const body = box.createDiv({ cls: "reel-chart-body" });
 	for (const d of data) {
 		const row = body.createDiv({ cls: "reel-chart-row" });
-		row.createDiv({ cls: "reel-chart-label", text: d.label });
+		// Full text in a tooltip, since a truncated director or title is
+		// otherwise unrecoverable on desktop.
+		const label = row.createDiv({ cls: "reel-chart-label", text: d.label });
+		label.setAttr("title", d.label);
 		const track = row.createDiv({ cls: "reel-chart-track" });
 		track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
 		row.createDiv({ cls: "reel-chart-value", text: `${d.n}${suffix}` });
