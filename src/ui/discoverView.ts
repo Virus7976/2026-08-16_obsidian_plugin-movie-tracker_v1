@@ -41,6 +41,9 @@ export class DiscoverScreen {
 	private handled = new Set<number>();
 	private page = 1;
 	private exhausted = false;
+	/** One-at-a-time browsing, for when you want to move fast rather than skim. */
+	private quick = false;
+	private quickAt = 0;
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -74,8 +77,193 @@ export class DiscoverScreen {
 			return;
 		}
 
-		if (this.filtered) this.paintResults(container);
+		if (this.quick) this.paintQuick(container);
+		else if (this.filtered) this.paintResults(container);
 		else this.paintForYou(container);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Quick mode — one title at a time                                    */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * The same pool the rows draw from, flattened and de-duplicated.
+	 *
+	 * A title can appear in several rows — trending and your top genre often
+	 * overlap — and seeing it twice in a linear run reads as the queue being
+	 * stuck rather than as two separate recommendations.
+	 */
+	private quickPool(): TmdbSearchResult[] {
+		const source = this.filtered ? (this.results ?? []) : (this.rows ?? []).flatMap((r) => r.items);
+		const seen = new Set<number>();
+		const out: TmdbSearchResult[] = [];
+		for (const item of source) {
+			if (seen.has(item.id) || this.handled.has(item.id)) continue;
+			seen.add(item.id);
+			out.push(item);
+		}
+		return out;
+	}
+
+	private paintQuick(container: HTMLElement): void {
+		// Quick mode reads whatever the browsing mode already loaded, so
+		// entering it cold has to trigger the same fetch the rows would.
+		if (!this.filtered && !this.rows) {
+			void this.loadRows(container);
+			container.createDiv({ cls: "reel-loading", text: "Loading…", attr: { role: "status" } });
+			return;
+		}
+		if (this.filtered && !this.results) {
+			// The filtered fetch lives inside paintResults; letting it run
+			// re-renders when it lands, and this branch is gone by then.
+			this.paintResults(container);
+			return;
+		}
+
+		const pool = this.quickPool();
+		if (!pool.length) {
+			const done = container.createDiv({ cls: "reel-empty" });
+			done.createDiv({ text: "Nothing left in this queue." });
+			const back = done.createEl("button", { cls: "reel-btn mod-cta", text: "Back to rows" });
+			back.addEventListener("click", () => {
+				this.quick = false;
+				this.render(container);
+			});
+			return;
+		}
+
+		if (this.quickAt >= pool.length) this.quickAt = 0;
+		const item = pool[this.quickAt];
+		const isTv = item.media_type === "tv";
+		const title = (isTv ? item.name : item.title) ?? "Untitled";
+
+		const card = container.createDiv({ cls: "reel-quickcard" });
+
+		card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool.length}` });
+
+		const posterEl = card.createDiv({ cls: "reel-quickcard-poster" });
+		this.plugin.posters.attach(posterEl, {
+			posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? undefined,
+			title,
+		});
+		posterEl.addEventListener("click", () => new PreviewSheet(this.plugin, item, () => this.render(container)).open());
+
+		const head = card.createDiv({ cls: "reel-quickcard-head" });
+		head.createSpan({ cls: "reel-quickcard-title", text: title });
+		const year = yearOf(isTv ? item.first_air_date : item.release_date);
+		if (year) head.createSpan({ cls: "reel-dim", text: ` ${year}` });
+
+		const facts = card.createDiv({ cls: "reel-header-facts" });
+		facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+		if (item.vote_average) facts.createSpan({ cls: "reel-dim", text: `TMDB ${item.vote_average.toFixed(1)}` });
+
+		if (item.overview) card.createDiv({ cls: "reel-quickcard-overview", text: item.overview });
+
+		/* ---- actions ---- */
+		const step = (by: number) => {
+			this.quickAt = Math.max(0, this.quickAt + by);
+			this.render(container);
+		};
+
+		const actions = card.createDiv({ cls: "reel-quickcard-actions" });
+
+		const skip = actions.createEl("button", { cls: "reel-btn reel-quick-skip", text: "✕  Skip" });
+		skip.addEventListener("click", () => step(1));
+
+		const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+  Watchlist" });
+		later.addEventListener("click", () => void this.quickAdd(item, true, container));
+
+		const seen = actions.createEl("button", { cls: "reel-btn", text: "✓  Seen it" });
+		seen.addEventListener("click", () => void this.quickAdd(item, false, container));
+
+		const nav = card.createDiv({ cls: "reel-quickcard-nav" });
+		const prev = nav.createEl("button", { cls: "reel-btn", text: "‹ Back", attr: { type: "button" } });
+		prev.toggleClass("is-disabled", this.quickAt === 0);
+		prev.addEventListener("click", () => step(-1));
+		// "Not interested" is the one that persists — it removes a title from
+		// every future queue, where Skip only defers it to the next session.
+		const never = nav.createEl("button", { cls: "reel-btn", text: "Never show this", attr: { type: "button" } });
+		never.addEventListener("click", () => {
+			void this.plugin.discover.dismiss(item.id).then(() => {
+				this.handled.add(item.id);
+				this.render(container);
+			});
+		});
+
+		card.createDiv({
+			cls: "reel-dim reel-quickcard-hint",
+			text: "Swipe, or use ← and → on a keyboard.",
+		});
+
+		this.wireSwipe(card, step);
+
+		// Focusable so the arrow keys have somewhere to land on desktop. Only
+		// focused when already in quick mode, so entering the tab does not
+		// steal focus from the search box.
+		card.setAttr("tabindex", "0");
+		card.addEventListener("keydown", (ev: KeyboardEvent) => {
+			if (ev.key === "ArrowRight") {
+				ev.preventDefault();
+				step(1);
+			} else if (ev.key === "ArrowLeft") {
+				ev.preventDefault();
+				step(-1);
+			}
+		});
+		card.focus({ preventScroll: true });
+	}
+
+	/** Add from quick mode and advance, so one tap is the whole interaction. */
+	private async quickAdd(item: TmdbSearchResult, watchlist: boolean, container: HTMLElement): Promise<void> {
+		try {
+			await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist });
+			new Notice(watchlist ? "Added to your watchlist" : "Added as watched");
+			this.handled.add(item.id);
+			this.render(container);
+		} catch (e) {
+			new Notice(`Reel: ${redact(e)}`);
+		}
+	}
+
+	/**
+	 * Horizontal drag to move through the queue.
+	 *
+	 * Only acts when the gesture is clearly sideways: the card scrolls
+	 * vertically, and a swipe that stole every downward drag would make the
+	 * overview unreadable on a phone.
+	 */
+	private wireSwipe(card: HTMLElement, step: (by: number) => void): void {
+		let startX = 0;
+		let startY = 0;
+		let tracking = false;
+
+		card.addEventListener(
+			"touchstart",
+			(ev: TouchEvent) => {
+				const t = ev.touches[0];
+				if (!t) return;
+				startX = t.clientX;
+				startY = t.clientY;
+				tracking = true;
+			},
+			{ passive: true }
+		);
+
+		card.addEventListener(
+			"touchend",
+			(ev: TouchEvent) => {
+				if (!tracking) return;
+				tracking = false;
+				const t = ev.changedTouches[0];
+				if (!t) return;
+				const dx = t.clientX - startX;
+				const dy = t.clientY - startY;
+				// Comfortably horizontal, and far enough to be deliberate.
+				if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+				step(dx < 0 ? 1 : -1);
+			},
+			{ passive: true }
+		);
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -116,6 +304,15 @@ export class DiscoverScreen {
 		};
 		chip(row1, "Films", this.filters.type === "movie", () => setType("movie"));
 		chip(row1, "Series", this.filters.type === "tv", () => setType("tv"));
+
+		// Browsing mode, not a filter — it changes how the same pool is shown.
+		// Rows are for skimming a shelf; this is for getting through a lot of
+		// titles quickly without your eye having to re-find the buttons.
+		const quick = chip(row1, "Quick", this.quick, () => {
+			this.quick = !this.quick;
+			this.quickAt = 0;
+		});
+		quick.addClass("reel-chip-mode");
 
 		row1.createSpan({ cls: "reel-chip-sep", text: "·" });
 
