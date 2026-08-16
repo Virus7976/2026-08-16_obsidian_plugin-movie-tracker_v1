@@ -10,12 +10,17 @@
  * on the title, which the user is free to rename.
  */
 
-import { Notice, TFile, normalizePath } from "obsidian";
+import { Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type ReelPlugin from "./main";
 import { redact } from "./secrets";
+import { orphanedPosters } from "./util/prune";
 
 export class PosterStore {
 	constructor(private plugin: ReelPlugin) {}
+
+	/** Set while a backfill runs, so a second invocation stops the first. */
+	private cancelBackfill = false;
+	private backfilling = false;
 
 	private get folder(): string {
 		return normalizePath(this.plugin.settings.posterFolder);
@@ -122,15 +127,33 @@ export class PosterStore {
 
 	/** Backfill posters for entries that have none. Used by the repair command. */
 	async backfill(): Promise<number> {
+		// A second run is a request to stop, not to start another: a 500-title
+		// vault takes minutes, and there was no way to call it off.
+		if (this.backfilling) {
+			this.cancelBackfill = true;
+			return -1;
+		}
+		this.backfilling = true;
+		this.cancelBackfill = false;
 		let done = 0;
 		const missing = this.plugin.library
 			.all()
 			.filter((e) => !e.poster || !this.plugin.app.vault.getAbstractFileByPath(e.poster));
 
-		if (!missing.length) return 0;
-		const notice = new Notice(`Reel: fetching ${missing.length} posters…`, 0);
+		if (!missing.length) {
+			this.backfilling = false;
+			return 0;
+		}
+		// Persistent notice, so it has to carry progress — a frozen "fetching
+		// 500 posters" for two minutes is indistinguishable from a hang.
+		const notice = new Notice("", 0);
+		const progress = (i: number) =>
+			notice.setMessage(`Reel: poster ${i} of ${missing.length}… (run the command again to stop)`);
+		progress(0);
 		try {
-			for (const entry of missing) {
+			for (const [i, entry] of missing.entries()) {
+				if (this.cancelBackfill) break;
+				progress(i + 1);
 				const type = entry.type === "tv" ? "tv" : "film";
 				try {
 					const meta =
@@ -155,8 +178,49 @@ export class PosterStore {
 			}
 		} finally {
 			notice.hide();
+			this.backfilling = false;
+			this.cancelBackfill = false;
 		}
 		return done;
+	}
+
+	/**
+	 * Remove posters no longer referenced by any note.
+	 *
+	 * Deleting a film left its poster behind forever — the folder only ever
+	 * grew, which is the opposite of keeping everything tidy in its folders.
+	 * Files go to the system trash rather than being destroyed, because
+	 * guessing wrong about someone's vault should be undoable.
+	 */
+	async pruneOrphans(): Promise<number> {
+		const folder = this.plugin.app.vault.getAbstractFileByPath(normalizePath(this.folder));
+		if (!(folder instanceof TFolder)) return 0;
+
+		const entries = this.plugin.library.all();
+		const files = folder.children.filter((c): c is TFile => c instanceof TFile);
+
+		// The decision itself lives in util/prune.ts, where it is tested —
+		// including the case where an unbuilt index would otherwise mean
+		// "nothing is referenced, remove everything".
+		const doomed = new Set(
+			orphanedPosters({
+				files: files.map((f) => f.path),
+				referenced: entries.map((e) => e.poster),
+				libraryEmpty: entries.length === 0,
+			})
+		);
+
+		let removed = 0;
+		for (const file of files) {
+			if (!doomed.has(file.path)) continue;
+			try {
+				await this.plugin.app.fileManager.trashFile(file);
+				removed++;
+			} catch (e) {
+				console.warn("Reel: could not remove orphaned poster", file.path, redact(e));
+			}
+		}
+		return removed;
 	}
 }
 

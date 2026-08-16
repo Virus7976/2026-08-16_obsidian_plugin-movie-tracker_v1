@@ -595,6 +595,35 @@ export class ReelSettingTab extends PluginSettingTab {
 					})
 			);
 
+		// The command palette is a poor fit on a phone, and these are exactly
+		// the actions you reach for after deleting a few titles.
+		const posterCount = this.plugin.library.all().filter((e) => !!e.poster).length;
+		new Setting(el)
+			.setName("Posters")
+			.setDesc(`${posterCount} title${posterCount === 1 ? "" : "s"} have a cached poster.`)
+			.addButton((b) =>
+				b.setButtonText("Download missing").onClick(async () => {
+					const n = await this.plugin.posters.backfill();
+					if (n < 0) {
+						new Notice("Reel: stopping after the current poster.");
+						return;
+					}
+					new Notice(`Reel: cached ${n} poster${n === 1 ? "" : "s"}.`);
+					this.display();
+				})
+			)
+			.addButton((b) =>
+				b.setButtonText("Remove unused").onClick(async () => {
+					const n = await this.plugin.posters.pruneOrphans();
+					new Notice(
+						n === 0
+							? "Reel: no orphaned posters."
+							: `Reel: moved ${n} unused poster${n === 1 ? "" : "s"} to the trash.`
+					);
+					this.display();
+				})
+			);
+
 		new Setting(el)
 			.setName("Clear cached responses")
 			.addButton((b) =>

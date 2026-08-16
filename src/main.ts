@@ -305,7 +305,30 @@ export default class ReelPlugin extends Plugin {
 			callback: async () => {
 				try {
 					const n = await this.posters.backfill();
+					// -1 means this invocation asked a running backfill to stop,
+					// so reporting "cached -1 posters" would be nonsense.
+					if (n < 0) {
+						new Notice("Reel: stopping after the current poster.");
+						return;
+					}
 					new Notice(`Reel: cached ${n} poster${n === 1 ? "" : "s"}.`);
+				} catch (e) {
+					new Notice(`Reel: ${redact(e)}`);
+				}
+			},
+		});
+
+		this.addCommand({
+			id: "prune-posters",
+			name: "Remove posters for deleted titles",
+			callback: async () => {
+				try {
+					const n = await this.posters.pruneOrphans();
+					new Notice(
+						n === 0
+							? "Reel: no orphaned posters."
+							: `Reel: moved ${n} unused poster${n === 1 ? "" : "s"} to the trash.`
+					);
 				} catch (e) {
 					new Notice(`Reel: ${redact(e)}`);
 				}
