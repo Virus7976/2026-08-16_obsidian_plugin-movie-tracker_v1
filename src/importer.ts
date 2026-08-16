@@ -26,9 +26,8 @@
 
 import { Notice, TFile } from "obsidian";
 import type ReelPlugin from "./main";
-import { clampRating } from "./util/ratings";
-import { normaliseDate, yearOf } from "./util/dates";
 import { redact } from "./secrets";
+import { LEGACY_KEYS, convertLegacy, looksLegacy, scaleIsTen } from "./util/legacy";
 
 export interface ImportReport {
 	scanned: number;
@@ -36,41 +35,6 @@ export interface ImportReport {
 	skipped: number;
 	scaleHalved: boolean;
 	errors: string[];
-}
-
-/** Keys that mark a note as belonging to the old tracker. */
-function looksLegacy(fm: Record<string, unknown>): boolean {
-	if (fm.tmdb_id != null) return false; // already ours
-	return fm["TMDB ID"] != null || fm.Title != null || fm.Type != null;
-}
-
-function str(value: unknown): string | undefined {
-	if (value == null) return undefined;
-	const s = String(value).trim();
-	return s || undefined;
-}
-
-/** "Thriller, Crime" → ["Thriller", "Crime"]. Already-arrays pass through. */
-function splitList(value: unknown): string[] {
-	if (value == null) return [];
-	if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
-	return String(value)
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
-}
-
-/** "116 minutes" → 116. */
-function minutes(value: unknown): number | undefined {
-	if (value == null) return undefined;
-	const m = String(value).match(/(\d+)/);
-	return m ? parseInt(m[1], 10) : undefined;
-}
-
-function num(value: unknown): number | undefined {
-	if (value == null || value === "") return undefined;
-	const n = Number(value);
-	return Number.isFinite(n) ? n : undefined;
 }
 
 export class Importer {
@@ -97,9 +61,9 @@ export class Importer {
 		};
 		if (!found.length) return report;
 
-		// Decide the rating scale once, across every note.
-		const maxRating = found.reduce((max, { fm }) => Math.max(max, num(fm.Rating) ?? 0), 0);
-		report.scaleHalved = maxRating > 5;
+		// Decide the rating scale once, across every note — the same judgement
+		// applied per note would give one library two different scales.
+		report.scaleHalved = scaleIsTen(found.map(({ fm }) => fm.Rating));
 
 		const notice = new Notice(`Reel: converting ${found.length} notes…`, 0);
 		try {
@@ -121,108 +85,18 @@ export class Importer {
 	}
 
 	private async convert(file: TFile, halve: boolean): Promise<void> {
-		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
-			const isTv = /tv|series|show/i.test(String(fm.Type ?? ""));
-			const title = str(fm.Title) ?? file.basename;
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+			const fields = convertLegacy(fm, { halveRatings: halve });
 
-			fm.tmdb_id = num(fm["TMDB ID"]) ?? num(fm.tmdb_id);
-			fm.type = isTv ? "tv" : "film";
-			fm.title = title;
-
-			const released = normaliseDate(fm.release_date);
-			const year = yearOf(released);
-			if (year) {
-				if (isTv) fm.first_air_year = year;
-				else fm.year = year;
+			for (const [key, value] of Object.entries(fields)) {
+				// `undefined` means "remove", which is how the converter says a
+				// field ended up empty — writing it back would leave a null.
+				if (value === undefined) delete fm[key];
+				else fm[key] = value;
 			}
 
-			const director = splitList(fm.Director);
-			if (director.length) {
-				if (isTv) fm.creators = director;
-				else fm.director = director;
-			}
-
-			const cast = splitList(fm.Cast);
-			if (cast.length) fm.cast = cast;
-
-			const genres = splitList(fm.Genre);
-			if (genres.length) fm.genres = genres;
-
-			const runtime = minutes(fm.Duration);
-			if (runtime) {
-				if (isTv) fm.episode_runtime = runtime;
-				else fm.runtime = runtime;
-			}
-
-			const vote = num(fm["Avg vote"]);
-			if (vote != null) fm.tmdb_rating = Math.round(vote * 10) / 10;
-
-			const popularity = num(fm.Popularity);
-			if (popularity != null) fm.popularity = Math.round(popularity * 10) / 10;
-
-			const rating = num(fm.Rating);
-			if (rating != null && rating > 0) {
-				fm.rating = clampRating(halve ? rating / 2 : rating);
-			}
-
-			// Status vocabulary differs between the two apps.
-			const status = String(fm.Status ?? "").toLowerCase();
-			if (isTv) {
-				fm.status = status.includes("watchlist")
-					? "watchlist"
-					: status.includes("complet") || status.includes("watched")
-						? "completed"
-						: status.includes("drop")
-							? "dropped"
-							: "watching";
-			} else {
-				fm.status = status.includes("watchlist") ? "watchlist" : status.includes("abandon") ? "abandoned" : "watched";
-			}
-
-			// The old notes recorded no viewing dates, so a watch history can't
-			// be invented. One undated entry would be a fabricated fact; an
-			// empty array is honest, and the rating is preserved regardless.
-			if (!Array.isArray(fm.watched)) fm.watched = [];
-
-			const providers = splitList(fm["Available On"]);
-			if (providers.length) fm.providers = providers;
-
-			const companies = splitList(fm.production_company);
-			if (companies.length) fm.production_companies = companies;
-
-			const collection = str(fm.belongs_to_collection);
-			if (collection) fm.collection = collection;
-
-			for (const [from, to] of [
-				["overview", "overview"],
-				["trailer", "trailer"],
-				["budget", "budget"],
-				["revenue", "revenue"],
-				["original_language", "language"],
-			] as const) {
-				const value = fm[from];
-				if (value != null && value !== "") fm[to] = from === "budget" || from === "revenue" ? num(value) : str(value);
-			}
-
-			// The old Poster was a remote URL. Keep it — it still renders — and
-			// leave a note for the poster backfill to replace it with a local
-			// copy, which is what makes the library work offline.
-			const poster = str(fm.Poster);
-			if (poster && !str(fm.poster)) fm.poster_url = poster;
-
-			// Retire the old keys so the note has one schema rather than two.
-			for (const key of [
-				"Title", "Rating", "Status", "Type", "Poster", "Genre", "Duration",
-				"Avg vote", "Popularity", "Cast", "TMDB ID", "Director",
-				"belongs_to_collection", "production_company", "Available On", "original_language",
-			]) {
-				delete fm[key];
-			}
-
-			// `tags: "tvtracker, Movie"` is a string where Obsidian wants a list.
-			const tags = splitList(fm.tags).filter((t) => t.toLowerCase() !== "tvtracker");
-			if (tags.length) fm.tags = tags;
-			else delete fm.tags;
+			// Retire the old keys so the note carries one schema, not two.
+			for (const key of LEGACY_KEYS) delete fm[key];
 		});
 	}
 }

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations",
+    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy",
     "test:content": "esbuild tests/content.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.content.cjs --log-level=error && node tests/.content.cjs",
     "test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
     "test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
@@ -19,7 +19,8 @@
     "connect": "node scripts/connect.mjs",
     "install-local": "npm run build && node scripts/install.mjs",
     "push-to-vault": "node scripts/install.mjs",
-    "test:mutations": "esbuild tests/mutations.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.mutations.cjs --log-level=error && node tests/.mutations.cjs"
+    "test:mutations": "esbuild tests/mutations.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.mutations.cjs --log-level=error && node tests/.mutations.cjs",
+    "test:legacy": "esbuild tests/legacy.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.legacy.cjs --log-level=error && node tests/.legacy.cjs"
   },
   "keywords": [
     "obsidian",
