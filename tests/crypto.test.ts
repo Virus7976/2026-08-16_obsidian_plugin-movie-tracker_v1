@@ -30,7 +30,11 @@ function eq(actual: unknown, expected: unknown, label: string) {
 }
 
 async function main() {
-	const KEY = "eyJhbGciOiJIUzI1NiJ9.fake-tmdb-v4-read-token.9Zx1QQ";
+	// Deliberately not JWT-shaped. A literal `eyJ…` string here is not a secret,
+	// but it matches every scanner that looks for one — our own CI check, the
+	// pre-push hook, and GitHub's push protection. None of these assertions
+	// care about the shape, so the fixture doesn't need to imitate it.
+	const KEY = "tmdb-test-key-not-a-real-credential-000000";
 	const PASS = "correct horse battery";
 
 	/* ---- round trip ---- */
@@ -40,7 +44,7 @@ async function main() {
 	/* ---- the blob really is opaque ---- */
 	const serialised = JSON.stringify(blob);
 	ok(!serialised.includes(KEY), "ciphertext does not contain the plaintext");
-	ok(!serialised.includes("fake-tmdb"), "no plaintext fragment leaks into the blob");
+	ok(!serialised.includes("not-a-real-credential"), "no plaintext fragment leaks into the blob");
 	eq(blob.v, 1, "blob version");
 	eq(blob.kdf, "PBKDF2-SHA256", "kdf recorded");
 	ok(blob.iters >= 100_000, "iteration count is not weakened");
@@ -115,8 +119,8 @@ async function main() {
 	eq(redact("abc def"), "abc def", "short secrets are not guarded");
 
 	/* ---- masking ---- */
-	ok(!maskSecret(KEY).includes("fake-tmdb"), "mask hides the body");
-	ok(maskSecret(KEY).startsWith("eyJhbG"), "mask keeps a recognisable prefix");
+	ok(!maskSecret(KEY).includes("not-a-real-credential"), "mask hides the body");
+	ok(maskSecret(KEY).startsWith("tmdb-t"), "mask keeps a recognisable prefix");
 	eq(maskSecret("short"), "•••••", "short values are fully masked");
 	eq(maskSecret(""), "", "empty mask");
 

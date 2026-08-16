@@ -50,7 +50,7 @@ jobs:
             echo "::error::data.json is tracked — it holds the TMDB key."
             exit 1
           fi
-          if git grep -nE 'eyJhbGciOi[A-Za-z0-9._-]{20,}' -- ':!*.md' ':!.github'; then
+          if git grep -nE 'eyJhbGciOi[A-Za-z0-9._-]{20,}' -- ':!*.md' ':!.github' ':!tests'; then
             echo "::error::Something that looks like a TMDB v4 token is committed."
             exit 1
           fi
