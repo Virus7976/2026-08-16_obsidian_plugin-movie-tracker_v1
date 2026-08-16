@@ -190,18 +190,12 @@ export class PosterStore {
 	}
 
 	/**
-	 * Remove posters no longer referenced by any note.
+	 * Which cached posters are no longer referenced by any note.
 	 *
-	 * Deleting a film left its poster behind forever — the folder only ever
-	 * grew, which is the opposite of keeping everything tidy in its folders.
-	 * Files go to the system trash rather than being destroyed, because
-	 * guessing wrong about someone's vault should be undoable.
-	 */
-	/**
-	 * Which cached posters are no longer referenced.
-	 *
-	 * Separate from the removal so the count can be shown before anything is
-	 * deleted. A number you can check is the only warning you get.
+	 * Deleting a film used to leave its poster behind forever — the folder
+	 * only ever grew, which is the opposite of keeping everything tidy in its
+	 * folders. Kept separate from the removal so the count can be shown before
+	 * anything is deleted; a number you can check is the only warning you get.
 	 */
 	findOrphans(): TFile[] {
 		const folder = this.plugin.app.vault.getAbstractFileByPath(normalizePath(this.folder));

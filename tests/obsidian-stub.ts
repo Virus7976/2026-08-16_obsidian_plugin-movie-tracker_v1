@@ -57,7 +57,10 @@ export class TFile extends TAbstractFile {
 	stat = { ctime: 0, mtime: 0, size: 0 };
 }
 
-export class TFolder extends TAbstractFile {}
+export class TFolder extends TAbstractFile {
+	/** The plugin walks this to find orphaned posters; the stub lacked it. */
+	children: TAbstractFile[] = [];
+}
 
 export class Notice {
 	constructor(public message?: string) {}
