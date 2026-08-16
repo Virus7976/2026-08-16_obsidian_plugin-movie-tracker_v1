@@ -17,6 +17,9 @@ import {
 } from "../src/content";
 import { personLink, providerNames, trailerUrl, applyFields } from "../src/extract";
 import { parseQuery, applyQuery } from "../src/render/query";
+import { topicHolds, flagsFromTopics } from "../src/enrich";
+import { derive, applyDerived } from "../src/bases";
+import { parseBundle } from "../src/credentials";
 import type { Entry } from "../src/types";
 
 let pass = 0;
@@ -133,6 +136,63 @@ applyFields(fm, { content_flags: ["sex"], runtime: 116 }, { preserve: ["status"]
 eq(fm.content_flags, ["profanity", "sex"], "hand-added flags survive a refresh");
 eq(fm.runtime, 116, "new fields are written");
 eq(fm.status, "watched", "preserved fields are untouched");
+
+/* ---- DoesTheDogDie vote thresholds ---- */
+// A single stray vote must not flag a title. Without a floor, one person
+// clicking "yes" on an obscure film hides it from the whole library — the
+// failure that makes people switch a filter off and never trust it again.
+eq(topicHolds({ name: "Sex", yes: 1, no: 0 }), false, "one vote is not enough");
+eq(topicHolds({ name: "Sex", yes: 3, no: 0 }), true, "three agreeing votes hold");
+eq(topicHolds({ name: "Sex", yes: 2, no: 2 }), false, "a tie does not hold");
+eq(topicHolds({ name: "Sex", yes: 10, no: 40 }), false, "minority does not hold");
+eq(topicHolds({ name: "Sex", yes: 40, no: 10 }), true, "majority holds");
+eq(topicHolds({ name: "Sex", yes: 0, no: 0 }), false, "no votes at all");
+
+eq(flagsFromTopics([{ name: "Sexual content", yes: 9, no: 1 }]), ["sex"], "sexual content maps to sex");
+eq(flagsFromTopics([{ name: "Strong language", yes: 9, no: 1 }]), ["profanity"], "language maps to profanity");
+eq(flagsFromTopics([{ name: "Sexual content", yes: 1, no: 9 }]), [], "community says no, so no flag");
+eq(flagsFromTopics([]), [], "no topics, no flags");
+// Several topics can imply one flag; it must not be duplicated.
+eq(flagsFromTopics([{ name: "Blood", yes: 5, no: 0 }, { name: "Gore", yes: 5, no: 0 }]), ["gore"], "flags deduped");
+
+/* ---- Bases derived fields ---- */
+eq(derive({ type: "film", watched: [{ date: "2024-03-11" }, { date: "2025-01-02" }] }).watch_count, 2, "watch count");
+eq(derive({ type: "film", watched: [{ date: "2024-03-11" }, { date: "2025-01-02" }] }).last_watched_date, "2025-01-02", "newest viewing wins");
+eq(derive({ type: "film", watched: [] }).last_watched_date, undefined, "no viewings, no date");
+eq(derive({ type: "film", watched: [] }).progress, undefined, "a film has no progress");
+
+const show = derive({
+	type: "tv",
+	seasons: [{ watched: "1-7", total: 7 }, { watched: "1-4", total: 13 }],
+	totalEpisodes: 20,
+	lastWatched: { season: 2, episode: 4, date: "2026-08-12" },
+	firstAirYear: 2008,
+	poster: "Movies/_posters/tv-1396.jpg",
+});
+eq(show.progress, 55, "progress is 11 of 20");
+eq(show.last_watched_ep, "S2E4", "flat episode label");
+eq(show.last_watched_date, "2026-08-12", "flat date lifted out of the nested object");
+eq(show.year, 2008, "series year unified onto `year`");
+eq(show.poster_embed, "![[Movies/_posters/tv-1396.jpg]]", "poster as an embed for card covers");
+
+// Total unknown: report 0 rather than dividing by zero or inventing a number.
+eq(derive({ type: "tv", seasons: [{ watched: "1-3" }], totalEpisodes: 0 }).progress, 0, "unknown total gives 0");
+eq(derive({ type: "tv", seasons: [{ watched: "1-7", total: 7 }], totalEpisodes: 7 }).progress, 100, "complete show is 100");
+// Falls back to summing per-season totals when TMDB's count is missing.
+eq(derive({ type: "tv", seasons: [{ watched: "1-5", total: 10 }] }).progress, 50, "falls back to season totals");
+
+const stale: Record<string, unknown> = { progress: 40, last_watched_ep: "S3E4", watch_count: 2 };
+applyDerived(stale, derive({ type: "tv", seasons: [{ watched: "", total: 10 }], totalEpisodes: 10 }));
+eq(stale.progress, 0, "reset show drops to 0");
+eq(stale.last_watched_ep, undefined, "stale episode label is deleted, not left behind");
+
+/* ---- credential bundle migration ---- */
+// A pre-multi-key blob holds a bare token, not JSON. Reading it as an empty
+// bundle would silently lose the key the user already had.
+eq(parseBundle("eyJhbGciOiJIUzI1NiJ9.abc"), { tmdb: "eyJhbGciOiJIUzI1NiJ9.abc" }, "legacy bare token becomes the tmdb key");
+eq(parseBundle('{"tmdb":"a","omdb":"b"}'), { tmdb: "a", omdb: "b" }, "json bundle parses");
+eq(parseBundle('{"tmdb":"a","junk":"x"}'), { tmdb: "a" }, "unknown key names ignored");
+eq(parseBundle("{not json"), { tmdb: "{not json" }, "unparseable falls back to a bare token");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

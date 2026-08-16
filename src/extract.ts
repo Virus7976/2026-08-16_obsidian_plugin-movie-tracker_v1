@@ -116,6 +116,9 @@ export function filmFields(meta: TmdbFilm, opts: ExtractOptions): Record<string,
 
 	if (meta.release_date) out.release_date = meta.release_date;
 
+	const imdb = meta.external_ids?.imdb_id ?? meta.imdb_id;
+	if (imdb) out.imdb_id = imdb;
+
 	return out;
 }
 
@@ -161,7 +164,19 @@ export function showFields(meta: TmdbShow, opts: ExtractOptions): Record<string,
 
 	if (meta.next_episode_to_air?.air_date) out.next_air_date = meta.next_episode_to_air.air_date;
 
+	const imdb = meta.external_ids?.imdb_id;
+	if (imdb) out.imdb_id = imdb;
+
 	return out;
+}
+
+/** `tt0240772` → the IMDb page. Built rather than stored, so it can't go stale. */
+export function imdbUrl(imdbId: string | undefined): string | undefined {
+	return imdbId ? `https://www.imdb.com/title/${imdbId}/` : undefined;
+}
+
+export function tmdbUrl(tmdbId: number, type: string): string {
+	return `https://www.themoviedb.org/${type === "tv" ? "tv" : "movie"}/${tmdbId}`;
 }
 
 /**

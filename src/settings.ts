@@ -2,12 +2,17 @@ import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type ReelPlugin from "./main";
 import { KeyMode, SecretBlob, maskSecret } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
+import { KEY_LABELS, KeyBundle, KeyName } from "./credentials";
 
 export interface ReelSettings {
 	/* Credentials — see credentials.ts. Only one of keyPlain / keyBlob is ever set. */
 	keyMode: KeyMode;
-	keyPlain: string | null;
+	keysPlain: KeyBundle | null;
 	keyBlob: SecretBlob | null;
+	/** Which services are configured. Names aren't secret; values are. */
+	keyNames: KeyName[];
+	/** Fetch OMDb scores and DoesTheDogDie topics after creating a note. */
+	enrich: boolean;
 
 	/* Vault layout */
 	filmFolder: string;
@@ -45,8 +50,10 @@ export interface ReelSettings {
 
 export const DEFAULT_SETTINGS: ReelSettings = {
 	keyMode: "encrypted",
-	keyPlain: null,
+	keysPlain: null,
 	keyBlob: null,
+	keyNames: [],
+	enrich: true,
 
 	filmFolder: "Movies",
 	seriesFolder: "Series",
@@ -112,7 +119,7 @@ export class ReelSettingTab extends PluginSettingTab {
 	/* ---------------------------------------------------------------- */
 
 	private renderCredentials(el: HTMLElement): void {
-		new Setting(el).setName("TMDB access").setHeading();
+		new Setting(el).setName("API keys").setHeading();
 
 		const store = this.plugin.credentials;
 
@@ -123,17 +130,22 @@ export class ReelSettingTab extends PluginSettingTab {
 			if (s.keyMode === "session") {
 				status.createSpan({
 					cls: store.isUnlocked ? "reel-pill ok" : "reel-pill",
-					text: store.isUnlocked ? "Key held for this session" : "No key this session",
+					text: store.isUnlocked ? "Keys held for this session" : "No keys this session",
 				});
 			} else if (s.keyBlob) {
 				status.createSpan({
 					cls: store.isUnlocked ? "reel-pill ok" : "reel-pill",
 					text: store.isUnlocked ? "Unlocked" : "Encrypted — locked",
 				});
-			} else if (s.keyPlain) {
-				status.createSpan({ cls: "reel-pill warn", text: `Stored in plain text · ${maskSecret(s.keyPlain)}` });
+			} else if (s.keysPlain && Object.keys(s.keysPlain).length) {
+				const names = Object.keys(s.keysPlain).map((n) => KEY_LABELS[n as KeyName] ?? n);
+				status.createSpan({ cls: "reel-pill warn", text: `Plain text · ${names.join(", ")}` });
 			} else {
-				status.createSpan({ cls: "reel-pill warn", text: "No key set" });
+				status.createSpan({ cls: "reel-pill warn", text: "No keys set" });
+			}
+			// Which services are configured, regardless of lock state.
+			for (const name of ["tmdb", "omdb", "dtdd"] as KeyName[]) {
+				if (store.has(name)) status.createSpan({ cls: "reel-pill ok", text: KEY_LABELS[name] });
 			}
 		};
 		describe();
@@ -141,8 +153,8 @@ export class ReelSettingTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Key storage")
 			.setDesc(
-				"Where the TMDB key lives. Encrypted mode writes only salt, IV and ciphertext into the vault — " +
-					"safe to sync, useless without your passphrase."
+				"All three keys share one encrypted blob and one passphrase — three unlock prompts for one library " +
+					"screen would be intolerable, and splitting them buys nothing, since whatever can read one can read the rest."
 			)
 			.addDropdown((d) => {
 				(Object.keys(MODE_LABELS) as KeyMode[]).forEach((m) => d.addOption(m, MODE_LABELS[m]));
@@ -152,39 +164,74 @@ export class ReelSettingTab extends PluginSettingTab {
 				});
 			});
 
-		new Setting(el)
-			.setName("TMDB key or read access token")
-			.setDesc(
-				"A v4 read access token (starts with eyJ) is preferred — it travels in an Authorization header " +
-					"rather than the URL, so it can't end up in a log. A v3 API key also works."
-			)
-			.addText((t) => {
-				t.setPlaceholder("Paste key, then Save").inputEl.type = "password";
-				t.inputEl.autocomplete = "off";
-				t.inputEl.spellcheck = false;
-				t.inputEl.addClass("reel-input");
-				this.pendingKeyInput = t.inputEl;
-			})
-			.addButton((b) =>
-				b
-					.setButtonText("Save")
-					.setCta()
-					.onClick(async () => {
-						const value = this.pendingKeyInput?.value ?? "";
-						if (!value.trim()) {
-							new Notice("Reel: nothing to save.");
-							return;
-						}
-						const ok = await this.plugin.credentials.store(value);
-						if (this.pendingKeyInput) this.pendingKeyInput.value = "";
-						new Notice(ok ? "Reel: key saved." : "Reel: key not saved.");
+		const keyField = (name: KeyName, label: string, desc: string) => {
+			let input: HTMLInputElement | null = null;
+			const setting = new Setting(el)
+				.setName(label)
+				.setDesc(desc)
+				.addText((t) => {
+					t.setPlaceholder(store.has(name) ? "Saved — paste to replace" : "Paste key, then Save");
+					t.inputEl.type = "password";
+					t.inputEl.autocomplete = "off";
+					t.inputEl.spellcheck = false;
+					t.inputEl.addClass("reel-input");
+					input = t.inputEl;
+				})
+				.addButton((b) =>
+					b
+						.setButtonText("Save")
+						.setCta()
+						.onClick(async () => {
+							const value = input?.value ?? "";
+							if (!value.trim()) {
+								new Notice("Reel: nothing to save.");
+								return;
+							}
+							const ok = await this.plugin.credentials.store(name, value);
+							if (input) input.value = "";
+							new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
+							this.display();
+						})
+				);
+			if (store.has(name)) {
+				setting.addButton((b) =>
+					b.setButtonText("Remove").onClick(async () => {
+						await this.plugin.credentials.remove(name);
+						new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
 						this.display();
 					})
+				);
+			}
+		};
+
+		keyField(
+			"tmdb",
+			"TMDB key or read access token",
+			"Required. A v4 read access token (starts with eyJ) is preferred — it travels in an Authorization header rather than the URL, so it can't end up in a log."
+		);
+		keyField(
+			"omdb",
+			"OMDb key",
+			"Optional. Adds IMDb rating, Rotten Tomatoes and Metacritic. Free tier is 1,000 requests a day, which the response cache makes ample. omdbapi.com/apikey.aspx"
+		);
+		keyField(
+			"dtdd",
+			"DoesTheDogDie key",
+			"Optional, and the best available answer to content filtering — community votes per topic, so you can tell one scene from constant. Request a free key at doesthedogdie.com/api."
+		);
+
+		new Setting(el)
+			.setName("Enrich new notes automatically")
+			.setDesc("Fetch OMDb scores and DoesTheDogDie topics after adding a title. Runs after the note is written, so a slow service never delays it.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.enrich).onChange(async (v) => {
+					this.plugin.settings.enrich = v;
+					await this.plugin.saveSettings();
+				})
 			);
 
 		new Setting(el)
-			.setName("Test connection")
-			.setDesc("Makes one small request to TMDB to confirm the key works.")
+			.setName("Test TMDB connection")
 			.addButton((b) =>
 				b.setButtonText("Test").onClick(async () => {
 					b.setDisabled(true).setButtonText("Testing…");
@@ -195,27 +242,26 @@ export class ReelSettingTab extends PluginSettingTab {
 				})
 			);
 
-		if (this.plugin.settings.keyMode === "encrypted" && this.plugin.credentials.isUnlocked) {
+		if (this.plugin.settings.keyMode === "encrypted" && store.isUnlocked) {
 			new Setting(el)
 				.setName("Lock now")
-				.setDesc("Forget the decrypted key until the next unlock.")
+				.setDesc("Forget the decrypted keys until the next unlock.")
 				.addButton((b) =>
 					b.setButtonText("Lock").onClick(() => {
-						this.plugin.credentials.lock();
-						new Notice("Reel: key locked.");
+						store.lock();
+						new Notice("Reel: keys locked.");
 						this.display();
 					})
 				);
 		}
 
-		if (this.plugin.credentials.hasStoredKey) {
+		if (store.hasStoredKey) {
 			new Setting(el)
-				.setName("Remove key")
-				.setDesc("Deletes the stored key from this vault.")
+				.setName("Remove all keys")
 				.addButton((b) =>
-					b.setWarning().setButtonText("Remove").onClick(async () => {
-						await this.plugin.credentials.clear();
-						new Notice("Reel: key removed.");
+					b.setWarning().setButtonText("Remove all").onClick(async () => {
+						await store.clear();
+						new Notice("Reel: keys removed.");
 						this.display();
 					})
 				);
@@ -225,8 +271,8 @@ export class ReelSettingTab extends PluginSettingTab {
 			el.createDiv({
 				cls: "reel-callout warn",
 				text:
-					"Plain text mode writes your key readably into .obsidian/plugins/reel/data.json. " +
-					"If this vault is synced to git or a shared drive, treat the key as public.",
+					"Plain text mode writes your keys readably into .obsidian/plugins/reel/data.json. " +
+					"If this vault is synced to git or a shared drive, treat them as public.",
 			});
 		}
 	}

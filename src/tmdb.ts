@@ -153,7 +153,7 @@ export class TmdbClient {
 			`movie-${id}`,
 			() =>
 				this.request<TmdbFilm>(`/movie/${id}`, {
-					append_to_response: "credits,watch/providers,keywords,videos,release_dates",
+					append_to_response: "credits,watch/providers,keywords,videos,release_dates,external_ids",
 				}),
 			true // a released film's credits and runtime don't change
 		);
@@ -162,7 +162,7 @@ export class TmdbClient {
 	async getShow(id: number): Promise<TmdbShow> {
 		const fetcher = () =>
 			this.request<TmdbShow>(`/tv/${id}`, {
-				append_to_response: "aggregate_credits,watch/providers,keywords,videos,content_ratings",
+				append_to_response: "aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids",
 			});
 		// A returning series gains episodes, so its record must expire.
 		const cacheKey = `tv-${id}`;
@@ -261,6 +261,19 @@ export class TmdbClient {
 		} catch {
 			// Cache is an optimisation. Failing to write it must never fail the request.
 		}
+	}
+
+	/**
+	 * Cache access for the supplementary clients (OMDb, DoesTheDogDie), so
+	 * every network response in the plugin expires under one policy and one
+	 * "Clear cache" button rather than three parallel schemes.
+	 */
+	async readExternalCache<T>(key: string): Promise<T | null> {
+		return this.readCache<T>(key);
+	}
+
+	async writeExternalCache<T>(key: string, data: T, immutable: boolean): Promise<void> {
+		return this.writeCache(key, data, immutable);
 	}
 
 	async clearCache(): Promise<number> {

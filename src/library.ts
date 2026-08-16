@@ -260,7 +260,16 @@ function toEntry(file: TFile, fm: Record<string, unknown>, seriesFolder: string)
 		popularity: numberOrUndef(fm.popularity),
 		certification: fm.certification ? String(fm.certification) : undefined,
 		contentFlags: toStringArray(fm.content_flags),
+		contentTopics: toStringArray(fm.content_topics),
 		lists: toStringArray(fm.lists),
+		imdbId: fm.imdb_id ? String(fm.imdb_id) : undefined,
+		imdbRating: numberOrUndef(fm.imdb_rating),
+		metacritic: numberOrUndef(fm.metacritic),
+		rottenTomatoes: numberOrUndef(fm.rotten_tomatoes),
+		lastWatchedDate: normaliseDate(fm.last_watched_date),
+		lastWatchedEp: fm.last_watched_ep ? String(fm.last_watched_ep) : undefined,
+		progress: numberOrUndef(fm.progress),
+		watchCount: numberOrUndef(fm.watch_count) ?? (Array.isArray(fm.watched) ? fm.watched.length : 0),
 		// The real creation time, so `sort: added` is chronological rather than
 		// the alphabetical-by-path it used to silently be.
 		added: file.stat?.ctime ?? 0,

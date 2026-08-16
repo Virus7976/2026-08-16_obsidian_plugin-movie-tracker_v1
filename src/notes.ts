@@ -20,6 +20,8 @@ import { nextShowStatus } from "./util/status";
 import { normaliseDate, prettyDate, todayISO, yearOf } from "./util/dates";
 import type { Entry, SeasonProgress, TmdbFilm, TmdbShow, WatchEvent } from "./types";
 import { applyFields, filmFields, showFields, ExtractOptions } from "./extract";
+import { applyDerived, derive } from "./bases";
+import { topicHolds } from "./enrich";
 import { redact } from "./secrets";
 
 export interface LogPayload {
@@ -73,10 +75,14 @@ export class NoteWriter {
 				if (log.rating != null) fm.rating = clampRating(log.rating);
 			}
 			if (log.liked) fm.liked = true;
+			this.refreshDerived(fm);
 		});
 
 		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
 		await this.linkFromDailyNote(file);
+		// Enrichment runs after the note exists, so a slow or missing
+		// third-party service delays extra fields rather than the note itself.
+		void this.enrich(file, { title: meta.title, year, imdbId: str(meta.external_ids?.imdb_id ?? meta.imdb_id) });
 		return file;
 	}
 
@@ -99,10 +105,16 @@ export class NoteWriter {
 			fm.seasons = seasons.map((s) => ({ n: s.season_number, watched: "", total: s.episode_count ?? 0 }));
 			if (log.liked) fm.liked = true;
 			if (log.rating != null) fm.rating = clampRating(log.rating);
+			this.refreshDerived(fm);
 		});
 
 		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
 		await this.linkFromDailyNote(file);
+		void this.enrich(file, {
+			title: meta.name,
+			year: yearOf(meta.first_air_date),
+			imdbId: str(meta.external_ids?.imdb_id),
+		});
 		return file;
 	}
 
@@ -153,6 +165,7 @@ export class NoteWriter {
 			if (lastRated?.rating != null) fm.rating = lastRated.rating;
 			if (log.liked === true) fm.liked = true;
 			else if (log.liked === false) delete fm.liked;
+			this.refreshDerived(fm);
 		});
 
 		if (log.review?.trim()) await this.appendReview(file, log.date, log.rating, log.review);
@@ -172,6 +185,7 @@ export class NoteWriter {
 			fm.last_watched = { season, episode, date };
 			if (fm.status === "watchlist" || fm.status === "paused" || !fm.status) fm.status = "watching";
 			this.settleShowStatus(fm, seasons);
+			this.refreshDerived(fm);
 		});
 	}
 
@@ -185,6 +199,7 @@ export class NoteWriter {
 			if (furthest > 0) fm.last_watched = { season, episode: furthest, date };
 			if (rangeCount(range) > 0 && (fm.status === "watchlist" || !fm.status)) fm.status = "watching";
 			this.settleShowStatus(fm, seasons);
+			this.refreshDerived(fm);
 		});
 	}
 
@@ -213,6 +228,7 @@ export class NoteWriter {
 
 			fm.seasons = seasons;
 			this.settleShowStatus(fm, seasons);
+			this.refreshDerived(fm);
 		});
 	}
 
@@ -248,6 +264,80 @@ export class NoteWriter {
 			fm.seasons = seasons;
 			delete fm.last_watched;
 			fm.status = "watching";
+			this.refreshDerived(fm);
+		});
+	}
+
+	/**
+	 * Recompute the flattened Bases properties from whatever the frontmatter
+	 * now says. Called at the end of every mutation that could move them —
+	 * the single place they're kept in step with the real data.
+	 */
+	private refreshDerived(fm: Record<string, unknown>): void {
+		applyDerived(
+			fm,
+			derive({
+				type: String(fm.type ?? "film"),
+				seasons: (Array.isArray(fm.seasons) ? fm.seasons : []) as { watched?: string; total?: number }[],
+				watched: (Array.isArray(fm.watched) ? fm.watched : []) as { date?: unknown }[],
+				totalEpisodes: Number(fm.total_episodes ?? 0) || undefined,
+				lastWatched: (fm.last_watched ?? null) as { season?: number; episode?: number; date?: unknown } | null,
+				year: Number(fm.year ?? 0) || undefined,
+				firstAirYear: Number(fm.first_air_year ?? 0) || undefined,
+				poster: fm.poster ? String(fm.poster) : undefined,
+			})
+		);
+	}
+
+	/**
+	 * Fetch OMDb scores and DoesTheDogDie topics, then merge them in.
+	 *
+	 * Optional and failure-tolerant by design: a missing key, a service outage
+	 * or a title neither database knows leaves the note exactly as TMDB
+	 * described it. Enrichment must never be able to fail note creation.
+	 */
+	async enrich(file: TFile, opts: { title: string; year?: number; imdbId?: string }): Promise<void> {
+		const jobs: Promise<void>[] = [];
+		const patch: Record<string, unknown> = {};
+
+		if (opts.imdbId && this.plugin.credentials.has("omdb")) {
+			jobs.push(
+				this.plugin.omdb.fetchScores(opts.imdbId).then((scores) => {
+					if (!scores) return;
+					if (scores.imdbRating != null) patch.imdb_rating = scores.imdbRating;
+					if (scores.metacritic != null) patch.metacritic = scores.metacritic;
+					if (scores.rottenTomatoes != null) patch.rotten_tomatoes = scores.rottenTomatoes;
+					if (scores.rated && !patch.certification) patch.certification_omdb = scores.rated;
+				})
+			);
+		}
+
+		let topics: string[] = [];
+		let dtddFlags: string[] = [];
+		if (this.plugin.credentials.has("dtdd")) {
+			jobs.push(
+				this.plugin.dtdd.fetchByTitle(opts.title, opts.year).then((result) => {
+					if (!result) return;
+					dtddFlags = result.flags;
+					topics = result.topics.filter(topicHolds).map((t) => t.name).sort();
+				})
+			);
+		}
+
+		await Promise.all(jobs);
+		if (!Object.keys(patch).length && !topics.length && !dtddFlags.length) return;
+
+		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+			Object.assign(fm, patch);
+			if (topics.length) fm.content_topics = topics;
+			if (dtddFlags.length) {
+				// Union with what TMDB keywords implied and with anything you
+				// added by hand. DTDD is better evidence, but it is not the
+				// only evidence, and it must not erase your own edits.
+				const existing: string[] = Array.isArray(fm.content_flags) ? fm.content_flags.map(String) : [];
+				fm.content_flags = [...new Set([...existing, ...dtddFlags])].sort();
+			}
+			this.refreshDerived(fm);
 		});
 	}
 
@@ -380,6 +470,7 @@ export class NoteWriter {
 				known.sort((a, b) => Number(a.n) - Number(b.n));
 				fm.seasons = known;
 				this.settleShowStatus(fm, known);
+				this.refreshDerived(fm);
 			});
 		} else {
 			const meta = await this.plugin.tmdb.getFilm(entry.tmdbId);
@@ -387,6 +478,7 @@ export class NoteWriter {
 			await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
 				applyFields(fm, filmFields(meta, this.extractOpts), { preserve });
 				if (poster && !fm.poster) fm.poster = poster;
+				this.refreshDerived(fm);
 			});
 		}
 	}
@@ -491,6 +583,13 @@ export class NoteWriter {
 		}
 		return candidate;
 	}
+}
+
+/** Nullable-to-undefined, since TMDB returns `null` for a missing imdb_id. */
+function str(value: unknown): string | undefined {
+	if (value == null) return undefined;
+	const s = String(value).trim();
+	return s || undefined;
 }
 
 /** Strip characters no filesystem — Windows included — will accept. */

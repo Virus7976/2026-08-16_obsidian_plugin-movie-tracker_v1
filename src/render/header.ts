@@ -16,6 +16,7 @@ import { renderStarsStatic } from "../ui/stars";
 import { LogSheet } from "../ui/logSheet";
 import { SeasonSheet } from "../ui/seasonSheet";
 import { ListPicker } from "../ui/listPicker";
+import { imdbUrl, tmdbUrl } from "../extract";
 import { unlink } from "../library";
 import { ContentFlag, FLAG_LABELS } from "../content";
 
@@ -91,6 +92,21 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 	const year = entry.year ?? entry.firstAirYear;
 	if (year) titleRow.createSpan({ cls: "reel-dim", text: ` ${year}` });
 
+	/* External scores. One row, four sources, each labelled — the label is what
+	   makes 87 (Metacritic, out of 100) and 8.7 (IMDb, out of 10) legible side
+	   by side. Sources with no data are omitted rather than shown as dashes. */
+	const scores = body.createDiv({ cls: "reel-scores" });
+	const score = (label: string, value: string, cls: string) => {
+		const chip = scores.createDiv({ cls: `reel-score ${cls}` });
+		chip.createDiv({ cls: "reel-score-value", text: value });
+		chip.createDiv({ cls: "reel-score-label", text: label });
+	};
+	if (entry.rating != null) score("You", String(entry.rating), "mine");
+	if (entry.imdbRating != null) score("IMDb", entry.imdbRating.toFixed(1), "imdb");
+	if (entry.metacritic != null) score("Metacritic", String(entry.metacritic), metacriticClass(entry.metacritic));
+	if (entry.rottenTomatoes != null) score("Tomatoes", `${entry.rottenTomatoes}%`, entry.rottenTomatoes >= 60 ? "fresh" : "rotten");
+	if (!scores.childElementCount) scores.remove();
+
 	const facts = body.createDiv({ cls: "reel-header-facts" });
 	const people = entry.type === "tv" ? entry.creators : entry.director;
 	if (people.length) facts.createSpan({ text: people.join(", ") });
@@ -125,6 +141,15 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 		flags.createSpan({ cls: "reel-dim", text: "Contains: " });
 		for (const f of entry.contentFlags) {
 			flags.createSpan({ cls: "reel-badge flag", text: FLAG_LABELS[f as ContentFlag] ?? f });
+		}
+		// The specific topics behind the flags, when DoesTheDogDie supplied
+		// them — collapsed, because there can be a dozen and they're detail
+		// you want on demand rather than in your face above every review.
+		if (entry.contentTopics.length) {
+			const details = body.createEl("details", { cls: "reel-topics" });
+			details.createEl("summary", { text: `${entry.contentTopics.length} content notes` });
+			const list = details.createDiv({ cls: "reel-topic-list" });
+			for (const t of entry.contentTopics) list.createSpan({ cls: "reel-chip static", text: t });
 		}
 	}
 
@@ -190,11 +215,31 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 
 	act("Lists", () => new ListPicker(plugin.app, plugin, entry, file).open());
 
-	if (entry.trailer) {
-		act("Trailer", () => window.open(entry.trailer, "_blank"));
-	}
-
-	act("Refresh from TMDB", async () => {
+	act("Refresh", async () => {
 		await plugin.notes.refreshMetadata(entry);
 	});
+
+	/* External links, kept apart from the actions.
+	   Actions change your vault; links leave the app. Mixing them means an
+	   accidental tap on "Trailer" sits next to one that edits your data, so
+	   they get their own row and their own visual weight. */
+	const links = body.createDiv({ cls: "reel-links" });
+	const link = (label: string, url: string, cls: string) => {
+		const a = links.createEl("a", { cls: `reel-link ${cls}`, text: label, href: url });
+		a.setAttr("target", "_blank");
+		a.setAttr("rel", "noopener");
+	};
+
+	if (entry.trailer) link("▶ Trailer", entry.trailer, "trailer");
+	const imdb = imdbUrl(entry.imdbId);
+	if (imdb) link("IMDb", imdb, "imdb");
+	link("TMDB", tmdbUrl(entry.tmdbId, entry.type), "tmdb");
+	if (!links.childElementCount) links.remove();
+}
+
+/** Metacritic's own bands: 61+ favourable, 40–60 mixed, below 40 unfavourable. */
+function metacriticClass(score: number): string {
+	if (score >= 61) return "meta-good";
+	if (score >= 40) return "meta-mixed";
+	return "meta-bad";
 }

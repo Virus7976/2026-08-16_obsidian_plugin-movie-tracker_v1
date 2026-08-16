@@ -1428,3 +1428,130 @@ input.reel-input {
 	border-bottom: none;
 	padding-bottom: 0;
 }
+
+/* ================================================================== *
+ * v0.3 — external scores, links, content topics
+ * ================================================================== */
+
+/* Score chips. Each carries its own label, because 87 (Metacritic, /100)
+   and 8.7 (IMDb, /10) are otherwise indistinguishable at a glance. */
+.reel-scores {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 2px 0;
+}
+
+.reel-score {
+	min-width: 52px;
+	padding: 4px 8px;
+	border-radius: 6px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	text-align: center;
+	line-height: 1.15;
+}
+
+.reel-score-value {
+	font-size: var(--font-ui-medium);
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-score-label {
+	font-size: 10px;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.reel-score.mine {
+	border-color: var(--interactive-accent);
+}
+
+.reel-score.mine .reel-score-value {
+	color: var(--text-accent);
+}
+
+.reel-score.imdb .reel-score-value {
+	color: var(--color-yellow, var(--text-normal));
+}
+
+/* Metacritic's own bands: 61+ favourable, 40–60 mixed, under 40 not. */
+.reel-score.meta-good .reel-score-value {
+	color: var(--color-green);
+}
+
+.reel-score.meta-mixed .reel-score-value {
+	color: var(--color-yellow);
+}
+
+.reel-score.meta-bad .reel-score-value {
+	color: var(--color-red);
+}
+
+.reel-score.fresh .reel-score-value {
+	color: var(--color-red);
+}
+
+.reel-score.rotten .reel-score-value {
+	color: var(--color-green);
+}
+
+/* Links leave the app; actions change your vault. Different row, different
+   weight, so a stray tap can't confuse the two. */
+.reel-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 6px;
+	padding-top: 8px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.reel-link {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	text-decoration: none;
+	min-height: 32px;
+	display: inline-flex;
+	align-items: center;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-link:hover,
+.reel-link:active {
+	color: var(--text-accent);
+	text-decoration: underline;
+}
+
+.reel-link.trailer {
+	color: var(--text-accent);
+	font-weight: 600;
+}
+
+.reel-topics {
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-topics summary {
+	color: var(--text-muted);
+	cursor: pointer;
+	min-height: 32px;
+	display: flex;
+	align-items: center;
+}
+
+.reel-topic-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 6px 0;
+}
+
+.reel-topic-list .reel-chip {
+	min-height: 26px;
+	font-size: 11px;
+	padding: 0 9px;
+	white-space: normal;
+}

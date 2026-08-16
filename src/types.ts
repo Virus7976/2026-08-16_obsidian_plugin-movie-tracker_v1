@@ -77,9 +77,24 @@ export interface Entry {
 	popularity?: number;
 	certification?: string;
 	contentFlags: string[];
+	contentTopics: string[];
 	lists: string[];
+	/** External scores */
+	imdbId?: string;
+	imdbRating?: number;
+	metacritic?: number;
+	rottenTomatoes?: number;
 	/** File creation time, so `sort: added` means something. */
 	added: number;
+	/* ---- Flattened for Obsidian Bases ------------------------------- *
+	 * Bases reads frontmatter properties directly and cannot reach into a
+	 * nested object or derive a value, so anything worth sorting or grouping
+	 * on has to exist as a top-level scalar. These are all derived — written
+	 * down rather than computed at read time, purely so Bases can see them. */
+	lastWatchedDate?: string;
+	lastWatchedEp?: string;
+	progress?: number;
+	watchCount: number;
 }
 
 /* ---------- TMDB response subsets (only the fields we actually read) ---------- */
@@ -131,6 +146,8 @@ export interface TmdbFilm {
 	keywords?: { keywords?: { name: string }[] };
 	videos?: { results?: TmdbVideo[] };
 	release_dates?: unknown;
+	external_ids?: { imdb_id?: string | null };
+	imdb_id?: string | null;
 	"watch/providers"?: TmdbProviderBlock;
 }
 
@@ -162,6 +179,7 @@ export interface TmdbShow {
 	keywords?: { results?: { name: string }[] };
 	videos?: { results?: TmdbVideo[] };
 	content_ratings?: unknown;
+	external_ids?: { imdb_id?: string | null };
 	"watch/providers"?: TmdbProviderBlock;
 }
 

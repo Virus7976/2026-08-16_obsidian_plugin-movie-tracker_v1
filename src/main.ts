@@ -6,6 +6,8 @@ import { Library } from "./library";
 import { NoteWriter } from "./notes";
 import { PosterStore } from "./posters";
 import { Importer } from "./importer";
+import { DtddClient, OmdbClient } from "./enrich";
+import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
 import { LogSheet } from "./ui/logSheet";
 import { SeasonSheet } from "./ui/seasonSheet";
@@ -44,6 +46,8 @@ export default class ReelPlugin extends Plugin {
 	posters!: PosterStore;
 	upNext!: UpNextService;
 	importer!: Importer;
+	omdb!: OmdbClient;
+	dtdd!: DtddClient;
 
 	private lastHidden = 0;
 
@@ -57,6 +61,8 @@ export default class ReelPlugin extends Plugin {
 		this.posters = new PosterStore(this);
 		this.upNext = new UpNextService(this);
 		this.importer = new Importer(this);
+		this.omdb = new OmdbClient(this);
+		this.dtdd = new DtddClient(this);
 
 		addIcon("reel", REEL_ICON);
 
@@ -297,13 +303,88 @@ export default class ReelPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "enrich-current",
+			name: "Fetch ratings and content notes for this title",
+			checkCallback: (checking) =>
+				this.withEntry(checking, (entry, file) => {
+					void this.notes
+						.enrich(file, { title: entry.title, year: entry.year ?? entry.firstAirYear, imdbId: entry.imdbId })
+						.then(() => new Notice("Reel: enrichment done."))
+						.catch((e) => new Notice(`Reel: ${redact(e)}`));
+				}),
+		});
+
+		this.addCommand({
+			id: "enrich-all",
+			name: "Fetch ratings and content notes for the whole library",
+			callback: async () => {
+				const rows = this.library.all().filter((e) => e.imdbRating == null || !e.contentTopics.length);
+				if (!rows.length) {
+					new Notice("Reel: everything is already enriched.");
+					return;
+				}
+				const notice = new Notice(`Reel: enriching ${rows.length} titles…`, 0);
+				let done = 0;
+				try {
+					for (const entry of rows) {
+						const file = this.app.vault.getAbstractFileByPath(entry.path);
+						if (!(file instanceof TFile)) continue;
+						try {
+							await this.notes.enrich(file, {
+								title: entry.title,
+								year: entry.year ?? entry.firstAirYear,
+								imdbId: entry.imdbId,
+							});
+							done++;
+						} catch (e) {
+							console.warn("Reel: enrich skipped", entry.title, redact(e));
+						}
+						// Both services are free tiers; pace accordingly.
+						await new Promise((r) => window.setTimeout(r, 350));
+					}
+				} finally {
+					notice.hide();
+				}
+				new Notice(`Reel: enriched ${done} of ${rows.length}.`);
+			},
+		});
+
+		this.addCommand({
+			id: "create-bases",
+			name: "Create starter Bases views",
+			callback: async () => {
+				const folder = `${this.settings.filmFolder}/Bases`;
+				try {
+					await this.notes.ensureFolder(folder);
+					let written = 0;
+					for (const base of STARTER_BASES) {
+						const path = `${folder}/${base.name}`;
+						// Never overwrite — these are meant to be edited, and
+						// clobbering a view you tuned would be worse than
+						// skipping one that already exists.
+						if (this.app.vault.getAbstractFileByPath(path)) continue;
+						await this.app.vault.create(path, base.content);
+						written++;
+					}
+					new Notice(
+						written
+							? `Reel: created ${written} Bases view${written === 1 ? "" : "s"} in ${folder}.`
+							: "Reel: those Bases views already exist — nothing overwritten."
+					);
+				} catch (e) {
+					new Notice(`Reel: ${redact(e)}`);
+				}
+			},
+		});
+
+		this.addCommand({
 			id: "lock-key",
-			name: "Lock the TMDB key",
+			name: "Lock the API keys",
 			checkCallback: (checking) => {
 				if (!this.credentials.isUnlocked) return false;
 				if (!checking) {
 					this.credentials.lock();
-					new Notice("Reel: key locked.");
+					new Notice("Reel: keys locked.");
 				}
 				return true;
 			},

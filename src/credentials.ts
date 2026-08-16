@@ -1,10 +1,14 @@
 /**
- * The runtime holder for the TMDB credential.
+ * Runtime holder for every API credential.
  *
- * Nothing outside this file ever touches the plaintext key except `tmdb.ts`,
- * which asks for it per request and never stores it. The plaintext lives in one
- * private field, is registered with `guardSecret` so it can be redacted out of
- * errors, and is dropped on unload.
+ * Reel now talks to three services — TMDB, OMDb and DoesTheDogDie — so this
+ * holds a *map* of keys rather than one. They share a single encrypted blob and
+ * therefore a single passphrase: three separate unlock prompts for one library
+ * screen would be intolerable, and splitting them buys no real security, since
+ * anything that can read one can read the others.
+ *
+ * Plaintext lives in one private field, is registered with `guardSecret` so it
+ * can be scrubbed from errors, and is dropped on unload.
  */
 
 import { Notice } from "obsidian";
@@ -20,17 +24,26 @@ import {
 } from "./secrets";
 import { PassphraseModal } from "./ui/passphraseModal";
 
+export type KeyName = "tmdb" | "omdb" | "dtdd";
+
+export const KEY_LABELS: Record<KeyName, string> = {
+	tmdb: "TMDB",
+	omdb: "OMDb",
+	dtdd: "DoesTheDogDie",
+};
+
+export type KeyBundle = Partial<Record<KeyName, string>>;
+
 export class MissingKeyError extends Error {
-	constructor(msg = "No TMDB key. Add one in Settings → Reel.") {
-		super(msg);
+	constructor(readonly key: KeyName = "tmdb", msg?: string) {
+		super(msg ?? `No ${KEY_LABELS[key]} key. Add one in Settings → Reel.`);
 		this.name = "MissingKeyError";
 	}
 }
 
 export class CredentialStore {
-	private plaintext: string | null = null;
-	/** De-duplicates concurrent unlock prompts — the grid can fire many requests at once. */
-	private pending: Promise<string> | null = null;
+	private plaintext: KeyBundle | null = null;
+	private pending: Promise<KeyBundle> | null = null;
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -38,180 +51,231 @@ export class CredentialStore {
 		return this.plugin.settings.keyMode;
 	}
 
-	/** True if a key is available right now without prompting. */
 	get isUnlocked(): boolean {
 		return !!this.plaintext;
 	}
 
-	/** True if there is *something* stored, locked or not. */
 	get hasStoredKey(): boolean {
 		const s = this.plugin.settings;
-		return !!(s.keyPlain || s.keyBlob);
+		return !!(s.keyBlob || (s.keysPlain && Object.keys(s.keysPlain).length));
 	}
 
-	/**
-	 * Resolve the key, prompting if needed. Every TMDB call goes through here.
-	 * Concurrent callers share one prompt.
-	 */
-	async get(): Promise<string> {
+	/** Is a given service configured? Answerable without unlocking. */
+	has(name: KeyName): boolean {
+		const s = this.plugin.settings;
+		if (this.plaintext) return !!this.plaintext[name];
+		if (s.keysPlain?.[name]) return true;
+		// Encrypted mode can't know without unlocking, so we track which names
+		// were stored alongside the blob. Names are not secret; values are.
+		return s.keyNames?.includes(name) ?? false;
+	}
+
+	/** Resolve one key, prompting if needed. Concurrent callers share a prompt. */
+	async get(name: KeyName = "tmdb"): Promise<string> {
+		const bundle = await this.bundle();
+		const value = bundle[name];
+		if (!value) throw new MissingKeyError(name);
+		return value;
+	}
+
+	/** Resolve a key, or null if it isn't configured — for optional services. */
+	async getOptional(name: KeyName): Promise<string | null> {
+		if (!this.has(name)) return null;
+		try {
+			return await this.get(name);
+		} catch {
+			return null;
+		}
+	}
+
+	private async bundle(): Promise<KeyBundle> {
 		if (this.plaintext) return this.plaintext;
 		if (this.pending) return this.pending;
-
 		this.pending = this.resolve().finally(() => {
 			this.pending = null;
 		});
 		return this.pending;
 	}
 
-	private async resolve(): Promise<string> {
+	private async resolve(): Promise<KeyBundle> {
 		const s = this.plugin.settings;
 
 		if (s.keyMode === "plain") {
-			if (!s.keyPlain) throw new MissingKeyError();
-			return this.adopt(s.keyPlain);
+			if (!s.keysPlain || !Object.keys(s.keysPlain).length) throw new MissingKeyError();
+			return this.adopt(s.keysPlain);
 		}
 
 		if (s.keyMode === "session") {
 			const entered = await PassphraseModal.prompt(this.plugin.app, {
 				title: "TMDB key",
-				body: "Session-only storage: the key is held in memory until Obsidian restarts, and never written to disk.",
+				body: "Session-only storage: keys are held in memory until Obsidian restarts, and never written to disk.",
 				placeholder: "Paste your TMDB key or read access token",
 				cta: "Use key",
 			});
-			if (!entered) throw new MissingKeyError("Cancelled — no key entered.");
-			return this.adopt(entered);
+			if (!entered) throw new MissingKeyError("tmdb", "Cancelled — no key entered.");
+			return this.adopt({ tmdb: entered.trim() });
 		}
 
-		// encrypted
 		if (!s.keyBlob) throw new MissingKeyError();
 		for (let attempt = 0; attempt < 3; attempt++) {
 			const pass = await PassphraseModal.prompt(this.plugin.app, {
-				title: "Unlock TMDB key",
+				title: "Unlock API keys",
 				body:
 					attempt === 0
-						? "Your key is encrypted in this vault. Enter the passphrase to unlock it for this session."
+						? "Your keys are encrypted in this vault. Enter the passphrase to unlock them for this session."
 						: "That didn't work. Try again.",
 				placeholder: "Passphrase",
 				cta: "Unlock",
 				password: true,
 			});
-			if (!pass) throw new MissingKeyError("Cancelled — key stays locked.");
+			if (!pass) throw new MissingKeyError("tmdb", "Cancelled — keys stay locked.");
 			try {
-				const key = await decryptSecret(s.keyBlob, pass);
-				return this.adopt(key);
+				const decrypted = await decryptSecret(s.keyBlob, pass);
+				return this.adopt(parseBundle(decrypted));
 			} catch (e) {
 				if (!(e instanceof WrongPassphraseError)) throw e;
 			}
 		}
-		throw new MissingKeyError("Too many failed attempts. Key stays locked.");
+		throw new MissingKeyError("tmdb", "Too many failed attempts. Keys stay locked.");
 	}
 
-	private adopt(key: string): string {
-		const trimmed = key.trim();
-		this.plaintext = trimmed;
-		guardSecret(trimmed);
-		return trimmed;
+	private adopt(bundle: KeyBundle): KeyBundle {
+		const clean: KeyBundle = {};
+		for (const [k, v] of Object.entries(bundle)) {
+			const trimmed = String(v).trim();
+			if (!trimmed) continue;
+			clean[k as KeyName] = trimmed;
+			guardSecret(trimmed);
+		}
+		this.plaintext = clean;
+		return clean;
 	}
 
 	/**
-	 * Store a new key under the current mode. Returns false if the user
-	 * cancelled the passphrase prompt in encrypted mode.
+	 * Store or replace one key, keeping the others. Returns false if the user
+	 * cancelled the passphrase prompt.
 	 */
-	async store(key: string): Promise<boolean> {
+	async store(name: KeyName, key: string): Promise<boolean> {
 		const trimmed = key.trim();
 		if (!trimmed) return false;
 		const s = this.plugin.settings;
 
-		if (s.keyMode === "plain") {
-			s.keyPlain = trimmed;
+		// Start from whatever is already held, so setting OMDb doesn't drop TMDB.
+		let existing: KeyBundle = {};
+		if (this.plaintext) existing = { ...this.plaintext };
+		else if (this.hasStoredKey) {
+			try {
+				existing = { ...(await this.bundle()) };
+			} catch {
+				return false; // couldn't unlock; refuse rather than overwrite
+			}
+		}
+		const next: KeyBundle = { ...existing, [name]: trimmed };
+
+		return this.writeBundle(next, s.keyMode);
+	}
+
+	async remove(name: KeyName): Promise<void> {
+		let existing: KeyBundle = {};
+		if (this.plaintext) existing = { ...this.plaintext };
+		else if (this.hasStoredKey) {
+			try {
+				existing = { ...(await this.bundle()) };
+			} catch {
+				return;
+			}
+		}
+		delete existing[name];
+		await this.writeBundle(existing, this.plugin.settings.keyMode);
+	}
+
+	private async writeBundle(bundle: KeyBundle, mode: KeyMode): Promise<boolean> {
+		const s = this.plugin.settings;
+
+		if (mode === "plain") {
+			s.keysPlain = bundle;
 			s.keyBlob = null;
-		} else if (s.keyMode === "session") {
-			s.keyPlain = null;
+		} else if (mode === "session") {
+			s.keysPlain = null;
 			s.keyBlob = null;
 		} else {
 			const pass = await PassphraseModal.prompt(this.plugin.app, {
-				title: "Set a passphrase",
+				title: this.hasStoredKey ? "Confirm passphrase" : "Set a passphrase",
 				body:
-					"This encrypts the key inside your vault with AES-256-GCM. You'll enter it once per session. " +
-					"There is no recovery — if you forget it, you re-enter the TMDB key instead.",
-				placeholder: "Choose a passphrase",
+					"This encrypts your keys inside the vault with AES-256-GCM. You'll enter it once per session. " +
+					"There is no recovery — if you forget it, you re-enter the keys instead.",
+				placeholder: this.hasStoredKey ? "Passphrase" : "Choose a passphrase",
 				cta: "Encrypt and save",
 				password: true,
-				confirm: true,
+				confirm: !this.hasStoredKey,
 			});
 			if (!pass) return false;
-			s.keyBlob = await encryptSecret(trimmed, pass);
-			s.keyPlain = null;
+			s.keyBlob = await encryptSecret(JSON.stringify(bundle), pass);
+			s.keysPlain = null;
 		}
 
-		this.adopt(trimmed);
+		// Names are not secret, and knowing which services are configured
+		// without unlocking is what lets the UI stay honest while locked.
+		s.keyNames = Object.keys(bundle) as KeyName[];
+		this.adopt(bundle);
 		await this.plugin.saveSettings();
 		return true;
 	}
 
 	/**
-	 * Re-encrypt / move the stored key when the mode changes.
-	 *
-	 * The stored key is the only copy — there is no recovery — so nothing is
-	 * discarded until the re-store has actually succeeded. Both prompts
-	 * involved (unlocking the old key, choosing a new passphrase) can be
-	 * cancelled, and a cancel must leave the existing key exactly as it was
-	 * rather than destroying it as a side effect of touching a dropdown.
+	 * Move stored keys to a different mode. Nothing is discarded until the
+	 * re-store succeeds — see the note in migrateTo's history: cancelling
+	 * either prompt used to destroy the only copy.
 	 */
 	async migrateTo(next: KeyMode): Promise<void> {
 		const s = this.plugin.settings;
 		const prev = s.keyMode;
 		if (prev === next) return;
 
-		const prevPlain = s.keyPlain;
+		const prevPlain = s.keysPlain;
 		const prevBlob = s.keyBlob;
 		const hadKey = this.hasStoredKey;
 
-		let key: string | null = this.plaintext;
-		if (!key && hadKey) {
+		let bundle: KeyBundle | null = this.plaintext;
+		if (!bundle && hadKey) {
 			try {
-				key = await this.get();
+				bundle = await this.bundle();
 			} catch {
-				// Locked and the user declined. Abort — switching the mode now
-				// would strand a key we can no longer read.
-				new Notice("Reel: couldn't unlock the existing key, so the storage mode is unchanged.");
+				new Notice("Reel: couldn't unlock the existing keys, so the storage mode is unchanged.");
 				return;
 			}
 		}
 
 		s.keyMode = next;
-		s.keyPlain = null;
+		s.keysPlain = null;
 		s.keyBlob = null;
 
-		if (key) {
-			const ok = await this.store(key);
+		if (bundle && Object.keys(bundle).length) {
+			const ok = await this.writeBundle(bundle, next);
 			if (!ok) {
-				// Re-store was cancelled — put everything back.
 				s.keyMode = prev;
-				s.keyPlain = prevPlain;
+				s.keysPlain = prevPlain;
 				s.keyBlob = prevBlob;
 				await this.plugin.saveSettings();
-				new Notice("Reel: storage mode unchanged — the key was left as it was.");
+				new Notice("Reel: storage mode unchanged — your keys were left as they were.");
 				return;
 			}
-			return; // store() already saved
+			return;
 		}
 
-		// Nothing was stored to begin with; just record the new mode.
 		if (!hadKey) await this.plugin.saveSettings();
 	}
 
-	/** Wipe everything, on disk and in memory. */
 	async clear(): Promise<void> {
 		const s = this.plugin.settings;
-		s.keyPlain = null;
+		s.keysPlain = null;
 		s.keyBlob = null;
+		s.keyNames = [];
 		this.plaintext = null;
 		forgetGuarded();
 		await this.plugin.saveSettings();
 	}
 
-	/** Drop the in-memory copy but keep what's on disk. */
 	lock(): void {
 		this.plaintext = null;
 		forgetGuarded();
@@ -221,6 +285,29 @@ export class CredentialStore {
 		this.plaintext = null;
 		this.pending = null;
 		forgetGuarded();
+	}
+}
+
+/**
+ * Decode a stored bundle.
+ *
+ * Blobs written before multi-key support hold a bare TMDB token, not JSON, so
+ * anything that doesn't parse as an object is treated as that. Without this a
+ * v0.2 upgrade would silently lose the key it already had.
+ */
+export function parseBundle(decrypted: string): KeyBundle {
+	const text = decrypted.trim();
+	if (!text.startsWith("{")) return { tmdb: text };
+	try {
+		const parsed = JSON.parse(text) as Record<string, unknown>;
+		const out: KeyBundle = {};
+		for (const name of ["tmdb", "omdb", "dtdd"] as KeyName[]) {
+			const v = parsed[name];
+			if (typeof v === "string" && v.trim()) out[name] = v.trim();
+		}
+		return out;
+	} catch {
+		return { tmdb: text };
 	}
 }
 
