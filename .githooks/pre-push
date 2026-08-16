@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Pre-push secret scan.
+#
+# The repo is public and an automated process pushes to it, so the cost of a
+# credential slipping in is high and the cost of this check is nil. It blocks
+# the push rather than warning, because a warning scrolls past.
+#
+# Scans the commits about to be pushed, not the working tree — something
+# committed three commits ago and forgotten is exactly what this is for.
+#
+# Enable with: git config core.hooksPath .githooks   (npm run setup does it)
+
+set -e
+
+fail() {
+	echo ""
+	echo "PUSH BLOCKED — $1"
+	echo ""
+	echo "Nothing was sent. If this is a false positive, inspect the commit first;"
+	echo "if a real credential was committed, it must be rotated even after removal,"
+	echo "because it existed in git history."
+	echo ""
+	exit 1
+}
+
+# Files tracked anywhere in history that should never be here at all.
+if git ls-files | grep -qE '(^|/)data\.json$'; then
+	fail "data.json is tracked. It holds your API keys."
+fi
+if git ls-files | grep -qE '(^|/)\.env$'; then
+	fail ".env is tracked."
+fi
+
+# Content patterns across the whole tracked tree. Docs are excluded because
+# they legitimately discuss the *shape* of these tokens.
+PATHSPEC=':!*.md :!.githooks :!.github :!tests'
+
+# GitHub personal access tokens — classic and fine-grained.
+if git grep -nE 'gh[pousr]_[A-Za-z0-9]{30,}' -- $PATHSPEC >/dev/null 2>&1; then
+	fail "something shaped like a GitHub personal access token is committed."
+fi
+if git grep -nE 'github_pat_[A-Za-z0-9_]{50,}' -- $PATHSPEC >/dev/null 2>&1; then
+	fail "something shaped like a fine-grained GitHub token is committed."
+fi
+
+# TMDB v4 read access tokens are JWTs.
+if git grep -nE 'eyJhbGciOi[A-Za-z0-9._-]{30,}' -- $PATHSPEC >/dev/null 2>&1; then
+	fail "something shaped like a TMDB v4 read access token is committed."
+fi
+
+# TMDB v3 / OMDb keys are bare hex. Only flag them next to a giveaway name, or
+# every commit hash in the tree would trip this.
+if git grep -niE '(api_?key|apikey|omdb|tmdb)[^a-z0-9]{0,12}[0-9a-f]{32}' -- $PATHSPEC >/dev/null 2>&1; then
+	fail "something shaped like an API key is committed."
+fi
+
+exit 0

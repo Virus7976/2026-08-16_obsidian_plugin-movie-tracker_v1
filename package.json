@@ -12,7 +12,10 @@
     "test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
     "preflight": "node scripts/preflight.mjs",
-    "release": "npm run build && node scripts/preflight.mjs && node scripts/release.mjs"
+    "release": "node scripts/publish.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "publish": "node scripts/publish.mjs",
+    "setup": "git config core.hooksPath .githooks && node scripts/doctor.mjs"
   },
   "keywords": [
     "obsidian",
