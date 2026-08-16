@@ -36,6 +36,14 @@ for (const file of ["main.js", "manifest.json", "styles.css"]) {
 	}
 }
 
+/* ---- the styles actually have content ------------------------------- */
+if (existsSync("styles.css")) {
+	const css = readFileSync("styles.css", "utf8").trim();
+	// A build that silently emitted an empty stylesheet would ship a plugin
+	// that loads and looks broken, which is worse than failing here.
+	if (css.length < 500) fail(`styles.css is only ${css.length} bytes — that looks like a broken build.`);
+}
+
 /* ---- version agreement --------------------------------------------- */
 if (manifest.version !== pkg.version) {
 	fail(`manifest.json is ${manifest.version} but package.json is ${pkg.version}. They must match.`);

@@ -129,12 +129,12 @@ export default class ReelPlugin extends Plugin {
 
 	/* ------------------------------------------------------------------ */
 
-	async openView(rebuild = false): Promise<void> {
+	async openView(targetTab = false): Promise<void> {
 		const existing = this.app.workspace.getLeavesOfType(REEL_VIEW);
 		if (existing.length) {
 			// A command that targets a tab has to switch it explicitly;
 			// revealing alone would leave you wherever you already were.
-			if (rebuild) {
+			if (targetTab) {
 				const view = existing[0].view;
 				if (view instanceof ReelView) view.showTab(this.settings.lastTab);
 			}

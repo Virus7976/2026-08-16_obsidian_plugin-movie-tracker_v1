@@ -215,13 +215,10 @@ export class LogSheet extends Modal {
 
 			if (this.opts.pending) {
 				const p = this.opts.pending;
-				if (p.type === "tv") {
-					const meta = await this.plugin.tmdb.getShow(p.id);
-					file = await this.plugin.notes.createShow(meta, payload);
-				} else {
-					const meta = await this.plugin.tmdb.getFilm(p.id);
-					file = await this.plugin.notes.createFilm(meta, payload);
-				}
+				file = await this.plugin.notes.createFromResult(
+					{ id: p.id, media_type: p.type === "tv" ? "tv" : "movie" },
+					payload
+				);
 				new Notice(`Reel: added ${p.title}.`);
 			} else if (this.opts.file) {
 				file = this.opts.file;

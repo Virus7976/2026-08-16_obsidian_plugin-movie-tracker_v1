@@ -119,6 +119,25 @@ export class NoteWriter {
 		return file;
 	}
 
+	/**
+	 * Create a note from a search or discovery result.
+	 *
+	 * Four call sites were each doing this dance — fetch the right detail
+	 * endpoint, branch on media type, build the payload — which is four places
+	 * to forget something like the review or the rating.
+	 */
+	async createFromResult(
+		item: { id: number; media_type?: string },
+		log: LogPayload
+	): Promise<TFile> {
+		if (item.media_type === "tv") {
+			const meta = await this.plugin.tmdb.getShow(item.id);
+			return this.createShow(meta, log);
+		}
+		const meta = await this.plugin.tmdb.getFilm(item.id);
+		return this.createFilm(meta, log);
+	}
+
 	/* ------------------------------------------------------------------ */
 	/* Reviews                                                             */
 	/* ------------------------------------------------------------------ */
@@ -312,7 +331,13 @@ export class NoteWriter {
 	private enrichQueue: Promise<unknown> = Promise.resolve();
 
 	async enrich(file: TFile, opts: { title: string; year?: number; imdbId?: string }): Promise<void> {
-		this.enrichQueue = this.enrichQueue.then(() => this.enrichNow(file, opts)).catch(() => undefined);
+		this.enrichQueue = this.enrichQueue
+			.then(() => this.enrichNow(file, opts))
+			// The queue must survive a failure, but swallowing it entirely
+			// meant a broken key looked like a service with no data.
+			.catch((e: unknown) => {
+				console.warn("Reel: enrichment failed for", opts.title, redact(e));
+			});
 		return this.enrichQueue as Promise<void>;
 	}
 

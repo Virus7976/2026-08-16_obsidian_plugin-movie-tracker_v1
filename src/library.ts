@@ -152,7 +152,10 @@ export class Library extends Events {
 		const q = query.trim().toLowerCase();
 		const rows = pool ?? this.all();
 		if (!q) return rows;
-		const terms = q.split(/\s+/).filter(Boolean);
+		// Quoted runs stay together, so "the office" doesn't match every title
+		// containing "the". Everything else splits on whitespace and must all
+		// match, which is what makes adding a word narrow rather than widen.
+		const terms = (q.match(/"[^"]+"|\S+/g) ?? []).map((t) => t.replace(/^"|"$/g, "")).filter(Boolean);
 		return rows.filter((e) => {
 			const hay = this.haystack(e);
 			return terms.every((t) => hay.includes(t));

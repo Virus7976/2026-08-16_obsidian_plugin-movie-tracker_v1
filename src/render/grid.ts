@@ -143,8 +143,15 @@ export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]
 		if (!compact) {
 			const thumb = row.createDiv({ cls: "reel-row-thumb" });
 			const src = plugin.posters.displayUrl(entry);
-			if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-			else placeholder(thumb, entry);
+			if (src) {
+				const img = thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
+				// An imported poster is a remote URL, so offline or a dead link
+				// leaves a blank box unless we fall back explicitly.
+				img.addEventListener("error", () => {
+					img.remove();
+					placeholder(thumb, entry);
+				});
+			} else placeholder(thumb, entry);
 		}
 
 		const body = row.createDiv({ cls: "reel-row-body" });

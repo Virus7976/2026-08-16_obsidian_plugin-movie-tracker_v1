@@ -103,7 +103,10 @@ export class DiscoverScreen {
 			this.filters = { ...EMPTY, type: this.filters.type };
 		});
 		chip(row1, "Films", this.filters.type === "movie", () => {
+			if (this.filters.type === "movie") return;
 			this.filters.type = "movie";
+			// Both have to be refetched: rows are built from the profile, and
+			// genre ids mean different things on the two endpoints.
 			this.rows = null;
 			this.genres = [];
 		});
@@ -222,7 +225,7 @@ export class DiscoverScreen {
 
 	private async loadRows(container: HTMLElement): Promise<void> {
 		try {
-			const profile = await this.plugin.discover.taste();
+			const profile = await this.plugin.discover.taste(this.filters.type);
 			this.rows = await this.plugin.discover.rows(profile, this.filters.type);
 			this.profile = profile;
 		} catch (e) {
@@ -412,14 +415,7 @@ export class DiscoverScreen {
 	}
 
 	private async add(item: TmdbSearchResult, watchlist: boolean, rating?: number): Promise<void> {
-		const payload = { date: todayISO(), watchlist, rating };
-		if (item.media_type === "tv") {
-			const meta = await this.plugin.tmdb.getShow(item.id);
-			await this.plugin.notes.createShow(meta, payload);
-		} else {
-			const meta = await this.plugin.tmdb.getFilm(item.id);
-			await this.plugin.notes.createFilm(meta, payload);
-		}
+		await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist, rating });
 	}
 }
 
@@ -464,14 +460,7 @@ class SeenSheet extends Modal {
 		if (this.busy) return;
 		this.busy = true;
 		try {
-			const payload = { date: todayISO(), watchlist: false, rating };
-			if (this.item.media_type === "tv") {
-				const meta = await this.plugin.tmdb.getShow(this.item.id);
-				await this.plugin.notes.createShow(meta, payload);
-			} else {
-				const meta = await this.plugin.tmdb.getFilm(this.item.id);
-				await this.plugin.notes.createFilm(meta, payload);
-			}
+			await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: false, rating });
 			new Notice(rating != null ? `Added — rated ${rating}` : "Added as watched");
 			this.onDone();
 			this.close();
@@ -545,14 +534,7 @@ class PreviewSheet extends Modal {
 		button.setAttr("disabled", "true");
 
 		try {
-			const payload = { date: todayISO(), watchlist };
-			if (this.item.media_type === "tv") {
-				const meta = await this.plugin.tmdb.getShow(this.item.id);
-				await this.plugin.notes.createShow(meta, payload);
-			} else {
-				const meta = await this.plugin.tmdb.getFilm(this.item.id);
-				await this.plugin.notes.createFilm(meta, payload);
-			}
+			await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist });
 			new Notice(watchlist ? "Added to your watchlist" : "Added as watched");
 			this.onAdded();
 			this.close();

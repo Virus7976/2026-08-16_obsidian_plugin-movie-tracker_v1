@@ -20,6 +20,7 @@ import { parseQuery, applyQuery } from "../src/render/query";
 import { topicHolds, flagsFromTopics } from "../src/enrich";
 import { derive, applyDerived } from "../src/bases";
 import { parseBundle } from "../src/credentials";
+import { tasteWeight, rankGenres } from "../src/discover";
 import type { Entry } from "../src/types";
 
 let pass = 0;
@@ -193,6 +194,32 @@ eq(parseBundle("eyJhbGciOiJIUzI1NiJ9.abc"), { tmdb: "eyJhbGciOiJIUzI1NiJ9.abc" }
 eq(parseBundle('{"tmdb":"a","omdb":"b"}'), { tmdb: "a", omdb: "b" }, "json bundle parses");
 eq(parseBundle('{"tmdb":"a","junk":"x"}'), { tmdb: "a" }, "unknown key names ignored");
 eq(parseBundle("{not json"), { tmdb: "{not json" }, "unparseable falls back to a bare token");
+
+/* ---- taste weighting: what Discover's quality rests on ---- */
+// Enthusiasm has to outweigh volume, or a genre you watch constantly and rate
+// 3.5 drowns out the one you rate 5 and would actually want more of.
+eq(tasteWeight({ rating: 5 }), 2.5, "a five weighs 2.5");
+eq(tasteWeight({ rating: 3.5 }), 1, "the threshold weighs 1");
+eq(tasteWeight({ rating: 5, liked: true }), 3.5, "a like adds a full point");
+eq(tasteWeight({ liked: true }), 2, "liked with no rating still counts");
+ok(tasteWeight({ rating: 5 }) > tasteWeight({ rating: 4 }), "higher ratings weigh more");
+
+eq(
+	rankGenres([
+		{ genres: ["Comedy"], rating: 3.5 },
+		{ genres: ["Comedy"], rating: 3.5 },
+		{ genres: ["Horror"], rating: 5, liked: true },
+	]),
+	["Horror", "Comedy"],
+	"one loved horror outranks two merely-liked comedies"
+);
+eq(rankGenres([]), [], "no ratings, no ranking");
+// Ties resolve alphabetically so the order can't drift between renders.
+eq(
+	rankGenres([{ genres: ["Drama"], rating: 4 }, { genres: ["Action"], rating: 4 }]),
+	["Action", "Drama"],
+	"ties are stable"
+);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -52,7 +52,29 @@ export interface DiscoverFilters {
 }
 
 /** Ratings at or above this count as "you liked it". */
-const LIKED_THRESHOLD = 3.5;
+export const LIKED_THRESHOLD = 3.5;
+
+/**
+ * How much one entry counts toward the profile.
+ *
+ * Rating above the threshold, plus a bonus for a deliberate like. A 3.5 counts
+ * for 1 and a 5 counts for 2.5, so enthusiasm outweighs volume — otherwise a
+ * genre you watch constantly and rate 3.5 would drown out the one you rate 5.
+ */
+export function tasteWeight(entry: { rating?: number; liked?: boolean }): number {
+	const base = (entry.rating ?? LIKED_THRESHOLD) - (LIKED_THRESHOLD - 1);
+	return base + (entry.liked ? 1 : 0);
+}
+
+/** Genres ordered by how much you actually like them, not how often you watch. */
+export function rankGenres(entries: { genres: string[]; rating?: number; liked?: boolean }[]): string[] {
+	const scores = new Map<string, number>();
+	for (const e of entries) {
+		const w = tasteWeight(e);
+		for (const g of e.genres) scores.set(g, (scores.get(g) ?? 0) + w);
+	}
+	return [...scores.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([n]) => n);
+}
 
 export class DiscoverEngine {
 	private genreCache: Map<string, Map<string, number>> = new Map();
@@ -70,24 +92,23 @@ export class DiscoverEngine {
 	 * about you than twenty you rated 3. Liked titles count double, since a
 	 * deliberate heart is a stronger signal than a rating you gave in passing.
 	 */
-	async taste(): Promise<TasteProfile> {
+	async taste(type: "movie" | "tv" = "movie"): Promise<TasteProfile> {
 		const all = this.plugin.visible(this.plugin.library.all());
 		const rated = all.filter((e) => (e.rating ?? 0) >= LIKED_THRESHOLD || e.liked);
 
-		const genreScores = new Map<string, number>();
 		const directorScores = new Map<string, number>();
-
 		for (const e of rated) {
-			const weight = (e.rating ?? LIKED_THRESHOLD) - (LIKED_THRESHOLD - 1) + (e.liked ? 1 : 0);
-			for (const g of e.genres) genreScores.set(g, (genreScores.get(g) ?? 0) + weight);
+			const weight = tasteWeight(e);
 			for (const d of e.director) {
 				const name = unlink(d);
 				directorScores.set(name, (directorScores.get(name) ?? 0) + weight);
 			}
 		}
 
-		const genreNames = [...genreScores.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
-		const map = await this.genreIds("movie");
+		const genreNames = rankGenres(rated);
+		// Ids are per-endpoint: "Action" is 28 for film and 10759 for TV, so a
+		// profile built against one is meaningless to the other.
+		const map = await this.genreIds(type);
 		const genreIds = genreNames.map((n) => map.get(n.toLowerCase())).filter((id): id is number => id != null);
 
 		// Seeds are the strongest, most recent things you rated — recency
