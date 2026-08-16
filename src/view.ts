@@ -12,6 +12,7 @@ import { ItemView, Platform, WorkspaceLeaf, setIcon } from "obsidian";
 import type ReelPlugin from "./main";
 import type { Entry } from "./types";
 import { renderPosterGrid, renderRowList } from "./render/grid";
+import { DetailScreen } from "./ui/detail";
 import { paintUpNext } from "./render/upnext";
 import { paintStats } from "./render/stats";
 import { viewings } from "./render/diary";
@@ -31,6 +32,30 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 	{ id: "stats", label: "Stats", icon: "bar-chart-3" },
 ];
 
+const SORT_OPTIONS: [string, string][] = [
+	["watched", "Recently watched"],
+	["added", "Recently added"],
+	["rating", "My rating"],
+	["imdb_rating", "IMDb rating"],
+	["metacritic", "Metacritic"],
+	["tmdb_rating", "TMDB rating"],
+	["title", "Title"],
+	["year", "Year"],
+	["runtime", "Runtime"],
+	["popularity", "Popularity"],
+	["certification", "Certification"],
+	["random", "Shuffle"],
+];
+
+/**
+ * Which direction reads as "natural" for a field. Titles and years want A–Z
+ * and oldest-first; ratings and dates want best and newest first. Guessing
+ * this correctly matters more than exposing an asc/desc toggle nobody touches.
+ */
+function ascending(field: string): 1 | -1 {
+	return field === "title" || field === "year" || field === "certification" ? 1 : -1;
+}
+
 export class ReelView extends ItemView {
 	private tab: Tab = "library";
 	private query = "";
@@ -38,7 +63,11 @@ export class ReelView extends ItemView {
 	private statusFilter: string | null = null;
 	private genreFilter: string | null = null;
 	private sort = "watched";
+	/** Secondary sort, applied when the primary ties. */
+	private sort2 = "";
 	private bodyEl!: HTMLElement;
+	/** Non-null when the detail screen is showing instead of the list. */
+	private detail: DetailScreen | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -132,6 +161,13 @@ export class ReelView extends ItemView {
 		this.filterEl.empty();
 		this.bodyEl.empty();
 
+		if (this.detail) {
+			// The detail screen owns the whole body; filters and tabs would
+			// only be noise while you're looking at one title.
+			this.detail.render(this.bodyEl);
+			return;
+		}
+
 		if (this.tab === "library") {
 			this.paintFilters();
 			this.paintLibrary();
@@ -182,25 +218,40 @@ export class ReelView extends ItemView {
 		}
 
 		const sortBar = this.filterEl.createDiv({ cls: "reel-sortbar" });
+
 		sortBar.createSpan({ cls: "reel-dim", text: "Sort" });
 		const select = sortBar.createEl("select", { cls: "reel-select" });
-		for (const [value, label] of [
-			["watched", "Recently watched"],
-			["added", "Recently added"],
-			["rating", "My rating"],
-			["tmdb_rating", "TMDB rating"],
-			["title", "Title"],
-			["year", "Year"],
-			["runtime", "Runtime"],
-			["random", "Shuffle"],
-		]) {
-			select.createEl("option", { value, text: label });
-		}
+		for (const [value, label] of SORT_OPTIONS) select.createEl("option", { value, text: label });
 		select.value = this.sort;
 		select.addEventListener("change", () => {
 			this.sort = select.value;
 			this.paint();
 		});
+
+		// Second criterion, applied where the first ties — "highest rated, and
+		// among equals the most recent" is a real question the single sort
+		// could not answer.
+		sortBar.createSpan({ cls: "reel-dim", text: "then" });
+		const select2 = sortBar.createEl("select", { cls: "reel-select" });
+		select2.createEl("option", { value: "", text: "—" });
+		for (const [value, label] of SORT_OPTIONS) {
+			if (value === this.sort || value === "random") continue;
+			select2.createEl("option", { value, text: label });
+		}
+		select2.value = this.sort2;
+		select2.addEventListener("change", () => {
+			this.sort2 = select2.value;
+			this.paint();
+		});
+	}
+
+	openDetail(entry: Entry): void {
+		this.detail = new DetailScreen(this.plugin, entry, () => {
+			this.detail = null;
+			this.paint();
+		});
+		this.paint();
+		this.bodyEl.scrollTop = 0;
 	}
 
 	/** Everything visible under the content policy, before UI filters. */
@@ -214,7 +265,11 @@ export class ReelView extends ItemView {
 		if (this.statusFilter) rows = rows.filter((e) => e.status === this.statusFilter);
 		if (this.genreFilter) rows = rows.filter((e) => e.genres.includes(this.genreFilter!));
 		rows = this.plugin.library.search(this.query, rows);
-		rows = sortEntries(rows, this.sort, this.sort === "title" || this.sort === "year" ? 1 : -1);
+		// Secondary sort first, primary second: a stable sort preserves the
+		// earlier order within ties, so sorting by the tiebreaker first is what
+		// makes it act as a tiebreaker.
+		if (this.sort2) rows = sortEntries(rows, this.sort2, ascending(this.sort2));
+		rows = sortEntries(rows, this.sort, ascending(this.sort));
 
 		const hiddenCount = this.plugin.hiddenCount();
 		const count = this.bodyEl.createDiv({ cls: "reel-block-count" });
@@ -236,7 +291,7 @@ export class ReelView extends ItemView {
 			return;
 		}
 
-		renderPosterGrid(this.plugin, this.bodyEl, rows);
+		renderPosterGrid(this.plugin, this.bodyEl, rows, (entry) => this.openDetail(entry));
 	}
 
 	private paintDiary(): void {
@@ -276,10 +331,7 @@ export class ReelView extends ItemView {
 			if (v.rewatch) meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
 			meta.createSpan({ cls: "reel-dim", text: prettyDate(v.date) });
 
-			row.addEventListener("click", async () => {
-				const file = this.plugin.app.vault.getAbstractFileByPath(v.entry.path);
-				if (file instanceof TFile) await this.plugin.app.workspace.getLeaf(false).openFile(file);
-			});
+			row.addEventListener("click", () => this.openDetail(v.entry));
 		}
 	}
 

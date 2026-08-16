@@ -1555,3 +1555,248 @@ input.reel-input {
 	padding: 0 9px;
 	white-space: normal;
 }
+
+/* ================================================================== *
+ * v0.4 — contrast, tap feedback, detail screen
+ * ================================================================== */
+
+/* ---------------- readable badges ----------------
+   The type badges used --color-purple / --color-blue with --text-on-accent.
+   In a light theme that is white text on a pale fill: technically coloured,
+   practically unreadable. Tinted background with normal-weight body text
+   reads in both themes without depending on either variable existing. */
+
+.reel-badge.tv,
+.reel-badge.film {
+	background: transparent;
+	border: 1px solid currentColor;
+	font-weight: 700;
+}
+
+.reel-badge.tv {
+	color: var(--color-purple, #7c3aed);
+}
+
+.reel-badge.film {
+	color: var(--color-blue, #2563eb);
+}
+
+.reel-badge.new,
+.reel-badge.in-library {
+	background: transparent;
+	border: 1px solid currentColor;
+	color: var(--color-green, #16a34a);
+	font-weight: 700;
+}
+
+.reel-badge.flag {
+	background: transparent;
+	border: 1px solid currentColor;
+	color: var(--text-error, #dc2626);
+}
+
+/* Rating overlay on a poster sat on a dark scrim; make it legible against
+   any poster art rather than hoping. */
+.reel-cell-rating {
+	background: rgba(0, 0, 0, 0.7);
+	backdrop-filter: blur(2px);
+}
+
+/* ---------------- unmistakable active states ----------------
+   Colour alone was carrying the "this is selected" signal, and when the
+   accent is desaturated it reads as nothing. Border, weight and a shadow
+   carry it too, so selection survives any theme. */
+
+.reel-seg {
+	background: var(--background-modifier-border);
+	gap: 3px;
+}
+
+.reel-seg-btn {
+	border: 1px solid transparent !important;
+	background: transparent;
+	color: var(--text-muted);
+	font-weight: 500;
+}
+
+.reel-seg-btn.is-active {
+	background: var(--interactive-accent, #7c3aed) !important;
+	color: var(--text-on-accent, #fff) !important;
+	border-color: var(--interactive-accent, #7c3aed) !important;
+	font-weight: 700;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.reel-chip.is-active {
+	background: var(--interactive-accent, #7c3aed) !important;
+	color: var(--text-on-accent, #fff) !important;
+	border-color: var(--interactive-accent, #7c3aed) !important;
+	font-weight: 600;
+}
+
+.reel-heart {
+	transition: transform 120ms ease;
+	font-weight: 600;
+	padding: 0 14px;
+	gap: 6px;
+}
+
+.reel-heart.is-on {
+	color: var(--color-red, #dc2626);
+	border-color: var(--color-red, #dc2626);
+	background: var(--background-modifier-error, rgba(220, 38, 38, 0.12));
+}
+
+.reel-heart:active {
+	transform: scale(0.94);
+}
+
+/* Every write flashes the control that caused it. A silent save is
+   indistinguishable from a dropped tap. */
+@keyframes reel-flash {
+	0% { box-shadow: 0 0 0 0 var(--color-green, #16a34a); }
+	30% { box-shadow: 0 0 0 3px var(--color-green, #16a34a); }
+	100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.reel-flash {
+	animation: reel-flash 600ms ease-out;
+	border-radius: var(--reel-radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-flash { animation: none; outline: 2px solid var(--color-green, #16a34a); }
+}
+
+/* ---------------- detail screen ---------------- */
+
+.reel-detail {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding-bottom: 32px;
+}
+
+.reel-detail-bar {
+	display: flex;
+	gap: 8px;
+	justify-content: space-between;
+	position: sticky;
+	top: 0;
+	z-index: 6;
+	background: var(--background-primary);
+	padding: 6px 0;
+}
+
+.reel-detail-bar .reel-btn {
+	flex: 0 0 auto;
+}
+
+.reel-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+
+.reel-detail-head {
+	display: flex;
+	gap: 16px;
+}
+
+.reel-detail-poster {
+	flex: 0 0 120px;
+	width: 120px;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.reel-detail-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-detail-info {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.reel-detail-title {
+	font-size: 1.5em;
+	font-weight: 700;
+	line-height: 1.15;
+}
+
+.reel-detail-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	padding: 12px;
+	border-radius: var(--reel-radius);
+	background: var(--background-secondary);
+}
+
+.reel-control.wide {
+	flex: 1 1 100%;
+}
+
+.reel-status-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.reel-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.reel-detail-actions .reel-btn {
+	flex: 1 1 auto;
+	min-width: 130px;
+}
+
+.reel-detail-overview {
+	color: var(--text-muted);
+	line-height: 1.55;
+}
+
+.reel-detail-section {
+	border-top: 1px solid var(--background-modifier-border);
+	padding-top: 12px;
+}
+
+.reel-section-title {
+	font-weight: 700;
+	margin-bottom: 8px;
+}
+
+.reel-season-pill.is-open {
+	border-color: var(--interactive-accent, #7c3aed);
+	box-shadow: 0 0 0 2px var(--interactive-accent, #7c3aed);
+}
+
+.reel-detail .reel-episodes {
+	max-height: none;
+	margin-top: 10px;
+}
+
+/* Desktop: poster and details side by side with room to breathe. */
+@media (min-width: 800px) {
+	.reel-detail-poster {
+		flex: 0 0 180px;
+		width: 180px;
+	}
+
+	.reel-detail-title {
+		font-size: 1.9em;
+	}
+}

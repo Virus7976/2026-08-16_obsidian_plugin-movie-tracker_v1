@@ -27,7 +27,7 @@ function placeholder(parent: HTMLElement, entry: Entry): void {
  * never fires the rating sheet — the single most annoying way to get this
  * wrong on a touch screen.
  */
-function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry): void {
+function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry, onSelect?: (e: Entry) => void): void {
 	let timer: number | null = null;
 	let longPressed = false;
 	let startY = 0;
@@ -66,6 +66,12 @@ function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry): void {
 			longPressed = false;
 			return;
 		}
+		// In the Reel view a tap opens the detail screen; elsewhere (a code
+		// block inside a note) there is nowhere to put one, so it opens the note.
+		if (onSelect) {
+			onSelect(entry);
+			return;
+		}
 		const file = plugin.app.vault.getAbstractFileByPath(entry.path);
 		if (file instanceof TFile) await plugin.app.workspace.getLeaf(false).openFile(file);
 		else new Notice("Reel: note not found.");
@@ -73,12 +79,16 @@ function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry): void {
 
 	cell.addEventListener("keydown", (e) => {
 		if (e.key !== "Enter") return;
+		if (onSelect) {
+			onSelect(entry);
+			return;
+		}
 		const file = plugin.app.vault.getAbstractFileByPath(entry.path);
 		if (file instanceof TFile) plugin.app.workspace.getLeaf(false).openFile(file);
 	});
 }
 
-export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]): void {
+export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entry[], onSelect?: (e: Entry) => void): void {
 	const grid = el.createDiv({ cls: "reel-grid" });
 	for (const entry of rows) {
 		const cell = grid.createDiv({ cls: "reel-cell" });
@@ -119,11 +129,11 @@ export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entr
 		const y = entry.year ?? entry.firstAirYear;
 		if (y) caption.createDiv({ cls: "reel-cell-year", text: String(y) });
 
-		wireCell(plugin, cell, entry);
+		wireCell(plugin, cell, entry, onSelect);
 	}
 }
 
-export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[], compact = false): void {
+export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[], compact = false, onSelect?: (e: Entry) => void): void {
 	const list = el.createDiv({ cls: "reel-list" });
 	for (const entry of rows) {
 		const row = list.createDiv({ cls: "reel-row" });
@@ -151,6 +161,6 @@ export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]
 			meta.createSpan({ text: `S${entry.lastWatched.season}E${entry.lastWatched.episode}` });
 		}
 
-		wireCell(plugin, row, entry);
+		wireCell(plugin, row, entry, onSelect);
 	}
 }
