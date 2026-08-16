@@ -42,8 +42,17 @@ export class Library extends Events {
 		);
 		this.plugin.registerEvent(
 			vault.on("rename", (file: TAbstractFile, oldPath: string) => {
+				if (!(file instanceof TFile)) {
+					// A folder moved. Only the folder's own path arrives here,
+					// and a folder is never in the index — but every entry
+					// beneath it now holds a stale path, which renders fine and
+					// fails to open. Rebuilding is idempotent, so this stays
+					// correct even if child renames are also delivered.
+					this.rebuild();
+					return;
+				}
 				this.entries.delete(oldPath);
-				if (file instanceof TFile && this.inScope(file.path)) this.upsert(file);
+				if (this.inScope(file.path)) this.upsert(file);
 				else this.emitChange();
 			})
 		);
@@ -73,7 +82,10 @@ export class Library extends Events {
 
 	private upsert(file: TFile, quiet = false): void {
 		const fm = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter;
-		if (!fm || fm.tmdb_id == null) {
+		// A non-numeric id would index as NaN, and NaN never equals itself — so
+		// byTmdbId() would silently miss and the search modal would offer to
+		// create a second note for a title already in the library.
+		if (!fm || fm.tmdb_id == null || !Number.isFinite(Number(fm.tmdb_id))) {
 			// The note lost its id, or never had one — drop it from the index.
 			if (this.entries.delete(file.path) && !quiet) this.emitChange();
 			return;
