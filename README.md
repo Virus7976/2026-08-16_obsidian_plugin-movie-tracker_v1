@@ -290,7 +290,7 @@ Design-level, not afterthoughts:
 npm test
 ```
 
-316 assertions over eight suites:
+351 assertions over nine suites:
 
 | Suite | Covers |
 |---|---|
@@ -302,6 +302,7 @@ npm test
 | prune | which cached posters are safe to delete |
 | importer | candidate selection and the once-per-library rating scale |
 | library | the index every surface reads from |
+| notes | the write path — reviews stay append-only, titles stay filesystem-safe |
 
 The bias is toward code that writes or deletes something. The pure logic is covered because an off-by-one there quietly corrupts watch history; the prune and importer suites exist because those are the two places Reel changes files you already own.
 
