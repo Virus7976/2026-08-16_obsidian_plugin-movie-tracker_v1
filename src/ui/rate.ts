@@ -32,6 +32,16 @@ export class RateScreen {
 	private index = 0;
 	/** Paths skipped this session, so Skip means "not now" rather than "never". */
 	private skipped = new Set<string>();
+	/**
+	 * Paths already acted on in this queue.
+	 *
+	 * The queue is recomputed from the library index on every repaint, but
+	 * `metadataCache` has not reparsed the file by the time we repaint — so a
+	 * film you just rated still looks unrated, stays in the queue, and you are
+	 * handed the same card again. Tracking it here makes the queue shrink
+	 * immediately, which is what the index will agree with a moment later.
+	 */
+	private handled = new Set<string>();
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -43,7 +53,7 @@ export class RateScreen {
 				: this.queue === "watchlist"
 					? all.filter((e) => e.status === "watchlist")
 					: all;
-		return base.filter((e) => !this.skipped.has(e.path));
+		return base.filter((e) => !this.skipped.has(e.path) && !this.handled.has(e.path));
 	}
 
 	render(container: HTMLElement): void {
@@ -58,6 +68,10 @@ export class RateScreen {
 			chip.addEventListener("click", () => {
 				this.queue = q.id;
 				this.index = 0;
+				// A new queue asks a different question, so what you've already
+				// dealt with in the old one shouldn't be hidden here.
+				this.handled.clear();
+				this.skipped.clear();
 				this.render(container);
 			});
 		}
@@ -74,6 +88,12 @@ export class RateScreen {
 					this.skipped.clear();
 					this.index = 0;
 					this.render(container);
+				});
+			}
+			if (this.handled.size) {
+				done.createDiv({
+					cls: "reel-dim",
+					text: `${this.handled.size} handled this session.`,
 				});
 			}
 			return;
@@ -122,6 +142,7 @@ export class RateScreen {
 				if (!file) return;
 				try {
 					await this.plugin.notes.setRating(file, v ?? null);
+					if (v != null) this.handled.add(entry.path);
 					new Notice(v == null ? `${entry.title}: rating cleared` : `${entry.title}: ${v}★`);
 					// Advance on its own — the point of this screen is that
 					// rating and moving on are a single action.
@@ -134,9 +155,9 @@ export class RateScreen {
 
 		/* ---- secondary actions ------------------------------------------ */
 		const actions = container.createDiv({ cls: "reel-rate-actions" });
-		const act = (label: string, cls: string, fn: () => void | Promise<void>) => {
+		const act = (label: string, cls: string, fn: (b: HTMLButtonElement) => void | Promise<void>) => {
 			const b = actions.createEl("button", { cls: `reel-btn ${cls}`, text: label });
-			b.addEventListener("click", () => void fn());
+			b.addEventListener("click", () => void fn(b));
 			return b;
 		};
 
@@ -145,12 +166,14 @@ export class RateScreen {
 			this.render(container);
 		});
 
-		act(entry.liked ? "♥ Liked" : "♡ Like", entry.liked ? "is-liked" : "", async () => {
+		act(entry.liked ? "♥ Liked" : "♡ Like", entry.liked ? "is-liked" : "", async (b) => {
 			const file = this.fileFor(entry);
 			if (!file) return;
 			const on = await this.plugin.notes.toggleLiked(file);
+			entry.liked = on;
+			b.setText(on ? "♥ Liked" : "♡ Like");
+			b.toggleClass("is-liked", on);
 			new Notice(on ? `Liked ${entry.title}` : `Unliked ${entry.title}`);
-			this.render(container);
 		});
 
 		if (entry.status !== "watchlist") {
@@ -158,6 +181,7 @@ export class RateScreen {
 				const file = this.fileFor(entry);
 				if (!file) return;
 				await this.plugin.notes.setStatus(file, "watchlist");
+				this.handled.add(entry.path);
 				new Notice(`${entry.title} moved to the watchlist`);
 				this.advance(container, rows.length);
 			});
@@ -167,6 +191,7 @@ export class RateScreen {
 				if (!file) return;
 				if (entry.type === "tv") await this.plugin.notes.setStatus(file, "watching");
 				else await this.plugin.notes.logFilm(file, { date: todayISO(), rating: entry.rating });
+				this.handled.add(entry.path);
 				new Notice(`${entry.title} marked watched`);
 				this.advance(container, rows.length);
 			});

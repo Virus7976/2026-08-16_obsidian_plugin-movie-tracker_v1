@@ -422,7 +422,15 @@ export class DetailScreen {
 				if (watched.has(n)) watched.delete(n);
 				else watched.add(n);
 				epRow.toggleClass("is-watched", watched.has(n));
-				await this.plugin.notes.setSeasonRange(file, season, formatRange([...watched]));
+				const range = formatRange([...watched]);
+				await this.plugin.notes.setSeasonRange(file, season, range);
+				// Keep the in-memory entry in step so the season pill counts are
+				// right if you collapse the season, without re-reading an index
+				// that hasn't caught up with this write yet.
+				this.entry = {
+					...this.entry,
+					seasons: this.entry.seasons.map((s) => (s.n === season ? { ...s, watched: range } : s)),
+				};
 			});
 
 			const epBody = epRow.createDiv({ cls: "reel-episode-body" });
