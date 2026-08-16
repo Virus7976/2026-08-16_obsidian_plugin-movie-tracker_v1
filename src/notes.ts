@@ -329,10 +329,17 @@ export class NoteWriter {
 	 * background work that no screen waits on.
 	 */
 	private enrichQueue: Promise<unknown> = Promise.resolve();
+	private enrichDepth = 0;
 
 	async enrich(file: TFile, opts: { title: string; year?: number; imdbId?: string }): Promise<void> {
+		// Reset the chain when it drains, so a long session doesn't hold a
+		// promise link per title ever added.
+		this.enrichDepth++;
 		this.enrichQueue = this.enrichQueue
 			.then(() => this.enrichNow(file, opts))
+			.finally(() => {
+				if (--this.enrichDepth === 0) this.enrichQueue = Promise.resolve();
+			})
 			// The queue must survive a failure, but swallowing it entirely
 			// meant a broken key looked like a service with no data.
 			.catch((e: unknown) => {

@@ -72,17 +72,7 @@ function buildCard(plugin: ReelPlugin, card: HTMLElement, entry: Entry, file: TF
 
 	/* Poster */
 	const posterEl = card.createDiv({ cls: "reel-header-poster" });
-	const src = plugin.posters.displayUrl(entry);
-	if (src) {
-		const img = posterEl.createEl("img", { attr: { src, alt: `${entry.title} poster`, loading: "lazy" } });
-		img.addEventListener("error", () => {
-			img.remove();
-			posterEl.addClass("is-empty");
-		});
-	} else {
-		posterEl.addClass("is-empty");
-		posterEl.createSpan({ text: entry.title.slice(0, 1) });
-	}
+	plugin.posters.attach(posterEl, entry);
 
 	/* Body */
 	const body = card.createDiv({ cls: "reel-header-body" });

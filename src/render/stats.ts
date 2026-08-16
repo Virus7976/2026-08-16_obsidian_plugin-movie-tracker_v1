@@ -130,6 +130,12 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		);
 	}
 
+	// Silence here reads as "this feature is broken" rather than "not enough
+	// data yet", which is the actual reason.
+	if (paired.length && paired.length < 3) {
+		tile("Vs IMDb", "—", `rate ${3 - paired.length} more to compare`);
+	}
+
 	const streak = currentStreak(watched.map((v) => v.date));
 	if (streak > 1) tile("Current streak", `${streak} days`);
 

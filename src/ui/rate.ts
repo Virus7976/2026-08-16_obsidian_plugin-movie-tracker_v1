@@ -98,6 +98,12 @@ export class RateScreen {
 		if (!rows.length) {
 			const done = container.createDiv({ cls: "reel-empty" });
 			done.createDiv({ text: this.skipped.size ? "Nothing left in this queue." : this.def.empty });
+			if (this.handled.size) {
+				done.createDiv({
+					cls: "reel-dim",
+					text: `${this.handled.size} handled this session.`,
+				});
+			}
 			if (this.skipped.size) {
 				const again = done.createEl("button", { cls: "reel-btn", text: `Bring back ${this.skipped.size} skipped` });
 				again.addEventListener("click", () => {
@@ -121,12 +127,7 @@ export class RateScreen {
 		if (!Platform.isMobile) window.setTimeout(() => card.focus(), 0);
 
 		const posterEl = card.createDiv({ cls: "reel-rate-poster" });
-		const src = this.plugin.posters.displayUrl(entry);
-		if (src) posterEl.createEl("img", { attr: { src, alt: "" } });
-		else {
-			posterEl.addClass("is-empty");
-			posterEl.createSpan({ text: entry.title.slice(0, 2) });
-		}
+		this.plugin.posters.attach(posterEl, entry);
 		posterEl.addEventListener("click", () => void this.plugin.openDetail(entry));
 
 		const body = card.createDiv({ cls: "reel-rate-body" });

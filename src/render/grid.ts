@@ -15,11 +15,6 @@ import { lastWatchDate } from "./query";
 import { prettyDate } from "../util/dates";
 import { rangeCount } from "../util/ranges";
 
-function placeholder(parent: HTMLElement, entry: Entry): void {
-	parent.addClass("is-empty");
-	parent.createSpan({ cls: "reel-placeholder-text", text: entry.title.slice(0, 2) });
-}
-
 /**
  * Tap opens the note; long-press (or right-click) quick-rates.
  *
@@ -97,16 +92,7 @@ export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entr
 		cell.setAttr("aria-label", entry.title);
 
 		const posterEl = cell.createDiv({ cls: "reel-cell-poster" });
-		const src = plugin.posters.displayUrl(entry);
-		if (src) {
-			const img = posterEl.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
-			img.addEventListener("error", () => {
-				img.remove();
-				placeholder(posterEl, entry);
-			});
-		} else {
-			placeholder(posterEl, entry);
-		}
+		plugin.posters.attach(posterEl, entry);
 
 		if (entry.rating != null) {
 			renderStarsStatic(posterEl.createDiv({ cls: "reel-cell-rating" }), entry.rating);
@@ -142,16 +128,7 @@ export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]
 
 		if (!compact) {
 			const thumb = row.createDiv({ cls: "reel-row-thumb" });
-			const src = plugin.posters.displayUrl(entry);
-			if (src) {
-				const img = thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-				// An imported poster is a remote URL, so offline or a dead link
-				// leaves a blank box unless we fall back explicitly.
-				img.addEventListener("error", () => {
-					img.remove();
-					placeholder(thumb, entry);
-				});
-			} else placeholder(thumb, entry);
+			plugin.posters.attach(thumb, entry);
 		}
 
 		const body = row.createDiv({ cls: "reel-row-body" });

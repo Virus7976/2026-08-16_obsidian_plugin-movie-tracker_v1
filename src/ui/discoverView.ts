@@ -543,6 +543,8 @@ class PreviewSheet extends Modal {
 			this.close();
 		} catch (e) {
 			new Notice(`Reel: ${redact(e)}`);
+			// Leave the sheet open on failure: closing it would lose the title
+			// and give no way to try again.
 			button.setText("Retry");
 			button.removeAttribute("disabled");
 			this.busy = false;

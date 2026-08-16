@@ -310,6 +310,18 @@ export class ReelSettingTab extends PluginSettingTab {
 	private renderFolders(el: HTMLElement): void {
 		new Setting(el).setName("Folders").setHeading();
 
+		// A count is the quickest way to tell "the folder setting is wrong"
+		// from "I haven't added anything yet" — both otherwise look identical.
+		const films = this.plugin.library.films().length;
+		const shows = this.plugin.library.shows().length;
+		el.createDiv({
+			cls: "reel-key-status",
+			text:
+				films + shows === 0
+					? "No titles indexed yet."
+					: `Indexing ${films} film${films === 1 ? "" : "s"} and ${shows} series.`,
+		});
+
 		type FolderKey = "filmFolder" | "seriesFolder" | "posterFolder" | "peopleFolder";
 		const folder = (name: string, desc: string, key: FolderKey) =>
 			new Setting(el)

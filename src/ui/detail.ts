@@ -55,7 +55,9 @@ export class DetailScreen {
 	constructor(
 		private plugin: ReelPlugin,
 		private entry: Entry,
-		private onBack: () => void
+		private onBack: () => void,
+		/** Where you came from, so the back button doesn't claim otherwise. */
+		private backLabel = "Library"
 	) {}
 
 	private get file(): TFile | null {
@@ -98,7 +100,7 @@ export class DetailScreen {
 		const bar = container.createDiv({ cls: "reel-detail-bar" });
 		const back = bar.createEl("button", { cls: "reel-btn reel-back" });
 		setIcon(back.createSpan(), "arrow-left");
-		back.createSpan({ text: "Library" });
+		back.createSpan({ text: this.backLabel });
 		back.addEventListener("click", () => this.onBack());
 
 		const openNote = bar.createEl("button", { cls: "reel-btn", text: "Open note" });
@@ -113,12 +115,7 @@ export class DetailScreen {
 		const hero = page.createDiv({ cls: "reel-hero" });
 
 		const posterEl = hero.createDiv({ cls: "reel-hero-poster" });
-		const src = this.plugin.posters.displayUrl(e);
-		if (src) posterEl.createEl("img", { attr: { src, alt: "" } });
-		else {
-			posterEl.addClass("is-empty");
-			posterEl.createSpan({ text: e.title.slice(0, 2) });
-		}
+		this.plugin.posters.attach(posterEl, e);
 
 		const body = hero.createDiv({ cls: "reel-hero-body" });
 

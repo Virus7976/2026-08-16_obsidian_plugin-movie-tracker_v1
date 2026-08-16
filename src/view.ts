@@ -137,6 +137,7 @@ export class ReelView extends ItemView {
 			this.query = search.value;
 			this.paint();
 		});
+		this.searchEl = search;
 		const clear = searchWrap.createEl("button", { cls: "reel-search-clear", text: "×" });
 		clear.addEventListener("click", () => {
 			search.value = "";
@@ -161,6 +162,9 @@ export class ReelView extends ItemView {
 				this.tab = t.id;
 				this.plugin.settings.lastTab = t.id;
 				void this.plugin.saveSettings();
+				// A search typed in the Library silently filtered the Diary
+				// too, which reads as missing data rather than a filter.
+				this.clearSearch();
 				this.paint();
 			});
 			btn.dataset.tab = t.id;
@@ -172,6 +176,13 @@ export class ReelView extends ItemView {
 	}
 
 	private filterEl!: HTMLElement;
+	private searchEl: HTMLInputElement | null = null;
+
+	private clearSearch(): void {
+		if (!this.query) return;
+		this.query = "";
+		if (this.searchEl) this.searchEl.value = "";
+	}
 
 	/**
 	 * Switch tabs from outside the view.
@@ -184,6 +195,7 @@ export class ReelView extends ItemView {
 		if (!TABS.some((t) => t.id === tab)) return;
 		this.tab = tab as Tab;
 		this.detail = null;
+		this.clearSearch();
 		// Persisted here rather than by the caller, so every route into a tab
 		// remembers it — a command, a click, or anything added later.
 		this.plugin.settings.lastTab = tab;
@@ -195,6 +207,11 @@ export class ReelView extends ItemView {
 		this.contentEl.findAll(".reel-tab").forEach((el) => {
 			el.toggleClass("is-active", el.dataset.tab === this.tab);
 		});
+
+		// Every library change repaints, and rebuilding the body resets its
+		// scroll to the top — so rating something halfway down your library
+		// threw you back to the start of it.
+		const scroll = this.bodyEl.scrollTop;
 
 		this.filterEl.empty();
 		this.bodyEl.empty();
@@ -213,6 +230,8 @@ export class ReelView extends ItemView {
 
 		try {
 			this.paintTab();
+			// After the DOM exists, or there is nothing to scroll yet.
+			if (scroll > 0) this.bodyEl.scrollTop = scroll;
 		} catch (e) {
 			// A thrown paint used to leave an empty pane with no explanation.
 			// Showing the error keeps the rest of the view usable and tells you
@@ -339,10 +358,16 @@ export class ReelView extends ItemView {
 	}
 
 	openDetail(entry: Entry): void {
-		this.detail = new DetailScreen(this.plugin, entry, () => {
-			this.detail = null;
-			this.paint();
-		});
+		const from = TABS.find((t) => t.id === this.tab)?.label ?? "Library";
+		this.detail = new DetailScreen(
+			this.plugin,
+			entry,
+			() => {
+				this.detail = null;
+				this.paint();
+			},
+			from
+		);
 		this.paint();
 		this.bodyEl.scrollTop = 0;
 	}
