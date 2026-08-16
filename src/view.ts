@@ -293,14 +293,57 @@ export class ReelView extends ItemView {
 		}
 
 		if (!rows.length) {
-			this.bodyEl.createDiv({
-				cls: "reel-empty",
-				text: this.query ? `Nothing matches "${this.query}".` : "Nothing here yet. Tap Log to add something.",
-			});
+			if (this.query) {
+				this.bodyEl.createDiv({ cls: "reel-empty", text: `Nothing matches "${this.query}".` });
+			} else {
+				this.renderFirstRun(this.bodyEl);
+			}
 			return;
 		}
 
 		renderPosterGrid(this.plugin, this.bodyEl, rows, (entry) => this.openDetail(entry));
+	}
+
+	/**
+	 * What an empty library says.
+	 *
+	 * "Nothing here yet" is useless when the real reason is that no API key is
+	 * set — you'd tap Log, get a notice, and still have to work out where to
+	 * go. The two cases are told apart, and each says the next thing to do.
+	 */
+	private renderFirstRun(el: HTMLElement): void {
+		const needsKey = !this.plugin.credentials.hasStoredKey && this.plugin.settings.keyMode !== "session";
+		const box = el.createDiv({ cls: "reel-firstrun" });
+
+		if (needsKey) {
+			box.createDiv({ cls: "reel-firstrun-title", text: "Add a TMDB key to get started" });
+			box.createDiv({
+				cls: "reel-firstrun-body",
+				text:
+					"Reel looks films and series up through TMDB, so it needs a key of your own. A free one takes " +
+					"a minute, and it's encrypted before it's written into your vault.",
+			});
+			const steps = box.createEl("ol", { cls: "reel-firstrun-steps" });
+			steps.createEl("li", { text: "Create a free key at themoviedb.org/settings/api" });
+			steps.createEl("li", { text: "Open Settings → Community plugins → Reel" });
+			steps.createEl("li", { text: "Paste it under “TMDB key”, then Save" });
+			const link = box.createEl("a", {
+				cls: "reel-btn mod-cta reel-firstrun-btn",
+				text: "Get a TMDB key",
+				href: "https://www.themoviedb.org/settings/api",
+			});
+			link.setAttr("target", "_blank");
+			link.setAttr("rel", "noopener");
+			return;
+		}
+
+		box.createDiv({ cls: "reel-firstrun-title", text: "Your library is empty" });
+		box.createDiv({
+			cls: "reel-firstrun-body",
+			text: "Search for anything you've watched and it becomes a note you can link to, write in, and back up.",
+		});
+		const add = box.createEl("button", { cls: "reel-btn mod-cta reel-firstrun-btn", text: "Log your first film" });
+		add.addEventListener("click", () => this.plugin.openSearch());
 	}
 
 	private paintDiary(): void {
