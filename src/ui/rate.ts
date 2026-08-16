@@ -1,49 +1,60 @@
 /**
- * Rate mode — one title at a time, rate, move on.
+ * Rate and Discover — one title at a time.
  *
- * The library grid is for finding a specific thing. This is for the opposite
- * job: working through a pile without deciding what to look at next. Every
- * other tracker has some version of it, and the reason is that rating twenty
- * films through a grid means twenty round trips into and out of a detail
- * screen, which nobody does twice.
+ * Two jobs share one screen because the interaction is identical: a card, a
+ * decision, the next card. Rate works through what you already own; Discover
+ * works through what you don't, so the library stops being a closed box you
+ * can only look backwards into.
  *
  * Rating advances automatically. That's the whole trick — the queue moves
- * without a second tap, so the interaction is one thumb and one decision.
+ * without a second tap, so it stays one thumb and one decision.
  */
 
 import { Notice, Platform, TFile } from "obsidian";
 import type ReelPlugin from "../main";
-import type { Entry } from "../types";
+import type { Entry, TmdbSearchResult } from "../types";
 import { redact } from "../secrets";
 import { renderStars } from "./stars";
-import { formatMinutes } from "../util/dates";
+import { formatMinutes, todayISO, yearOf } from "../util/dates";
 import { unlink } from "../library";
 
-export type RateQueue = "unrated" | "watchlist" | "all";
+export type RateQueue = "unrated" | "watchlist" | "all" | "trending" | "popular" | "top";
 
-const QUEUES: { id: RateQueue; label: string; empty: string }[] = [
+interface QueueDef {
+	id: RateQueue;
+	label: string;
+	empty: string;
+	/** Discover queues come from TMDB rather than the library. */
+	discover?: "trending" | "popular" | "top";
+}
+
+const QUEUES: QueueDef[] = [
 	{ id: "unrated", label: "Unrated", empty: "Everything you've watched is rated." },
 	{ id: "watchlist", label: "Watchlist", empty: "Nothing on the watchlist." },
 	{ id: "all", label: "Everything", empty: "Nothing in the library yet." },
+	{ id: "trending", label: "Trending", empty: "Couldn't load trending titles.", discover: "trending" },
+	{ id: "popular", label: "Popular", empty: "Couldn't load popular films.", discover: "popular" },
+	{ id: "top", label: "Top rated", empty: "Couldn't load top-rated films.", discover: "top" },
 ];
 
 export class RateScreen {
 	private queue: RateQueue = "unrated";
 	private index = 0;
-	/** Paths skipped this session, so Skip means "not now" rather than "never". */
 	private skipped = new Set<string>();
 	/**
-	 * Paths already acted on in this queue.
-	 *
-	 * The queue is recomputed from the library index on every repaint, but
-	 * `metadataCache` has not reparsed the file by the time we repaint — so a
-	 * film you just rated still looks unrated, stays in the queue, and you are
-	 * handed the same card again. Tracking it here makes the queue shrink
-	 * immediately, which is what the index will agree with a moment later.
+	 * Acted on this session. The queue is rebuilt from the library index on
+	 * every repaint, but metadataCache hasn't reparsed by then — so a film you
+	 * just rated still looks unrated and you'd be handed the same card again.
 	 */
 	private handled = new Set<string>();
+	private discoverCache = new Map<string, TmdbSearchResult[]>();
+	private loading = false;
 
 	constructor(private plugin: ReelPlugin) {}
+
+	private get def(): QueueDef {
+		return QUEUES.find((q) => q.id === this.queue) ?? QUEUES[0];
+	}
 
 	private pool(): Entry[] {
 		const all = this.plugin.visible(this.plugin.library.all());
@@ -60,40 +71,159 @@ export class RateScreen {
 		container.empty();
 		container.addClass("reel-rate");
 
-		/* ---- queue picker ---------------------------------------------- */
 		const bar = container.createDiv({ cls: "reel-chips" });
+		let discoverSeparatorDone = false;
 		for (const q of QUEUES) {
+			// A visual break between "what I have" and "what I don't".
+			if (q.discover && !discoverSeparatorDone) {
+				bar.createSpan({ cls: "reel-chip-sep", text: "·" });
+				discoverSeparatorDone = true;
+			}
 			const chip = bar.createEl("button", { cls: "reel-chip", text: q.label });
 			chip.toggleClass("is-active", this.queue === q.id);
 			chip.addEventListener("click", () => {
 				this.queue = q.id;
 				this.index = 0;
-				// A new queue asks a different question, so what you've already
-				// dealt with in the old one shouldn't be hidden here.
 				this.handled.clear();
 				this.skipped.clear();
 				this.render(container);
 			});
 		}
 
+		if (this.def.discover) this.renderDiscover(container);
+		else this.renderLibraryQueue(container);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Discover — titles you don't have yet                                */
+	/* ------------------------------------------------------------------ */
+
+	private renderDiscover(container: HTMLElement): void {
+		const kind = this.def.discover;
+		if (!kind) return;
+		const cached = this.discoverCache.get(kind);
+
+		if (!cached) {
+			container.createDiv({ cls: "reel-loading", text: "Loading…" });
+			if (this.loading) return;
+			this.loading = true;
+			this.plugin.tmdb
+				.discover(kind)
+				.then((results) => {
+					this.discoverCache.set(kind, results);
+					this.loading = false;
+					this.render(container);
+				})
+				.catch((e: unknown) => {
+					this.loading = false;
+					container.empty();
+					container.createDiv({ cls: "reel-error", text: redact(e) });
+				});
+			return;
+		}
+
+		// Anything already in the library belongs in Rate, not Discover.
+		const rows = cached.filter((r) => {
+			const type = r.media_type === "tv" ? "tv" : "film";
+			if (this.plugin.library.byTmdbId(r.id, type)) return false;
+			const key = `tmdb:${r.id}`;
+			return !this.skipped.has(key) && !this.handled.has(key);
+		});
+
+		if (!rows.length) {
+			container.createDiv({ cls: "reel-empty", text: "Nothing new here — you've seen or skipped all of it." });
+			return;
+		}
+
+		if (this.index >= rows.length) this.index = 0;
+		const item = rows[this.index];
+		const isTv = item.media_type === "tv";
+		const title = (isTv ? item.name : item.title) ?? "Untitled";
+		const year = yearOf(isTv ? item.first_air_date : item.release_date);
+
+		container.createDiv({ cls: "reel-rate-count", text: `${this.index + 1} of ${rows.length}` });
+
+		const card = container.createDiv({ cls: "reel-rate-card" });
+
+		const posterEl = card.createDiv({ cls: "reel-rate-poster" });
+		const src = this.plugin.tmdb.posterUrl(item.poster_path, "w342");
+		if (src) posterEl.createEl("img", { attr: { src, alt: "" } });
+		else {
+			posterEl.addClass("is-empty");
+			posterEl.createSpan({ text: title.slice(0, 2) });
+		}
+
+		const body = card.createDiv({ cls: "reel-rate-body" });
+		const h = body.createDiv({ cls: "reel-rate-title" });
+		h.createSpan({ text: title });
+		if (year) h.createSpan({ cls: "reel-dim", text: ` ${year}` });
+
+		const facts = body.createDiv({ cls: "reel-header-facts" });
+		facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+		if (item.vote_average) facts.createSpan({ cls: "reel-dim", text: `TMDB ${item.vote_average.toFixed(1)}` });
+
+		if (item.overview) body.createDiv({ cls: "reel-rate-overview", text: item.overview });
+
+		const actions = container.createDiv({ cls: "reel-rate-actions" });
+		const act = (label: string, cls: string, fn: () => Promise<void> | void) => {
+			const b = actions.createEl("button", { cls: `reel-btn ${cls}`, text: label });
+			b.addEventListener("click", () => void Promise.resolve(fn()));
+			return b;
+		};
+
+		act("Skip", "", () => {
+			this.skipped.add(`tmdb:${item.id}`);
+			this.render(container);
+		});
+
+		act("+ Watchlist", "mod-cta", async () => {
+			await this.addFromDiscover(item, true);
+			this.handled.add(`tmdb:${item.id}`);
+			new Notice(`${title} added to your watchlist`);
+			this.render(container);
+		});
+
+		act("Seen it", "", async () => {
+			await this.addFromDiscover(item, false);
+			this.handled.add(`tmdb:${item.id}`);
+			new Notice(`${title} added as watched`);
+			this.render(container);
+		});
+
+		this.renderNav(container, rows.length);
+	}
+
+	private async addFromDiscover(item: TmdbSearchResult, watchlist: boolean): Promise<void> {
+		try {
+			const payload = { date: todayISO(), watchlist };
+			if (item.media_type === "tv") {
+				const meta = await this.plugin.tmdb.getShow(item.id);
+				await this.plugin.notes.createShow(meta, payload);
+			} else {
+				const meta = await this.plugin.tmdb.getFilm(item.id);
+				await this.plugin.notes.createFilm(meta, payload);
+			}
+		} catch (e) {
+			new Notice(`Reel: ${redact(e)}`);
+		}
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Rate — titles you already have                                      */
+	/* ------------------------------------------------------------------ */
+
+	private renderLibraryQueue(container: HTMLElement): void {
 		const rows = this.pool();
-		const meta = QUEUES.find((q) => q.id === this.queue)!;
 
 		if (!rows.length) {
 			const done = container.createDiv({ cls: "reel-empty" });
-			done.createDiv({ text: this.skipped.size ? "Nothing left in this queue." : meta.empty });
+			done.createDiv({ text: this.skipped.size ? "Nothing left in this queue." : this.def.empty });
 			if (this.skipped.size) {
 				const again = done.createEl("button", { cls: "reel-btn", text: `Bring back ${this.skipped.size} skipped` });
 				again.addEventListener("click", () => {
 					this.skipped.clear();
 					this.index = 0;
 					this.render(container);
-				});
-			}
-			if (this.handled.size) {
-				done.createDiv({
-					cls: "reel-dim",
-					text: `${this.handled.size} handled this session.`,
 				});
 			}
 			return;
@@ -104,53 +234,10 @@ export class RateScreen {
 
 		container.createDiv({ cls: "reel-rate-count", text: `${this.index + 1} of ${rows.length}` });
 
-		/* ---- the card --------------------------------------------------- */
 		const card = container.createDiv({ cls: "reel-rate-card" });
-
-		/**
-		 * Keyboard shortcuts, bound to the card rather than the document — the
-		 * listener dies with the element, so there is nothing to clean up and
-		 * no chance of it firing while you're typing somewhere else.
-		 *
-		 * 1–5 rate whole stars, shift+1–5 add a half.
-		 */
 		card.setAttr("tabindex", "0");
-		card.addEventListener("keydown", async (ev) => {
-			const file = this.fileFor(entry);
-			if (!file) return;
-
-			if (ev.key >= "1" && ev.key <= "5") {
-				ev.preventDefault();
-				const whole = Number(ev.key);
-				const value = ev.shiftKey ? whole - 0.5 : whole;
-				await this.plugin.notes.setRating(file, value);
-				this.handled.add(entry.path);
-				new Notice(`${entry.title}: ${value}★`);
-				this.advance(container, rows.length);
-				return;
-			}
-
-			switch (ev.key) {
-				case "ArrowRight":
-				case "s":
-					ev.preventDefault();
-					this.skipped.add(entry.path);
-					this.render(container);
-					break;
-				case "ArrowLeft":
-					ev.preventDefault();
-					this.index = Math.max(0, this.index - 1);
-					this.render(container);
-					break;
-				case "l":
-					ev.preventDefault();
-					await this.plugin.notes.toggleLiked(file);
-					this.render(container);
-					break;
-			}
-		});
-		// Focus the card so the shortcuts work without a click first. Only on
-		// desktop — focusing on a phone raises the keyboard over the poster.
+		card.addEventListener("keydown", (ev) => void this.handleKey(ev, entry, container, rows.length));
+		// Focusing on a phone raises the keyboard over the poster.
 		if (!Platform.isMobile) window.setTimeout(() => card.focus(), 0);
 
 		const posterEl = card.createDiv({ cls: "reel-rate-poster" });
@@ -160,50 +247,33 @@ export class RateScreen {
 			posterEl.addClass("is-empty");
 			posterEl.createSpan({ text: entry.title.slice(0, 2) });
 		}
-		// Tapping the poster is the escape hatch into the full detail screen.
-		posterEl.addEventListener("click", () => this.plugin.openDetail(entry));
+		posterEl.addEventListener("click", () => void this.plugin.openDetail(entry));
 
-		const title = card.createDiv({ cls: "reel-rate-title" });
+		const body = card.createDiv({ cls: "reel-rate-body" });
+		const title = body.createDiv({ cls: "reel-rate-title" });
 		title.createSpan({ text: entry.title });
 		const year = entry.year ?? entry.firstAirYear;
 		if (year) title.createSpan({ cls: "reel-dim", text: ` ${year}` });
 
-		const facts = card.createDiv({ cls: "reel-header-facts" });
+		const facts = body.createDiv({ cls: "reel-header-facts" });
 		const people = entry.type === "tv" ? entry.creators : entry.director;
 		if (people.length) facts.createSpan({ text: people.map(unlink).slice(0, 2).join(", ") });
 		if (entry.runtime) facts.createSpan({ text: formatMinutes(entry.runtime) });
 		if (entry.genres.length) facts.createSpan({ cls: "reel-dim", text: entry.genres.slice(0, 2).join(", ") });
 		if (entry.imdbRating != null) facts.createSpan({ cls: "reel-dim", text: `IMDb ${entry.imdbRating.toFixed(1)}` });
 
-		if (entry.overview) {
-			card.createDiv({ cls: "reel-rate-overview", text: entry.overview });
-		}
+		if (entry.overview) body.createDiv({ cls: "reel-rate-overview", text: entry.overview });
 
-		/* ---- rating ----------------------------------------------------- */
-		const starRow = card.createDiv({ cls: "reel-rating-row big centred" });
+		const starRow = body.createDiv({ cls: "reel-rating-row big" });
 		renderStars(starRow, {
 			value: entry.rating,
-			onChange: async (v) => {
-				const file = this.fileFor(entry);
-				if (!file) return;
-				try {
-					await this.plugin.notes.setRating(file, v ?? null);
-					if (v != null) this.handled.add(entry.path);
-					new Notice(v == null ? `${entry.title}: rating cleared` : `${entry.title}: ${v}★`);
-					// Advance on its own — the point of this screen is that
-					// rating and moving on are a single action.
-					this.advance(container, rows.length);
-				} catch (e) {
-					new Notice(`Reel: ${redact(e)}`);
-				}
-			},
+			onChange: (v) => void this.applyRating(entry, v, container, rows.length),
 		});
 
-		/* ---- secondary actions ------------------------------------------ */
 		const actions = container.createDiv({ cls: "reel-rate-actions" });
-		const act = (label: string, cls: string, fn: (b: HTMLButtonElement) => void | Promise<void>) => {
+		const act = (label: string, cls: string, fn: (b: HTMLButtonElement) => Promise<void> | void) => {
 			const b = actions.createEl("button", { cls: `reel-btn ${cls}`, text: label });
-			b.addEventListener("click", () => void fn(b));
+			b.addEventListener("click", () => void Promise.resolve(fn(b)));
 			return b;
 		};
 
@@ -219,7 +289,6 @@ export class RateScreen {
 			entry.liked = on;
 			b.setText(on ? "♥ Liked" : "♡ Like");
 			b.toggleClass("is-liked", on);
-			new Notice(on ? `Liked ${entry.title}` : `Unliked ${entry.title}`);
 		});
 
 		if (entry.status !== "watchlist") {
@@ -243,7 +312,10 @@ export class RateScreen {
 			});
 		}
 
-		/* ---- prev / next ------------------------------------------------- */
+		this.renderNav(container, rows.length);
+	}
+
+	private renderNav(container: HTMLElement, total: number): void {
 		const nav = container.createDiv({ cls: "reel-rate-nav" });
 		const prev = nav.createEl("button", { cls: "reel-btn", text: "← Previous" });
 		prev.disabled = this.index === 0;
@@ -252,13 +324,60 @@ export class RateScreen {
 			this.render(container);
 		});
 		const next = nav.createEl("button", { cls: "reel-btn", text: "Next →" });
-		next.addEventListener("click", () => this.advance(container, rows.length));
+		next.addEventListener("click", () => {
+			this.index = this.index + 1 >= total ? 0 : this.index + 1;
+			this.render(container);
+		});
+	}
+
+	private async applyRating(entry: Entry, v: number | undefined, container: HTMLElement, total: number): Promise<void> {
+		const file = this.fileFor(entry);
+		if (!file) return;
+		try {
+			await this.plugin.notes.setRating(file, v ?? null);
+			if (v != null) this.handled.add(entry.path);
+			new Notice(v == null ? `${entry.title}: rating cleared` : `${entry.title}: ${v}★`);
+			this.advance(container, total);
+		} catch (e) {
+			new Notice(`Reel: ${redact(e)}`);
+		}
+	}
+
+	/** 1–5 rate, shift for halves, arrows move, s skips, l likes. */
+	private async handleKey(ev: KeyboardEvent, entry: Entry, container: HTMLElement, total: number): Promise<void> {
+		const file = this.fileFor(entry);
+		if (!file) return;
+
+		if (ev.key >= "1" && ev.key <= "5") {
+			ev.preventDefault();
+			const whole = Number(ev.key);
+			await this.applyRating(entry, ev.shiftKey ? whole - 0.5 : whole, container, total);
+			return;
+		}
+
+		switch (ev.key) {
+			case "ArrowRight":
+			case "s":
+				ev.preventDefault();
+				this.skipped.add(entry.path);
+				this.render(container);
+				break;
+			case "ArrowLeft":
+				ev.preventDefault();
+				this.index = Math.max(0, this.index - 1);
+				this.render(container);
+				break;
+			case "l":
+				ev.preventDefault();
+				await this.plugin.notes.toggleLiked(file);
+				this.render(container);
+				break;
+		}
 	}
 
 	private advance(container: HTMLElement, total: number): void {
 		// Rating removes the entry from the "unrated" queue, so the list
-		// shortens under us. Staying put lands on the next one; only wrap when
-		// we're genuinely at the end of a queue that isn't shrinking.
+		// shortens under us and staying put lands on the next one.
 		if (this.queue !== "unrated") this.index = this.index + 1 >= total ? 0 : this.index + 1;
 		this.render(container);
 	}
@@ -268,5 +387,3 @@ export class RateScreen {
 		return f instanceof TFile ? f : null;
 	}
 }
-
-import { todayISO } from "../util/dates";

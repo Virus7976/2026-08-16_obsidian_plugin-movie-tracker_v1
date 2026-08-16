@@ -148,6 +148,33 @@ export class TmdbClient {
 	 * five extra endpoints' worth of data for zero extra round trips, which
 	 * matters on a phone far more than it does on a desktop.
 	 */
+	/**
+	 * Titles you haven't seen — the input to Discover.
+	 *
+	 * Cached like anything else, so flicking between the queues doesn't spend a
+	 * request each time. Trending changes daily, so a short TTL is honest; the
+	 * shared cache TTL is close enough and keeps one policy rather than two.
+	 */
+	async discover(kind: "trending" | "popular" | "top" | "upcoming"): Promise<TmdbSearchResult[]> {
+		const path =
+			kind === "trending"
+				? "/trending/all/week"
+				: kind === "popular"
+					? "/movie/popular"
+					: kind === "top"
+						? "/movie/top_rated"
+						: "/movie/upcoming";
+
+		const data = await this.cached(`discover-${kind}`, () =>
+			this.request<{ results?: TmdbSearchResult[] }>(path, {})
+		);
+
+		return (data.results ?? [])
+			// /movie/* endpoints omit media_type; everything there is a film.
+			.map((r) => ({ ...r, media_type: r.media_type ?? "movie" }))
+			.filter((r) => r.media_type === "movie" || r.media_type === "tv");
+	}
+
 	async getFilm(id: number): Promise<TmdbFilm> {
 		return this.cached(
 			`movie-${id}`,

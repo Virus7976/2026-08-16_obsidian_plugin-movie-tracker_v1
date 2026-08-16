@@ -12,7 +12,7 @@
  *   construction, destroy an existing review.
  */
 
-import { Notice, TFile, TFolder, normalizePath } from "obsidian";
+import { TFile, TFolder, normalizePath } from "obsidian";
 import type ReelPlugin from "./main";
 import { clampRating, starString } from "./util/ratings";
 import { addToRange, contiguousProgress, rangeCount } from "./util/ranges";

@@ -43,7 +43,7 @@ export interface SecretBlob {
 const PBKDF2_ITERATIONS = 310_000;
 
 function subtle(): SubtleCrypto {
-	const c = globalThis.crypto;
+	const c = window.crypto;
 	if (!c?.subtle) {
 		throw new Error(
 			"WebCrypto is unavailable, so the key cannot be encrypted. " +
@@ -55,7 +55,7 @@ function subtle(): SubtleCrypto {
 
 function randomBytes(n: number): Uint8Array {
 	const b = new Uint8Array(n);
-	globalThis.crypto.getRandomValues(b);
+	window.crypto.getRandomValues(b);
 	return b;
 }
 

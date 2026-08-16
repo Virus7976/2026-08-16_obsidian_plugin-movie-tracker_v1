@@ -1,6 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type ReelPlugin from "./main";
-import { KeyMode, SecretBlob, maskSecret } from "./secrets";
+import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
 import { KEY_LABELS, KeyBundle, KeyName } from "./credentials";
 
@@ -265,7 +265,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			new Setting(el)
 				.setName("Remove all keys")
 				.addButton((b) =>
-					b.setWarning().setButtonText("Remove all").onClick(async () => {
+					b.setDestructive().setButtonText("Remove all").onClick(async () => {
 						await store.clear();
 						new Notice("Reel: keys removed.");
 						this.display();
@@ -277,7 +277,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			el.createDiv({
 				cls: "reel-callout warn",
 				text:
-					"Plain text mode writes your keys readably into .obsidian/plugins/reel/data.json. " +
+					`Plain text mode writes your keys readably into ${this.app.vault.configDir}/plugins/reel/data.json. ` +
 					"If this vault is synced to git or a shared drive, treat them as public.",
 			});
 		}
@@ -342,7 +342,6 @@ export class ReelSettingTab extends PluginSettingTab {
 				s
 					.setLimits(0, 25, 1)
 					.setValue(this.plugin.settings.castLimit)
-					.setDynamicTooltip()
 					.onChange(async (v) => {
 						this.plugin.settings.castLimit = v;
 						await this.plugin.saveSettings();
@@ -524,7 +523,6 @@ export class ReelSettingTab extends PluginSettingTab {
 				s
 					.setLimits(1, 90, 1)
 					.setValue(this.plugin.settings.cacheTtlDays)
-					.setDynamicTooltip()
 					.onChange(async (v) => {
 						this.plugin.settings.cacheTtlDays = v;
 						await this.plugin.saveSettings();

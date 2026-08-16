@@ -21,7 +21,7 @@
 
 .reel-chip,
 .reel-btn,
-.reel-seg-btn {
+.reel-log .reel-seg .reel-seg-btn {
 	font-family: inherit;
 	font-size: var(--font-ui-small);
 	color: var(--text-normal);
@@ -49,7 +49,9 @@
 	font-weight: 600;
 }
 
-.reel-chip.is-active {
+.reel-view .reel-chip.is-active,
+.reel-block .reel-chip.is-active,
+.reel-modal .reel-chip.is-active {
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 	border-color: transparent;
@@ -79,7 +81,6 @@
 	top: 0;
 	z-index: 5;
 	background: var(--background-primary);
-	scrollbar-width: none;
 	-webkit-overflow-scrolling: touch;
 	scroll-padding-inline: 8px;
 }
@@ -896,14 +897,14 @@ input.reel-input {
 	margin-bottom: 16px;
 }
 
-.reel-seg-btn {
+.reel-log .reel-seg .reel-seg-btn {
 	flex: 1;
 	border: none;
 	background: transparent;
 	min-height: 40px;
 }
 
-.reel-seg-btn.is-active {
+.reel-log .reel-seg .reel-seg-btn.is-active {
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 }
@@ -1128,10 +1129,10 @@ input.reel-input {
 	pointer-events: none;
 }
 
-.reel-search-input {
-	margin-bottom: 0 !important;
-	padding-left: 34px !important;
-	padding-right: 34px !important;
+.reel-view .reel-search-wrap .reel-search-input {
+	margin-bottom: 0;
+	padding-left: 34px;
+	padding-right: 34px;
 }
 
 /* The native search clear affordance is tiny and inconsistent across
@@ -1414,9 +1415,9 @@ input.reel-input {
 
 /* ---------------- review box ---------------- */
 
-.reel-textarea {
+.reel-modal .reel-textarea {
 	min-height: 96px;
-	padding: 10px 12px !important;
+	padding: 10px 12px;
 	line-height: 1.5;
 	resize: vertical;
 	font-family: inherit;
@@ -1612,25 +1613,27 @@ input.reel-input {
 	gap: 3px;
 }
 
-.reel-seg-btn {
-	border: 1px solid transparent !important;
+.reel-log .reel-seg .reel-seg-btn {
+	border: 1px solid transparent;
 	background: transparent;
 	color: var(--text-muted);
 	font-weight: 500;
 }
 
-.reel-seg-btn.is-active {
-	background: var(--interactive-accent, #7c3aed) !important;
-	color: var(--text-on-accent, #fff) !important;
-	border-color: var(--interactive-accent, #7c3aed) !important;
+.reel-log .reel-seg .reel-seg-btn.is-active {
+	background: var(--interactive-accent, #7c3aed);
+	color: var(--text-on-accent, #fff);
+	border-color: var(--interactive-accent, #7c3aed);
 	font-weight: 700;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
-.reel-chip.is-active {
-	background: var(--interactive-accent, #7c3aed) !important;
-	color: var(--text-on-accent, #fff) !important;
-	border-color: var(--interactive-accent, #7c3aed) !important;
+.reel-view .reel-chip.is-active,
+.reel-block .reel-chip.is-active,
+.reel-modal .reel-chip.is-active {
+	background: var(--interactive-accent, #7c3aed);
+	color: var(--text-on-accent, #fff);
+	border-color: var(--interactive-accent, #7c3aed);
 	font-weight: 600;
 }
 
@@ -2064,18 +2067,18 @@ input.reel-input {
 	max-width: 72ch;
 }
 
-.reel-trailer-btn {
-	flex: 0 0 auto !important;
+.reel-detail .reel-links .reel-trailer-btn {
+	flex: 0 0 auto;
 	display: inline-flex;
 	align-items: center;
 	gap: 7px;
-	text-decoration: none !important;
+	text-decoration: none;
 	min-height: 40px;
 	padding: 0 18px;
 }
 
-.reel-trailer-btn:hover {
-	text-decoration: none !important;
+.reel-detail .reel-links .reel-trailer-btn:hover {
+	text-decoration: none;
 }
 
 .reel-links {
@@ -2443,10 +2446,10 @@ input.reel-input {
 	line-height: 1.7;
 }
 
-.reel-firstrun-btn {
+.reel-firstrun .reel-firstrun-btn {
 	align-self: center;
-	flex: 0 0 auto !important;
-	text-decoration: none !important;
+	flex: 0 0 auto;
+	text-decoration: none;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -2528,4 +2531,106 @@ input.reel-input {
 	max-width: 920px;
 	margin-left: auto;
 	margin-right: auto;
+}
+
+/* ================================================================== *
+ * v0.8 — layout balance, discover cards
+ * ================================================================== */
+
+/* The grid stretched to a 1400px cap while a small library sat in the
+   top-left corner of it. Narrower cap, centred, and cells that don't grow
+   past a sensible poster size — one title should look deliberate, not
+   abandoned in a field of white. */
+.reel-grid {
+	max-width: 1100px;
+	margin: 0 auto;
+	justify-content: start;
+}
+
+@media (min-width: 900px) {
+	.reel-grid {
+		grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
+		justify-content: center;
+	}
+}
+
+/* The rating slab across the poster was the ugliest thing on screen.
+   Smaller, tucked into the corner, and only as wide as its stars. */
+.reel-cell-rating {
+	left: 4px;
+	right: auto;
+	bottom: 4px;
+	padding: 3px 6px;
+	border-radius: 5px;
+	background: rgba(0, 0, 0, 0.72);
+	display: inline-flex;
+}
+
+.reel-cell-rating .reel-star {
+	width: 11px;
+	height: 11px;
+	font-size: 10px;
+}
+
+.reel-cell-poster {
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+/* Selects looked like raw form controls next to the pill-shaped chips. */
+.reel-select {
+	border-radius: 999px;
+	padding: 0 12px;
+	min-height: 34px;
+	cursor: pointer;
+}
+
+.reel-sortbar {
+	align-items: center;
+	padding-bottom: 10px;
+}
+
+/* Tabs were spread across the full window with big gaps between icons. */
+.reel-tabs {
+	max-width: 620px;
+	gap: 2px;
+}
+
+.reel-view-header,
+.reel-view-filters {
+	max-width: 1100px;
+}
+
+.reel-block-count {
+	text-align: left;
+}
+
+/* ---------------- discover / rate card ---------------- */
+
+.reel-rate-body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+	flex: 1;
+}
+
+.reel-rate-card {
+	max-width: 720px;
+	margin: 0 auto;
+	width: 100%;
+	border: 1px solid var(--background-modifier-border);
+}
+
+@media (min-width: 800px) {
+	.reel-rate-card {
+		align-items: center;
+	}
+}
+
+.reel-rate-actions,
+.reel-rate-nav {
+	max-width: 720px;
+	margin-left: auto;
+	margin-right: auto;
+	width: 100%;
 }

@@ -6,6 +6,9 @@ on:
 
 permissions:
   contents: write
+  # Required to sign the build provenance attestation below.
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -28,6 +31,16 @@ jobs:
       # diagnose after the fact than a failed build here.
       - name: Preflight
         run: node scripts/preflight.mjs "$GITHUB_REF_NAME"
+
+      # Lets anyone verify these assets were built from this repository, by
+      # this workflow, rather than uploaded by hand. `gh attestation verify
+      # main.js --repo <owner>/<repo>` checks it.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            main.js
+            styles.css
 
       # Obsidian fetches these three by name from the release assets. They must
       # be loose files, not a zip.

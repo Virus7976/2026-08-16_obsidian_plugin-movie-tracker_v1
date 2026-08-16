@@ -21,7 +21,6 @@ import { viewings } from "./render/diary";
 import { sortEntries } from "./render/query";
 import { prettyDate } from "./util/dates";
 import { renderStarsStatic } from "./ui/stars";
-import { TFile } from "obsidian";
 
 export const REEL_VIEW = "reel-view";
 
@@ -161,7 +160,7 @@ export class ReelView extends ItemView {
 
 	private paint(): void {
 		this.contentEl.findAll(".reel-tab").forEach((el) => {
-			el.toggleClass("is-active", (el as HTMLElement).dataset.tab === this.tab);
+			el.toggleClass("is-active", el.dataset.tab === this.tab);
 		});
 
 		this.filterEl.empty();

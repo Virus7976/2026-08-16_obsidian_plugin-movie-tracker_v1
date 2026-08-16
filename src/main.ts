@@ -172,7 +172,7 @@ export default class ReelPlugin extends Plugin {
 	}
 
 	private registerCommands(): void {
-		this.addCommand({ id: "open-view", name: "Open Reel", icon: "reel", callback: () => void this.openView() });
+		this.addCommand({ id: "open-view", name: "Open library", icon: "reel", callback: () => void this.openView() });
 
 		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });
 

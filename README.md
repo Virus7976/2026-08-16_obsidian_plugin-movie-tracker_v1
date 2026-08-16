@@ -68,23 +68,68 @@ rating: 4.5
 
 `status` settles itself: tick the last episode and the show flips to `completed`; a new season arrives and it goes back to `watching`. A deliberate `paused` or `dropped` is never overridden.
 
-## The five surfaces
+## What it looks like
 
-### 1. Log something
+Everything lives in one tab — the film-reel icon in the ribbon. Five sections,
+a search box across the top, and filter chips underneath.
 
-Ribbon icon, mobile toolbar, or **Reel: log a film or series**. Debounced 300 ms against `/search/multi`, so one command finds both films and shows — two separate commands is more friction on a phone.
+### Library
 
-Pick a result → a sheet with date (defaults to today), tap-to-set stars, a liked toggle, and "watchlist instead". On a phone it's a bottom sheet, so the controls sit under your thumb rather than behind the keyboard.
+A poster grid: three across on a phone, capped column count on a desktop so a
+wide monitor doesn't give you sixteen tiny posters a row. Filter by type,
+status, genre or list; sort by two criteria at once ("highest rated, then most
+recent"). Search covers title, director, cast, genre, collection and list, with
+no debounce — the index is in memory, so it filters as you type.
 
-### 2. Note header card
+Tap a poster for the detail screen. Long-press to quick-rate without leaving
+the grid.
 
-Any note with a `tmdb_id` gets a card rendered above your writing: poster, runtime, director, your rating, full watch history. For a show, a season strip — tap a season for its episode checklist.
+### Detail
 
-Reading view only, since it's a markdown post-processor. In Live Preview you see the raw note, which is arguably what you want while writing.
+Everything about one title, and everything editable in place:
 
-### 3. Library
+- Poster, scores from you / IMDb / Metacritic / Rotten Tomatoes / TMDB, genres,
+  overview
+- **Trailer** as a button, plus IMDb and TMDB links
+- Rating, liked, and status — tap and it saves, with a flash to confirm
+- **Series:** a season strip that expands inline into episodes, each with its
+  own stars. Rating an episode marks it watched, and feeds the season and
+  series ratings.
+- **Films:** full watch history, and one button to log another viewing
+- Cast, streaming providers, collection, studio, lists and content flags as
+  aligned rows
 
-Drop this in any note:
+### Rate
+
+One title at a time: poster, the essentials, big stars. Rating advances
+automatically, so rating and moving on are a single action. Queues for unrated,
+watchlist, or everything; Skip means "not now" and can be undone.
+
+On desktop, `1`–`5` rate, shift for halves, `←`/`→` move, `s` skips, `l` likes.
+
+### Up next
+
+Every show you're partway through, one row each: poster, `S3E5`, progress, and
+a tick that marks it watched in one tap. Underneath, what's about to air for
+shows TMDB still lists as returning.
+
+### Diary
+
+Every *viewing*, newest first, grouped by month. The grid shows titles; this
+shows viewings — so a film seen twice appears twice, which is the whole reason
+the watch history is an array.
+
+### Stats
+
+Computed entirely from frontmatter, so no API calls and it works offline.
+Beyond the counts: how your ratings compare to IMDb, which directors and genres
+you actually rate rather than merely watch, current streak, films per month, how
+long your watchlist is at your current pace, day-of-week patterns, superlatives,
+and series progress.
+
+## Code blocks
+
+The same data, embeddable in any note:
 
 ````markdown
 ```films
@@ -94,43 +139,21 @@ layout: poster-grid
 ```
 ````
 
-Three posters across on a phone, sticky filter chips, tap to open, **long-press to quick-rate**.
-
-Also `​```series` and `​```library` (both types).
+Also `​```series`, `​```library`, `​```diary`, `​```up-next`, `​```upcoming` and
+`​```film-stats`.
 
 | Option | Values |
 |---|---|
-| `filter:` | comma-separated `field op value`, all ANDed. Ops: `=` `!=` `>` `<` `>=` `<=` `contains` |
-| `sort:` | `watched` `title` `year` `rating` `tmdb_rating` `runtime` `random`, plus `asc`/`desc` |
+| `filter:` | comma-separated `field op value`, all ANDed. Ops: `=` `!=` `>` `<` `>=` `<=` `contains` `excludes` `in` `not in` |
+| `sort:` | `watched` `added` `title` `year` `rating` `imdb_rating` `metacritic` `tmdb_rating` `runtime` `popularity` `certification` `random`, plus `asc`/`desc` |
 | `layout:` | `poster-grid` · `list` · `compact` |
-| `limit:` | a number |
-| `title:` | heading above the block |
-| `chips:` | `false` to hide the filter bar |
+| `limit:` `title:` `chips:` | a number · a heading · `false` to hide filters |
 
-Filterable fields: `status` `type` `title` `year` `decade` `rating` `tmdb_rating` `liked` `genre` `director` `creator` `runtime` `show_status` `watched` `episodes`.
-
-### 4. Up next
-
-````markdown
-```up-next
-limit: 8
-```
-````
-
-The screen you'd open daily, and the one film has no equivalent for. Every row is one show you're partway through, and the whole row is one action: tap ✓, the range extends by one, `last_watched` moves, done. No modal, no navigation, one thumb.
-
-Shows TMDB marks as `Returning Series` get refreshed once a day so a new episode gets a badge.
-
-### 5. Stats
-
-````markdown
-```film-stats
-year: 2026
-include: all
-```
-````
-
-Films per year, hours watched, top directors and creators, rating distribution, genres. Computed entirely from frontmatter already in the index — **zero API calls**, so it's safe on a dashboard note you open constantly.
+Filterable fields: `status` `type` `title` `year` `decade` `rating`
+`imdb_rating` `metacritic` `tmdb_rating` `liked` `genre` `director` `creator`
+`cast` `runtime` `show_status` `watched` `episodes` `collection` `provider`
+`language` `popularity` `certification` `content` `list` `studio` `budget`
+`revenue` `added`.
 
 ## Commands
 
@@ -241,26 +264,6 @@ npm test
 ```
 
 51 assertions over the range parser, rating maths, date handling and the query engine — the pure logic where an off-by-one would quietly corrupt watch history.
-
-## What's new in 0.2
-
-Built in response to "everything this is missing that other apps have":
-
-- **Reel view** — a real tab (ribbon icon), with Library / Up next / Diary / Stats, a search box, filter chips and a sort menu. On a phone the tab bar sits at the bottom, under your thumb.
-- **Search** across title, director, cast, genre, collection and list. No debounce — the haystack is prebuilt, so it filters on every keystroke.
-- **Diary** — every viewing, newest first, grouped by month. Rewatches get their own row.
-- **Reviews** — a review box in the log sheet. Appended to the note under a dated heading, via `vault.append`, so no code path here can overwrite what you wrote.
-- **Episode ratings** — stars on every episode row. Rating one marks it watched.
-- **Series rewatches** — *Start a rewatch* records the completed run and resets progress.
-- **Rich metadata** — cast, overview, trailer, budget, revenue, collection, studios, streaming providers, language, popularity, certification. Still one API call per title.
-- **Content filtering** — hide by flag (sex, nudity, swearing, violence, gore, drugs, horror) or by certification. See the honesty note below.
-- **People as links** — `[[Movies/People/Denis Villeneuve|Denis Villeneuve]]`, so directors and actors get backlinks and graph nodes.
-- **Lists** — membership in frontmatter, so a list can never desync from its members.
-- **Upcoming** — a calendar of returning shows.
-- **Analytics** — top actors, directors, collections, studios, certifications, providers, by-month, by-decade, busiest day.
-- **Importer** — converts notes from the old tracker in place.
-- **Specials** — season 0, optional.
-- Fixed: `sort: added` sorted by filename while claiming to be chronological.
 
 ## Content filtering — what it can and can't do
 
