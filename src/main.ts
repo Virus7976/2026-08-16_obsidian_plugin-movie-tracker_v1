@@ -50,7 +50,6 @@ export default class ReelPlugin extends Plugin {
 	dtdd!: DtddClient;
 	discover!: DiscoverEngine;
 
-	private lastHidden = 0;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -113,25 +112,33 @@ export default class ReelPlugin extends Plugin {
 	 */
 	visible(entries: Entry[]): Entry[] {
 		const policy = this.policy;
-		if (!policy.hideFlags.length && !policy.maxCertification && !policy.hideUnrated) {
-			this.lastHidden = 0;
-			return entries;
-		}
-		const kept = entries.filter((e) => policyBreach(e, policy) == null);
-		this.lastHidden = entries.length - kept.length;
-		return kept;
+		if (!policy.hideFlags.length && !policy.maxCertification && !policy.hideUnrated) return entries;
+		return entries.filter((e) => policyBreach(e, policy) == null);
 	}
 
-	/** How many titles the last `visible()` call removed, for the UI to admit to. */
-	hiddenCount(): number {
-		return this.lastHidden;
+	/**
+	 * How many of *these* entries the policy hides.
+	 *
+	 * Takes the list rather than reporting on whatever called `visible()` last:
+	 * several surfaces filter on every repaint, so a shared counter meant the
+	 * Library could show a number produced by Stats.
+	 */
+	hiddenCount(entries: Entry[]): number {
+		return entries.length - this.visible(entries).length;
 	}
 
 	/* ------------------------------------------------------------------ */
 
-	async openView(): Promise<void> {
+	async openView(rebuild = false): Promise<void> {
 		const existing = this.app.workspace.getLeavesOfType(REEL_VIEW);
 		if (existing.length) {
+			// A command that targets a tab has to re-run onOpen, which is where
+			// the saved tab is read; revealing alone would leave you wherever
+			// you already were.
+			if (rebuild) {
+				const view = existing[0].view;
+				if (view instanceof ReelView) await view.onOpen();
+			}
 			await this.app.workspace.revealLeaf(existing[0]);
 			return;
 		}
@@ -176,6 +183,25 @@ export default class ReelPlugin extends Plugin {
 
 	private registerCommands(): void {
 		this.addCommand({ id: "open-view", name: "Open library", icon: "reel", callback: () => void this.openView() });
+
+		// One command per tab: the palette is how a keyboard user navigates,
+		// and "open, then click a tab" is two steps where one will do.
+		for (const [id, tab, name] of [
+			["open-discover", "discover", "Open discover"],
+			["open-rate", "rate", "Open rate"],
+			["open-upnext", "up next", "Open up next"],
+			["open-diary", "diary", "Open diary"],
+			["open-stats", "stats", "Open stats"],
+		] as const) {
+			this.addCommand({
+				id,
+				name,
+				callback: () => {
+					this.settings.lastTab = tab === "up next" ? "upnext" : tab;
+					void this.saveSettings().then(() => this.openView(true));
+				},
+			});
+		}
 
 		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });
 

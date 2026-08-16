@@ -107,73 +107,79 @@ class UpNextPainter {
 			const more = el.createDiv({ cls: "reel-block-count" });
 			const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${hidden} more` });
 			btn.addEventListener("click", () => {
-				rows = everything;
-				this.limit = everything.length;
-				this.render();
+				// Append the rest rather than re-rendering: this painter is
+				// rebuilt on every library event, so any state set on it would
+				// be discarded the next time anything changed.
+				for (const entry of everything.slice(cap)) list.appendChild(this.row(entry));
+				more.remove();
 			});
 		}
-		for (const entry of rows) {
-			const next = this.plugin.upNext.nextFor(entry);
-			const row = list.createDiv({ cls: "reel-upnext-row" });
+		for (const entry of rows) list.appendChild(this.row(entry));
+	}
 
-			const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
-			const src = this.plugin.posters.displayUrl(entry);
-			if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-			else {
-				thumb.addClass("is-empty");
-				thumb.createSpan({ text: entry.title.slice(0, 2) });
-			}
-			// Opens the detail screen rather than the raw note — the note in
-			// Live Preview shows frontmatter, not the season strip.
-			thumb.addEventListener("click", () => void this.plugin.openDetail(entry));
+	/** One row. Detached, so it can be appended lazily by 'show more'. */
+	private row(entry: Entry): HTMLElement {
+		const next = this.plugin.upNext.nextFor(entry);
+		const row = createDiv({ cls: "reel-upnext-row" });
 
-			const body = row.createDiv({ cls: "reel-upnext-body" });
-			const title = body.createDiv({ cls: "reel-upnext-title" });
-			title.createSpan({ text: entry.title });
-			if (this.plugin.upNext.airingToday(entry)) {
-				title.createSpan({ cls: "reel-badge new", text: "New" });
-			}
+		const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
+		const src = this.plugin.posters.displayUrl(entry);
+		if (src) thumb.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
+		else {
+			thumb.addClass("is-empty");
+			thumb.createSpan({ text: entry.title.slice(0, 2) });
+		}
+		// Opens the detail screen rather than the raw note — the note in
+		// Live Preview shows frontmatter, not the season strip.
+		thumb.addEventListener("click", () => void this.plugin.openDetail(entry));
 
-			const total = entry.totalEpisodes ?? 0;
-			const seen = entry.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
+		const body = row.createDiv({ cls: "reel-upnext-body" });
+		const title = body.createDiv({ cls: "reel-upnext-title" });
+		title.createSpan({ text: entry.title });
+		if (this.plugin.upNext.airingToday(entry)) {
+			title.createSpan({ cls: "reel-badge new", text: "New" });
+		}
 
-			const meta = body.createDiv({ cls: "reel-upnext-meta" });
-			if (next) meta.createSpan({ cls: "reel-upnext-ep", text: `S${next.season}E${next.episode}` });
-			else meta.createSpan({ cls: "reel-dim", text: "All caught up" });
-			// How far through, in words as well as a bar — a 3px bar alone is
-			// not readable at a glance, and the count is the useful number.
-			if (total) meta.createSpan({ cls: "reel-dim", text: `${seen}/${total} · ${Math.round((seen / total) * 100)}%` });
-			if (entry.lastWatched?.date) meta.createSpan({ cls: "reel-dim", text: prettyDate(entry.lastWatched.date) });
+		const total = entry.totalEpisodes ?? 0;
+		const seen = entry.seasons.reduce((n, s) => n + rangeCount(s.watched), 0);
 
-			if (total) {
-				const bar = body.createDiv({ cls: "reel-progress" });
-				bar.setCssProps({ "--reel-fill": String(Math.min(1, seen / total)) });
-				bar.setAttr("aria-label", `${seen} of ${total} episodes`);
-			}
+		const meta = body.createDiv({ cls: "reel-upnext-meta" });
+		if (next) meta.createSpan({ cls: "reel-upnext-ep", text: `S${next.season}E${next.episode}` });
+		else meta.createSpan({ cls: "reel-dim", text: "All caught up" });
+		// How far through, in words as well as a bar — a 3px bar alone is
+		// not readable at a glance, and the count is the useful number.
+		if (total) meta.createSpan({ cls: "reel-dim", text: `${seen}/${total} · ${Math.round((seen / total) * 100)}%` });
+		if (entry.lastWatched?.date) meta.createSpan({ cls: "reel-dim", text: prettyDate(entry.lastWatched.date) });
 
-			const actions = row.createDiv({ cls: "reel-upnext-actions" });
-			if (next) {
-				const tick = actions.createEl("button", { cls: "reel-tick", text: "✓" });
-				tick.setAttr("aria-label", `Mark S${next.season}E${next.episode} watched`);
-				tick.addEventListener("click", async (e) => {
-					e.stopPropagation();
-					const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
-					if (!(file instanceof TFile)) return;
-					tick.setAttr("disabled", "true");
-					try {
-						await this.plugin.notes.markEpisode(file, next.season, next.episode);
-					} catch (err) {
-						new Notice(`Reel: ${redact(err)}`);
-						tick.removeAttribute("disabled");
-					}
-				});
-			}
-			const more = actions.createEl("button", { cls: "reel-more", text: "⋯" });
-			more.setAttr("aria-label", "Open season");
-			more.addEventListener("click", (e) => {
+		if (total) {
+			const bar = body.createDiv({ cls: "reel-progress" });
+			bar.setCssProps({ "--reel-fill": String(Math.min(1, seen / total)) });
+			bar.setAttr("aria-label", `${seen} of ${total} episodes`);
+		}
+
+		const actions = row.createDiv({ cls: "reel-upnext-actions" });
+		if (next) {
+			const tick = actions.createEl("button", { cls: "reel-tick", text: "✓" });
+			tick.setAttr("aria-label", `Mark S${next.season}E${next.episode} watched`);
+			tick.addEventListener("click", async (e) => {
 				e.stopPropagation();
-				new SeasonSheet(this.plugin.app, this.plugin, entry, next?.season ?? 1).open();
+				const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
+				if (!(file instanceof TFile)) return;
+				tick.setAttr("disabled", "true");
+				try {
+					await this.plugin.notes.markEpisode(file, next.season, next.episode);
+				} catch (err) {
+					new Notice(`Reel: ${redact(err)}`);
+					tick.removeAttribute("disabled");
+				}
 			});
 		}
+		const more = actions.createEl("button", { cls: "reel-more", text: "⋯" });
+		more.setAttr("aria-label", "Open season");
+		more.addEventListener("click", (e) => {
+			e.stopPropagation();
+			new SeasonSheet(this.plugin.app, this.plugin, entry, next?.season ?? 1).open();
+		});
+		return row;
 	}
 }

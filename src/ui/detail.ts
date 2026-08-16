@@ -247,6 +247,33 @@ export class DetailScreen {
 			flash(heart);
 		});
 
+		// Lists were only reachable through a modal, which is a lot of taps for
+		// something you mostly want to glance at and toggle.
+		const known = this.plugin.library.lists();
+		if (known.length || e.lists.length) {
+			const listBox = box.createDiv({ cls: "reel-control" });
+			listBox.createDiv({ cls: "reel-field-label", text: "Lists" });
+			const listRow = listBox.createDiv({ cls: "reel-status-row" });
+			for (const name of [...new Set([...known, ...e.lists])].sort()) {
+				const pill = listRow.createEl("button", { cls: "reel-chip", text: name });
+				const on = () => this.entry.lists.includes(name);
+				pill.toggleClass("is-active", on());
+				pill.addEventListener("click", () => {
+					void (async () => {
+						const file = this.file;
+						if (!file) return;
+						const next = on()
+							? this.entry.lists.filter((l) => l !== name)
+							: [...this.entry.lists, name];
+						await this.plugin.notes.setLists(file, next);
+						this.entry = { ...this.entry, lists: next };
+						pill.toggleClass("is-active", on());
+						flash(pill);
+					})();
+				});
+			}
+		}
+
 		const statusBox = box.createDiv({ cls: "reel-control" });
 		statusBox.createDiv({ cls: "reel-field-label", text: "Status" });
 		const statusRow = statusBox.createDiv({ cls: "reel-status-row" });
@@ -362,7 +389,7 @@ export class DetailScreen {
 		if (e.providers.length) rows.push(["Streaming", e.providers.join(", ")]);
 		if (e.collection) rows.push(["Collection", e.collection]);
 		if (e.productionCompanies.length) rows.push(["Studio", e.productionCompanies.slice(0, 3).join(", ")]);
-		if (e.lists.length) rows.push(["Lists", e.lists.join(", ")]);
+
 		if (e.contentFlags.length) {
 			rows.push(["Contains", e.contentFlags.map((f) => FLAG_LABELS[f as ContentFlag] ?? f).join(", ")]);
 		}
@@ -430,6 +457,7 @@ export class DetailScreen {
 		const ratings: Record<string, number> = { ...(row?.episode_ratings ?? {}) };
 
 		listEl.empty();
+		let firstUnwatched: HTMLElement | null = null;
 
 		const bulk = listEl.createDiv({ cls: "reel-season-bulk" });
 		const markAll = bulk.createEl("button", { cls: "reel-chip", text: "Mark all watched" });
@@ -498,6 +526,17 @@ export class DetailScreen {
 					new Notice(v == null ? `S${season}E${n} cleared` : `S${season}E${n} rated ${v}`);
 				},
 			});
+
+			// Opening season 4 of a show you're 18 episodes into should land on
+			// episode 19, not make you scroll past everything you've seen.
+			if (!firstUnwatched && !watched.has(n)) {
+				firstUnwatched = epRow;
+			}
+		}
+
+		if (firstUnwatched) {
+			// After layout, or the offset is measured against nothing.
+			window.setTimeout(() => firstUnwatched?.scrollIntoView({ block: "nearest" }), 0);
 		}
 	}
 

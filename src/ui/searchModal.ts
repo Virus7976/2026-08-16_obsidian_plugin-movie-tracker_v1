@@ -32,6 +32,9 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 			{ command: "↑↓", purpose: "navigate" },
 			{ command: "↵", purpose: "select" },
 			{ command: "esc", purpose: "dismiss" },
+			// Results are capped at 20; without saying so, a missing title
+			// looks like TMDB doesn't have it rather than like a cut-off list.
+			{ command: "top 20", purpose: "add words to narrow" },
 		]);
 	}
 

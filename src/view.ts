@@ -312,7 +312,7 @@ export class ReelView extends ItemView {
 		if (this.sort2) rows = sortEntries(rows, this.sort2, ascending(this.sort2));
 		rows = sortEntries(rows, this.sort, ascending(this.sort));
 
-		const hiddenCount = this.plugin.hiddenCount();
+		const hiddenCount = this.plugin.hiddenCount(this.plugin.library.all());
 		const count = this.bodyEl.createDiv({ cls: "reel-block-count" });
 		count.setText(`${rows.length} title${rows.length === 1 ? "" : "s"}`);
 		if (hiddenCount) {

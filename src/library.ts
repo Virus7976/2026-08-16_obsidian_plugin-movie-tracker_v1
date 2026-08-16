@@ -174,6 +174,8 @@ export class Library extends Events {
 				...e.lists,
 				e.collection ?? "",
 				e.certification ?? "",
+				// People remember plots more reliably than titles.
+				e.overview ?? "",
 			]
 				.join(" ")
 				// Strip wikilink syntax so searching "Villeneuve" still matches

@@ -61,7 +61,7 @@ class LibraryBlock extends MarkdownRenderChild {
 		// options either — a genre chip for a film you've filtered out is a
 		// small leak, but it's still a leak.
 		const base = applyQuery(this.plugin.visible(this.plugin.library.all()), this.query);
-		const hidden = this.plugin.hiddenCount();
+		const hidden = this.plugin.hiddenCount(this.plugin.library.all());
 
 		if (this.query.chips) this.renderChips(el, base);
 

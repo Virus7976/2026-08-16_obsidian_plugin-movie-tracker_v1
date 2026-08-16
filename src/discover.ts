@@ -191,8 +191,8 @@ export class DiscoverEngine {
 	}
 
 	/** A single filtered search — the manual counterpart to the taste rows. */
-	async search(filters: DiscoverFilters): Promise<TmdbSearchResult[]> {
-		const items = await this.plugin.tmdb.discoverBy(filters);
+	async search(filters: DiscoverFilters, page = 1): Promise<TmdbSearchResult[]> {
+		const items = await this.plugin.tmdb.discoverBy({ ...filters, page });
 		return this.filterOut(items);
 	}
 

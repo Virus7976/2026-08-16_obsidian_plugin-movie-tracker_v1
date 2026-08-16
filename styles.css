@@ -2963,3 +2963,14 @@ input.reel-input {
 	font-size: 11px;
 	padding-top: 4px;
 }
+
+.reel-dgrid-more {
+	display: flex;
+	justify-content: center;
+	padding: 18px 0 4px;
+}
+
+.reel-dgrid-more .reel-btn {
+	flex: 0 0 auto;
+	min-width: 160px;
+}

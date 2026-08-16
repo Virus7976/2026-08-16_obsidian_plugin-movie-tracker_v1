@@ -38,6 +38,8 @@ export class DiscoverScreen {
 	private loading = false;
 	private error: string | null = null;
 	private handled = new Set<number>();
+	private page = 1;
+	private exhausted = false;
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -51,6 +53,8 @@ export class DiscoverScreen {
 		this.results = null;
 		this.error = null;
 		this.handled.clear();
+		this.page = 1;
+		this.exhausted = false;
 	}
 
 	render(container: HTMLElement): void {
@@ -87,6 +91,8 @@ export class DiscoverScreen {
 			b.addEventListener("click", () => {
 				onClick();
 				this.results = null;
+				this.page = 1;
+				this.exhausted = false;
 				this.render(container);
 			});
 			return b;
@@ -274,6 +280,38 @@ export class DiscoverScreen {
 
 		const grid = container.createDiv({ cls: "reel-dgrid" });
 		for (const item of items) grid.appendChild(this.card(item, container));
+
+		// One page is twenty titles, which runs out quickly once you've
+		// filtered. Pages accumulate rather than replacing, so scrolling back
+		// up still shows what you already looked at.
+		if (!this.exhausted) {
+			const more = container.createDiv({ cls: "reel-dgrid-more" });
+			const btn = more.createEl("button", { cls: "reel-btn", text: "Load more" });
+			btn.addEventListener("click", () => {
+				btn.setText("Loading…");
+				btn.disabled = true;
+				void this.plugin.discover
+					.search(
+						{
+							type: this.filters.type,
+							genreId: this.filters.genreId ?? undefined,
+							decade: this.filters.decade ?? undefined,
+							minRating: this.filters.minRating ?? undefined,
+						},
+						this.page + 1
+					)
+					.then((next) => {
+						this.page += 1;
+						const fresh = next.filter((n) => !this.results?.some((r) => r.id === n.id));
+						if (!fresh.length) this.exhausted = true;
+						this.results = [...(this.results ?? []), ...fresh];
+					})
+					.catch(() => {
+						this.exhausted = true;
+					})
+					.finally(() => this.render(container));
+			});
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
