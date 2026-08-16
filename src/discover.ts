@@ -358,7 +358,50 @@ export class DiscoverEngine {
 			return true;
 		});
 
-		return this.filterOut(filtered);
+		const direct = this.filterOut(filtered);
+
+		// Recommendations are a fixed set of roughly twenty, so any real
+		// narrowing exhausts them — "like The Bourne Identity, from the 2010s,
+		// 7+" legitimately matches none of them. Stopping there is the wrong
+		// answer to "find me something like this": the request was to keep
+		// looking, not to report that one list came up short.
+		//
+		// So widen. Take the seed's own genres and run a proper discover query
+		// with the same filters, which searches the whole catalogue rather
+		// than one curated list. Results are appended after the direct
+		// recommendations, which stay first because they are the better match.
+		if (direct.length >= 12) return direct;
+
+		const genres = wanted.length ? wanted : await this.seedGenres(seed);
+		if (!genres.length) return direct;
+
+		try {
+			const wider = await this.plugin.tmdb.discoverBy({
+				type: seed.type,
+				genreIds: genres,
+				decade: filters.decade ?? undefined,
+				minRating: filters.minRating ?? undefined,
+			});
+			const seen = new Set(direct.map((d) => d.id));
+			// Never suggest the seed back to the person who named it.
+			seen.add(seed.id);
+			return [...direct, ...this.filterOut(wider.filter((w) => !seen.has(w.id)))];
+		} catch {
+			// The widening is a bonus; a failure here must not lose the
+			// recommendations that already worked.
+			return direct;
+		}
+	}
+
+	/** The seed's own genre ids, for widening a search beyond its recommendations. */
+	private async seedGenres(seed: { id: number; type: "movie" | "tv" }): Promise<number[]> {
+		try {
+			const meta =
+				seed.type === "tv" ? await this.plugin.tmdb.getShow(seed.id) : await this.plugin.tmdb.getFilm(seed.id);
+			return (meta.genres ?? []).map((g) => g.id).filter((n): n is number => Number.isFinite(n));
+		} catch {
+			return [];
+		}
 	}
 
 	/** One row, filtered against the library and your content policy. */

@@ -19,6 +19,7 @@ import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { renderStars } from "./stars";
 import { SearchModal } from "./searchModal";
+import { LogSheet } from "./logSheet";
 import { trailerUrl, providerNames } from "../extract";
 
 interface Filters {
@@ -183,7 +184,21 @@ export class DiscoverScreen {
 		later.addEventListener("click", () => void this.quickAdd(item, true, container));
 
 		const seen = actions.createEl("button", { cls: "reel-btn", text: "✓  Seen it" });
-		seen.addEventListener("click", () => void this.quickAdd(item, false, container));
+		seen.addEventListener("click", () => {
+			// The log sheet, not a silent add. "Seen it" for something you
+			// watched years ago should not claim you watched it today, and the
+			// date, rating and review all live on that one screen already.
+			const isTvItem = item.media_type === "tv";
+			new LogSheet(this.plugin.app, this.plugin, {
+				pending: {
+					id: item.id,
+					type: isTvItem ? "tv" : "film",
+					title: (isTvItem ? item.name : item.title) ?? "Untitled",
+				},
+			}).open();
+			this.handled.add(item.id);
+			this.render(container);
+		});
 
 		const nav = card.createDiv({ cls: "reel-quickcard-nav" });
 		const prev = nav.createEl("button", { cls: "reel-btn", text: "‹ Back", attr: { type: "button" } });
@@ -547,19 +562,6 @@ export class DiscoverScreen {
 
 		container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
 
-		// Recommendations are a fixed set, so narrowing hard can empty it. An
-		// empty grid with no explanation reads as a broken feature rather than
-		// as a combination nothing satisfies.
-		if (this.seed && !items.length) {
-			const none = container.createDiv({ cls: "reel-empty" });
-			none.createDiv({ text: `Nothing like ${this.seed.title} also matches those filters.` });
-			const wider = none.createEl("button", { cls: "reel-btn mod-cta", text: "Drop the filters" });
-			wider.addEventListener("click", () => {
-				this.filters = { ...EMPTY, type: this.filters.type };
-				this.results = null;
-				this.render(container);
-			});
-		}
 
 		if (!items.length) {
 			// Narrow filters are easy to stack and hard to remember; undoing
@@ -799,7 +801,19 @@ class PreviewSheet extends Modal {
 		const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
 		later.addEventListener("click", () => void this.add(true, later));
 		const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it" });
-		seen.addEventListener("click", () => void this.add(false, seen));
+		seen.addEventListener("click", () => {
+			// Opens the log sheet so the date is yours to set, rather than
+			// silently recording today for a film you saw last year.
+			new LogSheet(this.plugin.app, this.plugin, {
+				pending: {
+					id: this.item.id,
+					type: isTv ? "tv" : "film",
+					title,
+				},
+			}).open();
+			this.onAdded();
+			this.close();
+		});
 		const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested" });
 		nope.addEventListener("click", () => {
 			void this.plugin.discover.dismiss(this.item.id).then(() => {
