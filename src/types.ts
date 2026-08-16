@@ -113,6 +113,8 @@ export interface TmdbSearchResult {
 	poster_path?: string | null;
 	overview?: string;
 	vote_average?: number;
+	/** TMDB sends this on every result; only /discover lets us exclude it up front. */
+	adult?: boolean;
 }
 
 export interface TmdbCrew {

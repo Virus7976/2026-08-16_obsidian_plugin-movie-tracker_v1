@@ -185,6 +185,8 @@ export class ReelView extends ItemView {
 
 	private filterEl!: HTMLElement;
 	private searchEl: HTMLInputElement | null = null;
+	/** Where the list was when a detail screen was opened over it. */
+	private listScroll = 0;
 
 	private clearSearch(): void {
 		if (!this.query) return;
@@ -373,19 +375,30 @@ export class ReelView extends ItemView {
 	private onKey = (ev: KeyboardEvent): void => {
 		if (ev.key !== "Escape" || !this.detail) return;
 		ev.preventDefault();
-		this.detail = null;
-		this.paint();
+		this.closeDetail();
 	};
 
+	/**
+	 * One exit for both the back button and Escape.
+	 *
+	 * Repaints restore the scroll they captured, which is the *detail
+	 * screen's* — so leaving a deeply-scrolled episode list would drop the
+	 * library at a matching offset rather than where you left it. The
+	 * position to return to is the one saved when the detail was opened.
+	 */
+	private closeDetail(): void {
+		this.detail = null;
+		this.paint();
+		this.bodyEl.scrollTop = this.listScroll;
+	}
+
 	openDetail(entry: Entry): void {
+		this.listScroll = this.bodyEl.scrollTop;
 		const from = TABS.find((t) => t.id === this.tab)?.label ?? "Library";
 		this.detail = new DetailScreen(
 			this.plugin,
 			entry,
-			() => {
-				this.detail = null;
-				this.paint();
-			},
+			() => this.closeDetail(),
 			from
 		);
 		this.paint();
@@ -424,7 +437,14 @@ export class ReelView extends ItemView {
 
 		if (!rows.length) {
 			if (this.query) {
-				this.bodyEl.createDiv({ cls: "reel-empty", text: `Nothing matches "${this.query}".` });
+				// A dead end otherwise: the reason a title isn't in your library
+				// is usually that you haven't added it yet, and that is exactly
+				// what you came here to do.
+				const none = this.bodyEl.createDiv({ cls: "reel-empty" });
+				none.createDiv({ text: `Nothing in your library matches "${this.query}".` });
+				const find = none.createEl("button", { cls: "reel-btn mod-cta", text: "Search TMDB for it" });
+				const carried = this.query;
+				find.addEventListener("click", () => this.plugin.openSearch({ query: carried }));
 			} else {
 				this.renderFirstRun(this.bodyEl);
 			}
@@ -498,7 +518,10 @@ export class ReelView extends ItemView {
 
 		const rows = this.diaryYear ? all.filter((v) => v.date.startsWith(String(this.diaryYear))) : all;
 		if (!rows.length) {
-			this.bodyEl.createDiv({ cls: "reel-empty", text: "No viewings logged yet." });
+			const none = this.bodyEl.createDiv({ cls: "reel-empty" });
+			none.createDiv({ text: "No viewings logged yet." });
+			const first = none.createEl("button", { cls: "reel-btn mod-cta", text: "Log something you've watched" });
+			first.addEventListener("click", () => this.plugin.openSearch());
 			return;
 		}
 

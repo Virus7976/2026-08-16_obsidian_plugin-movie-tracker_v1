@@ -100,13 +100,15 @@
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	margin: 4px 0 8px;
-}
-
-.reel-empty {
 	padding: 18px;
 	text-align: center;
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: var(--reel-radius);
+}
+
+/* Empty states now carry a way out, which needs room from the message. */
+.reel-empty button {
+	margin-top: 10px;
 }
 
 .reel-error {

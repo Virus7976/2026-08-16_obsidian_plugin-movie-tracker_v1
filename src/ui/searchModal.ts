@@ -22,7 +22,7 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 	constructor(
 		app: App,
 		private plugin: ReelPlugin,
-		private opts: { watchlist?: boolean } = {}
+		private opts: { watchlist?: boolean; query?: string } = {}
 	) {
 		super(app);
 		this.setPlaceholder(opts.watchlist ? "Add to watchlist — search TMDB…" : "Search TMDB for a film or show…");
@@ -36,6 +36,15 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 			// looks like TMDB doesn't have it rather than like a cut-off list.
 			{ command: "20 max", purpose: "add words to narrow" },
 		]);
+
+		// Arriving from a library search that found nothing: carry the words
+		// across rather than making you type them a second time.
+		if (opts.query) {
+			this.inputEl.value = opts.query;
+			// The input has no value when SuggestModal binds its listener, so
+			// the first search has to be kicked off by hand.
+			window.setTimeout(() => this.inputEl.dispatchEvent(new Event("input")), 0);
+		}
 	}
 
 	/** 300ms debounce, with a sequence guard so a slow reply can't overwrite a fast one. */

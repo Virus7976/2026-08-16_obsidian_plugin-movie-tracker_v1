@@ -156,7 +156,7 @@ export default class ReelPlugin extends Plugin {
 		if (view instanceof ReelView) view.openDetail(entry);
 	}
 
-	openSearch(opts: { watchlist?: boolean } = {}): void {
+	openSearch(opts: { watchlist?: boolean; query?: string } = {}): void {
 		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
 			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
 			return;

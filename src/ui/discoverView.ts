@@ -298,7 +298,15 @@ export class DiscoverScreen {
 		container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
 
 		if (!items.length) {
-			container.createDiv({ cls: "reel-empty", text: "Nothing matches — try a wider filter." });
+			// Narrow filters are easy to stack and hard to remember; undoing
+			// them by hand means finding which chip is still lit.
+			const none = container.createDiv({ cls: "reel-empty" });
+			none.createDiv({ text: "Nothing matches those filters." });
+			const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
+			reset.addEventListener("click", () => {
+				this.filters = { ...EMPTY, type: this.filters.type };
+				this.render(container);
+			});
 			return;
 		}
 

@@ -13,8 +13,13 @@
  *   part a tracker can do better than a streaming service's front page.
  *
  *   Never suggest what you already have. Every row is filtered against the
- *   library and against your content policy — a recommendation you've hidden
- *   by filter is worse than no recommendation.
+ *   library, and against your content policy as far as each endpoint allows.
+ *   That last part is uneven and worth stating plainly: /discover accepts a
+ *   certification ceiling, so those rows are filtered at the source, but
+ *   /recommendations and /trending do not. For those, the ceiling is applied
+ *   by swapping in a filterable endpoint where one exists, and the adult flag
+ *   is dropped everywhere. A row that cannot honour the ceiling says so rather
+ *   than implying it did.
  *
  *   Rows, not a queue. Browsing is visual and lateral; you skim posters and
  *   stop at one. A one-at-a-time card is right for rating and wrong for
@@ -161,17 +166,41 @@ export class DiscoverEngine {
 			jobs.push(
 				this.plugin.tmdb
 					.recommendations(seed.tmdbId, seed.type === "tv" ? "tv" : "movie")
-					.then((items) => this.row(`rec-${seed.tmdbId}`, `Because you liked ${seed.title}`, items))
+					.then((items) =>
+						this.row(
+							`rec-${seed.tmdbId}`,
+							`Because you liked ${seed.title}`,
+							items,
+							// Honest rather than silent: TMDB offers no ceiling
+							// on this endpoint, and pretending otherwise is how
+							// a content filter loses your trust for good.
+							this.plugin.settings.maxCertification ? "Age limit does not apply to this row" : undefined
+						)
+					)
 					.catch(() => null)
 			);
 		}
 
-		jobs.push(
-			this.plugin.tmdb
-				.discover("trending")
-				.then((items) => this.row("trending", "Trending this week", items))
-				.catch(() => null)
-		);
+		// /trending cannot take a certification ceiling. Rather than show an
+		// unfiltered row to someone who set one, ask /discover for popular
+		// titles instead — a slightly different list, but one the ceiling
+		// actually reaches.
+		const ceiling = this.plugin.settings.maxCertification;
+		if (ceiling && type === "movie") {
+			jobs.push(
+				this.plugin.tmdb
+					.discoverBy({ type })
+					.then((items) => this.row("trending", "Popular right now", items, `Within your ${ceiling} limit`))
+					.catch(() => null)
+			);
+		} else {
+			jobs.push(
+				this.plugin.tmdb
+					.discover("trending")
+					.then((items) => this.row("trending", "Trending this week", items))
+					.catch(() => null)
+			);
+		}
 
 		if (profile.genreIds.length) {
 			const name = profile.genreNames[0];
@@ -235,8 +264,10 @@ export class DiscoverEngine {
 	 * Remove titles already in the library, duplicates, dismissals, and
 	 * anything without a poster — a poster-less card is a grey box.
 	 *
-	 * Not a content filter: see the note at the top of this file for why that
-	 * has to happen at the source.
+	 * Also drops adult-flagged results. /discover is sent include_adult=false,
+	 * but /recommendations and /trending take no such parameter, so without
+	 * this the two personalised rows were the only place adult titles could
+	 * surface — the rows most likely to be on screen.
 	 */
 	filterOut(items: TmdbSearchResult[]): TmdbSearchResult[] {
 		const seen = new Set<number>();
@@ -244,6 +275,7 @@ export class DiscoverEngine {
 		for (const item of items) {
 			if (seen.has(item.id)) continue;
 			seen.add(item.id);
+			if (item.adult) continue;
 			const type = item.media_type === "tv" ? "tv" : "film";
 			if (this.plugin.library.byTmdbId(item.id, type)) continue;
 			if (this.plugin.settings.dismissedIds.includes(item.id)) continue;
