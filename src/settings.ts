@@ -1,4 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting, debounce } from "obsidian";
+import { confirm } from "./ui/confirm";
 import type ReelPlugin from "./main";
 import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
@@ -208,6 +209,13 @@ export class ReelSettingTab extends PluginSettingTab {
 			if (store.has(name)) {
 				setting.addButton((b) =>
 					b.setButtonText("Remove").onClick(async () => {
+						const ok = await confirm(this.app, {
+							title: `Remove the ${KEY_LABELS[name]} key`,
+							body: "Reel cannot recover it. You would need the original key again to re-add it.",
+							confirmText: "Remove",
+							danger: true,
+						});
+						if (!ok) return;
 						await this.plugin.credentials.remove(name);
 						new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
 						this.display();
@@ -286,6 +294,15 @@ export class ReelSettingTab extends PluginSettingTab {
 				.setName("Remove all keys")
 				.addButton((b) =>
 					b.setDestructive().setButtonText("Remove all").onClick(async () => {
+						// Marked destructive since it was written, and yet it
+						// fired on one tap.
+						const ok = await confirm(this.app, {
+							title: "Remove every stored key",
+							body: "All saved keys are deleted and cannot be recovered. You would need each original key again.",
+							confirmText: "Remove all",
+							danger: true,
+						});
+						if (!ok) return;
 						await store.clear();
 						new Notice("Reel: keys removed.");
 						this.display();
@@ -650,6 +667,7 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		new Setting(el)
 			.setName("Clear cached responses")
+			.setDesc("Metadata Reel has already fetched. Clearing costs requests, not data — everything refetches on demand.")
 			.addButton((b) =>
 				b.setButtonText("Clear").onClick(async () => {
 					const n = await this.plugin.tmdb.clearCache();

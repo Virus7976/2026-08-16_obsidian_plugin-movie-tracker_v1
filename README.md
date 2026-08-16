@@ -192,9 +192,9 @@ Filterable fields: `status` `type` `title` `year` `decade` `rating`
 | Lock the TMDB key | |
 | Rebuild the library index | |
 | Fetch ratings and content notes for this title | OMDb + DoesTheDogDie |
-| Fetch ratings and content notes for the whole library | throttled |
+| Fetch ratings and content notes for the whole library | throttled; run again to stop |
 | Create starter Bases views | five `.base` files |
-| Import notes from another tracker | converts in place |
+| Import notes from another tracker | shows the count and rating scale, then asks before writing |
 | Start a rewatch of this series | records the completed run |
 
 ## Setup

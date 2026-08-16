@@ -164,6 +164,12 @@ export default class ReelPlugin extends Plugin {
 	 * one is the surprise.
 	 */
 	async prunePosters(): Promise<void> {
+		// A backfill in flight is writing posters this would judge unreferenced,
+		// because the frontmatter that will point at them is not written yet.
+		if (this.posters.busy) {
+			new Notice("Reel: posters are still downloading — try again once that finishes.");
+			return;
+		}
 		const orphans = this.posters.findOrphans();
 		if (!orphans.length) {
 			new Notice("Reel: no orphaned posters.");
@@ -182,6 +188,10 @@ export default class ReelPlugin extends Plugin {
 		const n = await this.posters.removeOrphans(orphans);
 		new Notice(`Reel: moved ${n} poster${n === 1 ? "" : "s"} to the trash.`);
 	}
+
+	/** Set while the whole-library enrichment runs, so a second call stops it. */
+	private enriching = false;
+	private cancelEnrich = false;
 
 	openSearch(opts: { watchlist?: boolean; query?: string } = {}): void {
 		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
@@ -362,11 +372,28 @@ export default class ReelPlugin extends Plugin {
 			name: "Import notes from another tracker",
 			callback: async () => {
 				try {
-					const report = await this.importer.run();
-					if (!report.scanned) {
+					// Rewriting frontmatter across the vault on a single command,
+					// with the rating scale decided silently, was too much to do
+					// without asking.
+					const plan = this.importer.preview();
+					if (!plan.scanned) {
 						new Notice("Reel: found no notes to convert.");
 						return;
 					}
+					const ok = await confirm(this.app, {
+						title: "Import notes from another tracker",
+						body:
+							`${plan.scanned} note${plan.scanned === 1 ? "" : "s"} will be converted in place. ` +
+							(plan.scaleHalved
+								? "Ratings look like they are out of 10, so they will be halved."
+								: "Ratings look like they are already out of 5, so they will be kept as they are.") +
+							" Only frontmatter is rewritten — your prose is untouched.",
+						confirmText: `Convert ${plan.scanned}`,
+					});
+					if (!ok) return;
+
+					// Reuse the scan the preview already did.
+					const report = await this.importer.run(plan);
 					const scale = report.scaleHalved
 						? " Ratings were treated as out of 10 and halved."
 						: " Ratings were treated as already out of 5.";
@@ -403,10 +430,25 @@ export default class ReelPlugin extends Plugin {
 					new Notice("Reel: everything is already enriched.");
 					return;
 				}
-				const notice = new Notice(`Reel: enriching ${rows.length} titles…`, 0);
+				// Same shape as the poster backfill: minutes of work behind a
+				// frozen notice. It gets the same treatment — a running count
+				// and a second invocation that calls it off.
+				if (this.enriching) {
+					this.cancelEnrich = true;
+					new Notice("Reel: stopping after the current title.");
+					return;
+				}
+				this.enriching = true;
+				this.cancelEnrich = false;
+
+				const notice = new Notice("", 0);
 				let done = 0;
 				try {
-					for (const entry of rows) {
+					for (const [i, entry] of rows.entries()) {
+						if (this.cancelEnrich) break;
+						notice.setMessage(
+							`Reel: enriching ${i + 1} of ${rows.length}… (run the command again to stop)`
+						);
 						const file = this.app.vault.getAbstractFileByPath(entry.path);
 						if (!(file instanceof TFile)) continue;
 						try {
@@ -423,6 +465,8 @@ export default class ReelPlugin extends Plugin {
 						await new Promise((r) => window.setTimeout(r, 350));
 					}
 				} finally {
+					this.enriching = false;
+					this.cancelEnrich = false;
 					notice.hide();
 				}
 				new Notice(`Reel: enriched ${done} of ${rows.length}.`);

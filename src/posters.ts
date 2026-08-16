@@ -22,6 +22,11 @@ export class PosterStore {
 	private cancelBackfill = false;
 	private backfilling = false;
 
+	/** True while posters are being written, so pruning knows to wait. */
+	get busy(): boolean {
+		return this.backfilling;
+	}
+
 	private get folder(): string {
 		return normalizePath(this.plugin.settings.posterFolder);
 	}

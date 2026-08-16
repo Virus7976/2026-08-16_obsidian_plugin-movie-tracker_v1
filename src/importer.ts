@@ -29,6 +29,13 @@ import type ReelPlugin from "./main";
 import { redact } from "./secrets";
 import { LEGACY_KEYS, convertLegacy, looksLegacy, scaleIsTen } from "./util/legacy";
 
+/** A scan result, so a preview and the run that follows share one walk. */
+export interface ImportPlan {
+	files: TFile[];
+	scanned: number;
+	scaleHalved: boolean;
+}
+
 export interface ImportReport {
 	scanned: number;
 	converted: number;
@@ -50,24 +57,46 @@ export class Importer {
 		return out;
 	}
 
-	async run(): Promise<ImportReport> {
+	/**
+	 * What a run would do, without doing it.
+	 *
+	 * The scale decision matters more than the count: it is taken once across
+	 * every note, and getting it wrong halves every rating in the library. It
+	 * belongs in front of you before the writes, not in the summary after.
+	 */
+	preview(): ImportPlan {
 		const found = this.candidates();
-		const report: ImportReport = {
+		return {
+			files: found.map(({ file }) => file),
 			scanned: found.length,
+			scaleHalved: found.length ? scaleIsTen(found.map(({ fm }) => fm.Rating)) : false,
+		};
+	}
+
+	/**
+	 * Convert. Pass the plan from `preview()` to reuse its scan — candidates()
+	 * walks every markdown file in the vault, and previewing then running
+	 * would otherwise walk it twice.
+	 */
+	async run(plan?: ImportPlan): Promise<ImportReport> {
+		const found = plan ?? this.preview();
+		const report: ImportReport = {
+			scanned: found.scanned,
 			converted: 0,
 			skipped: 0,
 			scaleHalved: false,
 			errors: [],
 		};
-		if (!found.length) return report;
+		if (!found.scanned) return report;
 
-		// Decide the rating scale once, across every note — the same judgement
-		// applied per note would give one library two different scales.
-		report.scaleHalved = scaleIsTen(found.map(({ fm }) => fm.Rating));
+		// Decided once, across every note — the same judgement applied per note
+		// would give one library two different scales.
+		report.scaleHalved = found.scaleHalved;
 
-		const notice = new Notice(`Reel: converting ${found.length} notes…`, 0);
+		const notice = new Notice("", 0);
 		try {
-			for (const { file } of found) {
+			for (const [i, file] of found.files.entries()) {
+				notice.setMessage(`Reel: converting ${i + 1} of ${found.scanned}…`);
 				try {
 					await this.convert(file, report.scaleHalved);
 					report.converted++;
