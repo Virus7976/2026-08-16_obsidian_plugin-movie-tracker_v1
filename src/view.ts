@@ -431,7 +431,23 @@ export class ReelView extends ItemView {
 	private paintLibrary(): void {
 		let rows = this.pool();
 		if (this.typeFilter !== "all") rows = rows.filter((e) => e.type === this.typeFilter);
-		if (this.statusFilter) rows = rows.filter((e) => e.status === this.statusFilter);
+		if (this.statusFilter) {
+			// "Watched" means you have seen it, which is a fact about your
+			// history — not a label that a later intent can overwrite.
+			//
+			// `status` is one field doing two jobs: have I seen this, and do I
+			// mean to watch it. Putting a film you have already seen back on
+			// the watchlist sets status to "watchlist", and filtering on the
+			// raw field then dropped it out of "watched" entirely — the app
+			// appeared to forget you had ever seen it. Reading the watch
+			// history instead means a film you intend to rewatch correctly
+			// shows under both, because both are true.
+			rows = rows.filter((e) =>
+				this.statusFilter === "watched" && e.type !== "tv"
+					? e.watched.length > 0
+					: e.status === this.statusFilter
+			);
+		}
 		if (this.genreFilter) rows = rows.filter((e) => e.genres.includes(this.genreFilter!));
 		if (this.listFilter) rows = rows.filter((e) => e.lists.includes(this.listFilter!));
 		rows = this.plugin.library.search(this.query, rows);

@@ -186,6 +186,47 @@ const film = (id: number, extra: Record<string, unknown> = {}) => ({
 	eq(lib.search("dune", pool).length, 0, "searching within a pool cannot reach outside it");
 }
 
+/* ---- seasons survive the index ---- */
+
+{
+	// The bug: episode ratings were written to the note correctly and then
+	// silently dropped when the index read them back, so reopening the season
+	// sheet showed empty stars and looked exactly like a save that failed.
+	const lib = makeLibrary([
+		{
+			path: "Series/The Office.md",
+			fm: {
+				tmdb_id: 2316,
+				title: "The Office",
+				seasons: [{ n: 1, watched: "1-3", total: 6, rating: 4, episode_ratings: { "1": 3, "2": 5 } }],
+			},
+		},
+	]);
+	const season = lib.all()[0]?.seasons[0];
+	eq(season?.episode_ratings, { "1": 3, "2": 5 }, "per-episode ratings survive the index");
+	eq(season?.watched, "1-3", "and so does the watched range");
+	eq(season?.rating, 4, "and the season rating");
+	eq(season?.total, 6, "and the episode total");
+}
+
+{
+	// Hand-edited YAML can produce numeric keys rather than quoted strings.
+	const lib = makeLibrary([
+		{
+			path: "Series/Show.md",
+			fm: { tmdb_id: 1, title: "Show", seasons: [{ n: 1, watched: "1", episode_ratings: { 1: 4.5 } }] },
+		},
+	]);
+	eq(lib.all()[0]?.seasons[0]?.episode_ratings, { "1": 4.5 }, "numeric YAML keys normalise to strings");
+}
+
+{
+	const lib = makeLibrary([
+		{ path: "Series/Show.md", fm: { tmdb_id: 1, title: "Show", seasons: [{ n: 1, watched: "1" }] } },
+	]);
+	ok(!lib.all()[0]?.seasons[0]?.episode_ratings, "a season with no ratings carries no empty map");
+}
+
 /* ---- rebuild is idempotent ---- */
 
 {

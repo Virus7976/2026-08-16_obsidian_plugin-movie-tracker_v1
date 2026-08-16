@@ -364,6 +364,23 @@ function toSeasons(v: unknown): SeasonProgress[] {
 		};
 		const total = numberOrUndef(obj.total);
 		if (total != null) row.total = total;
+
+		// Per-episode ratings were written to the note correctly and then
+		// dropped right here, so every star came back blank the next time the
+		// sheet opened — indistinguishable from a save that never happened.
+		// The data was never lost; the index simply refused to carry it.
+		const eps = obj.episode_ratings;
+		if (eps && typeof eps === "object" && !Array.isArray(eps)) {
+			const ratings: Record<string, number> = {};
+			for (const [k, val] of Object.entries(eps as Record<string, unknown>)) {
+				const parsed = numberOrUndef(val);
+				// YAML hands these back as "1" or 1 depending on how the file
+				// was written or hand-edited; normalise the key to a string.
+				if (parsed != null) ratings[String(k)] = parsed;
+			}
+			if (Object.keys(ratings).length) row.episode_ratings = ratings;
+		}
+
 		out.push(row);
 	}
 	return out.sort((a, b) => a.n - b.n);

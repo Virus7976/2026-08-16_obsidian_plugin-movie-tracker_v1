@@ -481,7 +481,30 @@ export class NoteWriter {
 	async setStatus(file: TFile, status: string): Promise<void> {
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
 			fm.status = status;
+			// Marking a film watched has to record *that you watched it*, not
+			// merely relabel it. The Diary, the streak, hours-watched and every
+			// per-year chart read the `watched` array, so a note saying
+			// "status: watched" with an empty history is invisible to all of
+			// them — it reads as a film nobody has ever seen.
+			if (fm.type !== "tv" && status === "watched") this.ensureViewing(fm);
+			this.refreshDerived(fm);
 		});
+	}
+
+	/**
+	 * Guarantee at least one viewing on a film that claims to have been seen.
+	 *
+	 * Dated today, because today is when you said so and a guessed date would
+	 * be worse than an honest one. Only ever adds — an existing history is
+	 * never touched.
+	 */
+	private ensureViewing(fm: Record<string, unknown>): void {
+		const history = Array.isArray(fm.watched) ? fm.watched : [];
+		if (history.length) return;
+		const event: WatchEvent = { date: todayISO(), rewatch: false };
+		const rating = Number(fm.rating);
+		if (fm.rating != null && Number.isFinite(rating)) event.rating = clampRating(rating);
+		fm.watched = [event];
 	}
 
 	async setRating(file: TFile, rating: number | null): Promise<void> {
@@ -499,7 +522,16 @@ export class NoteWriter {
 					history[history.length - 1] = { ...last, rating: value };
 					fm.watched = history;
 				}
+			} else if (fm.type !== "tv" && fm.status !== "watchlist") {
+				// Rating a film you have no recorded viewing of. You cannot
+				// have rated something you never saw, so the rating is the
+				// evidence — record the viewing rather than leaving a score
+				// floating above an empty history that the Diary and every
+				// stat will ignore.
+				fm.status = "watched";
+				this.ensureViewing(fm);
 			}
+			this.refreshDerived(fm);
 		});
 	}
 
