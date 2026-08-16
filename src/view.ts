@@ -21,6 +21,7 @@ import { paintStats } from "./render/stats";
 import { viewings } from "./render/diary";
 import { sortEntries } from "./render/query";
 import { prettyDate } from "./util/dates";
+import { redact } from "./secrets";
 import { renderStarsStatic } from "./ui/stars";
 
 export const REEL_VIEW = "reel-view";
@@ -183,6 +184,10 @@ export class ReelView extends ItemView {
 		if (!TABS.some((t) => t.id === tab)) return;
 		this.tab = tab as Tab;
 		this.detail = null;
+		// Persisted here rather than by the caller, so every route into a tab
+		// remembers it — a command, a click, or anything added later.
+		this.plugin.settings.lastTab = tab;
+		void this.plugin.saveSettings();
 		this.paint();
 	}
 
@@ -193,6 +198,9 @@ export class ReelView extends ItemView {
 
 		this.filterEl.empty();
 		this.bodyEl.empty();
+		// Tabs that add no filters would otherwise leave an empty bar taking
+		// up vertical space above the content.
+		this.filterEl.toggleClass("is-empty", true);
 
 		if (this.detail) {
 			// Repaints are driven by the library 'changed' event, which fires
@@ -203,6 +211,17 @@ export class ReelView extends ItemView {
 			return;
 		}
 
+		try {
+			this.paintTab();
+		} catch (e) {
+			// A thrown paint used to leave an empty pane with no explanation.
+			// Showing the error keeps the rest of the view usable and tells you
+			// which tab is broken.
+			this.bodyEl.createDiv({ cls: "reel-error", text: redact(e) });
+		}
+	}
+
+	private paintTab(): void {
 		if (this.tab === "library") {
 			this.paintFilters();
 			this.paintLibrary();
@@ -223,6 +242,7 @@ export class ReelView extends ItemView {
 			// Films and shows answer different questions — hours of film and
 			// episodes watched aren't comparable — so the tab can scope like
 			// the code block always could.
+			this.filterEl.removeClass("is-empty");
 			const bar = this.filterEl.createDiv({ cls: "reel-chips" });
 			for (const [scope, label] of [
 				["all", "Everything"],
@@ -243,6 +263,7 @@ export class ReelView extends ItemView {
 	/* ---------------------------------------------------------------- */
 
 	private paintFilters(): void {
+		this.filterEl.removeClass("is-empty");
 		const bar = this.filterEl.createDiv({ cls: "reel-chips" });
 
 		const chip = (label: string, active: boolean, onClick: () => void) => {
@@ -416,6 +437,7 @@ export class ReelView extends ItemView {
 		const all = viewings(this.plugin.library.search(this.query, this.pool()));
 		const years = [...new Set(all.map((v) => v.date.slice(0, 4)))].sort().reverse();
 		if (years.length > 1) {
+			this.filterEl.removeClass("is-empty");
 			const bar = this.filterEl.createDiv({ cls: "reel-chips" });
 			const chip = (label: string, active: boolean, year: number | null) => {
 				const b = bar.createEl("button", { cls: "reel-chip", text: label });

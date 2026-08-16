@@ -2980,3 +2980,9 @@ input.reel-input {
 	outline-offset: 2px;
 	border-radius: var(--reel-radius);
 }
+
+/* A filter bar with nothing in it shouldn't hold open a gap. */
+.reel-view-filters.is-empty {
+	padding: 0;
+	min-height: 0;
+}

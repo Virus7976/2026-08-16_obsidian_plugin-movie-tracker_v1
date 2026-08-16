@@ -68,6 +68,10 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 		this.lastQuery = q;
 
 		return new Promise<TmdbSearchResult[]>((resolve) => {
+			// Typing again before the debounce fires replaces this resolver.
+			// Settling the previous one first stops a pending promise per
+			// keystroke piling up for the life of the modal.
+			this.resolveResults?.(this.results);
 			this.resolveResults = resolve;
 			this.runSearch(q);
 		});

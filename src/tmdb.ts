@@ -377,6 +377,36 @@ export class TmdbClient {
 		return this.writeCache(key, data, immutable);
 	}
 
+	/**
+	 * Drop the cached discovery responses.
+	 *
+	 * Without this, a "Refresh" button clears the screen's own state and then
+	 * reads the same cached payloads straight back — visibly doing nothing.
+	 * Title metadata is left alone: that genuinely doesn't change, and
+	 * refetching it would spend requests for no benefit.
+	 */
+	async clearDiscoverCache(): Promise<void> {
+		for (const key of [...this.memCache.keys()]) {
+			if (key.startsWith("discover-") || key.startsWith("disc-") || key.startsWith("rec-")) {
+				this.memCache.delete(key);
+			}
+		}
+		const adapter = this.plugin.app.vault.adapter;
+		try {
+			if (!(await adapter.exists(this.cacheDir))) return;
+			const listing = await adapter.list(this.cacheDir);
+			for (const f of listing.files) {
+				const name = f.split("/").pop() ?? "";
+				if (name.startsWith("discover-") || name.startsWith("disc-") || name.startsWith("rec-")) {
+					await adapter.remove(f);
+				}
+			}
+		} catch {
+			// Cache eviction is best-effort; the memory clear above is what
+			// makes the button work within a session.
+		}
+	}
+
 	async clearCache(): Promise<number> {
 		this.memCache.clear();
 		const adapter = this.plugin.app.vault.adapter;

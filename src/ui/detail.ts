@@ -343,6 +343,9 @@ export class DetailScreen {
 
 		act("Refresh", false, async () => {
 			try {
+				// A refresh can add a season or rename episodes, so the cached
+				// episode lists are stale by definition afterwards.
+				this.episodeCache.clear();
 				await this.plugin.notes.refreshMetadata(e);
 				new Notice("Metadata refreshed");
 			} catch (err) {

@@ -195,13 +195,26 @@ export class DiscoverScreen {
 		}
 		const reload = head.createEl("button", { cls: "reel-chip", text: "Refresh" });
 		reload.addEventListener("click", () => {
-			this.reset();
-			this.render(container);
+			reload.setText("Refreshing…");
+			void this.plugin.tmdb.clearDiscoverCache().then(() => {
+				this.reset();
+				this.render(container);
+			});
 		});
 
 		const visible = this.rows.filter((r) => r.items.some((i) => !this.handled.has(i.id)));
 		if (!visible.length) {
-			container.createDiv({ cls: "reel-empty", text: "Nothing left to suggest — try a genre above." });
+			const empty = container.createDiv({ cls: "reel-empty" });
+			empty.createDiv({ text: "Nothing left to suggest — try a genre above." });
+			// Dismissals are permanent by design, so the way back has to be
+			// findable from where you run out of suggestions.
+			const dismissed = this.plugin.settings.dismissedIds.length;
+			if (dismissed) {
+				empty.createDiv({
+					cls: "reel-dim",
+					text: `${dismissed} dismissed — clear them in Settings → Reel to see them again.`,
+				});
+			}
 			return;
 		}
 		for (const row of visible) this.paintRow(container, row);

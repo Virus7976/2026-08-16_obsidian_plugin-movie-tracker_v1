@@ -301,7 +301,22 @@ export class NoteWriter {
 	 * or a title neither database knows leaves the note exactly as TMDB
 	 * described it. Enrichment must never be able to fail note creation.
 	 */
+	/**
+	 * Serialised so a burst of adds doesn't fire a burst of requests.
+	 *
+	 * Adding six titles from Discover in ten seconds used to start six
+	 * enrichments at once, against two free-tier APIs. They now queue behind
+	 * each other, which costs nothing noticeable — enrichment is already
+	 * background work that no screen waits on.
+	 */
+	private enrichQueue: Promise<unknown> = Promise.resolve();
+
 	async enrich(file: TFile, opts: { title: string; year?: number; imdbId?: string }): Promise<void> {
+		this.enrichQueue = this.enrichQueue.then(() => this.enrichNow(file, opts)).catch(() => undefined);
+		return this.enrichQueue as Promise<void>;
+	}
+
+	private async enrichNow(file: TFile, opts: { title: string; year?: number; imdbId?: string }): Promise<void> {
 		const jobs: Promise<void>[] = [];
 		const patch: Record<string, unknown> = {};
 

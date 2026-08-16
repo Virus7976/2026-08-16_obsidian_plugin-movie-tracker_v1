@@ -174,8 +174,11 @@ export class Library extends Events {
 				...e.lists,
 				e.collection ?? "",
 				e.certification ?? "",
-				// People remember plots more reliably than titles.
-				e.overview ?? "",
+				// People remember plots more reliably than titles, but a whole
+				// synopsis per title is half a megabyte of lowercased string
+				// across a large library, and the distinguishing words are
+				// almost always in the opening sentence.
+				(e.overview ?? "").slice(0, 160),
 			]
 				.join(" ")
 				// Strip wikilink syntax so searching "Villeneuve" still matches

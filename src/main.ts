@@ -188,7 +188,7 @@ export default class ReelPlugin extends Plugin {
 		for (const [id, tab, name] of [
 			["open-discover", "discover", "Open discover"],
 			["open-rate", "rate", "Open rate"],
-			["open-upnext", "up next", "Open up next"],
+			["open-upnext", "upnext", "Open up next"],
 			["open-diary", "diary", "Open diary"],
 			["open-stats", "stats", "Open stats"],
 		] as const) {
@@ -196,7 +196,7 @@ export default class ReelPlugin extends Plugin {
 				id,
 				name,
 				callback: () => {
-					this.settings.lastTab = tab === "up next" ? "upnext" : tab;
+					this.settings.lastTab = tab;
 					void this.saveSettings().then(() => this.openView(true));
 				},
 			});
