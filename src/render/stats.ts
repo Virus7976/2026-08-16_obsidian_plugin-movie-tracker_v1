@@ -267,9 +267,30 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			const y = v.date.slice(0, 4);
 			byYear.set(y, (byYear.get(y) ?? 0) + 1);
 		}
-		bars(charts, "Films per year", [...byYear.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, n]) => ({ label, n })));
+		// A year bar re-scopes the whole page to that year, which is what the
+		// year chips at the top already do — so the bar and the chip agree
+		// rather than the bar being the one number on the page that is inert.
+		bars(
+			charts,
+			"Films per year",
+			[...byYear.entries()]
+				.sort((a, b) => a[0].localeCompare(b[0]))
+				.map(([label, n]) => ({ label, n, go: () => paintStats(plugin, el, { ...opts, year: Number(label) }) })),
+			"",
+			plugin
+		);
 	}
 
+	// The four charts below stay inert on purpose, and it is worth saying so
+	// rather than leaving it to look like an oversight.
+	//
+	// Month and weekday have no set to open: "January" is not a property of a
+	// film, and searching for it matches nothing. Rating distribution and
+	// decade *do* name real sets, but the Library has no rating or decade
+	// filter to hand them to — sending "4.5" or "2010s" to a text search would
+	// return either nothing or the wrong titles, which is worse than a bar
+	// that plainly does not respond. They become clickable when those filters
+	// exist, not before.
 	if (watched.length) {
 		const byMonth = new Array(12).fill(0);
 		for (const v of watched) byMonth[parseInt(v.date.slice(5, 7), 10) - 1]++;
@@ -442,6 +463,8 @@ interface Bar {
 	entry?: Entry;
 	/** What tapping the row searches for. Defaults to the label. */
 	search?: string;
+	/** An action for rows whose answer is not a library search — a year rescopes the page. */
+	go?: () => void;
 }
 
 /**
@@ -503,13 +526,14 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 		row.createDiv({ cls: "reel-chart-value", text: `${d.n}${suffix}` });
 
 		// Every bar answers a question you can only otherwise ask by hand:
-		// "which seven were the dramas?" Tapping runs that search.
-		if (plugin && d.search) {
+		// "which seven were the dramas?" Tapping runs that search — or, where
+		// a search is the wrong answer, whatever the row supplied instead.
+		if (plugin && (d.search || d.go)) {
 			row.addClass("is-clickable");
 			row.setAttr("role", "button");
 			row.setAttr("tabindex", "0");
-			row.setAttr("aria-label", `Show titles matching ${d.label}`);
-			const open = () => void plugin.openViewWithSearch(d.search ?? d.label);
+			row.setAttr("aria-label", d.go ? `Show ${d.label} only` : `Show titles matching ${d.label}`);
+			const open = d.go ?? (() => void plugin.openViewWithSearch(d.search ?? d.label));
 			row.addEventListener("click", open);
 			row.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {
