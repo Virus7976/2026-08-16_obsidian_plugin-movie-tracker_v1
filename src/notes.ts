@@ -17,6 +17,7 @@ import type ReelPlugin from "./main";
 import { clampRating, starString } from "./util/ratings";
 import { addToRange, contiguousProgress, rangeCount } from "./util/ranges";
 import { nextShowStatus } from "./util/status";
+import { appendWatch, latestRating, mergeSeasons, rateEpisode as computeEpisodeRating } from "./util/mutations";
 import { normaliseDate, prettyDate, todayISO, yearOf } from "./util/dates";
 import type { Entry, SeasonProgress, TmdbFilm, TmdbShow, WatchEvent } from "./types";
 import { applyFields, filmFields, showFields, ExtractOptions } from "./extract";
@@ -143,26 +144,24 @@ export class NoteWriter {
 
 	async logFilm(file: TFile, log: LogPayload): Promise<void> {
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
-			const history: WatchEvent[] = Array.isArray(fm.watched) ? [...fm.watched] : [];
-
 			if (log.watchlist) {
 				fm.status = "watchlist";
 				if (log.liked != null) fm.liked = log.liked;
 				return;
 			}
 
-			const event: WatchEvent = {
+			const history = appendWatch(fm.watched, {
 				date: log.date || todayISO(),
-				rewatch: log.rewatch ?? history.length > 0,
-			};
-			if (log.rating != null) event.rating = clampRating(log.rating);
-			history.push(event);
-			history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+				rating: log.rating,
+				rewatch: log.rewatch,
+			});
 
 			fm.watched = history;
 			fm.status = "watched";
-			const lastRated = [...history].reverse().find((h) => h && typeof h === "object" && h.rating != null);
-			if (lastRated?.rating != null) fm.rating = lastRated.rating;
+			// `rating` mirrors the newest viewing that carried one, so the grid
+			// and stats can read a single field.
+			const newest = latestRating(history);
+			if (newest != null) fm.rating = newest;
 			if (log.liked === true) fm.liked = true;
 			else if (log.liked === false) delete fm.liked;
 			this.refreshDerived(fm);
@@ -210,45 +209,23 @@ export class NoteWriter {
 	 */
 	async rateEpisode(file: TFile, season: number, episode: number, rating: number | null): Promise<void> {
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
-			const seasons = this.seasonRows(fm);
-			const row = this.seasonRow(seasons, season);
-			const ratings: Record<string, number> = { ...(row.episode_ratings ?? {}) };
+			const { seasons, average } = computeEpisodeRating(this.seasonRows(fm), season, episode, rating);
+			fm.seasons = seasons;
 
-			if (rating == null) {
-				delete ratings[String(episode)];
-			} else {
-				ratings[String(episode)] = clampRating(rating);
-				row.watched = addToRange(row.watched, episode);
+			if (rating != null) {
 				fm.last_watched = { season, episode, date: todayISO() };
 				if (fm.status === "watchlist" || !fm.status) fm.status = "watching";
 			}
 
-			if (Object.keys(ratings).length) row.episode_ratings = ratings;
-			else delete row.episode_ratings;
-
-			fm.seasons = seasons;
-
-			// A season's rating is the mean of its rated episodes, and the
-			// series rating follows from all of them. Rating episodes is a
-			// judgement about the show, so it should show up as one.
-			const seasonValues = Object.values(ratings).filter((x): x is number => typeof x === "number");
-			if (seasonValues.length) row.rating = round1(seasonValues.reduce((a, b) => a + b, 0) / seasonValues.length);
-			else delete row.rating;
-
-			const all: number[] = [];
-			for (const s of seasons) {
-				for (const v of Object.values(s.episode_ratings ?? {})) if (typeof v === "number") all.push(v);
-			}
-			if (all.length) {
-				const avg = round1(all.reduce((a, b) => a + b, 0) / all.length);
-				fm.episode_rating_avg = avg;
+			if (average != null) {
+				fm.episode_rating_avg = average;
 				// Only fill the series rating when you haven't set one, or when
 				// the existing value was itself derived. A rating you chose by
 				// hand must not be overwritten by ticking through episodes.
 				const previous = Number(fm.episode_rating_avg_applied ?? NaN);
 				if (fm.rating == null || Number(fm.rating) === previous) {
-					fm.rating = clampRating(avg);
-					fm.episode_rating_avg_applied = clampRating(avg);
+					fm.rating = clampRating(average);
+					fm.episode_rating_avg_applied = clampRating(average);
 				}
 			} else {
 				delete fm.episode_rating_avg;
@@ -488,14 +465,11 @@ export class NoteWriter {
 				if (!meta.next_episode_to_air?.air_date) delete fm.next_air_date;
 				if (poster && !fm.poster) fm.poster = poster;
 
-				const known = this.seasonRows(fm);
-				for (const s of meta.seasons ?? []) {
-					if (!this.plugin.settings.includeSpecials && s.season_number <= 0) continue;
-					const row = known.find((k) => Number(k.n) === s.season_number);
-					if (row) row.total = s.episode_count ?? 0;
-					else known.push({ n: s.season_number, watched: "", total: s.episode_count ?? 0 });
-				}
-				known.sort((a, b) => Number(a.n) - Number(b.n));
+				const known = mergeSeasons(
+					this.seasonRows(fm),
+					meta.seasons ?? [],
+					this.plugin.settings.includeSpecials
+				);
 				fm.seasons = known;
 				this.settleShowStatus(fm, known);
 				this.refreshDerived(fm);
