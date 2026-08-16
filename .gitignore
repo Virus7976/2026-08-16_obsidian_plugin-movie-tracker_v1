@@ -1,0 +1,25 @@
+# Build output
+main.js
+*.js.map
+tests/.selftest.cjs
+
+# Dependencies
+node_modules/
+
+# Obsidian plugin runtime data. THIS IS WHERE THE TMDB KEY LIVES.
+# Never commit it, even encrypted — see SECURITY.md.
+data.json
+**/.obsidian/plugins/**/data.json
+
+# Secrets of any shape
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

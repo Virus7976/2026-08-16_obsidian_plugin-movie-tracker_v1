@@ -1,0 +1,253 @@
+/**
+ * The in-memory index.
+ *
+ * Built once at load from `metadataCache.getFileCache().frontmatter` across the
+ * film and series folders, then kept live off `metadataCache.on("changed")`.
+ * This is what replaces Dataview: the grid reads a plain array, so filtering
+ * 800 titles is a synchronous pass that finishes before the frame does. A
+ * DataviewJS block doing the same work is the thing that feels sluggish on a
+ * phone, and this removes the dependency entirely.
+ */
+
+import { Events, TAbstractFile, TFile, normalizePath } from "obsidian";
+import type ReelPlugin from "./main";
+import type { Entry, SeasonProgress, WatchEvent } from "./types";
+import { normaliseDate } from "./util/dates";
+import { rangeCount } from "./util/ranges";
+
+export class Library extends Events {
+	private entries = new Map<string, Entry>();
+	private ready = false;
+
+	constructor(private plugin: ReelPlugin) {
+		super();
+	}
+
+	/* ------------------------------------------------------------------ */
+
+	load(): void {
+		this.rebuild();
+
+		const { metadataCache, vault } = this.plugin.app;
+
+		this.plugin.registerEvent(
+			metadataCache.on("changed", (file) => {
+				if (this.inScope(file.path)) this.upsert(file);
+			})
+		);
+		this.plugin.registerEvent(
+			vault.on("delete", (file: TAbstractFile) => {
+				if (this.entries.delete(file.path)) this.emitChange();
+			})
+		);
+		this.plugin.registerEvent(
+			vault.on("rename", (file: TAbstractFile, oldPath: string) => {
+				this.entries.delete(oldPath);
+				if (file instanceof TFile && this.inScope(file.path)) this.upsert(file);
+				else this.emitChange();
+			})
+		);
+		// A vault can finish resolving after onload; rebuild once it settles.
+		this.plugin.registerEvent(metadataCache.on("resolved", () => {
+			if (!this.ready) {
+				this.ready = true;
+				this.rebuild();
+			}
+		}));
+	}
+
+	rebuild(): void {
+		this.entries.clear();
+		for (const file of this.plugin.app.vault.getMarkdownFiles()) {
+			if (this.inScope(file.path)) this.upsert(file, true);
+		}
+		this.emitChange();
+	}
+
+	private inScope(path: string): boolean {
+		const p = normalizePath(path);
+		const film = normalizePath(this.plugin.settings.filmFolder);
+		const series = normalizePath(this.plugin.settings.seriesFolder);
+		return p.startsWith(film + "/") || p.startsWith(series + "/");
+	}
+
+	private upsert(file: TFile, quiet = false): void {
+		const fm = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+		if (!fm || fm.tmdb_id == null) {
+			// The note lost its id, or never had one — drop it from the index.
+			if (this.entries.delete(file.path) && !quiet) this.emitChange();
+			return;
+		}
+		this.entries.set(file.path, toEntry(file, fm, this.plugin.settings.seriesFolder));
+		if (!quiet) this.emitChange();
+	}
+
+	private emitChange(): void {
+		this.trigger("changed");
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Reads                                                               */
+	/* ------------------------------------------------------------------ */
+
+	all(): Entry[] {
+		return [...this.entries.values()];
+	}
+
+	films(): Entry[] {
+		return this.all().filter((e) => e.type === "film");
+	}
+
+	shows(): Entry[] {
+		return this.all().filter((e) => e.type === "tv");
+	}
+
+	byPath(path: string): Entry | undefined {
+		return this.entries.get(normalizePath(path));
+	}
+
+	byTmdbId(id: number, type?: Entry["type"]): Entry | undefined {
+		return this.all().find((e) => e.tmdbId === id && (!type || e.type === type));
+	}
+
+	get size(): number {
+		return this.entries.size;
+	}
+
+	/** Shows with progress but not finished — the Up Next source. */
+	inProgress(): Entry[] {
+		return this.shows()
+			.filter((e) => {
+				if (e.status === "completed" || e.status === "dropped" || e.status === "watchlist") return false;
+				return e.seasons.some((s) => rangeCount(s.watched) > 0);
+			})
+			.sort((a, b) => (b.lastWatched?.date ?? "").localeCompare(a.lastWatched?.date ?? ""));
+	}
+
+	/** Distinct genres across the library, for the filter chips. */
+	genres(): string[] {
+		const set = new Set<string>();
+		for (const e of this.entries.values()) e.genres.forEach((g) => set.add(g));
+		return [...set].sort();
+	}
+
+	decades(): number[] {
+		const set = new Set<number>();
+		for (const e of this.entries.values()) {
+			const y = e.year ?? e.firstAirYear;
+			if (y) set.add(Math.floor(y / 10) * 10);
+		}
+		return [...set].sort((a, b) => b - a);
+	}
+}
+
+/* -------------------------------------------------------------------- */
+/* Frontmatter → Entry                                                   */
+/* -------------------------------------------------------------------- */
+
+function toEntry(file: TFile, fm: Record<string, unknown>, seriesFolder: string): Entry {
+	const declared = String(fm.type ?? "").toLowerCase();
+	// `type:` is authoritative; folder is the fallback for hand-made notes.
+	const type: Entry["type"] =
+		declared === "tv" || declared === "series" || declared === "show"
+			? "tv"
+			: declared === "film" || declared === "movie"
+				? "film"
+				: file.path.startsWith(normalizePath(seriesFolder) + "/")
+					? "tv"
+					: "film";
+
+	return {
+		path: file.path,
+		basename: file.basename,
+		type,
+		tmdbId: Number(fm.tmdb_id),
+		title: String(fm.title ?? file.basename),
+		year: numberOrUndef(fm.year),
+		director: toStringArray(fm.director),
+		runtime: numberOrUndef(fm.runtime),
+		watched: toWatchEvents(fm.watched),
+		creators: toStringArray(fm.creators ?? fm.creator),
+		firstAirYear: numberOrUndef(fm.first_air_year),
+		showStatus: fm.show_status ? String(fm.show_status) : undefined,
+		episodeRuntime: numberOrUndef(fm.episode_runtime),
+		totalEpisodes: numberOrUndef(fm.total_episodes),
+		seasons: toSeasons(fm.seasons),
+		lastWatched: toLastWatched(fm.last_watched),
+		nextAirDate: normaliseDate(fm.next_air_date),
+		genres: toStringArray(fm.genres),
+		poster: fm.poster ? String(fm.poster) : undefined,
+		tmdbRating: numberOrUndef(fm.tmdb_rating),
+		status: String(fm.status ?? (type === "tv" ? "watching" : "watched")),
+		rating: numberOrUndef(fm.rating),
+		liked: fm.liked === true,
+	};
+}
+
+function numberOrUndef(v: unknown): number | undefined {
+	if (v == null || v === "") return undefined;
+	const n = Number(v);
+	return Number.isFinite(n) ? n : undefined;
+}
+
+function toStringArray(v: unknown): string[] {
+	if (v == null) return [];
+	if (Array.isArray(v)) return v.map((x) => String(x)).filter(Boolean);
+	// Tolerate a hand-typed "Denis Villeneuve, Someone Else".
+	return String(v)
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+function toWatchEvents(v: unknown): WatchEvent[] {
+	if (!Array.isArray(v)) return [];
+	const out: WatchEvent[] = [];
+	for (const raw of v) {
+		if (raw == null) continue;
+		if (typeof raw === "string") {
+			const date = normaliseDate(raw);
+			if (date) out.push({ date });
+			continue;
+		}
+		const obj = raw as Record<string, unknown>;
+		const date = normaliseDate(obj.date);
+		if (!date) continue;
+		out.push({
+			date,
+			rating: numberOrUndef(obj.rating),
+			rewatch: obj.rewatch === true,
+		});
+	}
+	return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function toSeasons(v: unknown): SeasonProgress[] {
+	if (!Array.isArray(v)) return [];
+	const out: SeasonProgress[] = [];
+	for (const raw of v) {
+		if (raw == null || typeof raw !== "object") continue;
+		const obj = raw as Record<string, unknown>;
+		const n = numberOrUndef(obj.n ?? obj.season);
+		if (n == null) continue;
+		const row: SeasonProgress & { total?: number } = {
+			n,
+			watched: obj.watched == null ? "" : String(obj.watched),
+			rating: numberOrUndef(obj.rating),
+		};
+		const total = numberOrUndef(obj.total);
+		if (total != null) row.total = total;
+		out.push(row);
+	}
+	return out.sort((a, b) => a.n - b.n);
+}
+
+function toLastWatched(v: unknown): Entry["lastWatched"] {
+	if (!v || typeof v !== "object") return undefined;
+	const obj = v as Record<string, unknown>;
+	const season = numberOrUndef(obj.season);
+	const episode = numberOrUndef(obj.episode);
+	const date = normaliseDate(obj.date);
+	if (season == null || episode == null) return undefined;
+	return { season, episode, date: date ?? "" };
+}

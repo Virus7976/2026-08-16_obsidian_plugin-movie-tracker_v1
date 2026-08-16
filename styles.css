@@ -1,0 +1,1090 @@
+/* ------------------------------------------------------------------ *
+ * Reel
+ *
+ * Every colour is an Obsidian CSS variable, so switching theme — or using
+ * a theme this was never tested against — can't produce unreadable text.
+ * Every interactive target is at least 44px. Nothing depends on :hover.
+ * ------------------------------------------------------------------ */
+
+.reel-block {
+	--reel-gap: 10px;
+	--reel-radius: 8px;
+	margin: 0.5em 0 1em;
+}
+
+.reel-dim {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+/* ---------------- chips / buttons ---------------- */
+
+.reel-chip,
+.reel-btn,
+.reel-seg-btn {
+	font-family: inherit;
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	background: var(--background-modifier-form-field);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	padding: 0 14px;
+	min-height: 34px;
+	cursor: pointer;
+	white-space: nowrap;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-btn {
+	border-radius: var(--reel-radius);
+	min-height: 44px;
+	padding: 0 18px;
+	flex: 1 1 auto;
+}
+
+.reel-btn.mod-cta {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: transparent;
+	font-weight: 600;
+}
+
+.reel-chip.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: transparent;
+}
+
+.reel-chip.static {
+	cursor: default;
+	background: var(--background-secondary);
+}
+
+.reel-chip-sep {
+	color: var(--text-faint);
+	align-self: center;
+	padding: 0 2px;
+}
+
+/* Sticky filter bar. `position: sticky` plus a safe-area inset so the row
+   doesn't tuck under a notch or a home indicator on iOS. */
+.reel-chips {
+	display: flex;
+	gap: 6px;
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 8px 0 8px max(0px, env(safe-area-inset-left));
+	margin-bottom: 4px;
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	background: var(--background-primary);
+	scrollbar-width: none;
+	-webkit-overflow-scrolling: touch;
+	scroll-padding-inline: 8px;
+}
+
+.reel-chips::-webkit-scrollbar {
+	display: none;
+}
+
+.reel-block-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.reel-block-count,
+.reel-empty {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	margin: 4px 0 8px;
+}
+
+.reel-empty {
+	padding: 18px;
+	text-align: center;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--reel-radius);
+}
+
+.reel-error {
+	color: var(--text-error);
+	background: var(--background-modifier-error);
+	border-radius: var(--reel-radius);
+	padding: 10px 12px;
+	font-size: var(--font-ui-smaller);
+	margin-bottom: 8px;
+}
+
+.reel-loading {
+	color: var(--text-muted);
+	padding: 20px;
+	text-align: center;
+}
+
+/* ---------------- poster grid ---------------- */
+
+/* 3 across on a phone is the point at which a poster is still recognisable
+   at arm's length. Wider viewports fill in with auto-fill rather than a
+   breakpoint ladder, so it behaves in a split pane too. */
+.reel-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--reel-gap);
+}
+
+@media (min-width: 500px) {
+	.reel-grid {
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	}
+}
+
+.reel-cell {
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	/* Stop the long-press from raising the OS text/image callout. */
+	-webkit-touch-callout: none;
+	user-select: none;
+	touch-action: pan-y;
+}
+
+.reel-cell:active .reel-cell-poster {
+	transform: scale(0.97);
+}
+
+.reel-cell-poster {
+	position: relative;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-secondary);
+	transition: transform 120ms ease;
+}
+
+.reel-cell-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-cell-poster.is-empty,
+.reel-row-thumb.is-empty,
+.reel-upnext-thumb.is-empty,
+.reel-header-poster.is-empty,
+.reel-suggestion-thumb.is-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--background-modifier-border);
+	color: var(--text-faint);
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.reel-cell-rating {
+	position: absolute;
+	left: 4px;
+	bottom: 4px;
+	right: 4px;
+	padding: 2px 4px;
+	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.55);
+}
+
+.reel-cell-rating .reel-star {
+	width: 12px;
+	height: 12px;
+	font-size: 11px;
+}
+
+.reel-cell-heart {
+	position: absolute;
+	top: 4px;
+	right: 6px;
+	color: var(--color-red);
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.reel-cell-flag {
+	position: absolute;
+	top: 0;
+	left: 0;
+	font-size: 10px;
+	padding: 2px 6px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-bottom-right-radius: 6px;
+}
+
+.reel-cell-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 3px;
+	background: rgba(0, 0, 0, 0.4);
+}
+
+.reel-cell-progress::after {
+	content: "";
+	display: block;
+	height: 100%;
+	width: calc(var(--reel-fill, 0) * 100%);
+	background: var(--interactive-accent);
+}
+
+.reel-cell-caption {
+	padding: 4px 2px 0;
+}
+
+.reel-cell-title {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.25;
+	/* Two lines then ellipsis — a long title must not push the grid out of line. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-cell-year {
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+/* ---------------- list layout ---------------- */
+
+.reel-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.reel-row {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	min-height: 56px;
+	padding: 6px 4px;
+	border-radius: var(--reel-radius);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	touch-action: pan-y;
+}
+
+.reel-row:active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-row-thumb {
+	width: 40px;
+	flex: 0 0 40px;
+	aspect-ratio: 2 / 3;
+	border-radius: 4px;
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.reel-row-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-row-body {
+	min-width: 0;
+	flex: 1;
+}
+
+.reel-row-title {
+	font-size: var(--font-ui-small);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-row-meta {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+/* ---------------- stars ---------------- */
+
+.reel-stars {
+	display: inline-flex;
+	gap: 2px;
+	align-items: center;
+}
+
+.reel-star {
+	position: relative;
+	width: 20px;
+	height: 20px;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* Editable stars get a real 44px target via padding — the glyph stays small
+   but the tappable box does not. */
+.reel-stars:not(.is-readonly) .reel-star {
+	width: 40px;
+	height: 44px;
+	font-size: 34px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-star-bg,
+.reel-star-fg {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-star-bg {
+	color: var(--background-modifier-border);
+}
+
+.reel-star-fg {
+	color: var(--color-yellow, var(--interactive-accent));
+	width: 0;
+	overflow: hidden;
+	justify-content: flex-start;
+	padding-left: 0;
+}
+
+.reel-stars:not(.is-readonly) .reel-star-fg {
+	padding-left: 3px;
+}
+
+.reel-star.is-half .reel-star-fg {
+	width: 50%;
+}
+
+.reel-star.is-full .reel-star-fg {
+	width: 100%;
+}
+
+.reel-rating-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.reel-rating-readout {
+	color: var(--text-muted);
+	min-width: 2em;
+}
+
+.reel-heart {
+	background: none;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	min-width: 44px;
+	min-height: 44px;
+	font-size: 20px;
+	color: var(--text-faint);
+	cursor: pointer;
+}
+
+.reel-heart.is-on {
+	color: var(--color-red);
+	border-color: var(--color-red);
+}
+
+.reel-heart.static {
+	border: none;
+	min-width: 0;
+	min-height: 0;
+}
+
+/* ---------------- badges ---------------- */
+
+.reel-badge {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: var(--background-secondary);
+	color: var(--text-muted);
+}
+
+.reel-badge.tv {
+	background: var(--color-purple);
+	color: var(--text-on-accent);
+}
+
+.reel-badge.film {
+	background: var(--color-blue);
+	color: var(--text-on-accent);
+}
+
+.reel-badge.new {
+	background: var(--color-green);
+	color: var(--text-on-accent);
+}
+
+.reel-badge.in-library {
+	background: var(--background-modifier-success);
+	color: var(--text-normal);
+}
+
+.reel-badge.status-watchlist {
+	background: var(--color-orange);
+	color: var(--text-on-accent);
+}
+
+/* ---------------- note header card ---------------- */
+
+.reel-header {
+	display: flex;
+	gap: 14px;
+	padding: 14px;
+	margin-bottom: 1em;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-radius);
+	background: var(--background-secondary);
+}
+
+.reel-header-poster {
+	flex: 0 0 92px;
+	width: 92px;
+	aspect-ratio: 2 / 3;
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--background-modifier-border);
+}
+
+.reel-header-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-header-body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.reel-header-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.reel-header-facts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-header-genres {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.reel-header-genres .reel-chip {
+	min-height: 24px;
+	font-size: 11px;
+	padding: 0 9px;
+}
+
+.reel-header-rating {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.reel-header-history,
+.reel-history {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-history-row {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+
+.reel-header-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.reel-header-actions .reel-btn {
+	flex: 0 1 auto;
+	min-height: 40px;
+	font-size: var(--font-ui-smaller);
+}
+
+/* Stack the card on a narrow screen — 92px of poster plus text is too tight
+   below about 400px. */
+@media (max-width: 400px) {
+	.reel-header {
+		flex-direction: column;
+	}
+
+	.reel-header-poster {
+		flex: 0 0 auto;
+		width: 110px;
+	}
+
+	.reel-header-actions .reel-btn {
+		flex: 1 1 100%;
+	}
+}
+
+/* ---------------- season strip ---------------- */
+
+.reel-seasons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.reel-season-pill {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	min-height: 36px;
+	padding: 0 12px;
+	border-radius: 999px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	cursor: pointer;
+	overflow: hidden;
+	font-size: var(--font-ui-smaller);
+}
+
+/* Fill drawn behind the label rather than as a separate bar. */
+.reel-season-pill::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	width: calc(var(--reel-fill, 0) * 100%);
+	background: var(--interactive-accent);
+	opacity: 0.22;
+}
+
+.reel-season-pill > * {
+	position: relative;
+}
+
+.reel-season-pill.is-complete {
+	border-color: var(--interactive-accent);
+}
+
+.reel-season-n {
+	font-weight: 600;
+}
+
+/* ---------------- up next ---------------- */
+
+.reel-upnext {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.reel-upnext-row {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	padding: 8px;
+	border-radius: var(--reel-radius);
+	background: var(--background-secondary);
+}
+
+.reel-upnext-thumb {
+	flex: 0 0 44px;
+	width: 44px;
+	aspect-ratio: 2 / 3;
+	border-radius: 4px;
+	overflow: hidden;
+	background: var(--background-modifier-border);
+	cursor: pointer;
+}
+
+.reel-upnext-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-upnext-body {
+	flex: 1;
+	min-width: 0;
+}
+
+.reel-upnext-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--font-ui-small);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-upnext-meta {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-upnext-ep {
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.reel-progress {
+	height: 3px;
+	border-radius: 2px;
+	background: var(--background-modifier-border);
+	margin-top: 5px;
+	overflow: hidden;
+}
+
+.reel-progress::after {
+	content: "";
+	display: block;
+	height: 100%;
+	width: calc(var(--reel-fill, 0) * 100%);
+	background: var(--interactive-accent);
+}
+
+.reel-upnext-actions {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.reel-tick,
+.reel-more {
+	width: 44px;
+	height: 44px;
+	border-radius: 999px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 18px;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-tick {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: transparent;
+}
+
+.reel-tick:disabled {
+	opacity: 0.5;
+}
+
+/* ---------------- stats ---------------- */
+
+.reel-tiles {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: var(--reel-gap);
+	margin-bottom: 14px;
+}
+
+@media (min-width: 520px) {
+	.reel-tiles {
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	}
+}
+
+.reel-tile {
+	padding: 12px;
+	border-radius: var(--reel-radius);
+	background: var(--background-secondary);
+}
+
+.reel-tile-value {
+	font-size: 1.6em;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.reel-tile-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-tile-sub {
+	font-size: 11px;
+	color: var(--text-faint);
+	margin-top: 2px;
+}
+
+.reel-chart {
+	margin-bottom: 14px;
+}
+
+.reel-chart-title {
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+.reel-chart-row {
+	display: grid;
+	grid-template-columns: 4.5em 1fr 2.5em;
+	gap: 8px;
+	align-items: center;
+	min-height: 22px;
+}
+
+.reel-chart-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-chart-track {
+	height: 10px;
+	border-radius: 5px;
+	background: var(--background-modifier-border);
+	overflow: hidden;
+}
+
+.reel-chart-fill {
+	height: 100%;
+	width: calc(var(--reel-fill, 0) * 100%);
+	background: var(--interactive-accent);
+	border-radius: 5px;
+}
+
+.reel-chart-value {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	text-align: right;
+}
+
+/* ---------------- modals and sheets ---------------- */
+
+.reel-modal .reel-input,
+input.reel-input {
+	width: 100%;
+	min-height: 44px;
+	font-size: 16px; /* below 16px iOS zooms the page on focus */
+	padding: 0 12px;
+	border-radius: var(--reel-radius);
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	margin-bottom: 8px;
+}
+
+/* Bottom sheet on phones: the controls land under the thumb rather than
+   halfway up the screen behind the keyboard. */
+.reel-modal.reel-sheet {
+	position: fixed;
+	inset: auto 0 0 0;
+	width: 100%;
+	max-width: 100%;
+	max-height: 88vh;
+	border-radius: 16px 16px 0 0;
+	padding-bottom: calc(12px + env(safe-area-inset-bottom));
+	overflow-y: auto;
+	animation: reel-sheet-in 180ms ease-out;
+}
+
+@keyframes reel-sheet-in {
+	from {
+		transform: translateY(12%);
+		opacity: 0.6;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-modal.reel-sheet {
+		animation: none;
+	}
+
+	.reel-cell-poster {
+		transition: none;
+	}
+}
+
+.reel-prompt-title,
+.reel-log-title {
+	margin: 0 0 4px;
+	font-size: var(--font-ui-medium);
+}
+
+.reel-prompt-body,
+.reel-log-sub {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	margin: 0 0 12px;
+}
+
+.reel-prompt-error {
+	color: var(--text-error);
+	font-size: var(--font-ui-smaller);
+	margin-bottom: 8px;
+}
+
+.reel-prompt-actions,
+.reel-log-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.reel-field {
+	margin-bottom: 14px;
+}
+
+.reel-field-inline {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.reel-field-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-bottom: 6px;
+}
+
+.reel-quick-dates {
+	display: flex;
+	gap: 6px;
+}
+
+.reel-seg {
+	display: flex;
+	gap: 4px;
+	padding: 3px;
+	background: var(--background-modifier-form-field);
+	border-radius: 999px;
+	margin-bottom: 16px;
+}
+
+.reel-seg-btn {
+	flex: 1;
+	border: none;
+	background: transparent;
+	min-height: 40px;
+}
+
+.reel-seg-btn.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-log-details.is-hidden {
+	display: none;
+}
+
+.reel-rating-row.big .reel-star {
+	width: 52px;
+	height: 56px;
+	font-size: 44px;
+}
+
+/* ---------------- search suggestions ---------------- */
+
+.reel-suggestion {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	min-height: 56px;
+	padding: 6px 4px;
+}
+
+.reel-suggestion-thumb {
+	flex: 0 0 36px;
+	width: 36px;
+	aspect-ratio: 2 / 3;
+	border-radius: 3px;
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.reel-suggestion-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-suggestion-body {
+	min-width: 0;
+	flex: 1;
+}
+
+.reel-suggestion-title {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-suggestion-meta {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	margin-top: 2px;
+}
+
+/* ---------------- season checklist ---------------- */
+
+.reel-season-head {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-bottom: 10px;
+}
+
+.reel-season-head h3 {
+	margin: 0;
+	font-size: var(--font-ui-medium);
+}
+
+.reel-season-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-season-bulk {
+	display: flex;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.reel-episodes {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 52vh;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+.reel-episode {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	min-height: 48px;
+	padding: 6px 4px;
+	border-radius: 6px;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-episode:active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-episode-tick {
+	flex: 0 0 26px;
+	width: 26px;
+	height: 26px;
+	border-radius: 999px;
+	border: 2px solid var(--background-modifier-border);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: transparent;
+	font-size: 14px;
+}
+
+.reel-episode.is-watched .reel-episode-tick {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-episode-body {
+	min-width: 0;
+	flex: 1;
+}
+
+.reel-episode-title {
+	font-size: var(--font-ui-small);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-episode.is-watched .reel-episode-title {
+	color: var(--text-muted);
+}
+
+.reel-episode-meta {
+	display: flex;
+	gap: 8px;
+	color: var(--text-faint);
+	font-size: 11px;
+}
+
+/* ---------------- settings ---------------- */
+
+.reel-key-status {
+	margin-bottom: 10px;
+}
+
+.reel-pill {
+	display: inline-block;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: var(--font-ui-smaller);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+}
+
+.reel-pill.ok {
+	background: var(--background-modifier-success);
+	color: var(--text-normal);
+}
+
+.reel-pill.warn {
+	background: var(--background-modifier-error);
+	color: var(--text-normal);
+}
+
+.reel-callout {
+	padding: 10px 12px;
+	border-radius: var(--reel-radius);
+	font-size: var(--font-ui-smaller);
+	margin: 8px 0 16px;
+}
+
+.reel-callout.warn {
+	background: var(--background-modifier-error);
+	color: var(--text-normal);
+}

@@ -1,0 +1,10 @@
+{
+  "id": "reel",
+  "name": "Reel",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Log films and series with TMDB metadata. Poster library, rewatches, episode progress, Up Next and stats — all computed from frontmatter. Built for mobile.",
+  "author": "jakeg",
+  "authorUrl": "https://github.com/",
+  "isDesktopOnly": false
+}

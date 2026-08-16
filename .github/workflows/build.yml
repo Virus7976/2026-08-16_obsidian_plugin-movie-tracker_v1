@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -noEmit -skipLibCheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: node esbuild.config.mjs production
+
+      # The plugin must never pull in a Node builtin — mobile Obsidian has no
+      # Node, so a stray require() here is a crash on a phone and nothing on a
+      # desktop, which is the worst way to find out.
+      - name: Assert no Node builtins in the bundle
+        run: |
+          if grep -qE 'require\("(fs|path|os|child_process|crypto|http|https|net|electron)"\)' main.js; then
+            echo "::error::Bundle references a Node builtin — this breaks mobile."
+            exit 1
+          fi
+          echo "Bundle is clean."
+
+      # Nothing in this repo should ever look like a credential.
+      - name: Assert no committed secrets
+        run: |
+          if git ls-files | grep -qE '(^|/)data\.json$'; then
+            echo "::error::data.json is tracked — it holds the TMDB key."
+            exit 1
+          fi
+          if git grep -nE 'eyJhbGciOi[A-Za-z0-9._-]{20,}' -- ':!*.md' ':!.github'; then
+            echo "::error::Something that looks like a TMDB v4 token is committed."
+            exit 1
+          fi
+          echo "No credentials found."
