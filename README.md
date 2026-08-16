@@ -188,7 +188,7 @@ Filterable fields: `status` `type` `title` `year` `decade` `rating`
 | Toggle liked | |
 | Refresh metadata from TMDB | your ratings and history are never touched |
 | Download missing posters | throttled 250 ms/request; run again to stop |
-| Remove posters for deleted titles | moves unreferenced posters to the trash |
+| Remove posters for deleted titles | asks first; moves unreferenced posters to the trash |
 | Lock the TMDB key | |
 | Rebuild the library index | |
 | Fetch ratings and content notes for this title | OMDb + DoesTheDogDie |

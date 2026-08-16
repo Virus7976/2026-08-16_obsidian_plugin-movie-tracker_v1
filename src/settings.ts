@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, debounce } from "obsidian";
 import type ReelPlugin from "./main";
 import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
@@ -327,13 +327,21 @@ export class ReelSettingTab extends PluginSettingTab {
 			new Setting(el)
 				.setName(name)
 				.setDesc(desc)
-				.addText((t) =>
-					t.setValue(this.plugin.settings[key]).onChange(async (v) => {
-						this.plugin.settings[key] = v.replace(/^\/+|\/+$/g, "") || DEFAULT_SETTINGS[key];
-						await this.plugin.saveSettings();
-						this.plugin.library.rebuild();
-					})
-				);
+				.addText((t) => {
+					// Typing "Movies" fired six saves and six full vault scans,
+					// each briefly pointing the library at a folder named "M",
+					// then "Mo". Settle first, then rebuild once.
+					const apply = debounce(
+						async (v: string) => {
+							this.plugin.settings[key] = v.replace(/^\/+|\/+$/g, "") || DEFAULT_SETTINGS[key];
+							await this.plugin.saveSettings();
+							this.plugin.library.rebuild();
+						},
+						600,
+						true
+					);
+					t.setValue(this.plugin.settings[key]).onChange((v) => apply(v));
+				});
 
 		folder("Films folder", "One note per film.", "filmFolder");
 		folder("Series folder", "One note per show — not per season or episode.", "seriesFolder");
@@ -383,12 +391,21 @@ export class ReelSettingTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Region")
 			.setDesc("Drives which certification and streaming providers are stored. Two-letter country code.")
-			.addText((t) =>
-				t.setValue(this.plugin.settings.region).onChange(async (v) => {
-					this.plugin.settings.region = v.trim().toUpperCase().slice(0, 2) || "US";
-					await this.plugin.saveSettings();
-				})
-			);
+			.addText((t) => {
+				// Typing "GB" stored "G" on the first keypress — an invalid
+				// country code that drives certification and provider lookups
+				// until the second letter lands. Wait for a complete code.
+				const apply = debounce(
+					async (v: string) => {
+						const code = v.trim().toUpperCase().slice(0, 2);
+						this.plugin.settings.region = /^[A-Z]{2}$/.test(code) ? code : "US";
+						await this.plugin.saveSettings();
+					},
+					600,
+					true
+				);
+				t.setValue(this.plugin.settings.region).onChange((v) => apply(v));
+			});
 
 		new Setting(el)
 			.setName("Track specials")
@@ -430,24 +447,36 @@ export class ReelSettingTab extends PluginSettingTab {
 				"Where your daily notes live — leave empty for the vault root. Files must be named YYYY-MM-DD.md. " +
 					"Reel asks rather than reading the Daily Notes plugin's configuration, which is undocumented API."
 			)
-			.addText((t) =>
-				t
-					.setPlaceholder("e.g. Journal/Daily")
-					.setValue(this.plugin.settings.dailyNoteFolder)
-					.onChange(async (v) => {
+			.addText((t) => {
+				// Cheaper than the folder inputs — no rescan — but it still
+				// rewrote data.json, which holds your encrypted keys, once per
+				// keypress.
+				const apply = debounce(
+					async (v: string) => {
 						this.plugin.settings.dailyNoteFolder = v.replace(/^\/+|\/+$/g, "");
 						await this.plugin.saveSettings();
-					})
-			);
+					},
+					600,
+					true
+				);
+				t.setPlaceholder("e.g. Journal/Daily")
+					.setValue(this.plugin.settings.dailyNoteFolder)
+					.onChange((v) => apply(v));
+			});
 
 		new Setting(el)
 			.setName("Daily note line prefix")
-			.addText((t) =>
-				t.setValue(this.plugin.settings.dailyNotePrefix).onChange(async (v) => {
-					this.plugin.settings.dailyNotePrefix = v || "- Watched";
-					await this.plugin.saveSettings();
-				})
-			);
+			.addText((t) => {
+				const apply = debounce(
+					async (v: string) => {
+						this.plugin.settings.dailyNotePrefix = v || "- Watched";
+						await this.plugin.saveSettings();
+					},
+					600,
+					true
+				);
+				t.setValue(this.plugin.settings.dailyNotePrefix).onChange((v) => apply(v));
+			});
 	}
 
 	private renderContent(el: HTMLElement): void {
@@ -477,7 +506,7 @@ export class ReelSettingTab extends PluginSettingTab {
 				this.plugin.settings.hideFlags = [...set];
 				await this.plugin.saveSettings();
 				paint();
-				this.plugin.library.rebuild();
+				this.plugin.library.refresh();
 			});
 			paint();
 		}
@@ -491,7 +520,7 @@ export class ReelSettingTab extends PluginSettingTab {
 				d.setValue(this.plugin.settings.maxCertification ?? "").onChange(async (v) => {
 					this.plugin.settings.maxCertification = v || null;
 					await this.plugin.saveSettings();
-					this.plugin.library.rebuild();
+					this.plugin.library.refresh();
 				});
 			});
 
@@ -502,7 +531,7 @@ export class ReelSettingTab extends PluginSettingTab {
 				t.setValue(this.plugin.settings.hideUnrated).onChange(async (v) => {
 					this.plugin.settings.hideUnrated = v;
 					await this.plugin.saveSettings();
-					this.plugin.library.rebuild();
+					this.plugin.library.refresh();
 				})
 			);
 	}
@@ -614,12 +643,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			)
 			.addButton((b) =>
 				b.setButtonText("Remove unused").onClick(async () => {
-					const n = await this.plugin.posters.pruneOrphans();
-					new Notice(
-						n === 0
-							? "Reel: no orphaned posters."
-							: `Reel: moved ${n} unused poster${n === 1 ? "" : "s"} to the trash.`
-					);
+					await this.plugin.prunePosters();
 					this.display();
 				})
 			);

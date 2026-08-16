@@ -192,16 +192,23 @@ export class PosterStore {
 	 * Files go to the system trash rather than being destroyed, because
 	 * guessing wrong about someone's vault should be undoable.
 	 */
-	async pruneOrphans(): Promise<number> {
+	/**
+	 * Which cached posters are no longer referenced.
+	 *
+	 * Separate from the removal so the count can be shown before anything is
+	 * deleted. A number you can check is the only warning you get.
+	 */
+	findOrphans(): TFile[] {
 		const folder = this.plugin.app.vault.getAbstractFileByPath(normalizePath(this.folder));
-		if (!(folder instanceof TFolder)) return 0;
+		if (!(folder instanceof TFolder)) return [];
 
 		const entries = this.plugin.library.all();
 		const files = folder.children.filter((c): c is TFile => c instanceof TFile);
 
 		// The decision itself lives in util/prune.ts, where it is tested —
 		// including the case where an unbuilt index would otherwise mean
-		// "nothing is referenced, remove everything".
+		// "nothing is referenced, remove everything", and the case where the
+		// poster folder also holds files that are not Reel's to delete.
 		const doomed = new Set(
 			orphanedPosters({
 				files: files.map((f) => f.path),
@@ -209,10 +216,13 @@ export class PosterStore {
 				libraryEmpty: entries.length === 0,
 			})
 		);
+		return files.filter((f) => doomed.has(f.path));
+	}
 
+	/** Move the given posters to the system trash, so a wrong call is undoable. */
+	async removeOrphans(files: TFile[]): Promise<number> {
 		let removed = 0;
 		for (const file of files) {
-			if (!doomed.has(file.path)) continue;
 			try {
 				await this.plugin.app.fileManager.trashFile(file);
 				removed++;

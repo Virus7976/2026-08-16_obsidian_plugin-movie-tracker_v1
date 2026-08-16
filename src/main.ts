@@ -22,6 +22,7 @@ import { registerCalendarBlock } from "./render/calendar";
 import { REEL_VIEW, ReelView } from "./view";
 import { policyBreach, ContentPolicy } from "./content";
 import { redact } from "./secrets";
+import { confirm } from "./ui/confirm";
 import { todayISO } from "./util/dates";
 import type { Entry } from "./types";
 
@@ -154,6 +155,32 @@ export default class ReelPlugin extends Plugin {
 		const leaf = this.app.workspace.getLeavesOfType(REEL_VIEW)[0];
 		const view = leaf?.view;
 		if (view instanceof ReelView) view.openDetail(entry);
+	}
+
+	/**
+	 * Find, confirm, then remove. Lives here rather than in either caller so
+	 * the command and the settings button cannot drift apart — a confirmation
+	 * added to one and not the other is worse than none, because the missing
+	 * one is the surprise.
+	 */
+	async prunePosters(): Promise<void> {
+		const orphans = this.posters.findOrphans();
+		if (!orphans.length) {
+			new Notice("Reel: no orphaned posters.");
+			return;
+		}
+		const ok = await confirm(this.app, {
+			title: "Remove unused posters",
+			body: `${orphans.length} cached poster${orphans.length === 1 ? "" : "s"} ${
+				orphans.length === 1 ? "is" : "are"
+			} no longer used by any note. They move to the system trash, so this can be undone.`,
+			confirmText: `Move ${orphans.length} to trash`,
+			danger: true,
+		});
+		if (!ok) return;
+
+		const n = await this.posters.removeOrphans(orphans);
+		new Notice(`Reel: moved ${n} poster${n === 1 ? "" : "s"} to the trash.`);
 	}
 
 	openSearch(opts: { watchlist?: boolean; query?: string } = {}): void {
@@ -323,12 +350,7 @@ export default class ReelPlugin extends Plugin {
 			name: "Remove posters for deleted titles",
 			callback: async () => {
 				try {
-					const n = await this.posters.pruneOrphans();
-					new Notice(
-						n === 0
-							? "Reel: no orphaned posters."
-							: `Reel: moved ${n} unused poster${n === 1 ? "" : "s"} to the trash.`
-					);
+					await this.prunePosters();
 				} catch (e) {
 					new Notice(`Reel: ${redact(e)}`);
 				}

@@ -102,6 +102,18 @@ export class Library extends Events {
 		this.trigger("changed");
 	}
 
+	/**
+	 * Tell every surface to repaint without touching the index.
+	 *
+	 * The content policy filters at read time in `visible()` — the index
+	 * itself holds no policy state. Calling `rebuild()` for a filter change
+	 * therefore re-read and re-parsed every markdown file in the vault to
+	 * alter which of the already-loaded entries get drawn.
+	 */
+	refresh(): void {
+		this.emitChange();
+	}
+
 	/* ------------------------------------------------------------------ */
 	/* Reads                                                               */
 	/* ------------------------------------------------------------------ */
