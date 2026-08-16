@@ -405,6 +405,30 @@
 	border-color: var(--color-red);
 }
 
+/* Heart with a word beside it, for the log sheet where the state has to be
+   readable without another heart to compare it to. */
+.reel-heart-labelled {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: auto;
+	padding: 0 18px;
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+}
+
+.reel-heart-labelled .reel-heart-glyph {
+	font-size: 18px;
+	line-height: 1;
+}
+
+.reel-heart-labelled.is-on {
+	/* Tinted fill as well as red ink: at a glance the filled pill is the
+	   signal, and the colour only confirms it. */
+	background: color-mix(in srgb, var(--color-red) 12%, transparent);
+}
+
 .reel-heart.static {
 	border: none;
 	min-width: 0;
@@ -772,6 +796,15 @@
 .reel-chart-label {
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Second line under a bar's label — the film/series split on a provider. */
+.reel-chart-sub {
+	font-size: calc(var(--font-ui-smaller) * 0.85);
+	color: var(--text-faint);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1238,11 +1271,24 @@ input.reel-input {
 }
 
 @media (max-width: 700px) {
+	/*
+	 * Tabs go at the TOP on mobile, not the bottom.
+	 *
+	 * A bottom tab bar is the right pattern for a normal phone app, but this
+	 * runs inside Obsidian, which puts its own floating toolbar over the
+	 * bottom of every view. That toolbar sat directly on top of the tab row —
+	 * Library and Stats were half-visible at the edges and nothing in between
+	 * could be tapped at all, so the app had no working navigation.
+	 *
+	 * Padding the bar upward would mean guessing that toolbar's height, which
+	 * changes with the user's settings and their phone's gesture bar. Moving
+	 * out of its way entirely is the only version that cannot be covered.
+	 */
 	.reel-tabs {
-		order: 3;
-		border-bottom: none;
-		border-top: 1px solid var(--background-modifier-border);
-		padding-bottom: env(safe-area-inset-bottom);
+		order: 1;
+		border-top: none;
+		border-bottom: 1px solid var(--background-modifier-border);
+		padding-bottom: 0;
 	}
 
 	.reel-view {
@@ -1250,11 +1296,13 @@ input.reel-input {
 	}
 
 	.reel-view-body {
-		order: 2;
+		order: 3;
+		/* Clear the floating toolbar so the last row is reachable. */
+		padding-bottom: calc(72px + env(safe-area-inset-bottom));
 	}
 
 	.reel-view-filters {
-		order: 1;
+		order: 2;
 	}
 
 	.reel-tab.is-active {
@@ -2069,18 +2117,31 @@ input.reel-input {
 	max-width: 72ch;
 }
 
-.reel-detail .reel-links .reel-trailer-btn {
+/* Shared by the detail screen and the Discover preview sheet — one rule, so
+   the two cannot drift into looking like different buttons. */
+.reel-trailer-btn {
 	flex: 0 0 auto;
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	gap: 7px;
 	text-decoration: none;
 	min-height: 40px;
 	padding: 0 18px;
 }
 
-.reel-detail .reel-links .reel-trailer-btn:hover {
+.reel-trailer-btn:hover {
 	text-decoration: none;
+}
+
+/* In the preview sheet it is the primary way to decide, so it spans the
+   sheet rather than sitting inline with links. */
+.reel-preview-trailer {
+	margin: 12px 0 4px;
+}
+
+.reel-preview-trailer .reel-trailer-btn {
+	width: 100%;
 }
 
 .reel-links {
@@ -2714,6 +2775,9 @@ input.reel-input {
    than halfway between two, which is what makes it feel deliberate. */
 .reel-drow-strip {
 	display: flex;
+	/* stretch, so every card is as tall as the tallest in the row and the
+	   bottom-pinned action buttons line up across all of them. */
+	align-items: stretch;
 	gap: 12px;
 	overflow-x: auto;
 	overflow-y: hidden;
@@ -2741,6 +2805,11 @@ input.reel-input {
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
 	-webkit-touch-callout: none;
+	/* A column, so the action row can be pinned to the bottom. A one-line
+	   title and a two-line title otherwise put their +/✓/✕ buttons at
+	   different heights, and a row of them reads as broken alignment. */
+	display: flex;
+	flex-direction: column;
 }
 
 .reel-dcard:active .reel-dcard-poster {
@@ -2898,7 +2967,10 @@ input.reel-input {
 .reel-dcard-actions {
 	display: flex;
 	gap: 4px;
-	margin-top: 6px;
+	/* auto, not a fixed gap: this is what holds the buttons on one line
+	   across cards whose titles wrap differently. */
+	margin-top: auto;
+	padding-top: 6px;
 }
 
 .reel-dcard-btn {

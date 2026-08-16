@@ -99,7 +99,20 @@ export class DiscoverEngine {
 	 */
 	async taste(type: "movie" | "tv" = "movie"): Promise<TasteProfile> {
 		const all = this.plugin.visible(this.plugin.library.all());
-		const rated = all.filter((e) => (e.rating ?? 0) >= LIKED_THRESHOLD || e.liked);
+
+		// Signals, strongest first.
+		//
+		// Requiring a rating at or above the liked threshold meant a young
+		// library personalised nothing: rate one show three stars, put one
+		// film on the watchlist, and the profile came back empty while the
+		// screen still offered "For you". Adding something to your watchlist
+		// is a deliberate statement of interest even before you have seen it,
+		// and a middling rating says more than no data at all. So the weaker
+		// signals are folded in only while the strong ones are too few to
+		// stand on their own.
+		const strong = all.filter((e) => (e.rating ?? 0) >= LIKED_THRESHOLD || e.liked);
+		const weak = all.filter((e) => e.status === "watchlist" || (e.rating ?? 0) > 0);
+		const rated = strong.length >= 3 ? strong : [...new Map([...strong, ...weak].map((e) => [e.path, e])).values()];
 
 		const directorScores = new Map<string, number>();
 		for (const e of rated) {
@@ -119,17 +132,24 @@ export class DiscoverEngine {
 		// Seeds are the strongest, most recent things you rated — recency
 		// matters because taste drifts and a five-star film from 2019 is a
 		// weaker signal than one from last month.
-		const seeds = rated
-			.filter((e) => (e.rating ?? 0) >= 4)
-			.sort((a, b) => (b.lastWatchedDate ?? "").localeCompare(a.lastWatchedDate ?? ""))
-			.slice(0, 6);
+		const byRecency = (a: Entry, b: Entry) => (b.lastWatchedDate ?? "").localeCompare(a.lastWatchedDate ?? "");
+		const strongSeeds = rated.filter((e) => (e.rating ?? 0) >= 4).sort(byRecency);
+
+		// Demanding four stars meant no "Because you liked X" row at all until
+		// you had rated something that highly. Below that, seed from the best
+		// of what there is — a recommendation drawn from your three-star show
+		// beats a row of this week's trending titles.
+		const seeds = (strongSeeds.length ? strongSeeds : [...rated].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || byRecency(a, b))).slice(0, 6);
 
 		return {
 			genreIds,
 			genreNames,
 			seeds,
 			directors: [...directorScores.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n).slice(0, 5),
-			sparse: rated.length < 3,
+			// Sparse means "nothing to personalise from", not "not much" — if
+			// there is a genre or a seed, the rows are genuinely about you and
+			// saying otherwise undersells them.
+			sparse: !genreIds.length && !seeds.length,
 		};
 	}
 

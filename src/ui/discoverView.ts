@@ -18,6 +18,7 @@ import type { DiscoverRow, TasteProfile } from "../discover";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { renderStars } from "./stars";
+import { trailerUrl } from "../extract";
 
 interface Filters {
 	genreId: number | null;
@@ -187,9 +188,11 @@ export class DiscoverScreen {
 				text: "Rate a few films and these become personal — right now they're just what's popular.",
 			});
 		} else if (this.profile?.genreNames.length) {
+			// "Based on your ratings" was a lie once the profile could also be
+			// built from watchlist picks. Name the shape, not the source.
 			head.createDiv({
 				cls: "reel-discover-note",
-				text: `Based on your ratings — mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`,
+				text: `Based on your library — mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`,
 			});
 		}
 		const reload = head.createEl("button", { cls: "reel-chip", text: "Refresh" });
@@ -524,6 +527,13 @@ class PreviewSheet extends Modal {
 
 		if (this.item.overview) contentEl.createDiv({ cls: "reel-preview-overview", text: this.item.overview });
 
+		// A trailer is the fastest way to decide, which is this sheet's whole
+		// job. Search results carry no videos, so the detail payload loads in
+		// the background: the sheet stays usable and the button appears when
+		// it arrives. Responses are cached, and a title you go on to add would
+		// have needed this fetch regardless.
+		void this.loadTrailer(contentEl.createDiv({ cls: "reel-preview-trailer" }), isTv);
+
 		const actions = contentEl.createDiv({ cls: "reel-log-actions" });
 		const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
 		later.addEventListener("click", () => void this.add(true, later));
@@ -536,6 +546,29 @@ class PreviewSheet extends Modal {
 				this.close();
 			});
 		});
+	}
+
+	/**
+	 * Fetch the detail payload just for its trailer.
+	 *
+	 * Silent on failure: the sheet works without it, and an error notice for a
+	 * missing trailer would be noise on a screen you are skimming.
+	 */
+	private async loadTrailer(slot: HTMLElement, isTv: boolean): Promise<void> {
+		try {
+			const meta = isTv ? await this.plugin.tmdb.getShow(this.item.id) : await this.plugin.tmdb.getFilm(this.item.id);
+			const url = trailerUrl(meta.videos?.results);
+			if (!url) return;
+			const play = slot.createEl("a", {
+				cls: "reel-btn mod-cta reel-trailer-btn",
+				text: "▶  Watch trailer",
+				href: url,
+			});
+			play.setAttr("target", "_blank");
+			play.setAttr("rel", "noopener");
+		} catch {
+			/* no trailer is not worth interrupting the sheet for */
+		}
 	}
 
 	private async add(watchlist: boolean, button: HTMLButtonElement): Promise<void> {

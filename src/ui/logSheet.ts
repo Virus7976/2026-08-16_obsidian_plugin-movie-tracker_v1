@@ -144,13 +144,20 @@ export class LogSheet extends Modal {
 		const likeRow = detailsEl.createDiv({ cls: "reel-field reel-field-inline" });
 		likeRow.createDiv({ cls: "reel-field-label", text: "Liked" });
 		const heart = likeRow.createEl("button", {
-			cls: "reel-heart",
-			text: "♥",
-			attr: { "aria-label": "Liked", "aria-pressed": "false", type: "button" },
+			cls: "reel-heart reel-heart-labelled",
+			attr: { "aria-pressed": "false", type: "button" },
 		});
+		// Colour alone did not answer "did I like this?" — a faint heart and a
+		// red one look the same when you have nothing to compare against. The
+		// glyph fills and the word changes, so the state reads at a glance.
+		const glyph = heart.createSpan({ cls: "reel-heart-glyph" });
+		const word = heart.createSpan({ cls: "reel-heart-word" });
 		const paintHeart = () => {
 			heart.toggleClass("is-on", this.liked);
 			heart.setAttr("aria-pressed", String(this.liked));
+			heart.setAttr("aria-label", this.liked ? "Liked — tap to unlike" : "Not liked — tap to like");
+			glyph.setText(this.liked ? "♥" : "♡");
+			word.setText(this.liked ? "Liked" : "Like");
 		};
 		heart.addEventListener("click", () => {
 			this.liked = !this.liked;

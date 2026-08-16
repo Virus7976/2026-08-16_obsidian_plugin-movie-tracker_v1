@@ -152,6 +152,15 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	const unrated = films.filter((e) => e.rating == null && e.watched.length).length;
 	if (unrated) tile("Unrated", String(unrated), "tap Rate to fix");
 
+	// Breadth, as opposed to the depth the top-N charts show. "195 actors" is
+	// the number the old tracker put front and centre, and the charts alone
+	// never answer it.
+	const people = (pick: (e: Entry) => string[]) => new Set(all.flatMap((e) => pick(e).map(unlink))).size;
+	const actors = people((e) => e.cast);
+	const helmers = people((e) => [...e.director, ...e.creators]);
+	if (actors) tile("Unique actors", String(actors));
+	if (helmers) tile("Directors & creators", String(helmers));
+
 	if (watched.length && !opts.year) {
 		const perDay = new Map<string, number>();
 		for (const v of watched) perDay.set(v.date, (perDay.get(v.date) ?? 0) + 1);
@@ -160,9 +169,14 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	}
 
 	/* ---- superlatives -------------------------------------------------- */
-	const longest = films.filter((e) => e.runtime).sort((a, b) => (b.runtime ?? 0) - (a.runtime ?? 0))[0];
-	const topRated = films.filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-	const mostRewatched = films.filter((e) => e.watched.length > 1).sort((a, b) => b.watched.length - a.watched.length)[0];
+	// These describe what you have *seen*, so they run over the watched set
+	// rather than the whole library. Using every film put a watchlist title
+	// under "Longest" directly beneath "0 films watched".
+	const seen = [...new Map(watched.map((v) => [v.entry.path, v.entry])).values()];
+
+	const longest = seen.filter((e) => e.runtime).sort((a, b) => (b.runtime ?? 0) - (a.runtime ?? 0))[0];
+	const topRated = seen.filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+	const mostRewatched = seen.filter((e) => e.watched.length > 1).sort((a, b) => b.watched.length - a.watched.length)[0];
 
 	const facts: { label: string; value: string }[] = [];
 	if (topRated.length) facts.push({ label: "Highest rated", value: `${topRated[0].title} — ${topRated[0].rating}★` });
@@ -245,9 +259,96 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	ratedBy(charts, "Genres you rate highest", films, (e) => e.genres, 3);
 	tally(charts, "Top collections", all, (e) => (e.collection ? [e.collection] : []));
 	tally(charts, "Certifications", all, (e) => (e.certification ? [e.certification] : []), 8, 1);
-	tally(charts, "Streaming on", all, (e) => e.providers, 8, 1);
+	providerSplit(charts, all);
 	tally(charts, "Studios", all, (e) => e.productionCompanies, 6);
 	tally(charts, "Languages", all, (e) => (e.language ? [e.language] : []), 6, 1);
+
+	// Release years, distinct from "films per year" above: that counts when you
+	// watched, this counts when the film came out. A run of 2003s says
+	// something about taste that a viewing date does not.
+	tally(
+		charts,
+		"Top release years",
+		all,
+		(e) => {
+			const y = e.year ?? e.firstAirYear;
+			return y ? [String(y)] : [];
+		},
+		6,
+		1
+	);
+
+	/* ---- money ---------------------------------------------------------- */
+	// Budget and revenue only arrive for films, and TMDB leaves both at 0 for
+	// plenty of them — a zero here means "not reported", not "made nothing",
+	// so those rows are dropped rather than charted as the cheapest film ever.
+	const withBudget = films.filter((e) => (e.budget ?? 0) > 0);
+	const withRevenue = films.filter((e) => (e.revenue ?? 0) > 0);
+
+	if (withBudget.length) {
+		bars(
+			charts,
+			"Biggest budgets ($M)",
+			[...withBudget]
+				.sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0))
+				.slice(0, 5)
+				.map((e) => ({ label: e.title, n: Math.round((e.budget ?? 0) / 1_000_000) }))
+		);
+		bars(
+			charts,
+			"Smallest budgets ($M)",
+			[...withBudget]
+				.sort((a, b) => (a.budget ?? 0) - (b.budget ?? 0))
+				.slice(0, 5)
+				.map((e) => ({ label: e.title, n: Math.round((e.budget ?? 0) / 1_000_000) }))
+		);
+	}
+
+	if (withRevenue.length) {
+		bars(
+			charts,
+			"Highest grossing ($M)",
+			[...withRevenue]
+				.sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0))
+				.slice(0, 5)
+				.map((e) => ({ label: e.title, n: Math.round((e.revenue ?? 0) / 1_000_000) }))
+		);
+		bars(
+			charts,
+			"Lowest grossing ($M)",
+			[...withRevenue]
+				.sort((a, b) => (a.revenue ?? 0) - (b.revenue ?? 0))
+				.slice(0, 5)
+				.map((e) => ({ label: e.title, n: Math.round((e.revenue ?? 0) / 1_000_000) }))
+		);
+	}
+
+	// Return on budget. Needs both figures, so it is its own pool rather than
+	// a derived column on either chart above.
+	const ratios = films
+		.filter((e) => (e.budget ?? 0) > 0 && (e.revenue ?? 0) > 0)
+		.map((e) => ({ entry: e, x: (e.revenue ?? 0) / (e.budget ?? 1) }));
+
+	if (ratios.length) {
+		bars(
+			charts,
+			"Overperformers (× budget)",
+			[...ratios]
+				.sort((a, b) => b.x - a.x)
+				.slice(0, 5)
+				.map((r) => ({ label: r.entry.title, n: Math.round(r.x * 10) / 10 })),
+			"×"
+		);
+		bars(
+			charts,
+			"Underperformers (× budget)",
+			[...ratios]
+				.sort((a, b) => a.x - b.x)
+				.slice(0, 5)
+				.map((r) => ({ label: r.entry.title, n: Math.round(r.x * 10) / 10 })),
+			"×"
+		);
+	}
 
 	const decades = new Map<string, number>();
 	for (const e of all) {
@@ -276,6 +377,37 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 interface Bar {
 	label: string;
 	n: number;
+	/** Optional second line, e.g. the film/series split under a provider. */
+	note?: string;
+}
+
+/**
+ * Where your library can be streamed, split by type.
+ *
+ * A bare count answers "how many titles" but not "is this subscription
+ * carrying my films or my shows", which is the question behind deciding what
+ * to keep paying for.
+ */
+function providerSplit(el: HTMLElement, rows: Entry[]): void {
+	const counts = new Map<string, { films: number; shows: number }>();
+	for (const e of rows) {
+		for (const p of e.providers) {
+			if (!p) continue;
+			const row = counts.get(p) ?? { films: 0, shows: 0 };
+			if (e.type === "tv") row.shows++;
+			else row.films++;
+			counts.set(p, row);
+		}
+	}
+	const data = [...counts.entries()]
+		.map(([label, c]) => ({
+			label,
+			n: c.films + c.shows,
+			note: `${c.films} film${c.films === 1 ? "" : "s"} · ${c.shows} series`,
+		}))
+		.sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
+		.slice(0, 12);
+	bars(el, "Streaming on", data);
 }
 
 function bars(el: HTMLElement, title: string, data: Bar[], suffix = ""): void {
@@ -289,7 +421,8 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = ""): void {
 		// Full text in a tooltip, since a truncated director or title is
 		// otherwise unrecoverable on desktop.
 		const label = row.createDiv({ cls: "reel-chart-label", text: d.label });
-		label.setAttr("title", d.label);
+		label.setAttr("title", d.note ? `${d.label} — ${d.note}` : d.label);
+		if (d.note) label.createDiv({ cls: "reel-chart-sub", text: d.note });
 		const track = row.createDiv({ cls: "reel-chart-track" });
 		track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
 		row.createDiv({ cls: "reel-chart-value", text: `${d.n}${suffix}` });
@@ -304,10 +437,15 @@ function tally(
 	limit = 8,
 	minCount = 2
 ): void {
+	// "Appears at least twice" keeps a large library's charts meaningful, but
+	// it empties them entirely for a small one — every director has exactly
+	// one film until you own five. Below that, show singles: seeing your two
+	// titles listed is more useful than a blank page.
+	const floor = rows.length < 5 ? 1 : minCount;
 	const count = new Map<string, number>();
 	for (const e of rows) for (const value of pick(e)) if (value) count.set(value, (count.get(value) ?? 0) + 1);
 	const top = [...count.entries()]
-		.filter(([, n]) => n >= minCount)
+		.filter(([, n]) => n >= floor)
 		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
 		.slice(0, limit)
 		.map(([label, n]) => ({ label, n }));
