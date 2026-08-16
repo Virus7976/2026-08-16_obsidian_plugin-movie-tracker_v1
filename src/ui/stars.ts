@@ -8,6 +8,7 @@
  */
 
 import { clampRating, MAX_STARS } from "../util/ratings";
+import { haptic } from "../util/haptics";
 
 export interface StarsOptions {
 	value?: number;
@@ -55,6 +56,10 @@ export function renderStars(parent: HTMLElement, opts: StarsOptions = {}): HTMLE
 			// Tapping the current value clears it — the only way back to "unrated".
 			value = value === next ? undefined : next;
 			paint();
+			// Before the callback, not after: the callback awaits a vault write,
+			// and a tick that arrives after the disk has answered is late enough
+			// to feel disconnected from the finger that caused it.
+			haptic("tick");
 			opts.onChange?.(value);
 		};
 

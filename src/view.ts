@@ -80,6 +80,16 @@ export class ReelView extends ItemView {
 	private rateScreen: RateScreen | null = null;
 	/** Kept across repaints so rows aren't refetched on every tab switch. */
 	private discoverScreen: DiscoverScreen | null = null;
+	/**
+	 * Set by the navigation methods, consumed by the next paint.
+	 *
+	 * `paint()` runs on every library change, not only when you go somewhere —
+	 * so animating unconditionally would make the whole screen slide every time
+	 * you rated an episode. Only a deliberate move sets this.
+	 */
+	private moving: "forward" | "back" | "sideways" | null = null;
+	/** Where each tab was scrolled to, so coming back lands where you left. */
+	private tabScroll = new Map<string, number>();
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -253,6 +263,10 @@ export class ReelView extends ItemView {
 
 	showTab(tab: string): void {
 		if (!TABS.some((t) => t.id === tab)) return;
+		// Where you were on the tab you are leaving, so returning to it does not
+		// dump you at the top of a library you had scrolled halfway down.
+		if (!this.detail) this.tabScroll.set(this.tab, this.bodyEl?.scrollTop ?? 0);
+		this.moving = tab === this.tab ? null : "sideways";
 		this.tab = tab as Tab;
 		this.detail = null;
 		this.clearSearch();
@@ -263,6 +277,8 @@ export class ReelView extends ItemView {
 		this.plugin.settings.lastTab = tab;
 		void this.plugin.saveSettings();
 		this.paint();
+		// After the paint, since the body has no height to scroll until then.
+		this.bodyEl.scrollTop = this.tabScroll.get(this.tab) ?? 0;
 	}
 
 	private paint(): void {
@@ -291,6 +307,7 @@ export class ReelView extends ItemView {
 			// episodes is the one thing you do repeatedly without leaving the
 			// screen, and each rating repaints it.
 			if (scroll > 0) this.bodyEl.scrollTop = scroll;
+			this.playMove();
 			return;
 		}
 
@@ -298,12 +315,37 @@ export class ReelView extends ItemView {
 			this.paintTab();
 			// After the DOM exists, or there is nothing to scroll yet.
 			if (scroll > 0) this.bodyEl.scrollTop = scroll;
+			this.playMove();
 		} catch (e) {
 			// A thrown paint used to leave an empty pane with no explanation.
 			// Showing the error keeps the rest of the view usable and tells you
 			// which tab is broken.
 			this.bodyEl.createDiv({ cls: "reel-error", text: redact(e) });
 		}
+	}
+
+	/**
+	 * Give the freshly-painted body a direction, once.
+	 *
+	 * Tapping a title used to empty the container and rebuild it, which is
+	 * instant and tells you nothing about where you went. A short move in the
+	 * direction you travelled says the detail came *from* the list rather than
+	 * replacing it, and going back reverses it.
+	 *
+	 * The class is not removed afterwards. It only needs clearing so the same
+	 * animation can be re-triggered, and the reflow below does that — a timer
+	 * would be one more thing to cancel when the view closes.
+	 */
+	private playMove(): void {
+		const move = this.moving;
+		this.moving = null;
+		if (!move) return;
+
+		this.bodyEl.removeClasses(["reel-move-forward", "reel-move-back", "reel-move-sideways"]);
+		// Reading a layout property flushes the class removal, so re-adding it
+		// restarts the animation instead of being coalesced into a no-op.
+		void this.bodyEl.offsetWidth;
+		this.bodyEl.addClass(`reel-move-${move}`);
 	}
 
 	private paintTab(): void {
@@ -455,12 +497,14 @@ export class ReelView extends ItemView {
 	 */
 	private closeDetail(): void {
 		this.detail = null;
+		this.moving = "back";
 		this.paint();
 		this.bodyEl.scrollTop = this.listScroll;
 	}
 
 	openDetail(entry: Entry): void {
 		this.listScroll = this.bodyEl.scrollTop;
+		this.moving = "forward";
 		const from = TABS.find((t) => t.id === this.tab)?.label ?? "Library";
 		this.detail = new DetailScreen(
 			this.plugin,

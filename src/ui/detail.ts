@@ -38,6 +38,7 @@ import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { unlink } from "../library";
 import { compactCount } from "../util/format";
 import { ContentFlag, FLAG_LABELS } from "../content";
+import { haptic } from "../util/haptics";
 
 /**
  * "GB" → 🇬🇧.
@@ -1101,6 +1102,7 @@ export class DetailScreen {
 			tick.addEventListener("click", async () => {
 				const file = this.file;
 				if (!file) return;
+				haptic("tick");
 				if (watched.has(n)) watched.delete(n);
 				else watched.add(n);
 				epRow.toggleClass("is-watched", watched.has(n));

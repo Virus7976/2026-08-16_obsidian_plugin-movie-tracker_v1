@@ -12,6 +12,7 @@ import type { Entry } from "../types";
 import { nextEpisode, rangeCount } from "../util/ranges";
 import { prettyDate, todayISO } from "../util/dates";
 import { redact } from "../secrets";
+import { haptic } from "../util/haptics";
 import { SeasonSheet } from "../ui/seasonSheet";
 
 export interface NextUp {
@@ -164,6 +165,9 @@ class UpNextPainter {
 				e.stopPropagation();
 				const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
 				if (!(file instanceof TFile)) return;
+				// The signature interaction of the whole app — one thumb, one
+				// tap, a row at a time. It is the one that most wants a tick.
+				haptic("tick");
 				tick.setAttr("disabled", "true");
 				try {
 					await this.plugin.notes.markEpisode(file, next.season, next.episode);

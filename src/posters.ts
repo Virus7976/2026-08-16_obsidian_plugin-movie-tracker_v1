@@ -107,8 +107,36 @@ export class PosterStore {
 			return;
 		}
 
-		const img = parent.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+		// A tinted block sits under every poster from the moment the box exists,
+		// so a grid has its shape before any image decodes. Derived from the
+		// title, not random, so the same film gets the same colour every time —
+		// a placeholder that changes on each repaint is worse than a grey one.
+		parent.addClass("reel-poster-loading");
+		parent.setCssProps({ "--reel-poster-hue": String(hueOf(entry.title)) });
+
+		// One class on the image itself, rather than adding the fade to each of
+		// the ~28 `.reel-something-poster img` rules that already exist. Every
+		// image on every screen comes through here, so one selector covers all
+		// of them and the next screen gets it for free.
+		const img = parent.createEl("img", {
+			cls: "reel-img",
+			attr: { src, alt: "", loading: "lazy", decoding: "async" },
+		});
+
+		// Without this every poster snaps to full opacity the instant it
+		// decodes, and twenty of them arrive in whatever order the disk and the
+		// network settle on. The result reads as flicker rather than loading.
+		const settle = () => {
+			parent.removeClass("reel-poster-loading");
+			img.addClass("is-loaded");
+		};
+		// A cached image can be complete before the listener is attached, in
+		// which case `load` has already fired and would never fire again.
+		if (img.complete && img.naturalWidth > 0) settle();
+		else img.addEventListener("load", settle, { once: true });
+
 		img.addEventListener("error", () => {
+			parent.removeClass("reel-poster-loading");
 			img.remove();
 			fallback();
 		});
@@ -235,4 +263,18 @@ export class PosterStore {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((r) => window.setTimeout(r, ms));
+}
+
+/**
+ * A stable hue for a title, used to tint its loading placeholder.
+ *
+ * Any cheap hash would do; this one only has to be deterministic and spread
+ * titles across the wheel. The point is that a grid mid-load looks like a
+ * deliberate set of coloured cards rather than a page of identical grey boxes,
+ * and that each box keeps its colour across repaints.
+ */
+function hueOf(title: string): number {
+	let h = 0;
+	for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) % 360;
+	return h;
 }

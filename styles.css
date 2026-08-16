@@ -4439,3 +4439,269 @@ input.reel-input {
 	opacity: 0.5;
 	cursor: default;
 }
+
+/* ------------------------------------------------------------------ */
+/* Images — load, then fade                                            */
+/* ------------------------------------------------------------------ */
+
+/* Every poster in the app is created by PosterStore.attach, so this one
+   selector covers all of them. Before this, each image snapped to full
+   opacity the instant it decoded — twenty of them arriving in whatever order
+   the disk and the network settled on, which reads as flicker rather than
+   loading. */
+.reel-img {
+	opacity: 0;
+	transition: opacity 150ms ease-out;
+}
+
+.reel-img.is-loaded {
+	opacity: 1;
+}
+
+/* The block underneath, so the layout is complete before any image is. The
+   hue is derived from the title, so a box keeps its colour across repaints
+   and a half-loaded grid looks like a deliberate set of cards rather than a
+   page of identical grey rectangles. */
+.reel-poster-loading {
+	/* The sheen below is absolutely positioned; without this it would escape
+	   to whichever ancestor happens to be positioned. */
+	position: relative;
+	overflow: hidden;
+	background-image: linear-gradient(
+		160deg,
+		hsl(var(--reel-poster-hue, 220) 22% 26% / 0.55),
+		hsl(var(--reel-poster-hue, 220) 18% 16% / 0.55)
+	);
+}
+
+/* The sweep says "still coming" rather than "this is what it looks like".
+   Only on the placeholder, so it stops the moment the image lands. */
+.reel-poster-loading::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		100deg,
+		transparent 20%,
+		var(--background-modifier-hover) 50%,
+		transparent 80%
+	);
+	background-size: 220% 100%;
+	animation: reel-sheen 1.4s ease-in-out infinite;
+	pointer-events: none;
+}
+
+@keyframes reel-sheen {
+	from { background-position: 140% 0; }
+	to { background-position: -40% 0; }
+}
+
+/* A pulsing rectangle behind text someone is trying to read is hostile, and
+   for anyone who gets motion sick it is worse than a plain box. */
+@media (prefers-reduced-motion: reduce) {
+	.reel-poster-loading::after {
+		animation: none;
+	}
+	.reel-img {
+		transition: none;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Numbers                                                             */
+/* ------------------------------------------------------------------ */
+
+/* Proportional digits are narrower for 1 than for 0, so every count that
+   ticks up shifts the text beside it sideways. These are the numbers people
+   look at most in a tracker, which is exactly why the jitter reads as cheap.
+   Applied by role rather than globally — prose stays proportional, and the
+   list is of classes that actually exist rather than ones that sound like
+   they should. */
+.reel-tile-value,
+.reel-tile-sub,
+.reel-chart-value,
+.reel-chart-sub,
+.reel-chart-more,
+.reel-fact-value,
+.reel-facet-value,
+.reel-score-value,
+.reel-score-votes,
+.reel-meta-value,
+.reel-season-rating,
+.reel-block-count,
+.reel-upnext-ep,
+.reel-episode-meta,
+.reel-diary-meta,
+.reel-release-date,
+.reel-person-role-value,
+.reel-hero-sub,
+.reel-badge,
+.reel-dim {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum" 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Moving between screens                                              */
+/* ------------------------------------------------------------------ */
+
+/* Tapping a title emptied the container and rebuilt it — instant, and telling
+   you nothing about where you went. A short move in the direction travelled
+   gives the app a hierarchy: the detail comes *from* the list rather than
+   replacing it, and going back reverses it.
+
+   Applied only by ReelView.playMove, which is set by the navigation methods —
+   repaints from a rating or an episode tick do not animate, or the screen
+   would slide every time you touched a star. */
+.reel-move-forward {
+	animation: reel-move-forward 140ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.reel-move-back {
+	animation: reel-move-back 140ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Sideways is a cross-fade with almost no travel: tabs are siblings, so
+   implying depth between them would be a lie about the structure. */
+.reel-move-sideways {
+	animation: reel-move-sideways 120ms ease-out both;
+}
+
+@keyframes reel-move-forward {
+	from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.99); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes reel-move-back {
+	from { opacity: 0; transform: translate3d(0, -6px, 0) scale(1.01); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes reel-move-sideways {
+	from { opacity: 0; transform: translate3d(0, 4px, 0); }
+	to { opacity: 1; transform: none; }
+}
+
+/* Motion is the part people turn off. The screens still change; they just
+   arrive rather than travel. */
+@media (prefers-reduced-motion: reduce) {
+	.reel-move-forward,
+	.reel-move-back,
+	.reel-move-sideways {
+		animation: none;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Skeletons                                                           */
+/* ------------------------------------------------------------------ */
+
+/* One base for every placeholder shape. The sheen is what separates "still
+   coming" from "this is what it looks like" — a static grey box is
+   indistinguishable from a screen that has finished and has nothing on it. */
+.reel-skel {
+	position: relative;
+	overflow: hidden;
+	border-radius: var(--reel-radius);
+	background: var(--background-modifier-form-field);
+}
+
+.reel-skel::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		100deg,
+		transparent 20%,
+		var(--background-modifier-hover) 50%,
+		transparent 80%
+	);
+	background-size: 220% 100%;
+	animation: reel-sheen 1.4s ease-in-out infinite;
+}
+
+/* Staggered, so the row reads as a set of separate cards rather than one wide
+   bar sweeping across all of them at once. */
+.reel-skel-strip .reel-skel-card:nth-child(2) .reel-skel::after { animation-delay: 80ms; }
+.reel-skel-strip .reel-skel-card:nth-child(3) .reel-skel::after { animation-delay: 160ms; }
+.reel-skel-strip .reel-skel-card:nth-child(4) .reel-skel::after { animation-delay: 240ms; }
+.reel-skel-strip .reel-skel-card:nth-child(5) .reel-skel::after { animation-delay: 320ms; }
+.reel-skel-strip .reel-skel-card:nth-child(6) .reel-skel::after { animation-delay: 400ms; }
+
+/* 2:3 is the poster ratio, so the page is the height it will be before any
+   image exists — which is the whole point. Nothing jumps on arrival. */
+.reel-skel-poster {
+	aspect-ratio: 2 / 3;
+	width: 100%;
+}
+
+.reel-skel-line {
+	height: 10px;
+	margin-top: 8px;
+	border-radius: 5px;
+}
+
+.reel-skel-line.is-short {
+	width: 55%;
+}
+
+.reel-skel-strip {
+	display: flex;
+	gap: 12px;
+	overflow: hidden;
+	padding: 4px 0 12px;
+}
+
+.reel-skel-card {
+	flex: 0 0 108px;
+	width: 108px;
+}
+
+.reel-skel-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	gap: 12px;
+	padding: 4px 0;
+}
+
+.reel-skel-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 4px 0;
+}
+
+.reel-skel-row {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+}
+
+.reel-skel-thumb {
+	flex: 0 0 46px;
+	width: 46px;
+	height: 69px;
+}
+
+.reel-skel-body {
+	flex: 1 1 auto;
+}
+
+.reel-skel-section {
+	margin-bottom: 18px;
+}
+
+/* A page of pulsing rectangles is the worst version of this for anyone who
+   gets motion sick. The shapes still hold the layout; they just sit still. */
+@media (prefers-reduced-motion: reduce) {
+	.reel-skel::after {
+		animation: none;
+	}
+}
+
+@media (max-width: 700px) {
+	.reel-skel-card {
+		flex-basis: 96px;
+		width: 96px;
+	}
+}

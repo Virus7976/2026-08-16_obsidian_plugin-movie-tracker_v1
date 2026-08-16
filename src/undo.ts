@@ -30,6 +30,7 @@ import { Notice, TFile } from "obsidian";
 import type ReelPlugin from "./main";
 import { cloneFrontmatter, restoreInto, unchanged, UndoStack, type Snapshot } from "./util/undo";
 import { redact } from "./secrets";
+import { haptic } from "./util/haptics";
 
 export class UndoService {
 	private stack = new UndoStack(20);
@@ -124,6 +125,9 @@ export class UndoService {
 		const btn = el.createEl("button", { cls: "reel-undo-btn", text: "Undo", attr: { type: "button" } });
 		btn.addEventListener("click", (e) => {
 			e.stopPropagation();
+			// Heavier than a star landing: this is a real reversal, and the
+			// weight distinguishes "took it back" from "set a value".
+			haptic("commit");
 			btn.setAttr("disabled", "true");
 			notice.hide();
 			void this.undo();

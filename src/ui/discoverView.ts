@@ -21,6 +21,8 @@ import { renderStars } from "./stars";
 import { SearchModal } from "./searchModal";
 import { LogSheet } from "./logSheet";
 import { trailerUrl, providerNames } from "../extract";
+import { skeletonCards, skeletonGrid } from "./skeleton";
+import { haptic } from "../util/haptics";
 
 interface Filters {
 	genreId: number | null;
@@ -120,7 +122,9 @@ export class DiscoverScreen {
 		// entering it cold has to trigger the same fetch the rows would.
 		if (!this.filtered && !this.rows) {
 			void this.loadRows(container);
-			container.createDiv({ cls: "reel-loading", text: "Loading…", attr: { role: "status" } });
+			// Quick mode shows one big card at a time, so the placeholder is a
+			// single card rather than a strip of them.
+			skeletonCards(container, 1, "Loading");
 			return;
 		}
 		if (this.filtered && !this.results) {
@@ -241,6 +245,7 @@ export class DiscoverScreen {
 	private async quickAdd(item: TmdbSearchResult, watchlist: boolean, container: HTMLElement): Promise<void> {
 		try {
 			await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist });
+			haptic("commit");
 			// Quick mode is a swipe-speed interaction, which makes it the single
 			// easiest place to add the title you were only scrolling past.
 			this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
@@ -421,7 +426,11 @@ export class DiscoverScreen {
 
 	private paintForYou(container: HTMLElement): void {
 		if (!this.rows) {
+			// Three sections' worth, because that is roughly what comes back —
+			// the page ends up close to the height it will be, so nothing jumps
+			// when the results land.
 			container.createDiv({ cls: "reel-loading", text: "Finding things for you…" });
+			for (let i = 0; i < 3; i++) skeletonCards(container, 6, "Finding things for you");
 			if (this.loading) return;
 			this.loading = true;
 			void this.loadRows(container);
@@ -513,6 +522,7 @@ export class DiscoverScreen {
 	private paintResults(container: HTMLElement): void {
 		if (!this.results) {
 			container.createDiv({ cls: "reel-loading", text: "Searching…" });
+			skeletonGrid(container, 12, "Searching");
 			if (this.loading) return;
 			this.loading = true;
 			const query = this.seed
@@ -629,15 +639,11 @@ export class DiscoverScreen {
 		posterEl.setAttr("role", "button");
 		posterEl.setAttr("tabindex", "0");
 		posterEl.setAttr("aria-label", `${title} — details`);
+		// Through PosterStore rather than a hand-rolled <img>: this was the one
+		// place that built its own, so Discover cards were the only posters in
+		// the app that snapped in with no fade and no tinted block underneath.
 		const src = this.plugin.tmdb.posterUrl(item.poster_path, "w342");
-		if (src) {
-			const img = posterEl.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-			img.addEventListener("error", () => {
-				img.remove();
-				posterEl.addClass("is-empty");
-				posterEl.createSpan({ text: title.slice(0, 2) });
-			});
-		}
+		if (src) this.plugin.posters.attach(posterEl, { posterUrl: src, title });
 		if (item.vote_average) posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
 		if (isTv) posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
 
