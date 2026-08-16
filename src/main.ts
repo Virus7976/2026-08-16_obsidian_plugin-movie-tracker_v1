@@ -35,7 +35,6 @@ const REEL_ICON = `<circle cx="50" cy="50" r="42" fill="none" stroke="currentCol
 <circle cx="30" cy="50" r="9" fill="currentColor"/>
 <circle cx="70" cy="50" r="9" fill="currentColor"/>`;
 
-const NEW_EPISODE_CHECK_KEY = "reel-last-episode-check";
 
 export default class ReelPlugin extends Plugin {
 	settings!: ReelSettings;
@@ -403,12 +402,15 @@ export default class ReelPlugin extends Plugin {
 	/* ------------------------------------------------------------------ */
 
 	private async checkNewEpisodes(): Promise<void> {
-		const last = window.localStorage.getItem(NEW_EPISODE_CHECK_KEY);
-		if (last === todayISO()) return;
+		// Stored in plugin data, not localStorage. localStorage is app-wide, so
+		// three vaults would share one "already checked today" flag and only
+		// the first to open would ever refresh — a real bug, not just a
+		// review-guideline preference.
+		if (this.settings.lastEpisodeCheck === todayISO()) return;
 
 		const returning = this.library.shows().filter((s) => s.showStatus === "Returning Series" && s.status !== "dropped");
 		if (!returning.length) {
-			window.localStorage.setItem(NEW_EPISODE_CHECK_KEY, todayISO());
+			await this.markEpisodeCheckDone();
 			return;
 		}
 
@@ -424,7 +426,12 @@ export default class ReelPlugin extends Plugin {
 			}
 			await new Promise((r) => window.setTimeout(r, 400));
 		}
-		window.localStorage.setItem(NEW_EPISODE_CHECK_KEY, todayISO());
+		await this.markEpisodeCheckDone();
+	}
+
+	private async markEpisodeCheckDone(): Promise<void> {
+		this.settings.lastEpisodeCheck = todayISO();
+		await this.saveSettings();
 	}
 
 	/* ------------------------------------------------------------------ */

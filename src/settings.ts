@@ -30,6 +30,10 @@ export interface ReelSettings {
 	askForReview: boolean;
 	linkFromDailyNote: boolean;
 	dailyNotePrefix: string;
+	/** Folder holding daily notes. Empty means the vault root. */
+	dailyNoteFolder: string;
+	/** Last day the returning-series refresh ran, per vault. */
+	lastEpisodeCheck: string;
 
 	/* Content policy — see content.ts for what the data can and can't do */
 	hideFlags: string[];
@@ -68,6 +72,8 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	askForReview: true,
 	linkFromDailyNote: false,
 	dailyNotePrefix: "- Watched",
+	dailyNoteFolder: "",
+	lastEpisodeCheck: "",
 
 	hideFlags: [],
 	maxCertification: null,
@@ -385,6 +391,22 @@ export class ReelSettingTab extends PluginSettingTab {
 					this.plugin.settings.linkFromDailyNote = v;
 					await this.plugin.saveSettings();
 				})
+			);
+
+		new Setting(el)
+			.setName("Daily note folder")
+			.setDesc(
+				"Where your daily notes live — leave empty for the vault root. Files must be named YYYY-MM-DD.md. " +
+					"Reel asks rather than reading the Daily Notes plugin's configuration, which is undocumented API."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("e.g. Journal/Daily")
+					.setValue(this.plugin.settings.dailyNoteFolder)
+					.onChange(async (v) => {
+						this.plugin.settings.dailyNoteFolder = v.replace(/^\/+|\/+$/g, "");
+						await this.plugin.saveSettings();
+					})
 			);
 
 		new Setting(el)

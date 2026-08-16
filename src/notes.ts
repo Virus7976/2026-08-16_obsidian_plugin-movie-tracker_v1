@@ -514,23 +514,19 @@ export class NoteWriter {
 	}
 
 	/**
-	 * Resolve today's daily note path from the core plugin's own settings, so
-	 * the format and folder match whatever the user already configured. This
-	 * reaches past the public API, hence the defensive shape — if the internals
-	 * move, the feature quietly does nothing rather than throwing.
+	 * Today's daily note, from Reel's own setting.
+	 *
+	 * An earlier version read the core Daily Notes plugin's configuration
+	 * through `app.internalPlugins`. That is undocumented API: it can change
+	 * without notice, and reaching into another plugin's internals is the kind
+	 * of thing a reviewer is right to flag. A folder setting is one field the
+	 * user fills in once, and it cannot break.
+	 *
+	 * Only `YYYY-MM-DD` filenames are supported. Matching arbitrary date
+	 * formats would mean a date-parsing library for a convenience feature.
 	 */
 	private dailyNotePath(): string | null {
-		const internal = (
-			this.plugin.app as unknown as {
-				internalPlugins?: { getPluginById(id: string): { instance?: { options?: { folder?: string; format?: string } } } | null };
-			}
-		).internalPlugins;
-		const options = internal?.getPluginById("daily-notes")?.instance?.options;
-		const folder = (options?.folder ?? "").replace(/^\/+|\/+$/g, "");
-		const format = options?.format || "YYYY-MM-DD";
-		// Only the default ISO-ish format is supported without pulling in a date
-		// library; anything else is left alone rather than guessed at.
-		if (!/^YYYY-MM-DD$/.test(format)) return null;
+		const folder = (this.plugin.settings.dailyNoteFolder ?? "").replace(/^\/+|\/+$/g, "");
 		const name = todayISO();
 		return normalizePath(folder ? `${folder}/${name}.md` : `${name}.md`);
 	}
