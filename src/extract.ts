@@ -11,7 +11,7 @@ import {
 	certificationFromReleaseDates,
 	flagsFromKeywords,
 } from "./content";
-import type { TmdbFilm, TmdbShow, TmdbVideo } from "./types";
+import type { TmdbCastMember, TmdbFilm, TmdbShow, TmdbVideo } from "./types";
 
 export interface ExtractOptions {
 	/** Wrap people and genres as `[[People/Name|Name]]` links. */
@@ -64,6 +64,13 @@ export function providerNames(block: unknown, region: string): string[] {
 	return [...new Set(names)];
 }
 
+/** The part played. Shows list several roles per actor; take the first. */
+function characterOf(c: TmdbCastMember): string {
+	if (c.character?.trim()) return c.character.trim();
+	const role = c.roles?.find((r) => r.character?.trim());
+	return role?.character?.trim() ?? "";
+}
+
 function keywordNames(film: TmdbFilm | TmdbShow): string[] {
 	// Films nest under `keywords.keywords`, shows under `keywords.results`.
 	// Same endpoint name, different shape — a genuine TMDB inconsistency.
@@ -86,8 +93,12 @@ export function filmFields(meta: TmdbFilm, opts: ExtractOptions): Record<string,
 	const directors = (meta.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
 	if (directors.length) out.director = directors.map((d) => personLink(d, opts));
 
-	const cast = (meta.credits?.cast ?? []).slice(0, opts.castLimit).map((c) => c.name);
-	if (cast.length) out.cast = cast.map((c) => personLink(c, opts));
+	const castRows = (meta.credits?.cast ?? []).slice(0, opts.castLimit);
+	if (castRows.length) {
+		out.cast = castRows.map((c) => personLink(c.name, opts));
+		const characters = castRows.map((c) => characterOf(c)).filter(Boolean);
+		if (characters.length) out.characters = characters;
+	}
 
 	if (meta.runtime) out.runtime = meta.runtime;
 	out.genres = (meta.genres ?? []).map((g) => g.name);
@@ -134,8 +145,12 @@ export function showFields(meta: TmdbShow, opts: ExtractOptions): Record<string,
 
 	// Shows expose a flattened `aggregate_credits`, ordered by prominence
 	// across the whole run rather than per episode.
-	const cast = (meta.aggregate_credits?.cast ?? []).slice(0, opts.castLimit).map((c) => c.name);
-	if (cast.length) out.cast = cast.map((c) => personLink(c, opts));
+	const castRows = (meta.aggregate_credits?.cast ?? []).slice(0, opts.castLimit);
+	if (castRows.length) {
+		out.cast = castRows.map((c) => personLink(c.name, opts));
+		const characters = castRows.map((c) => characterOf(c)).filter(Boolean);
+		if (characters.length) out.characters = characters;
+	}
 
 	if (meta.status) out.show_status = meta.status;
 	const runtime = meta.episode_run_time?.[0];

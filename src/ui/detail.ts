@@ -318,7 +318,16 @@ export class DetailScreen {
 	private renderMeta(side: HTMLElement): void {
 		const e = this.entry;
 		const rows: [string, string][] = [];
-		if (e.cast.length) rows.push(["Cast", e.cast.map(unlink).join(", ")]);
+		if (e.cast.length) {
+			// Pair each actor with the part they played, where we have it —
+			// "Rainn Wilson as Dwight Schrute" says far more than either alone.
+			const names = e.cast.map(unlink);
+			const paired = names.map((n, i) => {
+				const character = e.characters[i];
+				return character ? `${n} as ${character}` : n;
+			});
+			rows.push(["Cast", paired.join(" · ")]);
+		}
 		if (e.providers.length) rows.push(["Streaming", e.providers.join(", ")]);
 		if (e.collection) rows.push(["Collection", e.collection]);
 		if (e.productionCompanies.length) rows.push(["Studio", e.productionCompanies.slice(0, 3).join(", ")]);

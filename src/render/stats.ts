@@ -223,8 +223,14 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		tally(charts, "Top directors", films, (e) => e.director.map(unlink));
 		ratedBy(charts, "Directors you rate highest", films, (e) => e.director.map(unlink));
 		tally(charts, "Top actors", films, (e) => e.cast.map(unlink));
+		// Recurring characters are mostly a franchise signal — the same part
+		// across several films is the interesting case, so require two.
+		tally(charts, "Recurring characters", films, (e) => e.characters);
 	}
-	if (shows.length) tally(charts, "Top creators", shows, (e) => e.creators.map(unlink));
+	if (shows.length) {
+		tally(charts, "Top creators", shows, (e) => e.creators.map(unlink));
+		tally(charts, "Top actors — TV", shows, (e) => e.cast.map(unlink));
+	}
 
 	tally(charts, "Genres", all, (e) => e.genres, 10);
 	ratedBy(charts, "Genres you rate highest", films, (e) => e.genres, 3);

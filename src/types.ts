@@ -66,6 +66,8 @@ export interface Entry {
 	liked?: boolean;
 	/** Rich metadata */
 	cast: string[];
+	/** "Rainn Wilson as Dwight Schrute", aligned by index with `cast`. */
+	characters: string[];
 	overview?: string;
 	trailer?: string;
 	budget?: number;
@@ -116,6 +118,16 @@ export interface TmdbCrew {
 	name: string;
 }
 
+/**
+ * A cast entry. Films put the part in `character`; a show's aggregate credits
+ * put it in `roles`, because an actor can play several parts across a run.
+ */
+export interface TmdbCastMember {
+	name: string;
+	character?: string;
+	roles?: { character?: string }[];
+}
+
 export interface TmdbVideo {
 	site?: string;
 	type?: string;
@@ -142,7 +154,7 @@ export interface TmdbFilm {
 	revenue?: number;
 	belongs_to_collection?: { name?: string } | null;
 	production_companies?: { name: string }[];
-	credits?: { crew?: TmdbCrew[]; cast?: { name: string }[] };
+	credits?: { crew?: TmdbCrew[]; cast?: TmdbCastMember[] };
 	keywords?: { keywords?: { name: string }[] };
 	videos?: { results?: TmdbVideo[] };
 	release_dates?: unknown;
@@ -172,7 +184,7 @@ export interface TmdbShow {
 	seasons?: TmdbSeason[];
 	next_episode_to_air?: { air_date?: string; season_number?: number; episode_number?: number } | null;
 	created_by?: { name: string }[];
-	aggregate_credits?: { crew?: TmdbCrew[]; cast?: { name: string }[] };
+	aggregate_credits?: { crew?: TmdbCrew[]; cast?: TmdbCastMember[] };
 	popularity?: number;
 	original_language?: string;
 	production_companies?: { name: string }[];
