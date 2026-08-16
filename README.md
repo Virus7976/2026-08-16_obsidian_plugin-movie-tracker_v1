@@ -290,7 +290,20 @@ Design-level, not afterthoughts:
 npm test
 ```
 
-51 assertions over the range parser, rating maths, date handling and the query engine — the pure logic where an off-by-one would quietly corrupt watch history.
+316 assertions over eight suites:
+
+| Suite | Covers |
+|---|---|
+| logic | range parser, rating maths, dates, the query engine |
+| crypto | AES-GCM round trips, tamper detection, redaction |
+| content | flag derivation, certifications, field extraction |
+| mutations | watch history and episode ratings — data you cannot reconstruct |
+| legacy | conversion from the old tracker's shape |
+| prune | which cached posters are safe to delete |
+| importer | candidate selection and the once-per-library rating scale |
+| library | the index every surface reads from |
+
+The bias is toward code that writes or deletes something. The pure logic is covered because an off-by-one there quietly corrupts watch history; the prune and importer suites exist because those are the two places Reel changes files you already own.
 
 ## Content filtering — what it can and can't do
 

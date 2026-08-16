@@ -61,6 +61,11 @@ export class TFolder extends TAbstractFile {}
 
 export class Notice {
 	constructor(public message?: string) {}
+	/** The plugin drives progress through this; the stub had drifted without it. */
+	setMessage(message: string): this {
+		this.message = message;
+		return this;
+	}
 	hide(): void {}
 }
 
