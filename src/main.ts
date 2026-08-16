@@ -132,12 +132,11 @@ export default class ReelPlugin extends Plugin {
 	async openView(rebuild = false): Promise<void> {
 		const existing = this.app.workspace.getLeavesOfType(REEL_VIEW);
 		if (existing.length) {
-			// A command that targets a tab has to re-run onOpen, which is where
-			// the saved tab is read; revealing alone would leave you wherever
-			// you already were.
+			// A command that targets a tab has to switch it explicitly;
+			// revealing alone would leave you wherever you already were.
 			if (rebuild) {
 				const view = existing[0].view;
-				if (view instanceof ReelView) await view.onOpen();
+				if (view instanceof ReelView) view.showTab(this.settings.lastTab);
 			}
 			await this.app.workspace.revealLeaf(existing[0]);
 			return;

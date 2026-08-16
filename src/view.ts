@@ -67,6 +67,8 @@ export class ReelView extends ItemView {
 	private statusFilter: string | null = null;
 	private genreFilter: string | null = null;
 	private listFilter: string | null = null;
+	private diaryYear: number | null = null;
+	private statsScope: "all" | "film" | "tv" = "all";
 	private sort = "watched";
 	/** Secondary sort, applied when the primary ties. */
 	private sort2 = "";
@@ -122,7 +124,7 @@ export class ReelView extends ItemView {
 			cls: "reel-input reel-search-input",
 			attr: {
 				type: "search",
-				placeholder: "Search title, director, cast…",
+				placeholder: "Search titles, people, characters, plots…",
 				enterkeyhint: "search",
 				autocapitalize: "off",
 				autocorrect: "off",
@@ -170,6 +172,20 @@ export class ReelView extends ItemView {
 
 	private filterEl!: HTMLElement;
 
+	/**
+	 * Switch tabs from outside the view.
+	 *
+	 * Not onOpen(): that registers the library listener, so calling it again
+	 * stacks a second one that lives until the view unloads. Five uses of the
+	 * per-tab commands and every change would repaint six times.
+	 */
+	showTab(tab: string): void {
+		if (!TABS.some((t) => t.id === tab)) return;
+		this.tab = tab as Tab;
+		this.detail = null;
+		this.paint();
+	}
+
 	private paint(): void {
 		this.contentEl.findAll(".reel-tab").forEach((el) => {
 			el.toggleClass("is-active", el.dataset.tab === this.tab);
@@ -204,7 +220,23 @@ export class ReelView extends ItemView {
 		} else if (this.tab === "diary") {
 			this.paintDiary();
 		} else {
-			paintStats(this.plugin, this.bodyEl, { include: "all" });
+			// Films and shows answer different questions — hours of film and
+			// episodes watched aren't comparable — so the tab can scope like
+			// the code block always could.
+			const bar = this.filterEl.createDiv({ cls: "reel-chips" });
+			for (const [scope, label] of [
+				["all", "Everything"],
+				["film", "Films"],
+				["tv", "Series"],
+			] as const) {
+				const b = bar.createEl("button", { cls: "reel-chip", text: label });
+				b.toggleClass("is-active", this.statsScope === scope);
+				b.addEventListener("click", () => {
+					this.statsScope = scope;
+					this.paint();
+				});
+			}
+			paintStats(this.plugin, this.bodyEl, { include: this.statsScope });
 		}
 	}
 
@@ -379,7 +411,25 @@ export class ReelView extends ItemView {
 	}
 
 	private paintDiary(): void {
-		const rows = viewings(this.plugin.library.search(this.query, this.pool()));
+		// The ```diary``` block took a year and the tab didn't, so the tab
+		// could only ever show everything.
+		const all = viewings(this.plugin.library.search(this.query, this.pool()));
+		const years = [...new Set(all.map((v) => v.date.slice(0, 4)))].sort().reverse();
+		if (years.length > 1) {
+			const bar = this.filterEl.createDiv({ cls: "reel-chips" });
+			const chip = (label: string, active: boolean, year: number | null) => {
+				const b = bar.createEl("button", { cls: "reel-chip", text: label });
+				b.toggleClass("is-active", active);
+				b.addEventListener("click", () => {
+					this.diaryYear = year;
+					this.paint();
+				});
+			};
+			chip("All time", this.diaryYear == null, null);
+			for (const y of years) chip(y, this.diaryYear === Number(y), Number(y));
+		}
+
+		const rows = this.diaryYear ? all.filter((v) => v.date.startsWith(String(this.diaryYear))) : all;
 		if (!rows.length) {
 			this.bodyEl.createDiv({ cls: "reel-empty", text: "No viewings logged yet." });
 			return;

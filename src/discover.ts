@@ -132,7 +132,7 @@ export class DiscoverEngine {
 	 * Requests run in parallel and a failed row is dropped rather than failing
 	 * the screen — one dead endpoint should cost you that row and nothing else.
 	 */
-	async rows(profile: TasteProfile): Promise<DiscoverRow[]> {
+	async rows(profile: TasteProfile, type: "movie" | "tv" = "movie"): Promise<DiscoverRow[]> {
 		const jobs: Promise<DiscoverRow | null>[] = [];
 
 		// Personal rows first, when there's enough history to build them.
@@ -154,10 +154,19 @@ export class DiscoverEngine {
 
 		if (profile.genreIds.length) {
 			const name = profile.genreNames[0];
+			// The Films/Series toggle has to reach these rows too, or picking
+			// Series changes the filtered grid and leaves the personalised
+			// rows showing films regardless.
 			jobs.push(
 				this.plugin.tmdb
-					.discoverBy({ type: "movie", genreId: profile.genreIds[0], minRating: 7 })
-					.then((items) => this.row("genre", `Highly rated ${name.toLowerCase()}`, items, `Your most-watched genre`))
+					.discoverBy({ type, genreId: profile.genreIds[0], minRating: 7 })
+					.then((items) => this.row("genre", `Highly rated ${name.toLowerCase()}`, items, "Your most-watched genre"))
+					.catch(() => null)
+			);
+			jobs.push(
+				this.plugin.tmdb
+					.discoverBy({ type, genreId: profile.genreIds[0], decade: 1990 })
+					.then((items) => this.row("genre-90s", `${name} from the nineties`, items))
 					.catch(() => null)
 			);
 		}

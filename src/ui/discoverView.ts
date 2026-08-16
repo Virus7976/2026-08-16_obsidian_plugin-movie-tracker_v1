@@ -102,8 +102,20 @@ export class DiscoverScreen {
 		chip(row1, "For you", !this.filtered, () => {
 			this.filters = { ...EMPTY, type: this.filters.type };
 		});
-		chip(row1, "Films", this.filters.type === "movie", () => (this.filters.type = "movie"));
-		chip(row1, "Series", this.filters.type === "tv", () => (this.filters.type = "tv"));
+		chip(row1, "Films", this.filters.type === "movie", () => {
+			this.filters.type = "movie";
+			this.rows = null;
+			this.genres = [];
+		});
+		chip(row1, "Series", this.filters.type === "tv", () => {
+			this.filters.type = "tv";
+			// Genre ids differ between films and shows, so the list has to be
+			// refetched rather than reused.
+			this.rows = null;
+			this.genres = [];
+			this.filters.genreId = null;
+			this.filters.genreName = null;
+		});
 
 		row1.createSpan({ cls: "reel-chip-sep", text: "·" });
 
@@ -198,7 +210,7 @@ export class DiscoverScreen {
 	private async loadRows(container: HTMLElement): Promise<void> {
 		try {
 			const profile = await this.plugin.discover.taste();
-			this.rows = await this.plugin.discover.rows(profile);
+			this.rows = await this.plugin.discover.rows(profile, this.filters.type);
 			this.profile = profile;
 		} catch (e) {
 			this.error = redact(e);

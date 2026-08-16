@@ -31,10 +31,20 @@ import { ContentFlag, FLAG_LABELS } from "../content";
 const FILM_STATUSES = ["watched", "watchlist", "abandoned"];
 const TV_STATUSES = ["watching", "completed", "watchlist", "paused", "dropped"];
 
-/** Brief flash, so a silent write still reads as "that worked". */
+/**
+ * Brief flash, so a silent write still reads as "that worked".
+ *
+ * A colour change says nothing to a screen reader, so the control is also
+ * marked as a live region for the moment it changes — otherwise the whole
+ * confirmation is invisible to anyone not looking at it.
+ */
 function flash(el: HTMLElement): void {
 	el.addClass("reel-flash");
-	window.setTimeout(() => el.removeClass("reel-flash"), 600);
+	el.setAttr("aria-live", "polite");
+	window.setTimeout(() => {
+		el.removeClass("reel-flash");
+		el.removeAttribute("aria-live");
+	}, 600);
 }
 
 export class DetailScreen {
@@ -458,6 +468,14 @@ export class DetailScreen {
 
 		listEl.empty();
 		let firstUnwatched: HTMLElement | null = null;
+
+		const remaining = episodes.filter((x) => !watched.has(x.episode_number)).length;
+		if (remaining) {
+			listEl.createDiv({
+				cls: "reel-block-count",
+				text: `${remaining} of ${episodes.length} left in season ${season}`,
+			});
+		}
 
 		const bulk = listEl.createDiv({ cls: "reel-season-bulk" });
 		const markAll = bulk.createEl("button", { cls: "reel-chip", text: "Mark all watched" });

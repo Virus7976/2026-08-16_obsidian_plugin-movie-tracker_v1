@@ -2957,12 +2957,7 @@ input.reel-input {
 	font-weight: 700;
 }
 
-.reel-rate-hint {
-	text-align: center;
-	color: var(--text-faint);
-	font-size: 11px;
-	padding-top: 4px;
-}
+
 
 .reel-dgrid-more {
 	display: flex;
@@ -2973,4 +2968,15 @@ input.reel-input {
 .reel-dgrid-more .reel-btn {
 	flex: 0 0 auto;
 	min-width: 160px;
+}
+
+/* Keyboard users had no idea where focus was on the grid — the cells are
+   focusable but nothing showed it. */
+.reel-cell:focus-visible,
+.reel-row:focus-visible,
+.reel-dcard-poster:focus-visible,
+.reel-diary-row:focus-visible {
+	outline: 2px solid var(--interactive-accent, #7c3aed);
+	outline-offset: 2px;
+	border-radius: var(--reel-radius);
 }
