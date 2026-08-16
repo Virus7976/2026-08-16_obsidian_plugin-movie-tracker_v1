@@ -26,8 +26,8 @@ IMDb holds is a deep link at best.
 | Trailer inline with duration + play overlay | TMDB `videos` has `key`; duration is not returned | **partial** — button only |
 | IMDb vote count ("1.2M") | OMDb `imdbVotes` | **done** — was fetched then discarded; now stored and shown |
 | Popularity rank + trend arrow | TMDB `popularity` (a float, no rank or delta) | **partial** — no trend |
-| "1 VIDEO" / "99+ PHOTOS" counts | TMDB `videos`, `/images` endpoint | **buildable** |
-| Photo gallery | TMDB `/images` | **buildable** |
+| "1 VIDEO" / "99+ PHOTOS" counts | TMDB `videos`, `/images` | **partial** — gallery exists, no count badge |
+| Photo gallery | TMDB `/images` | **done** — own tab, fetched lazily |
 | Add-to-list `+` overlay on poster | Reel lists | **done** (elsewhere in UI) |
 
 ## 2. People
@@ -37,7 +37,7 @@ IMDb holds is a deep link at best.
 | Cast list with headshots, name, character | TMDB `credits.cast.profile_path` | **done** |
 | Crew list with headshots, name, job | TMDB `credits.crew` | **done** |
 | Tap a person → what else of theirs you own | Reel library search | **done** |
-| Top-cast circular strip (IMDb style) | same data, different layout | **buildable** |
+| Top-cast circular strip (IMDb style) | same data, different layout | **done** — above the tabs |
 | Director / Writer / Stars summary rows | TMDB `credits` | **partial** — director shown in hero |
 | "All cast & crew" full screen | TMDB `credits` | **done** (Cast/Crew tabs) |
 | Favourite a person (heart) | no Reel concept of a followed person | **buildable** — needs a design decision |
@@ -154,11 +154,9 @@ community reviews, and the content tab.
 
 Remaining, cheapest first:
 
-1. **Top-cast circular strip** — same data as the Cast tab, different layout.
-2. **Photos gallery** — new `/images` endpoint, high visual payoff.
-3. **List view with inline metadata** — year, runtime, certificate, score and
+1. **List view with inline metadata** — year, runtime, certificate, score and
    director on one row; the layout already exists for the compact grid.
-4. **Watch options per related card** — needs a providers fetch per related
+2. **Watch options per related card** — needs a providers fetch per related
    item, so it is by far the most expensive thing left.
 
 Correction to an earlier estimate: the IMDb vote count was listed as "already

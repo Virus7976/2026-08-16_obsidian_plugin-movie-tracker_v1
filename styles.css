@@ -3552,3 +3552,110 @@ input.reel-input {
 	cursor: default;
     pointer-events: none;
 }
+
+/* ---------------- top cast strip ---------------- */
+
+/*
+ * Above the tabs, not inside them: "who is in this" is the one thing people
+ * look for without being prompted, and a tap was too much friction for it.
+ * Capped and scrollable — the Cast tab holds the full list.
+ */
+.reel-caststrip {
+	margin-top: 18px;
+}
+
+.reel-caststrip-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.reel-caststrip-track {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+	overflow-x: auto;
+	padding-bottom: 6px;
+	scroll-snap-type: x proximity;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: thin;
+}
+
+.reel-caststrip-cell {
+	flex: 0 0 76px;
+	width: 76px;
+	scroll-snap-align: start;
+	text-align: center;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	border-radius: var(--reel-radius);
+}
+
+.reel-caststrip-cell:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.reel-caststrip-shot {
+	width: 76px;
+	height: 76px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 6px;
+	transition: transform 120ms ease;
+}
+
+.reel-caststrip-cell:active .reel-caststrip-shot {
+	transform: scale(0.96);
+}
+
+.reel-caststrip-shot img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-caststrip-shot.is-empty .reel-placeholder-text {
+	font-size: var(--font-ui-small);
+	font-weight: 700;
+	color: var(--text-faint);
+	text-transform: uppercase;
+}
+
+.reel-caststrip-name {
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	line-height: 1.25;
+}
+
+.reel-caststrip-role {
+	font-size: calc(var(--font-ui-smaller) * 0.9);
+	color: var(--text-muted);
+	line-height: 1.25;
+}
+
+/* ---------------- photos ---------------- */
+
+.reel-photos {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 8px;
+}
+
+.reel-photo {
+	aspect-ratio: 16 / 9;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+}
+
+.reel-photo img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}

@@ -280,6 +280,30 @@ export class TmdbClient {
 	}
 
 	/** Episode titles for one season. Permanent cache once the show has ended. */
+	/**
+	 * Stills and backdrops for a title.
+	 *
+	 * A separate request rather than an append: images are the heaviest block
+	 * TMDB returns and only the gallery ever wants them, so folding them into
+	 * every detail fetch would slow down adding a title to pay for a tab most
+	 * people never open. Cached immutably — a released title's stills do not
+	 * change.
+	 *
+	 * `include_image_language` asks for language-neutral art first: text-free
+	 * backdrops travel better than posters with baked-in titles in a language
+	 * the reader may not have.
+	 */
+	async getImages(id: number, kind: "movie" | "tv"): Promise<{ backdrops?: { file_path?: string }[] }> {
+		return this.cached(
+			`img-${kind}-${id}`,
+			() =>
+				this.request<{ backdrops?: { file_path?: string }[] }>(`/${kind}/${id}/images`, {
+					include_image_language: "null,en",
+				}),
+			true
+		);
+	}
+
 	async getSeason(showId: number, season: number, showEnded = false): Promise<{ episodes: TmdbEpisode[] }> {
 		return this.cached(
 			`tv-${showId}-s${season}`,

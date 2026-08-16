@@ -286,6 +286,11 @@ export class DetailScreen {
 		const crew = (isTv ? (meta as TmdbShow).aggregate_credits?.crew : film?.credits?.crew) ?? [];
 		const related = meta.recommendations?.results ?? [];
 
+		// Top cast sits above the tabs, not inside them. It is the one piece of
+		// reference material people look for without being asked, and burying
+		// it behind a tap made the screen feel emptier than it is.
+		if (cast.length) this.renderCastStrip(wrap, cast);
+
 		const tabs: { id: string; label: string; render: (el: HTMLElement) => void }[] = [];
 
 		if (cast.length) tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
@@ -300,6 +305,8 @@ export class DetailScreen {
 			tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film) });
 		}
 		if (related.length) tabs.push({ id: "related", label: "Related", render: (el) => this.renderRelated(el, related) });
+
+		tabs.push({ id: "photos", label: "Photos", render: (el) => void this.renderPhotos(el, isTv) });
 
 		const reviews = meta.reviews?.results ?? [];
 		if (reviews.length) {
@@ -328,6 +335,56 @@ export class DetailScreen {
 			b.addEventListener("click", () => show(i));
 		});
 		show(0);
+	}
+
+	/**
+	 * Top billing as a horizontal strip of circular headshots.
+	 *
+	 * Deliberately capped and scrollable rather than complete — the Cast tab
+	 * holds the full list. This answers "who is in this" at a glance, which is
+	 * a different question from "show me everyone".
+	 */
+	private renderCastStrip(wrap: HTMLElement, cast: TmdbCastMember[]): void {
+		const box = wrap.createDiv({ cls: "reel-caststrip" });
+
+		const head = box.createDiv({ cls: "reel-caststrip-head" });
+		head.createSpan({ cls: "reel-facet-label", text: "Top cast" });
+		head.createSpan({ cls: "reel-dim", text: String(cast.length) });
+
+		const strip = box.createDiv({ cls: "reel-caststrip-track" });
+		for (const p of cast.slice(0, 12)) {
+			const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+			cell.setAttr("role", "button");
+			cell.setAttr("tabindex", "0");
+			cell.setAttr("aria-label", `Find ${p.name} in your library`);
+
+			const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+			const src = this.plugin.tmdb.posterUrl(p.profile_path, "w185");
+			if (src) {
+				const img = shot.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+				img.addEventListener("error", () => {
+					img.remove();
+					shot.addClass("is-empty");
+					shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+				});
+			} else {
+				shot.addClass("is-empty");
+				shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+			}
+
+			cell.createDiv({ cls: "reel-caststrip-name", text: p.name });
+			const part = p.character ?? p.roles?.[0]?.character ?? "";
+			if (part) cell.createDiv({ cls: "reel-caststrip-role", text: part });
+
+			const open = () => void this.plugin.openViewWithSearch(p.name);
+			cell.addEventListener("click", open);
+			cell.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key === "Enter" || ev.key === " ") {
+					ev.preventDefault();
+					open();
+				}
+			});
+		}
 	}
 
 	/**
@@ -566,6 +623,42 @@ export class DetailScreen {
 				if (r.cert) line.createSpan({ cls: "reel-badge cert", text: r.cert });
 				if (r.note) line.createSpan({ cls: "reel-dim", text: r.note });
 			}
+		}
+	}
+
+	/**
+	 * Stills and backdrops, fetched only when the tab is opened.
+	 *
+	 * Lazy on purpose: images are the largest block TMDB returns, and paying
+	 * for them on every title added would be a poor trade for a tab most
+	 * people never open.
+	 */
+	private async renderPhotos(el: HTMLElement, isTv: boolean): Promise<void> {
+		el.createDiv({ cls: "reel-loading", text: "Loading photos…", attr: { role: "status" } });
+		try {
+			const data = await this.plugin.tmdb.getImages(this.entry.tmdbId, isTv ? "tv" : "movie");
+			// The tab may have been switched away from while this was in flight.
+			if (!el.isConnected) return;
+			el.empty();
+
+			const shots = (data.backdrops ?? []).map((b) => b.file_path).filter((p): p is string => !!p);
+			if (!shots.length) {
+				el.createDiv({ cls: "reel-empty", text: "No photos for this title." });
+				return;
+			}
+
+			const grid = el.createDiv({ cls: "reel-photos" });
+			for (const path of shots.slice(0, 24)) {
+				const src = this.plugin.tmdb.posterUrl(path, "w500");
+				if (!src) continue;
+				const cell = grid.createDiv({ cls: "reel-photo" });
+				const img = cell.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+				img.addEventListener("error", () => cell.remove());
+			}
+		} catch (e) {
+			if (!el.isConnected) return;
+			el.empty();
+			el.createDiv({ cls: "reel-error", text: redact(e) });
 		}
 	}
 
