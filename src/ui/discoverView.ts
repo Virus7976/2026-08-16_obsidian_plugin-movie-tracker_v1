@@ -18,6 +18,7 @@ import type { DiscoverRow, TasteProfile } from "../discover";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { renderStars } from "./stars";
+import { SearchModal } from "./searchModal";
 import { trailerUrl, providerNames } from "../extract";
 
 interface Filters {
@@ -41,6 +42,8 @@ export class DiscoverScreen {
 	private handled = new Set<number>();
 	private page = 1;
 	private exhausted = false;
+	/** "Something like this one" — a title to draw recommendations from. */
+	private seed: { id: number; type: "movie" | "tv"; title: string } | null = null;
 	/** One-at-a-time browsing, for when you want to move fast rather than skim. */
 	private quick = false;
 	private quickAt = 0;
@@ -48,10 +51,16 @@ export class DiscoverScreen {
 	constructor(private plugin: ReelPlugin) {}
 
 	private get filtered(): boolean {
-		return this.filters.genreId != null || this.filters.decade != null || this.filters.minRating != null;
+		return (
+			this.seed != null ||
+			this.filters.genreId != null ||
+			this.filters.decade != null ||
+			this.filters.minRating != null
+		);
 	}
 
 	reset(): void {
+		this.seed = null;
 		this.rows = null;
 		this.profile = null;
 		this.results = null;
@@ -305,6 +314,30 @@ export class DiscoverScreen {
 		chip(row1, "Films", this.filters.type === "movie", () => setType("movie"));
 		chip(row1, "Series", this.filters.type === "tv", () => setType("tv"));
 
+		// "Like this one." A seed title, not a genre — it changes what the pool
+		// is drawn from rather than narrowing what is already there, which is
+		// why it sits apart from the genre chips.
+		const seedLabel = this.seed ? `Like ${this.seed.title}` : "Like…";
+		const seedChip = chip(row1, seedLabel, !!this.seed, () => {
+			if (this.seed) {
+				this.seed = null;
+				return;
+			}
+			new SearchModal(this.plugin.app, this.plugin, {
+				placeholder: "Find me something like…",
+				onPick: (item) => {
+					this.seed = {
+						id: item.id,
+						type: item.media_type === "tv" ? "tv" : "movie",
+						title: (item.media_type === "tv" ? item.name : item.title) ?? "that",
+					};
+					this.results = null;
+					this.render(container);
+				},
+			}).open();
+		});
+		seedChip.addClass("reel-chip-seed");
+
 		// Browsing mode, not a filter — it changes how the same pool is shown.
 		// Rows are for skimming a shelf; this is for getting through a lot of
 		// titles quickly without your eye having to re-find the buttons.
@@ -465,13 +498,26 @@ export class DiscoverScreen {
 			container.createDiv({ cls: "reel-loading", text: "Searching…" });
 			if (this.loading) return;
 			this.loading = true;
-			void this.plugin.discover
-				.search({
-					type: this.filters.type,
-					genreId: this.filters.genreId ?? undefined,
-					decade: this.filters.decade ?? undefined,
-					minRating: this.filters.minRating ?? undefined,
-				})
+			const query = this.seed
+				? // A seed changes the source: recommendations for that title,
+					// then narrowed by whatever else is set. "An action comedy
+					// like X" means titles like X that are also action comedies.
+					this.plugin.discover.like(
+						{ id: this.seed.id, type: this.seed.type },
+						{
+							genreIds: this.filters.genreId ? [this.filters.genreId] : [],
+							decade: this.filters.decade,
+							minRating: this.filters.minRating,
+						}
+					)
+				: this.plugin.discover.search({
+						type: this.filters.type,
+						genreId: this.filters.genreId ?? undefined,
+						decade: this.filters.decade ?? undefined,
+						minRating: this.filters.minRating ?? undefined,
+					});
+
+			void query
 				.then((items) => {
 					this.results = items;
 				})
@@ -491,11 +537,29 @@ export class DiscoverScreen {
 			this.filters.genreName ?? "",
 			this.filters.type === "tv" ? "series" : "films",
 			this.filters.decade ? `from the ${this.filters.decade}s` : "",
+			// Naming the seed matters: otherwise a narrowed set looks identical
+			// to an ordinary genre browse and you cannot tell whether the
+			// "like X" part was honoured at all.
+			this.seed ? `like ${this.seed.title}` : "",
 		]
 			.filter(Boolean)
 			.join(" ");
 
 		container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
+
+		// Recommendations are a fixed set, so narrowing hard can empty it. An
+		// empty grid with no explanation reads as a broken feature rather than
+		// as a combination nothing satisfies.
+		if (this.seed && !items.length) {
+			const none = container.createDiv({ cls: "reel-empty" });
+			none.createDiv({ text: `Nothing like ${this.seed.title} also matches those filters.` });
+			const wider = none.createEl("button", { cls: "reel-btn mod-cta", text: "Drop the filters" });
+			wider.addEventListener("click", () => {
+				this.filters = { ...EMPTY, type: this.filters.type };
+				this.results = null;
+				this.render(container);
+			});
+		}
 
 		if (!items.length) {
 			// Narrow filters are easy to stack and hard to remember; undoing

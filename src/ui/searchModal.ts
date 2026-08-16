@@ -22,10 +22,25 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 	constructor(
 		app: App,
 		private plugin: ReelPlugin,
-		private opts: { watchlist?: boolean; query?: string } = {}
+		private opts: {
+			watchlist?: boolean;
+			query?: string;
+			/**
+			 * Hand the chosen title back instead of creating a note.
+			 *
+			 * Lets this double as a title picker — Discover uses it to choose
+			 * a seed for "something like this" — rather than a second, nearly
+			 * identical TMDB search modal drifting alongside it.
+			 */
+			onPick?: (item: TmdbSearchResult) => void;
+			placeholder?: string;
+		} = {}
 	) {
 		super(app);
-		this.setPlaceholder(opts.watchlist ? "Add to watchlist — search TMDB…" : "Search TMDB for a film or show…");
+		this.setPlaceholder(
+			opts.placeholder ??
+				(opts.watchlist ? "Add to watchlist — search TMDB…" : "Search TMDB for a film or show…")
+		);
 		this.limit = 20;
 		this.modalEl.addClass("reel-modal", "reel-search");
 		this.setInstructions([
@@ -119,6 +134,11 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 	}
 
 	async onChooseSuggestion(item: TmdbSearchResult): Promise<void> {
+		// A picker, not an add: hand the choice back and write nothing.
+		if (this.opts.onPick) {
+			this.opts.onPick(item);
+			return;
+		}
 		const isTv = item.media_type === "tv";
 		const type = isTv ? "tv" : "film";
 		const existing = this.plugin.library.byTmdbId(item.id, type);

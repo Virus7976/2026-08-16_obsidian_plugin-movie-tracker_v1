@@ -4192,3 +4192,13 @@ input.reel-input {
 	display: flex;
 	align-items: center;
 }
+
+/* The seed chip changes what the pool is drawn from, not how it is filtered,
+   so it reads as its own control rather than one more genre. */
+.reel-chip-seed {
+	font-style: italic;
+}
+
+.reel-chip-seed.is-active {
+	font-style: normal;
+}
