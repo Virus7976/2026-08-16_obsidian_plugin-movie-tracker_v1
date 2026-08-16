@@ -38,6 +38,11 @@ jobs:
           fi
           echo "Bundle is clean."
 
+      # A version mismatch makes Obsidian silently skip the update rather than
+      # error, so it is cheaper to catch here than after publishing.
+      - name: Preflight (version consistency, manifest rules)
+        run: node scripts/preflight.mjs
+
       # Nothing in this repo should ever look like a credential.
       - name: Assert no committed secrets
         run: |

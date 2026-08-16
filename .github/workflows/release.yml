@@ -23,7 +23,14 @@ jobs:
       - run: npm test
       - run: node esbuild.config.mjs production
 
-      # Obsidian expects these three files as loose release assets, not a zip.
+      # The tag must equal manifest.version exactly. Obsidian doesn't error on
+      # a mismatch — it just never offers the update, which is far harder to
+      # diagnose after the fact than a failed build here.
+      - name: Preflight
+        run: node scripts/preflight.mjs "$GITHUB_REF_NAME"
+
+      # Obsidian fetches these three by name from the release assets. They must
+      # be loose files, not a zip.
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

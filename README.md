@@ -155,15 +155,32 @@ Films per year, hours watched, top directors and creators, rating distribution, 
 
 ## Install
 
-No release yet, so build it:
+### With BRAT — gets you automatic updates
+
+[BRAT](https://github.com/TfTHacker/obsidian42-brat) installs plugins straight
+from GitHub and keeps them updated, so you never copy files by hand.
+
+1. Community plugins → install **Obsidian42 - BRAT**.
+2. BRAT → *Add a beta plugin for testing* → paste this repo's URL.
+3. In BRAT's settings, turn on *Auto-update plugins at startup*.
+
+New releases then appear in Obsidian on their own.
+
+### Manually
+
+Download `main.js`, `manifest.json` and `styles.css` from the latest release
+into `<vault>/.obsidian/plugins/reel/`, then enable it in Community plugins.
+
+### From source
 
 ```bash
 npm install && npm run build
 ```
 
-Copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidian/plugins/reel/`, then enable it in Community plugins.
+Copy the same three files into `<vault>/.obsidian/plugins/reel/`. For
+development, `npm run dev` watches and rebuilds.
 
-For development, point the build straight at your vault and use `npm run dev` for watch mode.
+Releasing is documented in [RELEASING.md](RELEASING.md).
 
 ## How it's built
 
