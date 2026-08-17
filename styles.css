@@ -6656,3 +6656,22 @@ input.reel-input {
 .reel-sheet .reel-recipe-seeds {
 	max-height: 52dvh;
 }
+
+/* A screen that failed says so. An empty pane is indistinguishable from a
+   screen with nothing on it, and the user cannot tell you which they saw. */
+.reel-error-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--reel-space-2);
+	padding: var(--reel-space-6) var(--reel-space-4);
+	max-width: 420px;
+	margin: 0 auto;
+}
+
+.reel-error-state .reel-empty-body {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: var(--reel-text-caption);
+	word-break: break-word;
+}

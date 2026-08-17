@@ -1848,7 +1848,7 @@
       if (!isTv) {
         const dateRow = detailsEl.createDiv({ cls: "reel-field" });
         dateRow.createDiv({ cls: "reel-field-label", text: "Watched on" });
-        const quick = dateRow.createDiv({ cls: "reel-quick-dates" });
+        const quick2 = dateRow.createDiv({ cls: "reel-quick-dates" });
         const dateInput = dateRow.createEl("input", {
           cls: "reel-input",
           attr: { type: "date", value: this.date }
@@ -1862,7 +1862,7 @@
           const d = /* @__PURE__ */ new Date();
           d.setDate(d.getDate() - offsetDays);
           const iso = toLocalISO(d);
-          const b = quick.createEl("button", { cls: "reel-chip", text: label });
+          const b = quick2.createEl("button", { cls: "reel-chip", text: label });
           b.addEventListener("click", () => {
             this.date = iso;
             dateInput.value = iso;
@@ -2318,7 +2318,37 @@
       this.page = 1;
       this.exhausted = false;
     }
+    /**
+     * Draw the screen, and never leave it blank.
+     *
+     * `render` empties the container before it draws. If anything after that
+     * throws — and several paths reach here from a `.finally()`, where a throw
+     * becomes an unhandled rejection nothing catches — the user is left
+     * looking at an empty pane with no explanation. That is the white screen.
+     *
+     * The view's own `paintTab` has a try/catch, but it only guards the
+     * *synchronous* first paint. Every repaint that follows a fetch arrives
+     * outside it.
+     */
     render(container) {
+      try {
+        this.draw(container);
+      } catch (e) {
+        container.empty();
+        const box = container.createDiv({ cls: "reel-error-state" });
+        box.createDiv({ cls: "reel-empty-title", text: "Discover hit a problem" });
+        box.createDiv({ cls: "reel-empty-body", text: redact(e) });
+        const again = box.createEl("button", { cls: "reel-btn mod-cta", text: "Start again" });
+        again.addEventListener("click", () => {
+          this.reset();
+          this.quick = false;
+          this.shortlist = null;
+          this.render(container);
+        });
+        console.error("Reel: Discover render failed", e);
+      }
+    }
+    draw(container) {
       container.empty();
       container.addClass("reel-discover");
       const staged = this.plugin.discover.takeStaged();
@@ -2633,11 +2663,11 @@
         }).open();
       });
       seedChip.addClass("reel-chip-seed");
-      const quick = chip(row1, "Quick", this.quick, () => {
+      const quick2 = chip(row1, "Quick", this.quick, () => {
         this.quick = !this.quick;
         this.quickAt = 0;
       });
-      quick.addClass("reel-chip-mode");
+      quick2.addClass("reel-chip-mode");
       row1.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
       if (!this.genres.length) {
         void this.plugin.tmdb.genreList(this.filters.type).then((list) => {
@@ -4928,8 +4958,8 @@
         card.addEventListener("click", () => this.preview(item));
       }
       const actions = el.createDiv({ cls: "reel-recipe-actions" });
-      const quick = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Go through them one by one" });
-      quick.addEventListener("click", () => {
+      const quick2 = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Go through them one by one" });
+      quick2.addEventListener("click", () => {
         this.plugin.discover.stage(this.results?.map((r) => r.item) ?? []);
         this.close();
         void this.plugin.openTab("discover");
@@ -5510,6 +5540,12 @@
     }, "Library");
     screen.render(root);
   }
+  function quick(root) {
+    root.addClass("reel-view-body");
+    const screen = new DiscoverScreen(plugin);
+    plugin.discover.takeStaged = () => all.slice(0, 6);
+    screen.render(root);
+  }
   function discover(root) {
     root.addClass("reel-view-body");
     const screen = new DiscoverScreen(plugin);
@@ -5540,7 +5576,8 @@
     recipe,
     quickrate,
     logsheet,
-    longshow
+    longshow,
+    quick
   };
   var params2 = new URLSearchParams(location.search);
   var wanted = params2.get("screen") ?? "library";

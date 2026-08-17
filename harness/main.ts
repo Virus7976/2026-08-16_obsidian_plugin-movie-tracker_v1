@@ -286,6 +286,16 @@ function detailFilm(root: HTMLElement): void {
 	screen.render(root);
 }
 
+function quick(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	// Quick mode via a staged shortlist, which is the path the "Quick" button
+	// takes. Reported as going white — and white is what a throw looks like,
+	// since the container is emptied before the render that fails.
+	const screen = new DiscoverScreen(plugin);
+	(plugin as unknown as { discover: { takeStaged: () => unknown } }).discover.takeStaged = () => all.slice(0, 6);
+	screen.render(root);
+}
+
 function discover(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const screen = new DiscoverScreen(plugin);
@@ -331,6 +341,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	quickrate,
 	logsheet,
 	longshow,
+	quick,
 };
 
 /* ------------------------------------------------------------------ */

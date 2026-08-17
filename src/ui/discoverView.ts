@@ -89,7 +89,40 @@ export class DiscoverScreen {
 		this.exhausted = false;
 	}
 
+	/**
+	 * Draw the screen, and never leave it blank.
+	 *
+	 * `render` empties the container before it draws. If anything after that
+	 * throws — and several paths reach here from a `.finally()`, where a throw
+	 * becomes an unhandled rejection nothing catches — the user is left
+	 * looking at an empty pane with no explanation. That is the white screen.
+	 *
+	 * The view's own `paintTab` has a try/catch, but it only guards the
+	 * *synchronous* first paint. Every repaint that follows a fetch arrives
+	 * outside it.
+	 */
 	render(container: HTMLElement): void {
+		try {
+			this.draw(container);
+		} catch (e) {
+			container.empty();
+			const box = container.createDiv({ cls: "reel-error-state" });
+			box.createDiv({ cls: "reel-empty-title", text: "Discover hit a problem" });
+			// The message, not a blank screen. Redacted, because an error can
+			// carry the request URL and the URL can carry the API key.
+			box.createDiv({ cls: "reel-empty-body", text: redact(e) });
+			const again = box.createEl("button", { cls: "reel-btn mod-cta", text: "Start again" });
+			again.addEventListener("click", () => {
+				this.reset();
+				this.quick = false;
+				this.shortlist = null;
+				this.render(container);
+			});
+			console.error("Reel: Discover render failed", e);
+		}
+	}
+
+	private draw(container: HTMLElement): void {
 		container.empty();
 		container.addClass("reel-discover");
 
