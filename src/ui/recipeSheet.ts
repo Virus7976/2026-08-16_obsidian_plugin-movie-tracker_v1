@@ -323,9 +323,14 @@ export class RecipeSheet extends Modal {
 		const decades = el.createDiv({ cls: "reel-chips" });
 		for (const d of [1970, 1980, 1990, 2000, 2010, 2020]) {
 			const b = decades.createEl("button", { cls: "reel-chip", text: `${d}s`, attr: { type: "button" } });
-			setSelected(b, this.recipe.decade === d);
+			const on = this.recipe.decades.includes(d);
+			setSelected(b, on);
 			b.addEventListener("click", () => {
-				this.recipe.decade = this.recipe.decade === d ? undefined : d;
+				// Several at once: "the 90s or the 2010s" is an ordinary thing
+				// to want, and being made to pick one is arbitrary.
+				this.recipe.decades = on
+					? this.recipe.decades.filter((x) => x !== d)
+					: [...this.recipe.decades, d];
 				this.refreshCount();
 				this.paint();
 			});
@@ -487,8 +492,31 @@ export class RecipeSheet extends Modal {
 		}
 		if (!box.isConnected) return;
 
+		// The diagnostic. A recipe returning nothing when it obviously should
+		// is not debuggable from the outside — "no results" from a query you
+		// cannot see is indistinguishable from a broken app, and that is
+		// exactly what happened here: "Action or Comedy" with nothing else
+		// returned zero, which is not a real answer.
+		const show = box.createEl("button", { cls: "reel-link", text: "Show the query" });
+		show.addEventListener("click", () => {
+			show.remove();
+			const dump = box.createDiv({ cls: "reel-recipe-query" });
+			const queries = this.plugin.discover.describeQueries(this.recipe);
+			dump.createDiv({ text: queries.length ? `${queries.length} query to TMDB:` : "No query — nothing constrains it." });
+			for (const q of queries) dump.createEl("code", { text: q });
+			// The two things that narrow results without appearing in the
+			// recipe at all, and so never show up in the diagnosis above.
+			const cert = this.plugin.settings.maxCertification;
+			if (cert) dump.createDiv({ text: `Content filter: certification ≤ ${cert}. This applies to every search.` });
+			const dismissed = this.plugin.settings.dismissedIds.length;
+			if (dismissed) dump.createDiv({ text: `${dismissed} title(s) hidden by "not interested".` });
+			dump.createDiv({ text: `${this.plugin.library.size} in your library, hidden: ${this.recipe.excludeOwned}` });
+		});
+
 		if (!culprit) {
-			body.setText("Even loosening one thing doesn't help — try picking a different film to start from.");
+			body.setText(
+				"Even loosening one thing doesn't help. That usually means something outside these filters is cutting it — the query below will say what."
+			);
 			return;
 		}
 
@@ -499,7 +527,7 @@ export class RecipeSheet extends Modal {
 			const key = culprit.key;
 			if (key === "minScore") this.recipe.minScore = undefined;
 			else if (key === "maxRuntime") this.recipe.maxRuntime = undefined;
-			else if (key === "decade") this.recipe.decade = undefined;
+			else if (key === "decades") this.recipe.decades = [];
 			else if (key === "withoutGenres") this.recipe.withoutGenres = [];
 			else if (key === "genreMode") this.recipe.genreMode = "any";
 			else if (key === "genres") this.recipe.genres = [];

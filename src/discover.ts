@@ -497,10 +497,45 @@ export class DiscoverEngine {
 	 * all would report "every film ever made", which is true and useless.
 	 */
 	async count(recipe: Recipe): Promise<number | null> {
-		const params = toDiscoverParams(recipe);
-		if (!Object.keys(params).length) return null;
-		const { total } = await this.plugin.tmdb.discoverWith("movie", params);
-		return total;
+		const queries = this.queriesFor(recipe);
+		if (!queries.length) return null;
+		const totals = await Promise.all(
+			queries.map((params) => this.plugin.tmdb.discoverWith("movie", params).then((r) => r.total))
+		);
+		// Summed rather than maxed: the decades do not overlap, so the counts
+		// are of disjoint sets and adding them is exact.
+		return totals.reduce((a, b) => a + b, 0);
+	}
+
+	/**
+	 * One parameter set per query a recipe needs.
+	 *
+	 * Usually one. Several decades means several, because TMDB takes a single
+	 * date range — asking for 1990–2019 to mean "the 90s or the 2010s" would
+	 * quietly include the 2000s too.
+	 */
+	private queriesFor(recipe: Recipe): Record<string, string>[] {
+		if (!recipe.decades.length) {
+			const params = toDiscoverParams(recipe);
+			return Object.keys(params).length ? [params] : [];
+		}
+		return recipe.decades.map((d) => toDiscoverParams(recipe, d));
+	}
+
+	/**
+	 * The exact queries a recipe produces, for the diagnostic.
+	 *
+	 * Exposed because a recipe returning nothing when it obviously should is
+	 * not something anyone can debug from the outside — and "no results" from
+	 * a query you cannot see is indistinguishable from a broken app.
+	 */
+	describeQueries(recipe: Recipe): string[] {
+		return this.queriesFor(recipe).map((p) =>
+			Object.keys(p)
+				.sort()
+				.map((k) => `${k}=${p[k]}`)
+				.join("&")
+		);
 	}
 
 	/**
@@ -522,9 +557,15 @@ export class DiscoverEngine {
 		}
 		for (const id of this.plugin.settings.dismissedIds) owned.add(id);
 
-		const params = toDiscoverParams(recipe);
-		const constrained = Object.keys(params).length
-			? await this.plugin.tmdb.discoverWith("movie", params)
+		const queries = this.queriesFor(recipe);
+		// One request per decade, merged. De-duplicated by id, since a title
+		// cannot be in two decades but a caller could pass the same one twice.
+		const constrained = queries.length
+			? await Promise.all(queries.map((p) => this.plugin.tmdb.discoverWith("movie", p))).then((sets) => {
+					const seen = new Map<number, TmdbSearchResult>();
+					for (const set of sets) for (const r of set.results) if (!seen.has(r.id)) seen.set(r.id, r);
+					return { results: [...seen.values()], total: sets.reduce((n, s) => n + s.total, 0) };
+				})
 			: null;
 
 		// No seeds: the constrained set *is* the answer, with no explanation
@@ -579,8 +620,12 @@ export class DiscoverEngine {
 		if (recipe.maxRuntime != null) {
 			variants.push({ key: "maxRuntime", label: `the ${recipe.maxRuntime} minute limit`, recipe: { ...recipe, maxRuntime: undefined } });
 		}
-		if (recipe.decade != null) {
-			variants.push({ key: "decade", label: `the ${recipe.decade}s`, recipe: { ...recipe, decade: undefined } });
+		if (recipe.decades.length) {
+			variants.push({
+				key: "decades",
+				label: recipe.decades.map((d) => `the ${d}s`).join(" and "),
+				recipe: { ...recipe, decades: [] },
+			});
 		}
 		if (recipe.withoutGenres.length) {
 			variants.push({

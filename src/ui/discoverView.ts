@@ -57,6 +57,15 @@ export class DiscoverScreen {
 	private quickAt = 0;
 	/** Results handed over by the recipe flow, if any. */
 	private shortlist: TmdbSearchResult[] | null = null;
+	/**
+	 * The title the last quick action handled, and where it sat.
+	 *
+	 * Undo has to put back three things, not one: the vault change, the fact
+	 * that the card was marked handled, and your position in the queue.
+	 * Reversing only the first leaves a title in your library that the screen
+	 * still believes you dealt with.
+	 */
+	private lastAction: { id: number; at: number } | null = null;
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -239,12 +248,28 @@ export class DiscoverScreen {
 			});
 		});
 
-		card.createDiv({
-			cls: "reel-dim reel-quickcard-hint",
-			text: "Swipe, or use ← and → on a keyboard.",
-		});
+		// A gesture nobody is told about may as well not exist, and the hint
+		// changes to name the undo only once there is something to undo —
+		// otherwise it advertises an action that would do nothing.
+		const hint = card.createDiv({ cls: "reel-dim reel-quickcard-hint" });
+		hint.setText(
+			this.lastAction
+				? "Swipe to move, swipe down to take back the last one. Arrow keys and Z work too."
+				: "Swipe, or use ← and → on a keyboard."
+		);
 
-		this.wireSwipe(card, step);
+		if (this.lastAction) {
+			const back = card.createEl("button", {
+				cls: "reel-chip reel-quick-undo",
+				text: "Undo that",
+				attr: { type: "button" },
+			});
+			back.addEventListener("click", () => void this.undoLast(container));
+		}
+
+		// The container, not the card: undo re-renders the whole screen, and
+		// handing it the card would rebuild the screen inside the card.
+		this.wireSwipe(card, step, () => void this.undoLast(container));
 
 		// Focusable so the arrow keys have somewhere to land on desktop. Only
 		// focused when already in quick mode, so entering the tab does not
@@ -257,6 +282,12 @@ export class DiscoverScreen {
 			} else if (ev.key === "ArrowLeft") {
 				ev.preventDefault();
 				step(-1);
+			} else if (ev.key === "z" || ev.key === "Z") {
+				// Not Ctrl+Z: that belongs to Obsidian's own editor undo, and
+				// stealing it inside a plugin view would be a nasty surprise
+				// the one time you meant the other thing.
+				ev.preventDefault();
+				void this.undoLast(container);
 			}
 		});
 		card.focus({ preventScroll: true });
@@ -271,6 +302,7 @@ export class DiscoverScreen {
 			// easiest place to add the title you were only scrolling past.
 			this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
 			this.handled.add(item.id);
+			this.lastAction = { id: item.id, at: this.quickAt };
 			this.render(container);
 		} catch (e) {
 			new Notice(`Reel: ${redact(e)}`);
@@ -284,7 +316,20 @@ export class DiscoverScreen {
 	 * vertically, and a swipe that stole every downward drag would make the
 	 * overview unreadable on a phone.
 	 */
-	private wireSwipe(card: HTMLElement, step: (by: number) => void): void {
+	/**
+	 * Swipe left and right to move, down to take back what you just did.
+	 *
+	 * Left and right always worked. What did not was recovering from a
+	 * mistake: quick mode is built to be fast, so it is the single easiest
+	 * place to add a title you were only skimming past — and going *back* only
+	 * showed you a card for something already in your library. The action was
+	 * gone and the screen said nothing about it.
+	 *
+	 * Down rather than up: up is where the browser and Obsidian both put
+	 * their own gestures, and a third meaning on that axis is a collision
+	 * waiting to happen.
+	 */
+	private wireSwipe(card: HTMLElement, step: (by: number) => void, onUndo: () => void): void {
 		let startX = 0;
 		let startY = 0;
 		let tracking = false;
@@ -310,12 +355,44 @@ export class DiscoverScreen {
 				if (!t) return;
 				const dx = t.clientX - startX;
 				const dy = t.clientY - startY;
+
+				// Down, and clearly not a horizontal swipe that drifted.
+				if (dy > 80 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+					onUndo();
+					return;
+				}
+
 				// Comfortably horizontal, and far enough to be deliberate.
 				if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
 				step(dx < 0 ? 1 : -1);
 			},
 			{ passive: true }
 		);
+	}
+
+	/**
+	 * Take back the last thing quick mode did.
+	 *
+	 * Delegates the vault change to the undo service — it already knows how
+	 * to reverse an add, including trashing a note it created — and handles
+	 * the two things only this screen knows about: that the card was marked
+	 * handled, and where you were when you did it.
+	 */
+	private async undoLast(container: HTMLElement): Promise<void> {
+		const last = this.lastAction;
+		if (!last) {
+			new Notice("Reel: nothing to take back.");
+			return;
+		}
+		haptic("commit");
+		this.lastAction = null;
+		await this.plugin.undo.undo();
+		this.handled.delete(last.id);
+		// Back to the card you were on, so the screen shows the thing you
+		// just recovered rather than leaving you further down the queue
+		// wondering whether it worked.
+		this.quickAt = last.at;
+		this.render(container);
 	}
 
 	/* ------------------------------------------------------------------ */

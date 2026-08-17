@@ -141,7 +141,7 @@ eq(becauseText(["A", "B", "C", "D"]), "Because it's like A, B and C and 1 more",
 }
 
 {
-	const p = toDiscoverParams({ ...emptyRecipe(), decade: 1990 });
+	const p = toDiscoverParams({ ...emptyRecipe(), decades: [1990] }, 1990);
 	eq(p["primary_release_date.gte"], "1990-01-01", "a decade starts at its first day");
 	eq(p["primary_release_date.lte"], "1999-12-31", "and ends at its last");
 }
@@ -152,11 +152,11 @@ eq(Object.keys(toDiscoverParams(emptyRecipe())).length, 0, "an empty recipe cons
 
 eq(blame([]), null, "nothing to blame when there are no candidates");
 // A constraint whose removal changes nothing is not the culprit.
-eq(blame([{ key: "decade", label: "the 1990s", without: 0 }]), null, "a constraint that recovers nothing is not blamed");
+eq(blame([{ key: "decades", label: "the 1990s", without: 0 }]), null, "a constraint that recovers nothing is not blamed");
 
 {
 	const worst = blame([
-		{ key: "decade", label: "the 1990s", without: 3 },
+		{ key: "decades", label: "the 1990s", without: 3 },
 		{ key: "maxRuntime", label: "your 90 minute limit", without: 40 },
 	]);
 	eq(worst?.key, "maxRuntime", "the constraint recovering the most results is blamed");

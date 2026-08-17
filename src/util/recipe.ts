@@ -29,8 +29,15 @@ export interface Recipe {
 	minScore?: number;
 	/** Minutes. Phrased to the user as time available, not as runtime. */
 	maxRuntime?: number;
-	/** Release decade, e.g. 1990. */
-	decade?: number;
+	/**
+	 * Release decades, e.g. [1990, 2010].
+	 *
+	 * A list rather than one value because "the 90s or the 2010s" is an
+	 * ordinary thing to want and being made to choose one is arbitrary. TMDB
+	 * cannot express two disjoint date ranges in a single query, so the engine
+	 * runs one per decade and merges — see DiscoverEngine.run.
+	 */
+	decades: number[];
 	/** Hide anything already in the library — usually what you want. */
 	excludeOwned: boolean;
 	/** Require this many seeds to agree before a title is shown. */
@@ -44,6 +51,7 @@ export function emptyRecipe(): Recipe {
 		genres: [],
 		genreMode: "all",
 		withoutGenres: [],
+		decades: [],
 		excludeOwned: true,
 		minAgreement: 1,
 	};
@@ -57,7 +65,7 @@ export function emptyRecipe(): Recipe {
  * distinction hidden behind punctuation — "action AND comedy" finds action
  * comedies, "action OR comedy" finds twice as many films that are neither.
  */
-export function toDiscoverParams(recipe: Recipe): Record<string, string> {
+export function toDiscoverParams(recipe: Recipe, only?: number): Record<string, string> {
 	const params: Record<string, string> = {};
 
 	if (recipe.genres.length) {
@@ -77,9 +85,13 @@ export function toDiscoverParams(recipe: Recipe): Record<string, string> {
 
 	if (recipe.maxRuntime != null) params["with_runtime.lte"] = String(recipe.maxRuntime);
 
-	if (recipe.decade != null) {
-		params["primary_release_date.gte"] = `${recipe.decade}-01-01`;
-		params["primary_release_date.lte"] = `${recipe.decade + 9}-12-31`;
+	// Exactly one decade goes into a query. Several cannot: TMDB takes a
+	// single date range, and asking for 1990–2019 to cover "the 90s or the
+	// 2010s" would quietly include the 2000s as well. The engine runs one
+	// query per decade instead, which is exact.
+	if (only != null) {
+		params["primary_release_date.gte"] = `${only}-01-01`;
+		params["primary_release_date.lte"] = `${only + 9}-12-31`;
 	}
 
 	return params;
@@ -95,7 +107,7 @@ export function describeConstraints(recipe: Recipe, genreName: (id: number) => s
 	if (recipe.withoutGenres.length) out.push(`not ${recipe.withoutGenres.map(genreName).join(" or ")}`);
 	if (recipe.minScore != null) out.push(`rated ${recipe.minScore}+ on TMDB`);
 	if (recipe.maxRuntime != null) out.push(`under ${recipe.maxRuntime} minutes`);
-	if (recipe.decade != null) out.push(`from the ${recipe.decade}s`);
+	if (recipe.decades.length) out.push(recipe.decades.map((d) => `${d}s`).join(" or "));
 	if (recipe.excludeOwned) out.push("not already in your library");
 	if (recipe.minAgreement > 1) out.push(`${recipe.minAgreement}+ of your picks agree`);
 	return out;
@@ -131,7 +143,7 @@ export function blame(candidates: Culprit[]): Culprit | null {
 	const rank: Partial<Record<keyof Recipe, number>> = {
 		minScore: 0,
 		maxRuntime: 1,
-		decade: 2,
+		decades: 2,
 		minAgreement: 3,
 		withoutGenres: 4,
 		excludeOwned: 5,
@@ -155,7 +167,7 @@ export function recipeKey(recipe: Recipe): string {
 		withoutGenres: [...recipe.withoutGenres].sort((a, b) => a - b),
 		minScore: recipe.minScore ?? null,
 		maxRuntime: recipe.maxRuntime ?? null,
-		decade: recipe.decade ?? null,
+		decades: [...recipe.decades].sort((a, b) => a - b),
 		excludeOwned: recipe.excludeOwned,
 		minAgreement: recipe.minAgreement,
 	});

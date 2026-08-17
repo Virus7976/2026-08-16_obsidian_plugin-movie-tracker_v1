@@ -6,6 +6,19 @@
  * Every interactive target is at least 44px. Nothing depends on :hover.
  * ------------------------------------------------------------------ */
 
+/* `dvh`, not `vh`.
+ *
+ * On mobile Safari and Chrome, `vh` is the viewport with the address bar
+ * *hidden* — the largest it ever gets. A sheet sized to 88vh is therefore
+ * taller than the visible page whenever the bar is showing, which puts its
+ * footer buttons off screen until you scroll the bar away. `dvh` tracks the
+ * viewport as it actually is at that moment.
+ *
+ * `vh` stays as the fallback on the line above each: the two units are
+ * independent, and an engine that does not know `dvh` drops the whole
+ * declaration rather than falling back to something sensible.
+ */
+
 /* ------------------------------------------------------------------ *
  * Tokens
  *
@@ -1027,6 +1040,7 @@ input.reel-input {
 	width: 100%;
 	max-width: 100%;
 	max-height: 88vh;
+	max-height: 88dvh;
 	border-radius: 16px 16px 0 0;
 	padding-bottom: calc(12px + env(safe-area-inset-bottom));
 	overflow-y: auto;
@@ -1201,6 +1215,7 @@ input.reel-input {
 	flex-direction: column;
 	gap: 2px;
 	max-height: 52vh;
+	max-height: 52dvh;
 	overflow-y: auto;
 	-webkit-overflow-scrolling: touch;
 }
@@ -3105,6 +3120,7 @@ input.reel-input {
 	line-height: 1.55;
 	font-size: var(--font-ui-small);
 	max-height: 30vh;
+	max-height: 30dvh;
 	overflow-y: auto;
 }
 
@@ -5815,6 +5831,7 @@ input.reel-input {
 	grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
 	gap: var(--reel-space-3);
 	max-height: 46vh;
+	max-height: 46dvh;
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	padding: var(--reel-space-1);
@@ -5997,10 +6014,182 @@ input.reel-input {
 @media (max-width: 700px) {
 	.reel-recipe-seeds {
 		max-height: 40vh;
+		max-height: 40dvh;
 	}
 	/* Full-width actions on a phone: two buttons sharing a narrow row leaves
 	   neither with a comfortable target. */
 	.reel-recipe-actions .reel-btn {
 		flex: 1 1 100%;
+	}
+}
+
+/* The undo affordance in quick mode. Only rendered once there is something
+   to take back, so it never advertises an action that would do nothing. */
+.reel-quick-undo {
+	display: block;
+	margin: var(--reel-space-2) auto 0;
+}
+
+/* The query diagnostic. Deliberately plain and monospaced — it is for
+   reading and copying, not for looking at. */
+.reel-recipe-query {
+	margin-top: var(--reel-space-3);
+	padding: var(--reel-space-3);
+	border-radius: var(--reel-radius-sm);
+	background: var(--background-secondary);
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	text-align: left;
+	word-break: break-all;
+}
+
+.reel-recipe-query code {
+	display: block;
+	margin: var(--reel-space-1) 0;
+	font-size: 11px;
+	color: var(--text-normal);
+}
+
+/* ------------------------------------------------------------------ */
+/* Filter chrome — height is the scarce resource on a phone            */
+/* ------------------------------------------------------------------ */
+
+/* Every filter row was `flex-wrap: wrap`, which is right on a desktop and
+   badly wrong on a 6-inch screen: five suggestion chips became two rows, the
+   status chips became two more, and between the search box, the tabs, the
+   suggestions, the type chips, the status chips, the sort row and the count,
+   the first poster sat below the fold. The library looked empty when it had
+   32 titles in it.
+ *
+ * One row each, scrolled sideways. A chip row is a menu, and a menu that
+ * scrolls is a normal thing; a menu that reflows to four lines is not. */
+@media (max-width: 700px) {
+	.reel-view-filters .reel-chips,
+	.reel-suggest {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		/* Room for the scrollbar on the platforms that show one, so it does
+		   not sit on top of the chips. */
+		padding-bottom: 2px;
+		/* Hidden where the platform lets us: the row is obviously scrollable
+		   from the clipped chip at its edge. */
+		scrollbar-width: none;
+	}
+
+	.reel-view-filters .reel-chips::-webkit-scrollbar,
+	.reel-suggest::-webkit-scrollbar {
+		display: none;
+	}
+
+	/* A chip cannot shrink below its text, or a long director's name
+	   compresses to an ellipsis while the row still scrolls. */
+	.reel-view-filters .reel-chip,
+	.reel-suggest .reel-chip {
+		flex: 0 0 auto;
+	}
+
+	/* The rows themselves get tighter. Four stacked rows at 12px apart is
+	   48px of nothing before any content. */
+	.reel-view-filters {
+		padding-top: var(--reel-space-1);
+		padding-bottom: var(--reel-space-1);
+	}
+
+	.reel-view-filters > * + * {
+		margin-top: var(--reel-space-1);
+	}
+
+	/* The count is one line of text that was taking a full row to itself. */
+	.reel-view-count {
+		padding: 0;
+		font-size: var(--reel-text-caption);
+	}
+}
+
+/* Suggestions are the newest arrival and the least essential — they are a
+   shortcut, not a filter. On a short screen they go entirely rather than
+   pushing the library itself out of view. */
+@media (max-height: 720px) {
+	.reel-suggest {
+		display: none;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Filter chrome — height is the scarce resource on a phone            */
+/* ------------------------------------------------------------------ */
+
+/* Every filter row was flex-wrap: wrap, which is right on a desktop and
+   badly wrong on a 6-inch screen: five suggestion chips became two rows, the
+   status chips became two more, and between the search box, the tabs, the
+   suggestions, the type chips, the status chips, the sort row and the count,
+   the first poster sat below the fold. The library looked empty while holding
+   32 titles.
+
+   One row each, scrolled sideways. A chip row is a menu, and a menu that
+   scrolls is ordinary; a menu that reflows onto four lines is not. */
+@media (max-width: 700px) {
+	.reel-view-filters .reel-chips,
+	.reel-suggest {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		padding-bottom: 2px;
+		scrollbar-width: none;
+	}
+
+	.reel-view-filters .reel-chips::-webkit-scrollbar,
+	.reel-suggest::-webkit-scrollbar {
+		display: none;
+	}
+
+	/* A chip must not shrink below its text, or a long director's name
+	   compresses to an ellipsis while the row still scrolls. */
+	.reel-view-filters .reel-chip,
+	.reel-suggest .reel-chip {
+		flex: 0 0 auto;
+	}
+
+	/* Four stacked rows at 12px apart is 48px of nothing before any content. */
+	.reel-view-filters {
+		padding-top: var(--reel-space-1);
+		padding-bottom: var(--reel-space-1);
+	}
+
+	.reel-view-filters > * + * {
+		margin-top: var(--reel-space-1);
+	}
+}
+
+/* Suggestions are the newest arrival and the least essential — a shortcut,
+   not a filter. On a short screen they go entirely rather than pushing the
+   library itself out of view. */
+@media (max-height: 780px) {
+	.reel-suggest {
+		display: none;
+	}
+}
+
+/* The sort bar takes a full row for a control most people set once. On a
+   phone the secondary sort goes — it is a tie-breaker, and a tie-breaker is
+   not worth a row of a screen that has six of them already. */
+@media (max-width: 700px) {
+	.reel-sortbar {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.reel-sortbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	/* The label and the secondary sort. The dropdown itself says what it is,
+	   so "Sort" in front of it is a word doing no work. */
+	.reel-sortbar > .reel-dim,
+	.reel-sortbar > select:nth-of-type(2) {
+		display: none;
 	}
 }
