@@ -5244,7 +5244,9 @@
         const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
         const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
         if (w > 3 && h > 3) {
-          overlaps.push(`${a.className.split(" ")[0]} \xD7 ${b.className.split(" ")[0]}`);
+          overlaps.push(
+            `${a.className.split(" ")[0]} \xD7 ${b.className.split(" ")[0]} by ${Math.round(w)}\xD7${Math.round(h)}px at y=${Math.round(ra.top)}/${Math.round(rb.top)}`
+          );
           break;
         }
       }

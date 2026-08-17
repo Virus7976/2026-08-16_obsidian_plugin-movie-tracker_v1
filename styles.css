@@ -6379,3 +6379,17 @@ input.reel-input {
 .reel-seg-btn:not(.is-active) {
 	opacity: 0.85;
 }
+
+/* Two fact rows sat side by side in the desktop stats layout and overlapped
+   by 16px, because each sized to its content rather than to its column. The
+   audit named the pair but not the amount, so it looked like a mispaired
+   comparison for two rounds — `by 16×44px at y=253/253` is what made it
+   obviously real. */
+.reel-fact {
+	min-width: 0;
+	max-width: 100%;
+}
+
+.reel-fact > * {
+	min-width: 0;
+}

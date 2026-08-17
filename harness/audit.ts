@@ -243,7 +243,15 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 			const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
 			// A couple of pixels is a border sitting on a border.
 			if (w > 3 && h > 3) {
-				overlaps.push(`${a.className.split(" ")[0]} × ${b.className.split(" ")[0]}`);
+				// The amount, not just the pair. The first version of this
+				// check reported "reel-fact × reel-fact" and nothing else, and
+				// the rows it named measured perfectly adjacent — leaving no
+				// way to tell a real overlap from a mispaired comparison. A
+				// check that cannot explain itself gets ignored.
+				overlaps.push(
+					`${a.className.split(" ")[0]} × ${b.className.split(" ")[0]} ` +
+						`by ${Math.round(w)}×${Math.round(h)}px at y=${Math.round(ra.top)}/${Math.round(rb.top)}`
+				);
 				break;
 			}
 		}
