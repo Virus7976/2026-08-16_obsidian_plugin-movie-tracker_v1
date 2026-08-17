@@ -712,6 +712,13 @@ export class DetailScreen {
 		if (!local && !remote) return;
 
 		hero.addClass("has-backdrop");
+		// The two cases look different and have to be styled differently. A
+		// real backdrop is a photograph and wants a scrim; a blurred poster is
+		// a texture and wants to sit behind the accent colour rather than be
+		// the whole image. Blurring a pale poster — The Office, most comedies,
+		// anything with a white sleeve — produces fog, and fog is worse than no
+		// image at all because it looks like something failed to load.
+		hero.toggleClass("has-art", !!remote);
 		const wrap = hero.createDiv({ cls: "reel-hero-backdrop" });
 
 		if (local) {

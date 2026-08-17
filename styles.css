@@ -6,9 +6,55 @@
  * Every interactive target is at least 44px. Nothing depends on :hover.
  * ------------------------------------------------------------------ */
 
-.reel-block {
-	--reel-gap: 10px;
+/* ------------------------------------------------------------------ *
+ * Tokens
+ *
+ * On `body`, and that is a deliberate correction rather than laziness.
+ * These lived on `.reel-block` — the wrapper around a ```films``` code
+ * block — while `--reel-radius` is used in 42 rules, most of which are in
+ * the Reel view and inherit nothing from `.reel-block`. A `var()` with no
+ * fallback and no definition makes the whole declaration invalid, so
+ * `border-radius: var(--reel-radius)` silently computed to 0 and every
+ * card, poster and panel in the view had square corners. Nothing errored;
+ * it just looked cheap.
+ *
+ * `body` is safe here because every name is `--reel-` prefixed, so nothing
+ * can collide, and because Reel's modals and menus render at body level
+ * where a view-scoped definition would not reach them.
+ * ------------------------------------------------------------------ */
+
+body {
+	/* A 4px scale. The value of a scale is not that 12 is better than 14 —
+	   it is that two sections separated by different-but-similar numbers
+	   never line up, and the eye reads that as sloppiness without being
+	   able to point at what is wrong. */
+	--reel-space-1: 4px;
+	--reel-space-2: 8px;
+	--reel-space-3: 12px;
+	--reel-space-4: 16px;
+	--reel-space-5: 24px;
+	--reel-space-6: 32px;
+
+	/* The page margin. Was referenced by the hero and never defined, so it
+	   was falling back to 12px — right by luck rather than by rule. */
+	--reel-gutter: 12px;
+	--reel-gap: var(--reel-space-3);
+
+	--reel-radius-sm: 4px;
 	--reel-radius: 8px;
+	--reel-radius-lg: 16px;
+	--reel-radius-full: 999px;
+
+	/* Three levels, so a surface reads as *above* another rather than
+	   merely darker near its edge. Raised for things resting on the page,
+	   overlay for things floating over it, and the poster shadow, which is
+	   its own thing because artwork needs a harder edge than a panel. */
+	--reel-shadow-raised: 0 1px 3px rgba(0, 0, 0, 0.16);
+	--reel-shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.34);
+	--reel-shadow-poster: 0 3px 14px rgba(0, 0, 0, 0.22);
+}
+
+.reel-block {
 	margin: 0.5em 0 1em;
 }
 
@@ -27,7 +73,7 @@
 	color: var(--text-normal);
 	background: var(--background-modifier-form-field);
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	padding: 0 14px;
 	min-height: 34px;
 	cursor: pointer;
@@ -106,7 +152,7 @@
    doesn't tuck under a notch or a home indicator on iOS. */
 .reel-chips {
 	display: flex;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	overflow-x: auto;
 	overflow-y: hidden;
 	padding: 8px 0 8px max(0px, env(safe-area-inset-left));
@@ -134,7 +180,7 @@
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	margin: 4px 0 8px;
-	padding: 18px;
+	padding: var(--reel-space-4);
 	text-align: center;
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: var(--reel-radius);
@@ -149,14 +195,14 @@
 	color: var(--text-error);
 	background: var(--background-modifier-error);
 	border-radius: var(--reel-radius);
-	padding: 10px 12px;
+	padding: var(--reel-space-3) var(--reel-space-3);
 	font-size: var(--font-ui-smaller);
 	margin-bottom: 8px;
 }
 
 .reel-loading {
 	color: var(--text-muted);
-	padding: 20px;
+	padding: var(--reel-space-5);
 	text-align: center;
 }
 
@@ -226,7 +272,7 @@
 	bottom: 4px;
 	right: 4px;
 	padding: 2px 4px;
-	border-radius: 4px;
+	border-radius: var(--reel-radius-sm);
 	background: rgba(0, 0, 0, 0.55);
 }
 
@@ -301,10 +347,10 @@
 
 .reel-row {
 	display: flex;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: center;
 	min-height: 56px;
-	padding: 6px 4px;
+	padding: var(--reel-space-2) var(--reel-space-1);
 	border-radius: var(--reel-radius);
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
@@ -319,7 +365,7 @@
 	width: 40px;
 	flex: 0 0 40px;
 	aspect-ratio: 2 / 3;
-	border-radius: 4px;
+	border-radius: var(--reel-radius-sm);
 	overflow: hidden;
 	background: var(--background-secondary);
 }
@@ -344,7 +390,7 @@
 
 .reel-row-meta {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	align-items: center;
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
@@ -401,7 +447,7 @@
 }
 
 .reel-stars:not(.is-readonly) .reel-star-fg {
-	padding-left: 3px;
+	padding-left: var(--reel-space-1);
 }
 
 .reel-star.is-half .reel-star-fg {
@@ -415,7 +461,7 @@
 .reel-rating-row {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: var(--reel-space-3);
 }
 
 .reel-rating-readout {
@@ -426,7 +472,7 @@
 .reel-heart {
 	background: none;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	min-width: 44px;
 	min-height: 44px;
 	font-size: 20px;
@@ -445,7 +491,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	width: auto;
 	padding: 0 18px;
 	font-size: var(--font-ui-small);
@@ -476,7 +522,7 @@
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	padding: 2px 7px;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	background: var(--background-secondary);
 	color: var(--text-muted);
 }
@@ -510,8 +556,8 @@
 
 .reel-header {
 	display: flex;
-	gap: 14px;
-	padding: 14px;
+	gap: var(--reel-space-3);
+	padding: var(--reel-space-3);
 	margin-bottom: 1em;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--reel-radius);
@@ -522,7 +568,7 @@
 	flex: 0 0 92px;
 	width: 92px;
 	aspect-ratio: 2 / 3;
-	border-radius: 6px;
+	border-radius: var(--reel-radius);
 	overflow: hidden;
 	background: var(--background-modifier-border);
 }
@@ -539,7 +585,7 @@
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--reel-space-2);
 }
 
 .reel-header-title {
@@ -551,7 +597,7 @@
 .reel-header-facts {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px 10px;
+	gap: var(--reel-space-1) var(--reel-space-3);
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 }
@@ -559,7 +605,7 @@
 .reel-header-genres {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: var(--reel-space-1);
 }
 
 .reel-header-genres .reel-chip {
@@ -571,7 +617,7 @@
 .reel-header-rating {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	flex-wrap: wrap;
 }
 
@@ -586,14 +632,14 @@
 
 .reel-history-row {
 	display: flex;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	align-items: center;
 }
 
 .reel-header-actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	margin-top: 4px;
 }
 
@@ -625,17 +671,17 @@
 .reel-seasons {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: var(--reel-space-2);
 }
 
 .reel-season-pill {
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 5px;
+	gap: var(--reel-space-1);
 	min-height: 36px;
 	padding: 0 12px;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-primary);
 	cursor: pointer;
@@ -670,14 +716,14 @@
 .reel-upnext {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--reel-space-2);
 }
 
 .reel-upnext-row {
 	display: flex;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: center;
-	padding: 8px;
+	padding: var(--reel-space-2);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 }
@@ -686,7 +732,7 @@
 	flex: 0 0 44px;
 	width: 44px;
 	aspect-ratio: 2 / 3;
-	border-radius: 4px;
+	border-radius: var(--reel-radius-sm);
 	overflow: hidden;
 	background: var(--background-modifier-border);
 	cursor: pointer;
@@ -706,7 +752,7 @@
 .reel-upnext-title {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	font-size: var(--font-ui-small);
 	white-space: nowrap;
 	overflow: hidden;
@@ -715,7 +761,7 @@
 
 .reel-upnext-meta {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	align-items: center;
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
@@ -728,7 +774,7 @@
 
 .reel-progress {
 	height: 3px;
-	border-radius: 2px;
+	border-radius: var(--reel-radius-sm);
 	background: var(--background-modifier-border);
 	margin-top: 5px;
 	overflow: hidden;
@@ -744,7 +790,7 @@
 
 .reel-upnext-actions {
 	display: flex;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	align-items: center;
 }
 
@@ -752,7 +798,7 @@
 .reel-more {
 	width: 44px;
 	height: 44px;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-primary);
 	color: var(--text-normal);
@@ -787,7 +833,7 @@
 }
 
 .reel-tile {
-	padding: 12px;
+	padding: var(--reel-space-3);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 }
@@ -822,7 +868,7 @@
 .reel-chart-row {
 	display: grid;
 	grid-template-columns: 4.5em 1fr 2.5em;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	align-items: center;
 	min-height: 22px;
 }
@@ -846,7 +892,7 @@
 
 .reel-chart-track {
 	height: 10px;
-	border-radius: 5px;
+	border-radius: var(--reel-radius-sm);
 	background: var(--background-modifier-border);
 	overflow: hidden;
 }
@@ -855,7 +901,7 @@
 	height: 100%;
 	width: calc(var(--reel-fill, 0) * 100%);
 	background: var(--interactive-accent);
-	border-radius: 5px;
+	border-radius: var(--reel-radius-sm);
 }
 
 .reel-chart-value {
@@ -932,7 +978,7 @@ input.reel-input {
 .reel-prompt-actions,
 .reel-log-actions {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	margin-top: 16px;
 }
 
@@ -954,15 +1000,15 @@ input.reel-input {
 
 .reel-quick-dates {
 	display: flex;
-	gap: 6px;
+	gap: var(--reel-space-2);
 }
 
 .reel-seg {
 	display: flex;
-	gap: 4px;
-	padding: 3px;
+	gap: var(--reel-space-1);
+	padding: var(--reel-space-1);
 	background: var(--background-modifier-form-field);
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	margin-bottom: 16px;
 }
 
@@ -992,17 +1038,17 @@ input.reel-input {
 
 .reel-suggestion {
 	display: flex;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: center;
 	min-height: 56px;
-	padding: 6px 4px;
+	padding: var(--reel-space-2) var(--reel-space-1);
 }
 
 .reel-suggestion-thumb {
 	flex: 0 0 36px;
 	width: 36px;
 	aspect-ratio: 2 / 3;
-	border-radius: 3px;
+	border-radius: var(--reel-radius-sm);
 	overflow: hidden;
 	background: var(--background-secondary);
 }
@@ -1026,7 +1072,7 @@ input.reel-input {
 
 .reel-suggestion-meta {
 	display: flex;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	align-items: center;
 	margin-top: 2px;
 }
@@ -1052,7 +1098,7 @@ input.reel-input {
 
 .reel-season-bulk {
 	display: flex;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	margin-bottom: 10px;
 }
 
@@ -1067,11 +1113,11 @@ input.reel-input {
 
 .reel-episode {
 	display: flex;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: center;
 	min-height: 48px;
-	padding: 6px 4px;
-	border-radius: 6px;
+	padding: var(--reel-space-2) var(--reel-space-1);
+	border-radius: var(--reel-radius);
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
 }
@@ -1084,7 +1130,7 @@ input.reel-input {
 	flex: 0 0 26px;
 	width: 26px;
 	height: 26px;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	border: 2px solid var(--background-modifier-border);
 	display: flex;
 	align-items: center;
@@ -1117,7 +1163,7 @@ input.reel-input {
 
 .reel-episode-meta {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	color: var(--text-faint);
 	font-size: 11px;
 }
@@ -1130,8 +1176,8 @@ input.reel-input {
 
 .reel-pill {
 	display: inline-block;
-	padding: 3px 10px;
-	border-radius: 999px;
+	padding: var(--reel-space-1) var(--reel-space-3);
+	border-radius: var(--reel-radius-full);
 	font-size: var(--font-ui-smaller);
 	background: var(--background-secondary);
 	color: var(--text-muted);
@@ -1148,7 +1194,7 @@ input.reel-input {
 }
 
 .reel-callout {
-	padding: 10px 12px;
+	padding: var(--reel-space-3) var(--reel-space-3);
 	border-radius: var(--reel-radius);
 	font-size: var(--font-ui-smaller);
 	margin: 8px 0 16px;
@@ -1175,7 +1221,7 @@ input.reel-input {
 
 .reel-view-header {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	align-items: center;
 	padding: 10px 12px calc(10px) 12px;
 	padding-left: max(12px, env(safe-area-inset-left));
@@ -1229,7 +1275,7 @@ input.reel-input {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	padding: 0 14px;
 }
 
@@ -1289,8 +1335,8 @@ input.reel-input {
 .reel-sortbar {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	padding-bottom: 8px;
+	gap: var(--reel-space-2);
+	padding-bottom: var(--reel-space-2);
 }
 
 .reel-select {
@@ -1369,10 +1415,10 @@ input.reel-input {
 
 .reel-diary-row {
 	display: flex;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	align-items: center;
 	min-height: 56px;
-	padding: 6px 4px;
+	padding: var(--reel-space-2) var(--reel-space-1);
 	border-radius: var(--reel-radius);
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
@@ -1395,7 +1441,7 @@ input.reel-input {
 	flex: 0 0 36px;
 	width: 36px;
 	aspect-ratio: 2 / 3;
-	border-radius: 4px;
+	border-radius: var(--reel-radius-sm);
 	overflow: hidden;
 	background: var(--background-secondary);
 }
@@ -1420,7 +1466,7 @@ input.reel-input {
 
 .reel-diary-meta {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	align-items: center;
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
@@ -1430,7 +1476,7 @@ input.reel-input {
 
 .reel-episode {
 	align-items: flex-start;
-	padding: 8px 4px;
+	padding: var(--reel-space-2) var(--reel-space-1);
 }
 
 .reel-episode-stars {
@@ -1456,7 +1502,7 @@ input.reel-input {
 .reel-flag-row {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	margin-bottom: 16px;
 }
 
@@ -1478,7 +1524,7 @@ input.reel-input {
 	font-size: 10px;
 	font-weight: 700;
 	padding: 1px 5px;
-	border-radius: 3px;
+	border-radius: var(--reel-radius-sm);
 	background: rgba(0, 0, 0, 0.6);
 	color: #fff;
 }
@@ -1487,7 +1533,7 @@ input.reel-input {
 .reel-header-cast {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: var(--reel-space-1);
 	align-items: center;
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
@@ -1501,7 +1547,7 @@ input.reel-input {
 
 .reel-modal .reel-textarea {
 	min-height: 96px;
-	padding: 10px 12px;
+	padding: var(--reel-space-3) var(--reel-space-3);
 	line-height: 1.5;
 	resize: vertical;
 	font-family: inherit;
@@ -1523,14 +1569,14 @@ input.reel-input {
 .reel-scores {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	margin: 2px 0;
 }
 
 .reel-score {
 	min-width: 52px;
-	padding: 4px 8px;
-	border-radius: 6px;
+	padding: var(--reel-space-1) var(--reel-space-2);
+	border-radius: var(--reel-radius);
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	text-align: center;
@@ -1588,9 +1634,9 @@ input.reel-input {
 .reel-links {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	margin-top: 6px;
-	padding-top: 8px;
+	padding-top: var(--reel-space-2);
 	border-top: 1px solid var(--background-modifier-border);
 }
 
@@ -1630,7 +1676,7 @@ input.reel-input {
 .reel-topic-list {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: var(--reel-space-1);
 	padding: 6px 0;
 }
 
@@ -1694,7 +1740,7 @@ input.reel-input {
 
 .reel-seg {
 	background: var(--background-modifier-border);
-	gap: 3px;
+	gap: var(--reel-space-1);
 }
 
 .reel-log .reel-seg .reel-seg-btn {
@@ -1709,7 +1755,7 @@ input.reel-input {
 	color: var(--text-on-accent, #fff);
 	border-color: var(--interactive-accent, #7c3aed);
 	font-weight: 700;
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+	box-shadow: var(--reel-shadow-raised);
 }
 
 .reel-view .reel-chip.is-active,
@@ -1725,7 +1771,7 @@ input.reel-input {
 	transition: transform 120ms ease;
 	font-weight: 600;
 	padding: 0 14px;
-	gap: 6px;
+	gap: var(--reel-space-2);
 }
 
 .reel-heart.is-on {
@@ -1760,19 +1806,27 @@ input.reel-input {
 .reel-detail {
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
-	padding-bottom: 32px;
+	gap: var(--reel-space-3);
+	padding-bottom: var(--reel-space-6);
 }
 
 .reel-detail-bar {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	justify-content: space-between;
 	position: sticky;
 	top: 0;
 	z-index: 6;
+	/* Full-bleed and opaque. It was already sticky with a background, but the
+	   background only covered the strip the buttons sat in — so content
+	   scrolling past showed through either side of it, which reads as two
+	   buttons floating loose over the page rather than as a bar. */
 	background: var(--background-primary);
-	padding: 6px 0;
+	margin: 0 calc(-1 * var(--reel-gutter));
+	padding: var(--reel-space-2) var(--reel-gutter);
+	/* The hairline is what tells you the bar is pinned rather than part of
+	   whatever happens to be beneath it. */
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .reel-detail-bar .reel-btn {
@@ -1782,13 +1836,13 @@ input.reel-input {
 .reel-back {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	font-weight: 600;
 }
 
 .reel-detail-head {
 	display: flex;
-	gap: 16px;
+	gap: var(--reel-space-4);
 }
 
 .reel-detail-poster {
@@ -1812,7 +1866,7 @@ input.reel-input {
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-detail-title {
@@ -1824,8 +1878,8 @@ input.reel-input {
 .reel-detail-controls {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 16px;
-	padding: 12px;
+	gap: var(--reel-space-4);
+	padding: var(--reel-space-3);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 }
@@ -1837,13 +1891,13 @@ input.reel-input {
 .reel-status-row {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: var(--reel-space-2);
 }
 
 .reel-detail-actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-detail-actions .reel-btn {
@@ -1858,7 +1912,7 @@ input.reel-input {
 
 .reel-detail-section {
 	border-top: 1px solid var(--background-modifier-border);
-	padding-top: 12px;
+	padding-top: var(--reel-space-3);
 }
 
 .reel-section-title {
@@ -1897,7 +1951,7 @@ input.reel-input {
 .reel-rate {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: stretch;
 }
 
@@ -1912,9 +1966,9 @@ input.reel-input {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	text-align: center;
-	padding: 16px;
+	padding: var(--reel-space-4);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 }
@@ -1927,7 +1981,7 @@ input.reel-input {
 	overflow: hidden;
 	background: var(--background-modifier-border);
 	cursor: pointer;
-	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+	box-shadow: var(--reel-shadow-overlay);
 }
 
 .reel-rate-poster img {
@@ -1966,7 +2020,7 @@ input.reel-input {
 .reel-rate-actions,
 .reel-rate-nav {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-rate-actions .reel-btn,
@@ -1990,7 +2044,7 @@ input.reel-input {
 		flex-direction: row;
 		align-items: flex-start;
 		text-align: left;
-		gap: 20px;
+		gap: var(--reel-space-5);
 	}
 
 	.reel-rate-poster {
@@ -2014,7 +2068,7 @@ input.reel-input {
 .reel-chart-grid {
 	display: grid;
 	grid-template-columns: 1fr;
-	gap: 18px;
+	gap: var(--reel-space-4);
 }
 
 @media (min-width: 760px) {
@@ -2025,7 +2079,7 @@ input.reel-input {
 
 .reel-chart {
 	margin-bottom: 0;
-	padding: 12px;
+	padding: var(--reel-space-3);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 }
@@ -2040,14 +2094,14 @@ input.reel-input {
 @media (min-width: 620px) {
 	.reel-facts {
 		grid-template-columns: repeat(2, 1fr);
-		gap: 8px 20px;
+		gap: var(--reel-space-2) var(--reel-space-5);
 	}
 }
 
 .reel-fact {
 	display: flex;
 	justify-content: space-between;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	padding: 7px 0;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
@@ -2088,14 +2142,14 @@ input.reel-input {
 	margin: 0 auto;
 	display: flex;
 	flex-direction: column;
-	gap: 20px;
+	gap: var(--reel-space-5);
 }
 
 /* ---------------- hero ---------------- */
 
 .reel-hero {
 	display: flex;
-	gap: 20px;
+	gap: var(--reel-space-5);
 	align-items: flex-start;
 }
 
@@ -2106,7 +2160,7 @@ input.reel-input {
 	border-radius: var(--reel-radius);
 	overflow: hidden;
 	background: var(--background-secondary);
-	box-shadow: 0 3px 14px rgba(0, 0, 0, 0.22);
+	box-shadow: var(--reel-shadow-poster);
 }
 
 .reel-hero-poster img {
@@ -2121,7 +2175,7 @@ input.reel-input {
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: var(--reel-space-3);
 }
 
 .reel-hero-title {
@@ -2133,7 +2187,7 @@ input.reel-input {
 .reel-hero-sub {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px 14px;
+	gap: var(--reel-space-2) var(--reel-space-3);
 	align-items: center;
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
@@ -2142,7 +2196,7 @@ input.reel-input {
 .reel-hero-genres {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 5px;
+	gap: var(--reel-space-1);
 }
 
 .reel-hero-overview {
@@ -2158,7 +2212,7 @@ input.reel-input {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 7px;
+	gap: var(--reel-space-2);
 	text-decoration: none;
 	min-height: 40px;
 	padding: 0 18px;
@@ -2182,7 +2236,7 @@ input.reel-input {
 	align-items: center;
 	border-top: none;
 	padding-top: 0;
-	gap: 16px;
+	gap: var(--reel-space-4);
 }
 
 /* ---------------- two columns ---------------- */
@@ -2190,7 +2244,7 @@ input.reel-input {
 .reel-detail-cols {
 	display: grid;
 	grid-template-columns: 1fr;
-	gap: 20px;
+	gap: var(--reel-space-5);
 	align-items: start;
 }
 
@@ -2205,17 +2259,17 @@ input.reel-input {
 .reel-detail-main {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: var(--reel-space-4);
 	min-width: 0;
 }
 
 .reel-panel {
-	padding: 14px;
+	padding: var(--reel-space-3);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--reel-space-3);
 }
 
 .reel-panel-title {
@@ -2236,7 +2290,7 @@ input.reel-input {
 .reel-detail-actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-detail-actions .reel-btn {
@@ -2252,13 +2306,13 @@ input.reel-input {
 .reel-meta {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-meta-row {
 	display: grid;
 	grid-template-columns: 5.5em minmax(0, 1fr);
-	gap: 10px;
+	gap: var(--reel-space-3);
 	align-items: baseline;
 	font-size: var(--font-ui-smaller);
 }
@@ -2289,9 +2343,9 @@ input.reel-input {
 .reel-episode {
 	display: grid;
 	grid-template-columns: 30px minmax(0, 1fr);
-	gap: 10px;
+	gap: var(--reel-space-3);
 	align-items: center;
-	padding: 6px 4px;
+	padding: var(--reel-space-2) var(--reel-space-1);
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -2324,7 +2378,7 @@ input.reel-input {
    not layout — they size to their content and sit inline with the label. */
 .reel-sortbar {
 	flex-wrap: wrap;
-	gap: 8px 10px;
+	gap: var(--reel-space-2) var(--reel-space-3);
 }
 
 .reel-select {
@@ -2345,7 +2399,7 @@ input.reel-input {
 
 @media (max-width: 620px) {
 	.reel-hero {
-		gap: 14px;
+		gap: var(--reel-space-3);
 	}
 
 	.reel-hero-poster {
@@ -2414,8 +2468,8 @@ input.reel-input {
 /* ---------------- up next ---------------- */
 
 .reel-upnext-row {
-	padding: 10px;
-	gap: 14px;
+	padding: var(--reel-space-3);
+	gap: var(--reel-space-3);
 }
 
 .reel-upnext-thumb {
@@ -2431,13 +2485,13 @@ input.reel-input {
 
 .reel-upnext-meta {
 	flex-wrap: wrap;
-	gap: 4px 10px;
+	gap: var(--reel-space-1) var(--reel-space-3);
 	margin-top: 2px;
 }
 
 .reel-progress {
 	height: 5px;
-	border-radius: 3px;
+	border-radius: var(--reel-radius-sm);
 }
 
 @media (min-width: 700px) {
@@ -2450,8 +2504,8 @@ input.reel-input {
 /* ---------------- diary ---------------- */
 
 .reel-diary-row {
-	padding: 8px 6px;
-	gap: 12px;
+	padding: var(--reel-space-2) var(--reel-space-2);
+	gap: var(--reel-space-3);
 }
 
 .reel-diary-thumb {
@@ -2514,12 +2568,12 @@ input.reel-input {
 .reel-firstrun {
 	max-width: 480px;
 	margin: 32px auto;
-	padding: 24px;
+	padding: var(--reel-space-5);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	text-align: center;
 }
 
@@ -2584,9 +2638,9 @@ input.reel-input {
 		grid-template-areas:
 			"label label"
 			"track value";
-		gap: 3px 8px;
+		gap: var(--reel-space-1) var(--reel-space-2);
 		min-height: 0;
-		padding-bottom: 8px;
+		padding-bottom: var(--reel-space-2);
 	}
 
 	.reel-chart-label {
@@ -2609,11 +2663,11 @@ input.reel-input {
 @media (max-width: 400px) {
 	.reel-tiles {
 		grid-template-columns: 1fr 1fr;
-		gap: 8px;
+		gap: var(--reel-space-2);
 	}
 
 	.reel-tile {
-		padding: 10px;
+		padding: var(--reel-space-3);
 	}
 
 	.reel-tile-value {
@@ -2623,7 +2677,7 @@ input.reel-input {
 
 .reel-upcoming-section {
 	margin-top: 24px;
-	padding-top: 16px;
+	padding-top: var(--reel-space-4);
 	border-top: 1px solid var(--background-modifier-border);
 	max-width: 920px;
 	margin-left: auto;
@@ -2657,8 +2711,8 @@ input.reel-input {
 	left: 4px;
 	right: auto;
 	bottom: 4px;
-	padding: 3px 6px;
-	border-radius: 5px;
+	padding: var(--reel-space-1) var(--reel-space-2);
+	border-radius: var(--reel-radius-sm);
 	background: rgba(0, 0, 0, 0.72);
 	display: inline-flex;
 }
@@ -2670,12 +2724,12 @@ input.reel-input {
 }
 
 .reel-cell-poster {
-	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+	box-shadow: var(--reel-shadow-raised);
 }
 
 /* Selects looked like raw form controls next to the pill-shaped chips. */
 .reel-select {
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	padding: 0 12px;
 	min-height: 34px;
 	cursor: pointer;
@@ -2683,7 +2737,7 @@ input.reel-input {
 
 .reel-sortbar {
 	align-items: center;
-	padding-bottom: 10px;
+	padding-bottom: var(--reel-space-3);
 }
 
 /* Tabs were spread across the full window with big gaps between icons. */
@@ -2706,7 +2760,7 @@ input.reel-input {
 .reel-rate-body {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	min-width: 0;
 	flex: 1;
 }
@@ -2739,17 +2793,17 @@ input.reel-input {
 .reel-discover {
 	display: flex;
 	flex-direction: column;
-	gap: 26px;
+	gap: var(--reel-space-5);
 	max-width: 1400px;
 	margin: 0 auto;
-	padding-bottom: 24px;
+	padding-bottom: var(--reel-space-5);
 }
 
 .reel-discover-head {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	flex-wrap: wrap;
 }
 
@@ -2766,13 +2820,13 @@ input.reel-input {
 .reel-drow {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-drow-head {
 	display: flex;
 	align-items: baseline;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	flex-wrap: wrap;
 }
 
@@ -2789,7 +2843,7 @@ input.reel-input {
 .reel-drow-nav {
 	margin-left: auto;
 	display: flex;
-	gap: 4px;
+	gap: var(--reel-space-1);
 }
 
 .reel-drow-arrow {
@@ -2798,7 +2852,7 @@ input.reel-input {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-primary);
 	color: var(--text-muted);
@@ -2812,10 +2866,10 @@ input.reel-input {
 	/* stretch, so every card is as tall as the tallest in the row and the
 	   bottom-pinned action buttons line up across all of them. */
 	align-items: stretch;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	overflow-x: auto;
 	overflow-y: hidden;
-	padding-bottom: 6px;
+	padding-bottom: var(--reel-space-2);
 	scroll-snap-type: x proximity;
 	-webkit-overflow-scrolling: touch;
 	scroll-padding-left: 2px;
@@ -2827,7 +2881,7 @@ input.reel-input {
 
 .reel-drow-strip::-webkit-scrollbar-thumb {
 	background: var(--background-modifier-border);
-	border-radius: 4px;
+	border-radius: var(--reel-radius-sm);
 }
 
 /* ---------------- cards ---------------- */
@@ -2857,7 +2911,7 @@ input.reel-input {
 	overflow: hidden;
 	background: var(--background-secondary);
 	transition: transform 120ms ease;
-	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+	box-shadow: var(--reel-shadow-raised);
 }
 
 .reel-dcard-poster img {
@@ -2872,7 +2926,7 @@ input.reel-input {
 	bottom: 5px;
 	left: 5px;
 	padding: 2px 6px;
-	border-radius: 5px;
+	border-radius: var(--reel-radius-sm);
 	background: rgba(0, 0, 0, 0.75);
 	color: #fff;
 	font-size: 11px;
@@ -2885,7 +2939,7 @@ input.reel-input {
 	top: 5px;
 	right: 5px;
 	padding: 1px 6px;
-	border-radius: 4px;
+	border-radius: var(--reel-radius-sm);
 	background: rgba(0, 0, 0, 0.75);
 	color: #fff;
 	font-size: 10px;
@@ -2918,7 +2972,7 @@ input.reel-input {
 
 .reel-preview-head {
 	display: flex;
-	gap: 16px;
+	gap: var(--reel-space-4);
 	margin-bottom: 12px;
 }
 
@@ -2943,7 +2997,7 @@ input.reel-input {
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-preview-title {
@@ -2971,8 +3025,8 @@ input.reel-input {
 
 .reel-discover-filters .reel-chips {
 	position: static;
-	padding-top: 4px;
-	padding-bottom: 4px;
+	padding-top: var(--reel-space-1);
+	padding-bottom: var(--reel-space-1);
 	align-items: center;
 }
 
@@ -2981,7 +3035,7 @@ input.reel-input {
 .reel-dgrid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-	gap: 16px 12px;
+	gap: var(--reel-space-4) var(--reel-space-3);
 }
 
 @media (min-width: 900px) {
@@ -3000,11 +3054,11 @@ input.reel-input {
    exist on a phone, and this is the commonest interaction on the screen. */
 .reel-dcard-actions {
 	display: flex;
-	gap: 4px;
+	gap: var(--reel-space-1);
 	/* auto, not a fixed gap: this is what holds the buttons on one line
 	   across cards whose titles wrap differently. */
 	margin-top: auto;
-	padding-top: 6px;
+	padding-top: var(--reel-space-2);
 }
 
 .reel-dcard-btn {
@@ -3013,7 +3067,7 @@ input.reel-input {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border-radius: 6px;
+	border-radius: var(--reel-radius);
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-primary);
 	color: var(--text-muted);
@@ -3106,7 +3160,7 @@ input.reel-input {
 .reel-facets {
 	margin-top: 20px;
 	border-top: 1px solid var(--background-modifier-border);
-	padding-top: 4px;
+	padding-top: var(--reel-space-1);
 }
 
 .reel-facet-tabs {
@@ -3128,7 +3182,7 @@ input.reel-input {
 	border: none;
 	box-shadow: none;
 	border-radius: 0;
-	padding: 10px 14px;
+	padding: var(--reel-space-3) var(--reel-space-3);
 	min-height: 44px;
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
@@ -3176,8 +3230,8 @@ input.reel-input {
 .reel-person {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 8px 4px;
+	gap: var(--reel-space-3);
+	padding: var(--reel-space-2) var(--reel-space-1);
 	border-radius: var(--reel-radius);
 	cursor: pointer;
 	min-height: 56px;
@@ -3240,7 +3294,7 @@ input.reel-input {
 .reel-release-row {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	flex-wrap: wrap;
 	padding: 7px 0;
 	border-bottom: 1px solid var(--background-modifier-border);
@@ -3265,9 +3319,9 @@ input.reel-input {
 .reel-related {
 	display: flex;
 	align-items: stretch;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	overflow-x: auto;
-	padding-bottom: 6px;
+	padding-bottom: var(--reel-space-2);
 	scroll-snap-type: x proximity;
 	-webkit-overflow-scrolling: touch;
 }
@@ -3279,7 +3333,7 @@ input.reel-input {
 	cursor: pointer;
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	-webkit-tap-highlight-color: transparent;
 }
 
@@ -3328,7 +3382,7 @@ input.reel-input {
 .reel-content-row {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	padding: 7px 0;
 	border-bottom: 1px solid var(--background-modifier-border);
 	font-size: var(--font-ui-small);
@@ -3351,7 +3405,7 @@ input.reel-input {
 	width: 4px;
 	align-self: stretch;
 	min-height: 18px;
-	border-radius: 2px;
+	border-radius: var(--reel-radius-sm);
 	background: var(--text-faint);
 }
 
@@ -3391,7 +3445,7 @@ input.reel-input {
 .reel-review-head {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	flex-wrap: wrap;
 	margin-bottom: 6px;
 }
@@ -3424,10 +3478,10 @@ input.reel-input {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	max-width: 460px;
 	margin: 0 auto;
-	padding: 8px 4px 24px;
+	padding: var(--reel-space-2) var(--reel-space-1) var(--reel-space-5);
 	text-align: center;
 	outline: none;
 }
@@ -3449,7 +3503,7 @@ input.reel-input {
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
-	box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
+	box-shadow: var(--reel-shadow-overlay);
 }
 
 .reel-quickcard-poster img {
@@ -3478,7 +3532,7 @@ input.reel-input {
 
 .reel-quickcard-actions {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	width: 100%;
 	margin-top: 4px;
 }
@@ -3495,7 +3549,7 @@ input.reel-input {
 
 .reel-quickcard-nav {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	width: 100%;
 }
 
@@ -3567,16 +3621,16 @@ input.reel-input {
 .reel-caststrip-head {
 	display: flex;
 	align-items: baseline;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	margin-bottom: 8px;
 }
 
 .reel-caststrip-track {
 	display: flex;
 	align-items: flex-start;
-	gap: 14px;
+	gap: var(--reel-space-3);
 	overflow-x: auto;
-	padding-bottom: 6px;
+	padding-bottom: var(--reel-space-2);
 	scroll-snap-type: x proximity;
 	-webkit-overflow-scrolling: touch;
 	scrollbar-width: thin;
@@ -3644,7 +3698,7 @@ input.reel-input {
 .reel-photos {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 .reel-photo {
@@ -3664,7 +3718,7 @@ input.reel-input {
 
 .reel-person-sheet .reel-person-head {
 	display: flex;
-	gap: 14px;
+	gap: var(--reel-space-3);
 	align-items: flex-start;
 	margin-bottom: 12px;
 }
@@ -3710,7 +3764,7 @@ input.reel-input {
 .reel-person-credits {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-	gap: 12px;
+	gap: var(--reel-space-3);
 	margin-top: 8px;
 }
 
@@ -3793,7 +3847,7 @@ input.reel-input {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 6px 10px;
+	gap: var(--reel-space-2) var(--reel-space-3);
 	margin-top: 3px;
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
@@ -3831,18 +3885,18 @@ input.reel-input {
  */
 
 .reel-stats {
-	padding-bottom: 8px;
+	padding-bottom: var(--reel-space-2);
 }
 
 /* ---- headline tiles ---- */
 
 .reel-stats .reel-tiles {
-	gap: 10px;
+	gap: var(--reel-space-3);
 	margin-bottom: 20px;
 }
 
 .reel-stats .reel-tile {
-	padding: 14px 14px 12px;
+	padding: var(--reel-space-3) var(--reel-space-3) var(--reel-space-3);
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--reel-radius);
@@ -3883,7 +3937,7 @@ input.reel-input {
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--reel-radius);
-	padding: 4px 14px;
+	padding: var(--reel-space-1) var(--reel-space-3);
 	gap: 0;
 	margin-bottom: 20px;
 }
@@ -3910,7 +3964,7 @@ input.reel-input {
  * grouping to rest on and every chart looks like a continuation of the last.
  */
 .reel-stats .reel-chart-grid {
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: start;
 }
 
@@ -3918,7 +3972,7 @@ input.reel-input {
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--reel-radius);
-	padding: 14px;
+	padding: var(--reel-space-3);
 	margin-bottom: 0;
 }
 
@@ -3935,14 +3989,14 @@ input.reel-input {
 
 .reel-stats .reel-chart-track {
 	height: 8px;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	background: var(--background-modifier-border);
 	overflow: hidden;
 }
 
 .reel-stats .reel-chart-fill {
 	height: 100%;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	background: var(--interactive-accent);
 	/* --reel-fill is a 0–1 ratio set inline by the renderer. */
 	width: calc(var(--reel-fill, 0) * 100%);
@@ -3967,11 +4021,11 @@ input.reel-input {
 	 */
 	.reel-stats .reel-tiles {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 8px;
+		gap: var(--reel-space-2);
 	}
 
 	.reel-stats .reel-tile {
-		padding: 12px 10px;
+		padding: var(--reel-space-3) var(--reel-space-3);
 		min-height: 76px;
 	}
 
@@ -3980,7 +4034,7 @@ input.reel-input {
 	}
 
 	.reel-stats .reel-chart {
-		padding: 12px 10px;
+		padding: var(--reel-space-3) var(--reel-space-3);
 	}
 
 	/* Narrower label column: 7.5rem of a 375px screen left almost nothing for
@@ -4012,7 +4066,7 @@ input.reel-input {
 
 .reel-person-role-panel {
 	margin-top: 8px;
-	padding: 12px;
+	padding: var(--reel-space-3);
 	border-radius: var(--reel-radius);
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
@@ -4046,7 +4100,7 @@ input.reel-input {
 
 .reel-person-role-actions {
 	display: flex;
-	gap: 8px;
+	gap: var(--reel-space-2);
 }
 
 /* ---------------- credit rows ---------------- */
@@ -4062,7 +4116,7 @@ input.reel-input {
 
 .reel-credit-row {
 	display: flex;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: baseline;
 	padding: 9px 0;
 	border-bottom: 1px solid var(--background-modifier-border);
@@ -4110,7 +4164,7 @@ input.reel-input {
 .reel-credit-name:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: 2px;
-	border-radius: 3px;
+	border-radius: var(--reel-radius-sm);
 }
 
 @media (max-width: 700px) {
@@ -4165,7 +4219,7 @@ input.reel-input {
 .reel-person-opinion {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	flex-wrap: wrap;
 	margin-top: 8px;
 }
@@ -4204,7 +4258,7 @@ input.reel-input {
 .reel-chart-thumb {
 	width: 26px;
 	height: 39px;
-	border-radius: 3px;
+	border-radius: var(--reel-radius-sm);
 	overflow: hidden;
 	background: var(--background-modifier-form-field);
 	display: flex;
@@ -4231,8 +4285,8 @@ input.reel-input {
 	cursor: pointer;
 	border-radius: var(--reel-radius);
 	margin: 0 -6px;
-	padding-left: 6px;
-	padding-right: 6px;
+	padding-left: var(--reel-space-2);
+	padding-right: var(--reel-space-2);
 }
 
 .reel-stats .reel-chart-row.is-clickable:hover {
@@ -4269,8 +4323,8 @@ input.reel-input {
 .reel-stats .reel-fact.is-clickable {
 	border-radius: var(--reel-radius);
 	margin: 0 -8px;
-	padding-left: 8px;
-	padding-right: 8px;
+	padding-left: var(--reel-space-2);
+	padding-right: var(--reel-space-2);
 }
 
 .reel-stats .reel-tile.is-clickable:focus-visible,
@@ -4287,7 +4341,7 @@ input.reel-input {
 .reel-crumb-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: var(--reel-space-2);
 	flex: 0 0 auto;
 	min-height: 34px;
 	padding: 0 12px;
@@ -4318,7 +4372,7 @@ input.reel-input {
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	margin-bottom: 6px;
 }
 
@@ -4340,7 +4394,7 @@ input.reel-input {
 
 .reel-chart-strip {
 	display: flex;
-	gap: 5px;
+	gap: var(--reel-space-1);
 	align-items: flex-end;
 	flex-wrap: wrap;
 }
@@ -4348,7 +4402,7 @@ input.reel-input {
 .reel-chart-thumb {
 	width: 38px;
 	height: 57px;
-	border-radius: 4px;
+	border-radius: var(--reel-radius-sm);
 	overflow: hidden;
 	background: var(--background-modifier-form-field);
 	display: flex;
@@ -4381,7 +4435,7 @@ input.reel-input {
    keep the bar, since something has to carry the comparison. */
 .reel-stats .reel-chart-track {
 	height: 8px;
-	border-radius: 999px;
+	border-radius: var(--reel-radius-full);
 	background: var(--background-modifier-border);
 	overflow: hidden;
 }
@@ -4404,7 +4458,7 @@ input.reel-input {
 .reel-undo-notice {
 	display: flex;
 	align-items: center;
-	gap: 14px;
+	gap: var(--reel-space-3);
 	justify-content: space-between;
 }
 
@@ -4638,7 +4692,7 @@ input.reel-input {
 .reel-skel-line {
 	height: 10px;
 	margin-top: 8px;
-	border-radius: 5px;
+	border-radius: var(--reel-radius-sm);
 }
 
 .reel-skel-line.is-short {
@@ -4647,7 +4701,7 @@ input.reel-input {
 
 .reel-skel-strip {
 	display: flex;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	overflow: hidden;
 	padding: 4px 0 12px;
 }
@@ -4660,20 +4714,20 @@ input.reel-input {
 .reel-skel-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-	gap: 12px;
+	gap: var(--reel-space-3);
 	padding: 4px 0;
 }
 
 .reel-skel-rows {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	padding: 4px 0;
 }
 
 .reel-skel-row {
 	display: flex;
-	gap: 12px;
+	gap: var(--reel-space-3);
 	align-items: center;
 }
 
@@ -4716,7 +4770,7 @@ input.reel-input {
    copying uses, and it costs one string in frontmatter. */
 .reel-hero.has-backdrop {
 	position: relative;
-	padding: 20px;
+	padding: var(--reel-space-5);
 	border-radius: var(--reel-radius);
 	overflow: hidden;
 	isolation: isolate;
@@ -4728,12 +4782,16 @@ input.reel-input {
 	z-index: -1;
 }
 
-/* The offline layer: the local poster, scaled well past its size and blurred
-   until it is no longer readable as cover art. Always present, so the hero is
-   never blank and never shifts when the real backdrop lands. */
+/* The fallback layer, when the note has no backdrop of its own.
+   Blurring a pale poster produces fog — The Office, most comedies, anything
+   with a white sleeve — and fog reads as an image that failed to load. So
+   without real art the poster is only a faint texture, and the colour comes
+   from the accent the swatch already pulled out of that same poster. If
+   there is no defensible accent either, this stays in the theme's own
+   colours, which is the honest answer rather than a grey smear. */
 .reel-hero-backdrop-base {
 	position: absolute;
-	/* Overhang, because a 40px blur samples past the edges and would
+	/* Overhang, because a large blur samples past the edges and would
 	   otherwise leave a pale halo around all four sides. */
 	inset: -40px;
 	background-image: var(--reel-backdrop);
@@ -4741,6 +4799,24 @@ input.reel-input {
 	background-position: center 22%;
 	filter: blur(28px) saturate(1.25);
 	transform: scale(1.08);
+	/* Barely there without real art. Raised to full strength below, where a
+	   genuine backdrop is sitting on top of it anyway. */
+	opacity: 0.28;
+}
+
+.reel-hero.has-art .reel-hero-backdrop-base {
+	opacity: 1;
+}
+
+/* The colour wash that stands in for a backdrop. Drawn from --reel-accent,
+   which SwatchStore set from this title's own poster, so a title with no
+   backdrop still gets a hero that belongs to it. */
+.reel-hero:not(.has-art) .reel-hero-backdrop {
+	background: linear-gradient(
+		135deg,
+		hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.30),
+		hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.08)
+	);
 }
 
 .reel-hero-backdrop-img {
@@ -4762,7 +4838,7 @@ input.reel-input {
    contrast. Heavier at the bottom, where the title and the scores sit, and
    in the theme's own background colour so it belongs to the page rather than
    being a grey wash over it. */
-.reel-hero-backdrop::after {
+.reel-hero.has-art .reel-hero-backdrop::after {
 	content: "";
 	position: absolute;
 	inset: 0;
@@ -4779,7 +4855,7 @@ input.reel-input {
    dropped and the text would sit on a raw photograph, so this plain fallback
    is declared first and only overridden where relative colours parse. */
 @supports not (color: rgb(from white r g b / 50%)) {
-	.reel-hero-backdrop::after {
+	.reel-hero.has-art .reel-hero-backdrop::after {
 		background: linear-gradient(
 			to bottom,
 			rgba(0, 0, 0, 0.45) 0%,
@@ -4792,7 +4868,7 @@ input.reel-input {
 /* The poster sits proud of the backdrop rather than inside it — the overlap
    is what reads as depth. */
 .reel-hero.has-backdrop .reel-hero-poster {
-	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+	box-shadow: var(--reel-shadow-overlay);
 }
 
 @media (max-width: 700px) {
@@ -4832,7 +4908,7 @@ input.reel-input {
 	width: 28px;
 	height: 2px;
 	margin-top: 6px;
-	border-radius: 2px;
+	border-radius: var(--reel-radius-sm);
 	background: var(--reel-accent);
 }
 
@@ -4894,7 +4970,7 @@ input.reel-input {
 	flex-direction: column;
 	align-items: center;
 	text-align: center;
-	gap: 10px;
+	gap: var(--reel-space-3);
 	padding: 44px 20px 48px;
 	margin: 0 auto;
 	/* Capped, or the body text runs the full width of a monitor and stops
@@ -4934,7 +5010,7 @@ input.reel-input {
 .reel-empty-actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: var(--reel-space-2);
 	justify-content: center;
 	margin-top: 6px;
 }
