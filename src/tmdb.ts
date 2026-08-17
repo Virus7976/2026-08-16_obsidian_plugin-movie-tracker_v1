@@ -19,6 +19,7 @@
 import { Plugin, requestUrl, RequestUrlResponse } from "obsidian";
 import type ReelPlugin from "./main";
 import { redact } from "./secrets";
+import { cacheFileName } from "./util/cachekey";
 import { MissingKeyError } from "./credentials";
 import type {
 	TmdbEpisode,
@@ -436,8 +437,16 @@ export class TmdbClient {
 	/* Disk cache — vault adapter, so it works on mobile with no Node APIs */
 	/* ------------------------------------------------------------------ */
 
+	/**
+	 * The file a cache key maps to.
+	 *
+	 * Sanitising alone was not enough and the failure was silent: a comma and
+	 * a pipe both became an underscore, so `with_genres=28,35` (action AND
+	 * comedy) and `with_genres=28|35` (action OR comedy) shared one file.
+	 * Whichever ran first answered for both. See util/cachekey.ts.
+	 */
 	private cachePath(key: string): string {
-		return `${this.cacheDir}/${key.replace(/[^a-z0-9._-]/gi, "_")}.json`;
+		return `${this.cacheDir}/${cacheFileName(key)}`;
 	}
 
 	private async readCache<T>(key: string): Promise<T | null> {

@@ -571,7 +571,12 @@ export class DiscoverEngine {
 		// No seeds: the constrained set *is* the answer, with no explanation
 		// to offer beyond the constraints the user set themselves.
 		if (!recipe.seeds.length) {
-			const rows = (constrained?.results ?? []).filter((r) => !owned.has(r.id) && r.poster_path);
+			// And with no constraints either, there is nothing to query — which
+			// used to mean an empty screen for someone who pressed straight
+			// through both steps. Popular titles are the honest answer to "show
+			// me something" and a much better one than nothing.
+			const pool = constrained ? constrained.results : await this.plugin.tmdb.discover("popular");
+			const rows = pool.filter((r) => !owned.has(r.id) && r.poster_path);
 			return rows.map((item, i) => ({ item, because: [], agreement: 0, bestRank: i }));
 		}
 
