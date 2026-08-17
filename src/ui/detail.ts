@@ -165,28 +165,61 @@ export class DetailScreen {
 		if (e.certification) sub.createSpan({ cls: "reel-badge cert", text: e.certification });
 
 		const scores = body.createDiv({ cls: "reel-scores" });
-		const score = (label: string, value: string, cls: string) => {
+		/**
+		 * One score chip.
+		 *
+		 * `outOf` is the fix for a real misreading: your 4 out of 5 sat beside
+		 * TMDB's 8 out of 10 as bare numbers, so an identical judgement looked
+		 * like half the score. Four different scales were on that row at once
+		 * — 5, 10, 100 and a percentage — with nothing to say so.
+		 */
+		const score = (label: string, value: string, cls: string, outOf?: string) => {
 			const chip = scores.createDiv({ cls: `reel-score ${cls}` });
-			chip.createDiv({ cls: "reel-score-value", text: value });
+			const v = chip.createDiv({ cls: "reel-score-value", text: value });
+			// Attached to the number, and much smaller, so the score still
+			// reads at a glance and the denominator is there when compared.
+			if (outOf) v.createSpan({ cls: "reel-score-scale", text: `/${outOf}` });
 			chip.createDiv({ cls: "reel-score-label", text: label });
 		};
-		if (e.rating != null) score("You", String(e.rating), "mine");
+		if (e.rating != null) score("You", String(e.rating), "mine", "5");
 		const epAvg = this.episodeAverage();
-		if (epAvg != null) score("Episodes", epAvg.toFixed(1), "mine");
+		if (epAvg != null) score("Episodes", epAvg.toFixed(1), "mine", "5");
 		if (e.imdbRating != null) {
 			// The sample size belongs with the score. 7.9 from 1.2M voters and
 			// 7.9 from 400 are different claims, and the number alone hides it.
-			score("IMDb", e.imdbRating.toFixed(1), "imdb");
+			score("IMDb", e.imdbRating.toFixed(1), "imdb", "10");
 			if (e.imdbVotes) {
 				const chip = scores.lastElementChild;
 				chip?.createDiv({ cls: "reel-score-votes", text: compactCount(e.imdbVotes) });
 			}
 		}
 		if (e.metacritic != null) {
-			score("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad");
+			score("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad", "100");
 		}
+		// Already carries its own % sign, so a denominator would be redundant.
 		if (e.rottenTomatoes != null) score("Tomatoes", `${e.rottenTomatoes}%`, e.rottenTomatoes >= 60 ? "fresh" : "rotten");
-		if (e.tmdbRating != null) score("TMDB", e.tmdbRating.toFixed(1), "");
+		if (e.tmdbRating != null) score("TMDB", e.tmdbRating.toFixed(1), "", "10");
+
+		/**
+		 * How your score compares once the scales match.
+		 *
+		 * The denominators alone still leave you doing the arithmetic. This
+		 * does it: your rating doubled onto TMDB's ten-point scale, so "same
+		 * as TMDB" or "a point above" is stated rather than inferred.
+		 */
+		if (e.rating != null) {
+			const theirs = e.imdbRating ?? e.tmdbRating;
+			const source = e.imdbRating != null ? "IMDb" : "TMDB";
+			if (theirs != null) {
+				const mine = e.rating * 2;
+				const delta = Math.round((mine - theirs) * 10) / 10;
+				const text =
+					Math.abs(delta) < 0.5
+						? `Your ${e.rating} is about the same as ${source}'s ${theirs.toFixed(1)}`
+						: `Your ${e.rating} is ${Math.abs(delta).toFixed(1)} ${delta > 0 ? "above" : "below"} ${source}, on their scale`;
+				body.createDiv({ cls: "reel-score-compare", text });
+			}
+		}
 		if (!scores.childElementCount) scores.remove();
 
 		if (e.genres.length) {

@@ -653,6 +653,18 @@ export class ReelSettingTab extends PluginSettingTab {
 				})
 			);
 
+		// Everything above this line is a preference: set it, and it changes
+		// what Reel does from now on. Everything below is an *action* that
+		// runs immediately, and two of the three move files to the trash.
+		// They were interleaved with the toggles, so the control that deletes
+		// cached posters sat directly beneath the one choosing a poster size
+		// — same visual weight, entirely different consequence.
+		new Setting(el).setName("Maintenance").setHeading();
+		el.createDiv({
+			cls: "reel-setting-note",
+			text: "These run straight away rather than changing a preference. The ones that remove files move them to the trash, and ask first.",
+		});
+
 		new Setting(el)
 			.setName("Dismissed suggestions")
 			.setDesc("Titles you marked 'not interested' in Discover. Clearing brings them back.")

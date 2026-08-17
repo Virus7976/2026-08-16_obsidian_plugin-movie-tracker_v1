@@ -16,6 +16,7 @@ import { DetailScreen } from "./ui/detail";
 import { RateScreen } from "./ui/rate";
 import { DiscoverScreen } from "./ui/discoverView";
 import { paintUpNext } from "./render/upnext";
+import { paintOnThisDay } from "./render/onthisday";
 import { paintUpcoming } from "./render/calendar";
 import { paintStats } from "./render/stats";
 import { viewings } from "./render/diary";
@@ -370,6 +371,10 @@ export class ReelView extends ItemView {
 			if (!this.rateScreen) this.rateScreen = new RateScreen(this.plugin);
 			this.rateScreen.render(this.bodyEl);
 		} else if (this.tab === "upnext") {
+			// Above Up Next, not below: it is a grace note on the way to the
+			// thing you opened the screen for, and it renders nothing at all on
+			// the days it has nothing to say.
+			paintOnThisDay(this.plugin, this.bodyEl);
 			paintUpNext(this.plugin, this.bodyEl);
 			// Upcoming lives here rather than in its own tab: "what am I part
 			// way through" and "what's about to air" are the same question.

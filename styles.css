@@ -5398,3 +5398,148 @@ input.reel-input {
 		transform: none;
 	}
 }
+
+/* ------------------------------------------------------------------ */
+/* On this day                                                         */
+/* ------------------------------------------------------------------ */
+
+/* Only rendered on days that have something, so it never becomes a daily
+   reminder that the feature exists and has nothing for you. */
+.reel-otd {
+	margin-bottom: var(--reel-space-4);
+}
+
+.reel-otd-strip {
+	display: flex;
+	gap: var(--reel-space-3);
+	overflow-x: auto;
+	padding-bottom: var(--reel-space-1);
+	/* Stops the horizontal scroll from chaining to the page behind it once
+	   the strip reaches its end. */
+	overscroll-behavior-x: contain;
+}
+
+.reel-otd-card {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-3);
+	padding: var(--reel-space-2);
+	padding-right: var(--reel-space-4);
+	border-radius: var(--reel-radius);
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	box-shadow: var(--reel-shadow-raised);
+	cursor: pointer;
+	max-width: 260px;
+}
+
+.reel-otd-card:hover {
+	background: var(--background-modifier-hover);
+}
+
+.reel-otd-thumb {
+	flex: 0 0 44px;
+	width: 44px;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius-sm);
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	position: relative;
+}
+
+.reel-otd-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-otd-body {
+	min-width: 0;
+}
+
+/* The interval is the hook, so it leads and carries the accent. */
+.reel-otd-when {
+	font-size: var(--reel-text-caption);
+	font-weight: var(--reel-weight-medium);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-accent);
+}
+
+.reel-otd-title {
+	font-size: var(--reel-text-label);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The exact date as well as the interval — "three years ago" is the hook,
+   but the date is what you might actually be trying to remember. */
+.reel-otd-date {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings                                                            */
+/* ------------------------------------------------------------------ */
+
+/* Sets the Maintenance section apart from the preferences above it. Those
+   change what Reel does next; these run immediately and two of them move
+   files to the trash. */
+.reel-setting-note {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	padding: var(--reel-space-2) var(--reel-space-3);
+	margin-bottom: var(--reel-space-2);
+	border-left: 2px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	border-radius: 0 var(--reel-radius-sm) var(--reel-radius-sm) 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Scroll containment                                                  */
+/* ------------------------------------------------------------------ */
+
+/* Reaching the end of a Reel list used to chain the scroll to whatever sits
+   behind it, and on Android that can trigger the browser's pull-to-refresh
+   inside a plugin pane. */
+.reel-view-body,
+.reel-skel-strip,
+.reel-caststrip,
+.reel-related-strip,
+.reel-chart-strip {
+	overscroll-behavior: contain;
+}
+
+/* ------------------------------------------------------------------ */
+/* Score scales                                                        */
+/* ------------------------------------------------------------------ */
+
+/* Four scales were on one row — 5, 10, 100 and a percentage — as bare
+   numbers with nothing to distinguish them. A 4 out of 5 beside an 8 out of
+   10 read as half the score when it is the identical judgement. */
+.reel-score-scale {
+	font-size: 0.6em;
+	font-weight: var(--reel-weight-normal);
+	color: var(--text-faint);
+	margin-left: 1px;
+	/* Kept off the tabular run, so the denominator does not consume the
+	   width that keeps the numbers themselves aligned. */
+	font-variant-numeric: normal;
+}
+
+/* The comparison in words, because the denominators alone still leave you
+   doing the arithmetic. */
+.reel-score-compare {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
