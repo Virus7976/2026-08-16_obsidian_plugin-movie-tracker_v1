@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones",
+    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend",
     "test:content": "esbuild tests/content.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.content.cjs --log-level=error && node tests/.content.cjs",
     "test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
     "test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
@@ -30,7 +30,8 @@
     "test:swatch": "esbuild tests/swatch.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.swatch.cjs --log-level=error && node tests/.swatch.cjs",
     "test:failure": "esbuild tests/failure.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.failure.cjs --log-level=error && node tests/.failure.cjs",
     "test:suggest": "esbuild tests/suggest.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.suggest.cjs --log-level=error && node tests/.suggest.cjs",
-    "test:milestones": "esbuild tests/milestones.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.milestones.cjs --log-level=error && node tests/.milestones.cjs"
+    "test:milestones": "esbuild tests/milestones.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.milestones.cjs --log-level=error && node tests/.milestones.cjs",
+    "test:blend": "esbuild tests/blend.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.blend.cjs --log-level=error && node tests/.blend.cjs"
   },
   "keywords": [
     "obsidian",

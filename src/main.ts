@@ -14,6 +14,8 @@ import { reportFailure, offline } from "./ui/failure";
 import { PeopleStore } from "./people";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
+import { RecipeSheet } from "./ui/recipeSheet";
+import type { Recipe } from "./util/recipe";
 import { LogSheet } from "./ui/logSheet";
 import { SeasonSheet } from "./ui/seasonSheet";
 import { ListPicker } from "./ui/listPicker";
@@ -230,6 +232,25 @@ export default class ReelPlugin extends Plugin {
 	private enriching = false;
 	private cancelEnrich = false;
 
+	/**
+	 * The guided flow, or one you saved.
+	 *
+	 * Gated on the same two things a search is: without a key there is nothing
+	 * to recommend from, and offline the whole thing is a spinner that ends in
+	 * an error.
+	 */
+	openRecipe(saved?: Recipe): void {
+		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
+			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
+			return;
+		}
+		if (offline()) {
+			new Notice("Reel: finding new things needs a connection. Your library still works.", 7000);
+			return;
+		}
+		new RecipeSheet(this, saved).open();
+	}
+
 	openSearch(opts: { watchlist?: boolean; query?: string } = {}): void {
 		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
 			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
@@ -298,6 +319,13 @@ export default class ReelPlugin extends Plugin {
 				if (!checking) void this.undo.undo();
 				return true;
 			},
+		});
+
+		this.addCommand({
+			id: "find-something",
+			name: "Find something to watch",
+			icon: "compass",
+			callback: () => this.openRecipe(),
 		});
 
 		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });

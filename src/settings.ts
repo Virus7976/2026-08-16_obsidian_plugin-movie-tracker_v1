@@ -6,6 +6,8 @@ import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertificat
 import { KEY_LABELS, KeyBundle, KeyName } from "./credentials";
 
 /** What you think of a person, used to weight what gets recommended. */
+import type { Recipe } from "./util/recipe";
+
 export interface PersonOpinion {
 	name: string;
 	liked?: boolean;
@@ -59,6 +61,8 @@ export interface ReelSettings {
 	lastTab: string;
 	/** Newest-first, capped. Offered under an empty search box. */
 	recentSearches: string[];
+	/** Named discovery recipes, newest first. A mood you built once. */
+	recipes: Recipe[];
 
 	/* Content policy — see content.ts for what the data can and can't do */
 	hideFlags: string[];
@@ -103,6 +107,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	people: {},
 	lastTab: "library",
 	recentSearches: [],
+	recipes: [],
 
 	hideFlags: [],
 	maxCertification: null,

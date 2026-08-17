@@ -55,6 +55,8 @@ export class DiscoverScreen {
 	/** One-at-a-time browsing, for when you want to move fast rather than skim. */
 	private quick = false;
 	private quickAt = 0;
+	/** Results handed over by the recipe flow, if any. */
+	private shortlist: TmdbSearchResult[] | null = null;
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -81,6 +83,16 @@ export class DiscoverScreen {
 	render(container: HTMLElement): void {
 		container.empty();
 		container.addClass("reel-discover");
+
+		// Consumed rather than read: a shortlist is for the run you just
+		// asked for, and finding it still there on a later visit would be a
+		// stale answer to a question you have moved on from.
+		const staged = this.plugin.discover.takeStaged();
+		if (staged) {
+			this.shortlist = staged;
+			this.quick = true;
+			this.quickAt = 0;
+		}
 
 		this.paintFilters(container);
 
@@ -111,6 +123,10 @@ export class DiscoverScreen {
 	 * stuck rather than as two separate recommendations.
 	 */
 	private quickPool(): TmdbSearchResult[] {
+		// A shortlist handed over by the recipe flow wins over everything
+		// else: you asked for exactly these, so browsing anything else would
+		// be ignoring the question you just answered.
+		if (this.shortlist?.length) return this.shortlist.filter((i) => !this.handled.has(i.id));
 		const source = this.filtered ? (this.results ?? []) : (this.rows ?? []).flatMap((r) => r.items);
 		const seen = new Set<number>();
 		const out: TmdbSearchResult[] = [];
@@ -308,6 +324,28 @@ export class DiscoverScreen {
 
 	private paintFilters(container: HTMLElement): void {
 		const wrap = container.createDiv({ cls: "reel-discover-filters" });
+
+		// The guided flow, and the moods you have already built. Above the
+		// filter chips because it is a better first move than any of them:
+		// starting from three films you loved beats starting from a genre.
+		const launch = wrap.createDiv({ cls: "reel-recipe-launch" });
+		const find = launch.createEl("button", { cls: "reel-btn mod-cta", attr: { type: "button" } });
+		setIcon(find.createSpan(), "wand-2");
+		find.createSpan({ text: "Find something to watch" });
+		find.addEventListener("click", () => this.plugin.openRecipe());
+
+		for (const saved of this.plugin.settings.recipes.slice(0, 4)) {
+			const b = launch.createEl("button", { cls: "reel-chip", text: saved.name ?? "Recipe", attr: { type: "button" } });
+			b.addEventListener("click", () => this.plugin.openRecipe(saved));
+			// Right-click or long-press to forget it. A delete button on every
+			// chip would double the width of a row meant to be scanned.
+			b.addEventListener("contextmenu", async (ev) => {
+				ev.preventDefault();
+				this.plugin.settings.recipes = this.plugin.settings.recipes.filter((r) => r !== saved);
+				await this.plugin.saveSettings();
+				this.render(container);
+			});
+		}
 
 		const row1 = wrap.createDiv({ cls: "reel-chips" });
 		const chip = (parent: HTMLElement, label: string, active: boolean, onClick: () => void) => {

@@ -253,6 +253,55 @@ export class TmdbClient {
 		return (data.results ?? []).map((r) => ({ ...r, media_type: r.media_type ?? opts.type }));
 	}
 
+	/**
+	 * `/discover` with parameters supplied directly, plus the total count.
+	 *
+	 * `filter()` above takes a fixed set of options and builds its own query,
+	 * which is right for the filter bar but cannot express a recipe — AND-vs-
+	 * OR genres, exclusions, a runtime ceiling. Rather than grow that
+	 * signature to a dozen optional fields, a recipe produces the parameters
+	 * and this passes them through.
+	 *
+	 * `total_results` is why this returns an object rather than an array.
+	 * Showing "312 films match" while someone is still building a query needs
+	 * the count, and TMDB returns both in one response — so the live counter
+	 * costs nothing beyond a request that was going to happen anyway.
+	 */
+	async discoverWith(
+		type: "movie" | "tv",
+		params: Record<string, string>
+	): Promise<{ results: TmdbSearchResult[]; total: number }> {
+		const merged: Record<string, string> = {
+			sort_by: "popularity.desc",
+			include_adult: "false",
+			...params,
+		};
+
+		// Same reasoning as filter(): discover results carry no certification
+		// field, so the content policy is applied at the source or not at all.
+		const maxCert = this.plugin.settings.maxCertification;
+		if (maxCert && type === "movie") {
+			merged.certification_country = this.plugin.settings.region;
+			merged["certification.lte"] = maxCert;
+		}
+
+		// The key covers every parameter, or two different recipes would share
+		// one cached answer. Sorted, so key order cannot cause a miss for a
+		// query that is genuinely identical.
+		const key = `rec-${type}-${Object.keys(merged)
+			.sort()
+			.map((k) => `${k}=${merged[k]}`)
+			.join("&")}`;
+
+		const data = await this.cached(key, () =>
+			this.request<{ results?: TmdbSearchResult[]; total_results?: number }>(`/discover/${type}`, merged)
+		);
+		return {
+			results: (data.results ?? []).map((r) => ({ ...r, media_type: r.media_type ?? type })),
+			total: data.total_results ?? 0,
+		};
+	}
+
 	/** Genre name/id pairs. Immutable in practice, so cached permanently. */
 	async genreList(kind: "movie" | "tv"): Promise<{ id: number; name: string }[]> {
 		const data = await this.cached(

@@ -29,6 +29,8 @@
 import type ReelPlugin from "./main";
 import type { Entry, TmdbSearchResult } from "./types";
 import { unlink } from "./library";
+import { blend, type Blended } from "./util/blend";
+import { toDiscoverParams, blame, type Recipe, type SeedPool, type Culprit } from "./util/recipe";
 
 export interface DiscoverRow {
 	id: string;
@@ -432,5 +434,179 @@ export class DiscoverEngine {
 			out.push(item);
 		}
 		return out;
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Recipes — several seeds, blended                                    */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * A shortlist handed to the Discover screen's one-at-a-time mode.
+	 *
+	 * Held here rather than passed as an argument because the two screens do
+	 * not know about each other — the recipe sheet closes, the tab opens, and
+	 * this is the only thing that survives in between.
+	 */
+	private staged: TmdbSearchResult[] | null = null;
+
+	stage(items: TmdbSearchResult[]): void {
+		this.staged = items.length ? items : null;
+	}
+
+	/** Take the shortlist, if there is one. Reading it consumes it. */
+	takeStaged(): TmdbSearchResult[] | null {
+		const held = this.staged;
+		this.staged = null;
+		return held;
+	}
+
+	/**
+	 * Which of your own films to offer as seeds.
+	 *
+	 * The default is what you *rated highly*, not what you watched. A picker
+	 * showing everything you have seen includes the things you disliked, and
+	 * seeding a recommendation engine with a film you gave two stars is
+	 * actively counterproductive — it asks for more of what you did not want.
+	 *
+	 * "Would rewatch" is its own pool because it answers a different question:
+	 * not "what was good" but "what do I want again", which is much closer to
+	 * what someone deciding what to watch tonight actually means.
+	 */
+	seedPool(pool: SeedPool): Entry[] {
+		const films = this.plugin.visible(this.plugin.library.all()).filter((e) => e.watched.length || e.rating != null);
+
+		const rows =
+			pool === "rewatch"
+				? films.filter((e) => e.wouldRewatch)
+				: pool === "loved"
+					? films.filter((e) => (e.rating ?? 0) >= 4 || e.liked || e.wouldRewatch)
+					: films;
+
+		// Best first, so the picker opens on the films you are most likely to
+		// choose rather than on whatever happens to sort first alphabetically.
+		return [...rows].sort(
+			(a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title)
+		);
+	}
+
+	/**
+	 * How many titles a recipe would return, without fetching them.
+	 *
+	 * Used by the live counter while the recipe is still being built. Returns
+	 * null when there is nothing to count — a recipe with no constraints at
+	 * all would report "every film ever made", which is true and useless.
+	 */
+	async count(recipe: Recipe): Promise<number | null> {
+		const params = toDiscoverParams(recipe);
+		if (!Object.keys(params).length) return null;
+		const { total } = await this.plugin.tmdb.discoverWith("movie", params);
+		return total;
+	}
+
+	/**
+	 * Run a recipe: blend the seeds, then apply the constraints.
+	 *
+	 * Order matters and is not obvious. The seeds come first because
+	 * /recommendations takes no filters at all — there is no way to ask TMDB
+	 * for "films like Heat that are under 90 minutes". So the blend is fetched
+	 * whole and narrowed locally against a constrained /discover set.
+	 *
+	 * With no seeds it degenerates to a plain filtered search, which is the
+	 * right behaviour rather than an error: "any well-rated 90s comedy" is a
+	 * reasonable thing to ask for and needs no seed at all.
+	 */
+	async run(recipe: Recipe): Promise<Blended[]> {
+		const owned = new Set<number>();
+		if (recipe.excludeOwned) {
+			for (const e of this.plugin.library.all()) owned.add(e.tmdbId);
+		}
+		for (const id of this.plugin.settings.dismissedIds) owned.add(id);
+
+		const params = toDiscoverParams(recipe);
+		const constrained = Object.keys(params).length
+			? await this.plugin.tmdb.discoverWith("movie", params)
+			: null;
+
+		// No seeds: the constrained set *is* the answer, with no explanation
+		// to offer beyond the constraints the user set themselves.
+		if (!recipe.seeds.length) {
+			const rows = (constrained?.results ?? []).filter((r) => !owned.has(r.id) && r.poster_path);
+			return rows.map((item, i) => ({ item, because: [], agreement: 0, bestRank: i }));
+		}
+
+		const sets = await Promise.all(
+			recipe.seeds.map(async (id) => {
+				const entry = this.plugin.library.byTmdbId(id, "film");
+				try {
+					const items = await this.plugin.tmdb.recommendations(id, "movie");
+					return { seedId: id, seedTitle: entry?.title ?? String(id), items };
+				} catch {
+					// One dead seed must not lose the other two. A partial
+					// blend is a worse answer than a full one and a much
+					// better answer than an error page.
+					return { seedId: id, seedTitle: entry?.title ?? String(id), items: [] };
+				}
+			})
+		);
+
+		let out = blend(sets, { exclude: owned, minAgreement: recipe.minAgreement });
+
+		// Narrow against the constrained set. An id present in /discover under
+		// these parameters satisfies them; TMDB will not tell us that about a
+		// recommendation directly.
+		if (constrained) {
+			const allowed = new Set(constrained.results.map((r) => r.id));
+			out = out.filter((b) => allowed.has(b.item.id));
+		}
+
+		return out.filter((b) => b.item.poster_path);
+	}
+
+	/**
+	 * When a recipe returns nothing, work out which constraint to blame.
+	 *
+	 * One count per constraint with that constraint removed — so at most a
+	 * handful of requests, all cached, and only on the failure path. "No
+	 * results" is a dead end; "your 90 minute limit is what is cutting it,
+	 * drop it and you get 40" is an action.
+	 */
+	async blameFor(recipe: Recipe, genreName: (id: number) => string): Promise<Culprit | null> {
+		const variants: { key: keyof Recipe; label: string; recipe: Recipe }[] = [];
+
+		if (recipe.minScore != null) {
+			variants.push({ key: "minScore", label: `the ${recipe.minScore}+ score filter`, recipe: { ...recipe, minScore: undefined } });
+		}
+		if (recipe.maxRuntime != null) {
+			variants.push({ key: "maxRuntime", label: `the ${recipe.maxRuntime} minute limit`, recipe: { ...recipe, maxRuntime: undefined } });
+		}
+		if (recipe.decade != null) {
+			variants.push({ key: "decade", label: `the ${recipe.decade}s`, recipe: { ...recipe, decade: undefined } });
+		}
+		if (recipe.withoutGenres.length) {
+			variants.push({
+				key: "withoutGenres",
+				label: `excluding ${recipe.withoutGenres.map(genreName).join(" and ")}`,
+				recipe: { ...recipe, withoutGenres: [] },
+			});
+		}
+		if (recipe.genres.length > 1 && recipe.genreMode === "all") {
+			// Not "drop the genres" but "loosen them" — asking for action AND
+			// comedy AND crime is usually the culprit, and "either" recovers
+			// most of it without abandoning what was asked for.
+			variants.push({
+				key: "genreMode",
+				label: `requiring all of ${recipe.genres.map(genreName).join(", ")}`,
+				recipe: { ...recipe, genreMode: "any" },
+			});
+		}
+
+		const counted = await Promise.all(
+			variants.map(async (v) => ({
+				key: v.key,
+				label: v.label,
+				without: (await this.count(v.recipe)) ?? 0,
+			}))
+		);
+		return blame(counted);
 	}
 }

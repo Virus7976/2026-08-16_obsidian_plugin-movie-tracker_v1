@@ -5721,3 +5721,286 @@ input.reel-input {
 	flex: 0 0 auto;
 	margin-left: auto;
 }
+
+/* ------------------------------------------------------------------ */
+/* The recipe flow                                                     */
+/* ------------------------------------------------------------------ */
+
+/* Built for thumb and mouse at the same time rather than adapted from one
+   to the other. Everything below is a single column at any width, every
+   target clears 44px, and the only thing that changes on a phone is that the
+   sheet arrives from the bottom — which is Obsidian's own convention. */
+
+.reel-recipe-launch {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--reel-space-2);
+	margin-bottom: var(--reel-space-3);
+}
+
+.reel-recipe-launch .reel-btn {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+/* ---- steps ---- */
+
+.reel-recipe-steps {
+	display: flex;
+	gap: var(--reel-space-1);
+	margin-bottom: var(--reel-space-4);
+}
+
+.reel-recipe-step {
+	flex: 1 1 0;
+	min-height: 36px;
+	border: none;
+	background: none;
+	box-shadow: none;
+	color: var(--text-faint);
+	font-size: var(--reel-text-caption);
+	font-weight: var(--reel-weight-medium);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	/* The rule under each step is the progress bar — a separate one would be
+	   a second thing saying what these already say. */
+	border-bottom: 2px solid var(--background-modifier-border);
+	padding-bottom: var(--reel-space-2);
+	cursor: default;
+}
+
+.reel-recipe-step.is-done {
+	color: var(--text-muted);
+	border-bottom-color: var(--text-faint);
+	cursor: pointer;
+}
+
+.reel-recipe-step.is-active {
+	color: var(--text-normal);
+	border-bottom-color: var(--interactive-accent);
+}
+
+.reel-recipe-title {
+	font-size: var(--reel-text-title);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+	margin-bottom: var(--reel-space-2);
+}
+
+.reel-recipe-hint {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	margin-bottom: var(--reel-space-3);
+}
+
+.reel-recipe-label {
+	font-size: var(--reel-text-caption);
+	font-weight: var(--reel-weight-medium);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	margin: var(--reel-space-4) 0 var(--reel-space-2);
+}
+
+/* ---- seed picker ---- */
+
+/* auto-fill rather than a fixed column count, so the same markup gives four
+   across on a phone and eight on a monitor with no breakpoint. */
+.reel-recipe-seeds {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+	gap: var(--reel-space-3);
+	max-height: 46vh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: var(--reel-space-1);
+}
+
+.reel-recipe-seed {
+	cursor: pointer;
+	border-radius: var(--reel-radius);
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-recipe-seed-poster {
+	position: relative;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	/* The ring is drawn inside, so a picked poster does not shift the grid. */
+	box-shadow: inset 0 0 0 0 var(--interactive-accent);
+	transition: box-shadow 120ms ease-out;
+}
+
+.reel-recipe-seed.is-on .reel-recipe-seed-poster {
+	box-shadow: inset 0 0 0 3px var(--interactive-accent);
+}
+
+.reel-recipe-seed:not(.is-on) .reel-recipe-seed-poster img {
+	/* Unpicked posters step back so the picked ones read as chosen rather
+	   than merely outlined. */
+	opacity: 0.62;
+}
+
+.reel-recipe-seed-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-recipe-seed-tick {
+	position: absolute;
+	right: var(--reel-space-1);
+	bottom: var(--reel-space-1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: var(--reel-radius-full);
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-recipe-seed-tick .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.reel-recipe-seed-title {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-tight);
+	color: var(--text-muted);
+	margin-top: var(--reel-space-1);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* An excluded genre reads as a negation, not as a second kind of selected. */
+.reel-chip.is-excluded {
+	border-color: var(--color-red, #e5484d);
+	color: var(--color-red, #e5484d);
+	text-decoration: line-through;
+}
+
+/* ---- footer ---- */
+
+/* Sticky, because the count is only useful while you are still changing
+   things — having to scroll down to see what your last tap did defeats it. */
+.reel-recipe-nav {
+	position: sticky;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--reel-space-3);
+	margin-top: var(--reel-space-4);
+	padding: var(--reel-space-3) 0;
+	background: var(--background-primary);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.reel-recipe-count {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	min-width: 0;
+}
+
+.reel-recipe-nav .reel-btn {
+	flex: 0 0 auto;
+}
+
+/* ---- results ---- */
+
+.reel-recipe-results {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	gap: var(--reel-space-3);
+	padding: var(--reel-space-1) 0;
+}
+
+.reel-recipe-result {
+	cursor: pointer;
+	min-width: 0;
+}
+
+.reel-recipe-result-poster {
+	position: relative;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-modifier-form-field);
+	box-shadow: var(--reel-shadow-poster);
+}
+
+.reel-recipe-result-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* How many of your picks agreed. It is the ranking signal, so it sits where
+   the eye lands first rather than in the caption. */
+.reel-recipe-agree {
+	position: absolute;
+	top: var(--reel-space-1);
+	left: var(--reel-space-1);
+	padding: 1px 6px;
+	border-radius: var(--reel-radius-full);
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-size: 11px;
+	font-weight: var(--reel-weight-strong);
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-recipe-result-title {
+	font-size: var(--reel-text-label);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+	margin-top: var(--reel-space-1);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The argument. A list that cannot say why is just a list. */
+.reel-recipe-because {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-tight);
+	color: var(--text-accent);
+	min-width: 0;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+.reel-recipe-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--reel-space-2);
+	margin-top: var(--reel-space-4);
+}
+
+@media (max-width: 700px) {
+	.reel-recipe-seeds {
+		max-height: 40vh;
+	}
+	/* Full-width actions on a phone: two buttons sharing a narrow row leaves
+	   neither with a comfortable target. */
+	.reel-recipe-actions .reel-btn {
+		flex: 1 1 100%;
+	}
+}
