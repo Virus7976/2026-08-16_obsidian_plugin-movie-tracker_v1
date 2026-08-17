@@ -5482,6 +5482,8 @@
   var params2 = new URLSearchParams(location.search);
   var wanted = params2.get("screen") ?? "library";
   var phone2 = params2.get("phone") !== "0";
+  document.body.classList.toggle("theme-dark", params2.get("dark") === "1");
+  document.body.classList.toggle("theme-light", params2.get("dark") !== "1");
   function mount(app2, name) {
     const view = app2.createDiv({ cls: "reel-view" });
     view.toggleClass("is-phone", phone2);

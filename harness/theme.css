@@ -70,3 +70,29 @@ html, body {
 .reel-audit h2 { margin: 0 0 12px; font-size: 16px; }
 .reel-audit-row { padding: 6px 0; border-top: 1px solid #ddd; }
 .reel-audit-row code { display: block; color: #b00; margin-top: 2px; word-break: break-all; }
+
+/* Obsidian's dark theme variables.
+ *
+ * Reel has zero `.theme-dark` rules of its own, which is right — every colour
+ * comes from a variable, so switching the variables should switch the app.
+ * "Should" is the operative word: six shadows and the poster-loading gradient
+ * are hard-coded rgba(0,0,0,…), and nobody has ever looked at them on a dark
+ * background because the vault theme is light.
+ */
+body.theme-dark {
+	--background-primary: #1e1e1e;
+	--background-primary-alt: #1a1a1a;
+	--background-secondary: #252525;
+	--background-secondary-alt: #161616;
+	--background-modifier-border: #333;
+	--background-modifier-border-hover: #444;
+	--background-modifier-hover: rgba(255, 255, 255, 0.075);
+	--background-modifier-form-field: #1a1a1a;
+	--text-normal: #dadada;
+	--text-muted: #999;
+	--text-faint: #666;
+	--text-accent: #a68cf0;
+	--text-on-accent: #fff;
+	--interactive-accent: #7b6cd9;
+	--interactive-accent-hover: #8a7ce0;
+}

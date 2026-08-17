@@ -311,6 +311,12 @@ const params = new URLSearchParams(location.search);
 const wanted = params.get("screen") ?? "library";
 const phone = params.get("phone") !== "0";
 
+// Obsidian puts the theme on <body>, and every Reel colour resolves from
+// there. The harness has to do the same, or a dark-theme check would quietly
+// measure light-theme colours and pass.
+document.body.classList.toggle("theme-dark", params.get("dark") === "1");
+document.body.classList.toggle("theme-light", params.get("dark") !== "1");
+
 /** Render one screen into a fresh, correctly-classed view root. */
 function mount(app: HTMLElement, name: string): HTMLElement {
 	const view = app.createDiv({ cls: "reel-view" });

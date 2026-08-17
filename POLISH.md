@@ -24,10 +24,17 @@ Carried from round 4, where five items were listed and not built.
       `by 16×44px at y=253/253`, which showed two rows side by side in the
       desktop layout overlapping horizontally because each sized to its
       content rather than to its column. Both viewports now pass 137/137.
-- [ ] **2. Dark theme.** Zero `.theme-dark` rules across 706. Six hard-coded
-      `rgba(0,0,0,…)` shadows and the poster-loading gradient are tuned for
-      light backgrounds. Neither of us has seen it because the vault theme is
-      light.
+- [x] **2. Dark theme.** The harness takes `?dark=1` and puts `theme-dark` on
+      `<body>`, where Obsidian puts it, so every Reel colour resolves through
+      the dark variables. `npm run audit` now runs four passes — phone and
+      desktop, light and dark — and all four pass 137/137 with no changes
+      needed to the app. The variable discipline held.
+
+      **Caveat worth keeping:** the audit checks text contrast, not shadows.
+      The six hard-coded `rgba(0,0,0,…)` shadows and the poster-loading
+      gradient are still light-tuned and still unverified — a black shadow on
+      a dark background is invisible rather than wrong, so nothing fails. That
+      wants a check of its own before it can be called done.
 - [ ] **3. Unused rules.** 706 rules, 86 matching a full detail screen. No way
       to tell which of the rest are still live.
 - [ ] **4. The harness never interacts.** It renders and measures a static

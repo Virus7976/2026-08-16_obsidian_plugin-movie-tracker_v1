@@ -106,15 +106,24 @@ const browser = await puppeteer.launch({ executablePath: exe, headless: "new", a
 
 let failed = 0;
 try {
-	for (const phone of [1, 0]) {
+	// Four passes, not two. A dark-theme regression is invisible on a light
+	// vault and vice versa, and Reel has no theme rules of its own — which is
+	// correct, and exactly why nobody has ever checked that the variables
+	// carry it.
+	for (const { phone, dark } of [
+		{ phone: 1, dark: 0 },
+		{ phone: 1, dark: 1 },
+		{ phone: 0, dark: 0 },
+		{ phone: 0, dark: 1 },
+	]) {
 		const page = await browser.newPage();
 		// A real phone viewport, and a desktop one — the compact layout is a
 		// separate code path and a regression in either is a regression.
 		await page.setViewport(phone ? { width: 375, height: 812 } : { width: 1280, height: 900 });
-		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}`, { waitUntil: "networkidle0" });
+		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}`, { waitUntil: "networkidle0" });
 
 		const result = await page.evaluate(() => window.REEL_AUDIT);
-		const label = phone ? "phone 375x812" : "desktop 1280x900";
+		const label = `${phone ? "phone 375x812" : "desktop 1280x900"} ${dark ? "dark" : "light"}`;
 
 		if (!result) {
 			console.log(`✗ ${label}: the audit did not run — the harness failed to load.`);
