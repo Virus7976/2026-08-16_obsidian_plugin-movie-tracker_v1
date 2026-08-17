@@ -57,6 +57,8 @@ export interface ReelSettings {
 	people: Record<string, PersonOpinion>;
 	/** The Reel view reopens where you left it. */
 	lastTab: string;
+	/** Newest-first, capped. Offered under an empty search box. */
+	recentSearches: string[];
 
 	/* Content policy — see content.ts for what the data can and can't do */
 	hideFlags: string[];
@@ -100,6 +102,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dismissedIds: [],
 	people: {},
 	lastTab: "library",
+	recentSearches: [],
 
 	hideFlags: [],
 	maxCertification: null,

@@ -5303,3 +5303,98 @@ input.reel-input {
 .reel-dcard-body {
 	min-width: 0;
 }
+
+/* ------------------------------------------------------------------ */
+/* Search suggestions                                                  */
+/* ------------------------------------------------------------------ */
+
+/* Under an empty search box only. Every chip is built from the library, so
+   tapping one always returns something — a generic list would sometimes
+   return nothing, which reads as the library being emptier than it is. */
+.reel-suggest {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--reel-space-2);
+	padding-bottom: var(--reel-space-2);
+}
+
+.reel-suggest-label {
+	font-size: var(--reel-text-caption);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-faint);
+}
+
+.reel-suggest-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex-direction: row-reverse;
+}
+
+.reel-suggest-icon {
+	display: flex;
+	opacity: 0.6;
+}
+
+.reel-suggest-icon .svg-icon {
+	width: 13px;
+	height: 13px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Reactions                                                           */
+/* ------------------------------------------------------------------ */
+
+/* The fast path. A rating is a judgement you have to compose; often what you
+   want to record is just "yes" or "again". */
+.reel-reactions {
+	display: flex;
+	gap: var(--reel-space-2);
+	margin: var(--reel-space-3) 0;
+}
+
+.reel-reaction {
+	flex: 1 1 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--reel-space-1);
+	min-height: 60px;
+	border-radius: var(--reel-radius);
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-modifier-form-field);
+	color: var(--text-muted);
+	cursor: pointer;
+	box-shadow: none;
+	transition:
+		background-color 120ms ease-out,
+		border-color 120ms ease-out,
+		color 120ms ease-out;
+}
+
+.reel-reaction-label {
+	font-size: var(--reel-text-caption);
+	font-weight: var(--reel-weight-medium);
+}
+
+.reel-reaction.is-on {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-reaction:active {
+	transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-reaction {
+		transition: none;
+	}
+	.reel-reaction:active {
+		transform: none;
+	}
+}

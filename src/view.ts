@@ -25,6 +25,8 @@ import { redact } from "./secrets";
 import { renderStarsStatic } from "./ui/stars";
 import { renderEmpty } from "./ui/empty";
 import { setSelected } from "./ui/a11y";
+import { suggestions, rememberSearch } from "./util/suggest";
+import { unlink } from "./library";
 
 export const REEL_VIEW = "reel-view";
 
@@ -250,6 +252,11 @@ export class ReelView extends ItemView {
 		this.tab = "library";
 		this.detail = null;
 		this.plugin.settings.lastTab = "library";
+		// Only searches made deliberately — a tapped chip, a cast name, a jump
+		// from stats. Typing is *not* recorded: every keystroke repaints, so
+		// "Christopher Nolan" would otherwise leave seventeen recents, sixteen
+		// of them prefixes nobody meant to search for.
+		this.plugin.settings.recentSearches = rememberSearch(this.plugin.settings.recentSearches ?? [], query);
 		void this.plugin.saveSettings();
 		this.paint();
 		this.query = query;
@@ -393,6 +400,44 @@ export class ReelView extends ItemView {
 
 	/* ---------------------------------------------------------------- */
 
+	/**
+	 * What to offer under an empty search box.
+	 *
+	 * Only when nothing is typed and no filter is set — once you are looking
+	 * at a narrowed list, a row of other searches is a distraction from the
+	 * one you are making.
+	 *
+	 * Every suggestion is built from your own library, so tapping one always
+	 * returns something. A generic list would sometimes return nothing, which
+	 * reads as the library being emptier than it is.
+	 */
+	private paintSuggestions(): void {
+		if (this.query || this.statusFilter || this.genreFilter || this.listFilter) return;
+
+		const rows = this.pool();
+		if (rows.length < 4) return; // too small to have a shape worth guessing at
+
+		const picks = suggestions({
+			recent: this.plugin.settings.recentSearches ?? [],
+			people: rows.flatMap((e) => (e.type === "tv" ? e.creators : e.director).map(unlink)),
+			genres: rows.flatMap((e) => e.genres),
+			years: rows.map((e) => e.year ?? e.firstAirYear ?? 0),
+		});
+		if (!picks.length) return;
+
+		const wrap = this.filterEl.createDiv({ cls: "reel-suggest" });
+		wrap.createSpan({ cls: "reel-suggest-label", text: "Try" });
+		for (const s of picks) {
+			const chip = wrap.createEl("button", {
+				cls: `reel-chip reel-suggest-chip is-${s.kind}`,
+				text: s.label,
+				attr: { type: "button" },
+			});
+			if (s.kind === "recent") setIcon(chip.createSpan({ cls: "reel-suggest-icon" }), "history");
+			chip.addEventListener("click", () => this.searchFor(s.query));
+		}
+	}
+
 	private paintFilters(): void {
 		this.filterEl.removeClass("is-empty");
 
@@ -409,6 +454,8 @@ export class ReelView extends ItemView {
 			back.createSpan({ text: `Back to ${origin.label}` });
 			back.addEventListener("click", () => this.showTab(origin.tab));
 		}
+
+		this.paintSuggestions();
 
 		const bar = this.filterEl.createDiv({ cls: "reel-chips" });
 

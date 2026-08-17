@@ -85,6 +85,8 @@ export interface Entry {
 	status: string;
 	rating?: number;
 	liked?: boolean;
+	/** "I'd watch that again" — deliberately separate from the rating. */
+	wouldRewatch?: boolean;
 	/** Rich metadata */
 	cast: string[];
 	/** "Rainn Wilson as Dwight Schrute", aligned by index with `cast`. */

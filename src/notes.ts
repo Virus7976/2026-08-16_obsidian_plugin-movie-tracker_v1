@@ -569,6 +569,24 @@ export class NoteWriter {
 		});
 	}
 
+	/**
+	 * "I'd watch that again" — a judgement a star rating does not capture.
+	 *
+	 * A four-star film you will never revisit and a three-star one you put on
+	 * every winter are different facts, and only the number was recordable.
+	 * Kept as its own flag rather than inferred from the rating, because the
+	 * whole point is that it disagrees with the rating sometimes.
+	 */
+	async toggleRewatch(file: TFile): Promise<boolean> {
+		let on = false;
+		await this.edit(file, `the rewatch mark on ${file.basename}`, (fm) => {
+			on = !fm.would_rewatch;
+			if (on) fm.would_rewatch = true;
+			else delete fm.would_rewatch;
+		});
+		return on;
+	}
+
 	async toggleLiked(file: TFile): Promise<boolean> {
 		let next = false;
 		await this.edit(file, `the like on ${file.basename}`, (fm) => {
