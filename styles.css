@@ -6051,145 +6051,97 @@ input.reel-input {
 	color: var(--text-normal);
 }
 
+
 /* ------------------------------------------------------------------ */
-/* Filter chrome — height is the scarce resource on a phone            */
+/* Phone layout                                                        */
 /* ------------------------------------------------------------------ */
 
-/* Every filter row was `flex-wrap: wrap`, which is right on a desktop and
-   badly wrong on a 6-inch screen: five suggestion chips became two rows, the
-   status chips became two more, and between the search box, the tabs, the
-   suggestions, the type chips, the status chips, the sort row and the count,
-   the first poster sat below the fold. The library looked empty when it had
-   32 titles in it.
+/* Keyed off a class the plugin sets from Platform.isPhone, not off a width.
+   The width query this replaces did not match on a real device — Obsidian's
+   mobile webview does not report the CSS width it assumed — so the whole
+   block was inert while reading as correct. */
+
+/* Containment first, because this is what the previous attempt got wrong and
+   what broke Discover.
  *
- * One row each, scrolled sideways. A chip row is a menu, and a menu that
- * scrolls is a normal thing; a menu that reflows to four lines is not. */
-@media (max-width: 700px) {
-	.reel-view-filters .reel-chips,
-	.reel-suggest {
-		flex-wrap: nowrap;
-		overflow-x: auto;
-		overscroll-behavior-x: contain;
-		/* Room for the scrollbar on the platforms that show one, so it does
-		   not sit on top of the chips. */
-		padding-bottom: 2px;
-		/* Hidden where the platform lets us: the row is obviously scrollable
-		   from the clipped chip at its edge. */
-		scrollbar-width: none;
-	}
-
-	.reel-view-filters .reel-chips::-webkit-scrollbar,
-	.reel-suggest::-webkit-scrollbar {
-		display: none;
-	}
-
-	/* A chip cannot shrink below its text, or a long director's name
-	   compresses to an ellipsis while the row still scrolls. */
-	.reel-view-filters .reel-chip,
-	.reel-suggest .reel-chip {
-		flex: 0 0 auto;
-	}
-
-	/* The rows themselves get tighter. Four stacked rows at 12px apart is
-	   48px of nothing before any content. */
-	.reel-view-filters {
-		padding-top: var(--reel-space-1);
-		padding-bottom: var(--reel-space-1);
-	}
-
-	.reel-view-filters > * + * {
-		margin-top: var(--reel-space-1);
-	}
-
-	/* The count is one line of text that was taking a full row to itself. */
-	.reel-view-count {
-		padding: 0;
-		font-size: var(--reel-text-caption);
-	}
+ * A horizontally scrolling row inside a flex column does not scroll unless
+ * every ancestor is allowed to be narrower than its content. A flex item
+ * defaults to `min-width: auto`, meaning "at least as wide as what's inside
+ * me" — so `overflow-x: auto` on the row did nothing and the *parent* grew
+ * instead, pushing the whole screen sideways. That is the sliding and the
+ * clipped chips in Discover. */
+.reel-view,
+.reel-view-header,
+.reel-view-filters,
+.reel-view-body,
+.reel-discover,
+.reel-discover-filters {
+	min-width: 0;
+	max-width: 100%;
 }
 
-/* Suggestions are the newest arrival and the least essential — they are a
-   shortcut, not a filter. On a short screen they go entirely rather than
-   pushing the library itself out of view. */
-@media (max-height: 720px) {
-	.reel-suggest {
-		display: none;
-	}
+.reel-view.is-phone .reel-view-filters .reel-chips,
+.reel-view.is-phone .reel-suggest,
+.reel-view.is-phone .reel-sortbar,
+.reel-view.is-phone .reel-discover-filters .reel-chips {
+	flex-wrap: nowrap;
+	min-width: 0;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+	padding-bottom: 2px;
 }
 
-/* ------------------------------------------------------------------ */
-/* Filter chrome — height is the scarce resource on a phone            */
-/* ------------------------------------------------------------------ */
-
-/* Every filter row was flex-wrap: wrap, which is right on a desktop and
-   badly wrong on a 6-inch screen: five suggestion chips became two rows, the
-   status chips became two more, and between the search box, the tabs, the
-   suggestions, the type chips, the status chips, the sort row and the count,
-   the first poster sat below the fold. The library looked empty while holding
-   32 titles.
-
-   One row each, scrolled sideways. A chip row is a menu, and a menu that
-   scrolls is ordinary; a menu that reflows onto four lines is not. */
-@media (max-width: 700px) {
-	.reel-view-filters .reel-chips,
-	.reel-suggest {
-		flex-wrap: nowrap;
-		overflow-x: auto;
-		overscroll-behavior-x: contain;
-		padding-bottom: 2px;
-		scrollbar-width: none;
-	}
-
-	.reel-view-filters .reel-chips::-webkit-scrollbar,
-	.reel-suggest::-webkit-scrollbar {
-		display: none;
-	}
-
-	/* A chip must not shrink below its text, or a long director's name
-	   compresses to an ellipsis while the row still scrolls. */
-	.reel-view-filters .reel-chip,
-	.reel-suggest .reel-chip {
-		flex: 0 0 auto;
-	}
-
-	/* Four stacked rows at 12px apart is 48px of nothing before any content. */
-	.reel-view-filters {
-		padding-top: var(--reel-space-1);
-		padding-bottom: var(--reel-space-1);
-	}
-
-	.reel-view-filters > * + * {
-		margin-top: var(--reel-space-1);
-	}
+.reel-view.is-phone .reel-view-filters .reel-chips::-webkit-scrollbar,
+.reel-view.is-phone .reel-suggest::-webkit-scrollbar,
+.reel-view.is-phone .reel-sortbar::-webkit-scrollbar,
+.reel-view.is-phone .reel-discover-filters .reel-chips::-webkit-scrollbar {
+	display: none;
 }
 
-/* Suggestions are the newest arrival and the least essential — a shortcut,
-   not a filter. On a short screen they go entirely rather than pushing the
-   library itself out of view. */
-@media (max-height: 780px) {
-	.reel-suggest {
-		display: none;
-	}
+/* A chip must not shrink below its own text, or a long director's name
+   compresses to an ellipsis while the row still scrolls. */
+.reel-view.is-phone .reel-chips .reel-chip,
+.reel-view.is-phone .reel-suggest .reel-chip {
+	flex: 0 0 auto;
 }
 
-/* The sort bar takes a full row for a control most people set once. On a
-   phone the secondary sort goes — it is a tie-breaker, and a tie-breaker is
-   not worth a row of a screen that has six of them already. */
-@media (max-width: 700px) {
-	.reel-sortbar {
-		flex-wrap: nowrap;
-		overflow-x: auto;
-		scrollbar-width: none;
-	}
+/* The stack above the library was taller than the screen: search, tabs, two
+   wrapped rows of suggestions, type chips, status chips, sort, secondary
+   sort, count. The first poster started below the fold on a library holding
+   32 titles. */
+.reel-view.is-phone .reel-view-filters {
+	padding-top: var(--reel-space-1);
+	padding-bottom: var(--reel-space-1);
+}
 
-	.reel-sortbar::-webkit-scrollbar {
-		display: none;
-	}
+.reel-view.is-phone .reel-view-filters > * + * {
+	margin-top: var(--reel-space-1);
+}
 
-	/* The label and the secondary sort. The dropdown itself says what it is,
-	   so "Sort" in front of it is a word doing no work. */
-	.reel-sortbar > .reel-dim,
-	.reel-sortbar > select:nth-of-type(2) {
-		display: none;
-	}
+/* Suggestions are a shortcut, not a filter — the newest arrival and the
+   least essential. They go rather than cost a phone screen the thing it came
+   to show. */
+.reel-view.is-phone .reel-suggest {
+	display: none;
+}
+
+/* The secondary sort is a tie-breaker, and the primary dropdown already says
+   what it is, so the word "Sort" in front of it does no work. */
+.reel-view.is-phone .reel-sortbar > .reel-dim,
+.reel-view.is-phone .reel-sortbar > select:nth-of-type(2) {
+	display: none;
+}
+
+/* Every horizontal strip in the app, contained for the same reason as above.
+   These were relying on their parents happening to be narrow enough. */
+.reel-caststrip,
+.reel-related-strip,
+.reel-chart-strip,
+.reel-otd-strip,
+.reel-skel-strip,
+.reel-drow,
+.reel-drow-strip {
+	min-width: 0;
+	max-width: 100%;
 }

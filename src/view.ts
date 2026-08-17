@@ -124,6 +124,16 @@ export class ReelView extends ItemView {
 
 		this.contentEl.empty();
 		this.contentEl.addClass("reel-view");
+		// A class, not a width media query.
+		//
+		// `@media (max-width: 700px)` did not match on a real phone at all —
+		// Obsidian's mobile webview does not report the CSS width the rule
+		// assumed, so every "compact on mobile" rule was silently inert while
+		// looking perfectly correct in the stylesheet. `Platform.isPhone` is
+		// what the rest of the plugin already trusts, and it cannot be wrong
+		// about the thing it is describing.
+		this.contentEl.toggleClass("is-phone", Platform.isPhone);
+		this.contentEl.toggleClass("is-mobile", Platform.isMobile);
 		// registerDomEvent, not addEventListener: Obsidian unbinds it when the
 		// view closes, so reopening the tab can't stack duplicate handlers.
 		this.registerDomEvent(this.contentEl, "keydown", this.onKey);
