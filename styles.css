@@ -6165,3 +6165,80 @@ input.reel-input {
 	min-width: 0;
 	max-width: 100%;
 }
+
+/* ------------------------------------------------------------------ */
+/* Targets and legibility                                              */
+/* ------------------------------------------------------------------ */
+
+/* The README says "every interactive target is at least 44px". It was not
+   true. The harness measured chips at 34px, the search clear button at 32,
+   the segmented buttons at 40 and the sort dropdown at 19 — the last of
+   those barely hittable with a thumb.
+ *
+ * Fixed by raising the target rather than shrinking the claim, because 44px
+ * is the right number and the claim was the honest part. */
+.reel-chip,
+.reel-btn,
+.reel-log .reel-seg .reel-seg-btn,
+.reel-seg-btn,
+.reel-recipe-step {
+	min-height: 44px;
+}
+
+/* The chip row grows with the chips, so its padding comes back down to keep
+   the filter stack from reclaiming the height the compact layout just won. */
+.reel-view.is-phone .reel-chips,
+.reel-view.is-phone .reel-suggest {
+	padding-top: 0;
+}
+
+.reel-search-clear {
+	min-width: 44px;
+	min-height: 44px;
+}
+
+/* A select is a control, not a label. 19px is a line of text with a border. */
+.reel-sortbar select,
+.reel-view-filters select {
+	min-height: 44px;
+	padding: 0 var(--reel-space-2);
+}
+
+/* Nothing readable below 12px.
+ *
+ * The offenders were the score denominator at 9px, badges and vote counts at
+ * 10, the reaction label at 10.7 and the tab labels at 11 — and the tab
+ * labels are permanent navigation, which is the worst place to save two
+ * pixels. `em`-based sizes are the cause: 0.6em of a small parent is tiny,
+ * and nothing was checking the result. */
+.reel-badge,
+.reel-cell-cert,
+.reel-cell-flag,
+.reel-score-votes,
+.reel-score-scale,
+.reel-tile-sub,
+.reel-stats .reel-tile-sub,
+.reel-reaction-label,
+.reel-tab-label,
+.reel-person-badge,
+.reel-recipe-agree {
+	font-size: 12px;
+}
+
+/* The denominator still has to read as subordinate to the score beside it,
+   which it did by being 9px. Weight and colour do that job instead, and
+   neither costs legibility. */
+.reel-score-scale {
+	font-weight: var(--reel-weight-normal);
+	color: var(--text-faint);
+	opacity: 0.85;
+}
+
+/* A stats fact row is clickable, so it is a target. 41px on desktop — caught
+   only once the audit ran at both viewports, because the phone layout gives
+   it more padding and it cleared 44 there. A check that runs at one width
+   verifies one width. */
+.reel-fact {
+	min-height: 44px;
+	align-items: center;
+}

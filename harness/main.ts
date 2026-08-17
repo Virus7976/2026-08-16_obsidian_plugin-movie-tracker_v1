@@ -22,7 +22,13 @@ import { paintUpNext } from "../src/render/upnext";
 import { renderEmpty } from "../src/ui/empty";
 import { skeletonCards, skeletonGrid } from "../src/ui/skeleton";
 import { renderStars } from "../src/ui/stars";
+import { DetailScreen } from "../src/ui/detail";
+import { DiscoverScreen } from "../src/ui/discoverView";
+import { RecipeSheet } from "../src/ui/recipeSheet";
+import { QuickRate } from "../src/ui/quickRate";
+import { LogSheet } from "../src/ui/logSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
+import { auditScreen, type Check } from "./audit";
 
 /* ------------------------------------------------------------------ */
 /* A poster that always loads                                          */
@@ -200,6 +206,77 @@ function stars(root: HTMLElement): void {
 	renderStars(compact.createDiv({ cls: "reel-rating-row" }), { value: 4, compact: true });
 }
 
+
+/* ------------------------------------------------------------------ */
+/* The screens the first version missed                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A sheet, mounted into the page.
+ *
+ * Obsidian's Modal attaches itself to the app; the shim's does nothing, so
+ * the harness mounts `contentEl` itself and applies the same classes the real
+ * modal would. Without `reel-sheet` the phone layout — which is the whole
+ * reason these are here — would not apply.
+ */
+function mountSheet(root: HTMLElement, sheet: { contentEl: HTMLElement; modalEl: HTMLElement; onOpen(): void }): void {
+	const shell = root.createDiv({ cls: "reel-modal-shell" });
+	sheet.modalEl = shell;
+	shell.addClass("reel-modal");
+	if (phone) shell.addClass("reel-sheet");
+	shell.appendChild(sheet.contentEl);
+	try {
+		sheet.onOpen();
+	} catch (e) {
+		sheet.contentEl.createEl("pre", { text: `sheet failed: ${String(e)}` });
+	}
+}
+
+function detail(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const screen = new DetailScreen(plugin, SHOW, () => {}, "Library");
+	screen.render(root);
+}
+
+function detailFilm(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	// The longest title in the fixtures, because the hero is where a long name
+	// has the most room to break something.
+	const screen = new DetailScreen(plugin, LIBRARY[0], () => {}, "Library");
+	screen.render(root);
+}
+
+function discover(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const screen = new DiscoverScreen(plugin);
+	screen.render(root);
+}
+
+function recipe(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(root, new RecipeSheet(plugin) as never);
+}
+
+function quickrate(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(root, new QuickRate(plugin, LIBRARY[0], {} as never) as never);
+}
+
+function logsheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(root, new LogSheet(plugin.app, plugin, { entry: LIBRARY[0], file: {} as never }) as never);
+}
+
+/*
+ * No diary screen.
+ *
+ * Its painter lives inside a MarkdownRenderChild rather than being exported,
+ * and exporting it purely so the harness could reach it would be changing the
+ * thing being measured to suit the measurement. The Diary is covered by the
+ * `viewings()` unit tests instead; when it next needs a layout change, that is
+ * the moment to extract the painter for real reasons.
+ */
+
 const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	library,
 	rows,
@@ -207,6 +284,12 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	upnext,
 	empties,
 	stars,
+	detail,
+	detailFilm,
+	discover,
+	recipe,
+	quickrate,
+	logsheet,
 };
 
 /* ------------------------------------------------------------------ */
@@ -217,20 +300,59 @@ const params = new URLSearchParams(location.search);
 const wanted = params.get("screen") ?? "library";
 const phone = params.get("phone") !== "0";
 
-const app = document.getElementById("app");
-if (app) {
+/** Render one screen into a fresh, correctly-classed view root. */
+function mount(app: HTMLElement, name: string): HTMLElement {
 	const view = app.createDiv({ cls: "reel-view" });
 	// The same two classes ReelView sets. Without these the harness would
 	// render the desktop layout at phone width and report a fixed bug.
 	view.toggleClass("is-phone", phone);
 	view.toggleClass("is-mobile", phone);
-
-	const paint = SCREENS[wanted] ?? library;
 	try {
-		paint(view);
+		(SCREENS[name] ?? library)(view);
 	} catch (e) {
 		view.createEl("pre", { text: `render failed: ${String(e)}\n${(e as Error)?.stack ?? ""}` });
 	}
+	return view;
+}
+
+const app = document.getElementById("app");
+
+if (app && params.get("audit") != null) {
+	/**
+	 * Check every screen in turn.
+	 *
+	 * Each is mounted alone and removed before the next: two views in the
+	 * document at once would share a viewport, and every "is this taller than
+	 * the screen" answer would be measured against the wrong thing.
+	 */
+	const results: { screen: string; checks: Check[] }[] = [];
+	for (const name of Object.keys(SCREENS)) {
+		const view = mount(app, name);
+		results.push({ screen: name, checks: auditScreen(view, { phone }) });
+		view.remove();
+	}
+
+	const failures = results.flatMap((r) => r.checks.filter((c) => !c.ok).map((c) => ({ ...c, screen: r.screen })));
+	const total = results.reduce((n, r) => n + r.checks.length, 0);
+
+	// In the title as well as the page, so pass or fail can be read without
+	// parsing anything.
+	document.title = failures.length ? `FAIL ${failures.length}/${total}` : `PASS ${total}`;
+
+	const report = app.createDiv({ cls: "reel-audit" });
+	report.createEl("h2", { text: document.title });
+	if (!failures.length) {
+		report.createEl("p", { text: `${Object.keys(SCREENS).length} screens, nothing to report.` });
+	}
+	for (const f of failures) {
+		const row = report.createDiv({ cls: "reel-audit-row" });
+		row.createEl("strong", { text: `${f.screen} · ${f.name}` });
+		if (f.detail) row.createEl("code", { text: f.detail });
+	}
+	// A machine-readable copy, so a future CI step needs no scraping.
+	(window as unknown as { REEL_AUDIT: unknown }).REEL_AUDIT = { total, failures };
+} else if (app) {
+	mount(app, wanted);
 }
 
 // A marker the screenshot step can wait on, rather than guessing at a delay.

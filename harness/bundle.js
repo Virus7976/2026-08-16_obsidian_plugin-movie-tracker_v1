@@ -176,6 +176,11 @@
     showAtPosition() {
     }
   };
+  function debounce(fn, _wait, _immediate) {
+    return fn;
+  }
+  var SuggestModal = class extends Modal {
+  };
 
   // harness/fixtures.ts
   var n = 0;
@@ -575,6 +580,12 @@
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   }
+  function yearOf(dateish) {
+    if (!dateish)
+      return void 0;
+    const m = String(dateish).match(/^(\d{4})/);
+    return m ? parseInt(m[1], 10) : void 0;
+  }
   function prettyDate(iso) {
     if (!iso)
       return "";
@@ -612,6 +623,17 @@
     const slash = text.lastIndexOf("/");
     return (slash >= 0 ? text.slice(slash + 1) : text).trim();
   }
+
+  // src/content.ts
+  var FLAG_LABELS = {
+    sex: "Sex",
+    nudity: "Nudity",
+    profanity: "Swearing",
+    violence: "Violence",
+    gore: "Gore",
+    drugs: "Drugs",
+    horror: "Horror"
+  };
 
   // src/render/query.ts
   var SYMBOL_OPS = [">=", "<=", "!=", "="];
@@ -928,6 +950,9 @@
     }
     const badge = el.createDiv({ cls: "reel-person-badge is-liked", text: "\u2665" });
     badge.setAttr("aria-label", `You like ${opinion.name}`);
+  }
+  function badgePerson(plugin2, el, personId) {
+    attachOpinion(el, opinionOf(plugin2, personId));
   }
 
   // src/render/stats.ts
@@ -1718,6 +1743,3251 @@
     return grid;
   }
 
+  // src/ui/logSheet.ts
+  var LogSheet = class extends Modal {
+    constructor(app2, plugin2, opts) {
+      super(app2);
+      this.plugin = plugin2;
+      this.opts = opts;
+      this.date = todayISO();
+      this.liked = false;
+      this.review = "";
+      this.busy = false;
+      this.asWatchlist = opts.watchlist ?? false;
+      this.rating = opts.entry?.rating;
+      this.liked = opts.entry?.liked ?? false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-log");
+      const isTv = (this.opts.entry?.type ?? this.opts.pending?.type) === "tv";
+      const title = this.opts.entry?.title ?? this.opts.pending?.title ?? "";
+      const isNew = !!this.opts.pending;
+      const rewatchCount = this.opts.entry?.watched.length ?? 0;
+      contentEl.createEl("h3", { cls: "reel-log-title", text: title });
+      const sub = contentEl.createDiv({ cls: "reel-log-sub" });
+      if (isTv)
+        sub.setText(isNew ? "Adding a series \u2014 track episodes from its note." : "Series");
+      else if (rewatchCount > 0)
+        sub.setText(`Rewatch \u2014 ${rewatchCount} previous viewing${rewatchCount === 1 ? "" : "s"}`);
+      else
+        sub.setText("First viewing");
+      const modeRow = contentEl.createDiv({ cls: "reel-seg" });
+      const logBtn = modeRow.createEl("button", { cls: "reel-seg-btn", text: isTv ? "Watching" : "Watched" });
+      const listBtn = modeRow.createEl("button", { cls: "reel-seg-btn", text: "Watchlist" });
+      const paintMode = () => {
+        logBtn.toggleClass("is-active", !this.asWatchlist);
+        listBtn.toggleClass("is-active", this.asWatchlist);
+        detailsEl.toggleClass("is-hidden", this.asWatchlist);
+      };
+      logBtn.addEventListener("click", () => {
+        this.asWatchlist = false;
+        paintMode();
+      });
+      listBtn.addEventListener("click", () => {
+        this.asWatchlist = true;
+        paintMode();
+      });
+      const detailsEl = contentEl.createDiv({ cls: "reel-log-details" });
+      if (!isTv) {
+        const dateRow = detailsEl.createDiv({ cls: "reel-field" });
+        dateRow.createDiv({ cls: "reel-field-label", text: "Watched on" });
+        const quick = dateRow.createDiv({ cls: "reel-quick-dates" });
+        const dateInput = dateRow.createEl("input", {
+          cls: "reel-input",
+          attr: { type: "date", value: this.date }
+        });
+        dateInput.addEventListener("change", () => {
+          this.date = dateInput.value || todayISO();
+          paintChips();
+        });
+        const chips = [];
+        const shortcut = (label, offsetDays) => {
+          const d = /* @__PURE__ */ new Date();
+          d.setDate(d.getDate() - offsetDays);
+          const iso = toLocalISO(d);
+          const b = quick.createEl("button", { cls: "reel-chip", text: label });
+          b.addEventListener("click", () => {
+            this.date = iso;
+            dateInput.value = iso;
+            paintChips();
+          });
+          chips.push({ el: b, iso });
+        };
+        const paintChips = () => chips.forEach((c) => c.el.toggleClass("is-active", c.iso === this.date));
+        shortcut("Today", 0);
+        shortcut("Yesterday", 1);
+        shortcut("2 days ago", 2);
+        paintChips();
+      }
+      const ratingRow = detailsEl.createDiv({ cls: "reel-field" });
+      ratingRow.createDiv({ cls: "reel-field-label", text: "Rating" });
+      const ratingValue = ratingRow.createDiv({ cls: "reel-rating-row" });
+      renderStars(ratingValue, {
+        value: this.rating,
+        onChange: (v) => {
+          this.rating = v;
+          readout.setText(v != null ? `${v}` : "\u2014");
+        }
+      });
+      const readout = ratingValue.createSpan({
+        cls: "reel-rating-readout",
+        text: this.rating != null ? `${this.rating}` : "\u2014"
+      });
+      const likeRow = detailsEl.createDiv({ cls: "reel-field reel-field-inline" });
+      likeRow.createDiv({ cls: "reel-field-label", text: "Liked" });
+      const heart = likeRow.createEl("button", {
+        cls: "reel-heart reel-heart-labelled",
+        attr: { "aria-pressed": "false", type: "button" }
+      });
+      const glyph = heart.createSpan({ cls: "reel-heart-glyph" });
+      const word = heart.createSpan({ cls: "reel-heart-word" });
+      const paintHeart = () => {
+        heart.toggleClass("is-on", this.liked);
+        heart.setAttr("aria-pressed", String(this.liked));
+        heart.setAttr("aria-label", this.liked ? "Liked \u2014 tap to unlike" : "Not liked \u2014 tap to like");
+        glyph.setText(this.liked ? "\u2665" : "\u2661");
+        word.setText(this.liked ? "Liked" : "Like");
+      };
+      heart.addEventListener("click", () => {
+        this.liked = !this.liked;
+        paintHeart();
+      });
+      paintHeart();
+      if (this.plugin.settings.askForReview) {
+        const reviewRow = detailsEl.createDiv({ cls: "reel-field" });
+        reviewRow.createDiv({ cls: "reel-field-label", text: "Review" });
+        const box = reviewRow.createEl("textarea", {
+          cls: "reel-input reel-textarea",
+          attr: {
+            rows: "4",
+            placeholder: "What did you think? Appended to the note under a dated heading.",
+            enterkeyhint: "enter"
+          }
+        });
+        box.addEventListener("input", () => {
+          this.review = box.value;
+          box.setCssStyles({ height: "auto" });
+          box.setCssStyles({ height: `${Math.min(box.scrollHeight, 240)}px` });
+        });
+      }
+      if (this.opts.entry?.watched.length) {
+        const hist = detailsEl.createDiv({ cls: "reel-field" });
+        hist.createDiv({ cls: "reel-field-label", text: "History" });
+        const list = hist.createDiv({ cls: "reel-history" });
+        for (const w of [...this.opts.entry.watched].reverse().slice(0, 5)) {
+          const row = list.createDiv({ cls: "reel-history-row" });
+          row.createSpan({ text: prettyDate(w.date) });
+          if (w.rating != null)
+            row.createSpan({ cls: "reel-dim", text: `\u2605 ${w.rating}` });
+          if (w.rewatch)
+            row.createSpan({ cls: "reel-dim", text: "rewatch" });
+        }
+      }
+      paintMode();
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+      const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: isNew ? "Add" : "Save" });
+      save.addEventListener("click", () => this.submit(save));
+    }
+    async submit(button) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      button.setText("Saving\u2026");
+      button.setAttr("disabled", "true");
+      try {
+        const payload = {
+          date: this.date,
+          rating: this.rating,
+          liked: this.liked,
+          watchlist: this.asWatchlist,
+          review: this.asWatchlist ? void 0 : this.review
+        };
+        let file = null;
+        if (this.opts.pending) {
+          const p = this.opts.pending;
+          file = await this.plugin.notes.createFromResult(
+            { id: p.id, media_type: p.type === "tv" ? "tv" : "movie" },
+            payload
+          );
+          this.plugin.undo.offer(`Added ${p.title}`);
+        } else if (this.opts.file) {
+          file = this.opts.file;
+          if (this.opts.entry?.type === "tv") {
+            await this.plugin.notes.edit(file, `the change to ${file.basename}`, (fm) => {
+              if (this.asWatchlist)
+                fm.status = "watchlist";
+              else if (fm.status === "watchlist")
+                fm.status = "watching";
+              if (this.rating != null)
+                fm.rating = this.rating;
+              if (this.liked)
+                fm.liked = true;
+              else
+                delete fm.liked;
+            });
+            if (payload.review?.trim()) {
+              await this.plugin.notes.appendReview(file, this.date, this.rating, payload.review);
+            }
+          } else {
+            await this.plugin.notes.logFilm(file, payload);
+          }
+          this.plugin.undo.offer("Saved");
+        }
+        this.close();
+        if (file && this.opts.pending && this.plugin.settings.openNoteAfterCreate) {
+          await this.app.workspace.getLeaf(false).openFile(file);
+        }
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`, 8e3);
+        button.setText("Retry");
+        button.removeAttribute("disabled");
+        this.busy = false;
+        return;
+      }
+      this.busy = false;
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+  function toLocalISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  // src/ui/searchModal.ts
+  var SearchModal = class extends SuggestModal {
+    constructor(app2, plugin2, opts = {}) {
+      super(app2);
+      this.plugin = plugin2;
+      this.opts = opts;
+      this.results = [];
+      this.lastQuery = "";
+      this.seq = 0;
+      this.resolveResults = null;
+      /** 300ms debounce, with a sequence guard so a slow reply can't overwrite a fast one. */
+      this.runSearch = debounce(
+        async (query) => {
+          const ticket = ++this.seq;
+          try {
+            const results = await this.plugin.tmdb.searchMulti(query);
+            if (ticket !== this.seq)
+              return;
+            this.results = results;
+          } catch (e) {
+            if (ticket !== this.seq)
+              return;
+            this.results = [];
+            new Notice(`Reel: ${redact(e)}`);
+          }
+          this.resolveResults?.(this.results);
+          this.resolveResults = null;
+        },
+        300,
+        true
+      );
+      this.setPlaceholder(
+        opts.placeholder ?? (opts.watchlist ? "Add to watchlist \u2014 search TMDB\u2026" : "Search TMDB for a film or show\u2026")
+      );
+      this.limit = 20;
+      this.modalEl.addClass("reel-modal", "reel-search");
+      this.setInstructions([
+        { command: "\u2191\u2193", purpose: "navigate" },
+        { command: "\u21B5", purpose: "select" },
+        { command: "esc", purpose: "dismiss" },
+        // Results are capped at 20; without saying so, a missing title
+        // looks like TMDB doesn't have it rather than like a cut-off list.
+        { command: "20 max", purpose: "add words to narrow" }
+      ]);
+      if (opts.query) {
+        this.inputEl.value = opts.query;
+        window.setTimeout(() => this.inputEl.dispatchEvent(new Event("input")), 0);
+      }
+    }
+    async getSuggestions(query) {
+      const q = query.trim();
+      if (q.length < 2) {
+        this.results = [];
+        return [];
+      }
+      if (q === this.lastQuery && this.results.length)
+        return this.results;
+      this.lastQuery = q;
+      return new Promise((resolve) => {
+        this.resolveResults?.(this.results);
+        this.resolveResults = resolve;
+        this.runSearch(q);
+      });
+    }
+    renderSuggestion(item, el) {
+      el.addClass("reel-suggestion");
+      const isTv = item.media_type === "tv";
+      const title = isTv ? item.name ?? "Untitled" : item.title ?? "Untitled";
+      const year = yearOf(isTv ? item.first_air_date : item.release_date);
+      const thumb = el.createDiv({ cls: "reel-suggestion-thumb" });
+      const url = this.plugin.tmdb.posterUrl(item.poster_path, "w92");
+      if (url) {
+        const img = thumb.createEl("img", { attr: { src: url, loading: "lazy", alt: "" } });
+        img.addEventListener("error", () => {
+          img.remove();
+          thumb.addClass("is-empty");
+        });
+      } else {
+        thumb.addClass("is-empty");
+      }
+      const body = el.createDiv({ cls: "reel-suggestion-body" });
+      const line = body.createDiv({ cls: "reel-suggestion-title" });
+      line.createSpan({ text: title });
+      if (year)
+        line.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const meta = body.createDiv({ cls: "reel-suggestion-meta" });
+      meta.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      const existing = this.plugin.library.byTmdbId(item.id, isTv ? "tv" : "film");
+      if (existing)
+        meta.createSpan({ cls: "reel-badge in-library", text: "In library" });
+      if (item.vote_average)
+        meta.createSpan({ cls: "reel-dim", text: `\u2605 ${item.vote_average.toFixed(1)}` });
+    }
+    async onChooseSuggestion(item) {
+      if (this.opts.onPick) {
+        this.opts.onPick(item);
+        return;
+      }
+      const isTv = item.media_type === "tv";
+      const type = isTv ? "tv" : "film";
+      const existing = this.plugin.library.byTmdbId(item.id, type);
+      if (existing) {
+        const file = this.app.vault.getAbstractFileByPath(existing.path);
+        if (file instanceof TFile) {
+          new LogSheet(this.app, this.plugin, { file, entry: existing }).open();
+          return;
+        }
+      }
+      new LogSheet(this.app, this.plugin, {
+        pending: { id: item.id, type, title: isTv ? item.name ?? "" : item.title ?? "" },
+        watchlist: this.opts.watchlist
+      }).open();
+    }
+  };
+
+  // src/extract.ts
+  function trailerUrl(videos) {
+    if (!videos?.length)
+      return void 0;
+    const youtube = videos.filter((v) => v.site === "YouTube" && v.key);
+    const pick = youtube.find((v) => v.type === "Trailer" && v.official) ?? youtube.find((v) => v.type === "Trailer") ?? youtube.find((v) => v.type === "Teaser") ?? youtube[0];
+    return pick?.key ? `https://www.youtube.com/watch?v=${pick.key}` : void 0;
+  }
+  function providerNames(block, region) {
+    const results = block?.results;
+    const row = results?.[region];
+    if (!row)
+      return [];
+    const names = [...row.flatrate ?? [], ...row.free ?? []].map((p) => p.provider_name);
+    return [...new Set(names)];
+  }
+  function keywordNames(film2) {
+    const asFilm = film2.keywords?.keywords;
+    const asShow = film2.keywords?.results;
+    return (asFilm ?? asShow ?? []).map((k) => k.name).filter(Boolean);
+  }
+  function imdbUrl(imdbId) {
+    return imdbId ? `https://www.imdb.com/title/${imdbId}/` : void 0;
+  }
+  function tmdbUrl(tmdbId, type) {
+    return `https://www.themoviedb.org/${type === "tv" ? "tv" : "movie"}/${tmdbId}`;
+  }
+
+  // src/util/failure.ts
+  function diagnose(status, online) {
+    if (!online) {
+      return {
+        kind: "offline",
+        message: "You're offline. Your library, diary and stats all still work \u2014 only new lookups need a connection.",
+        retryable: true
+      };
+    }
+    if (status === 401 || status === 403) {
+      return {
+        kind: "auth",
+        message: "TMDB rejected the key. Check it in Settings \u2192 Reel.",
+        // Retrying an unchanged bad key fails identically every time, so
+        // offering it would be a button that cannot work.
+        retryable: false,
+        settings: true
+      };
+    }
+    if (status === 404) {
+      return {
+        kind: "missing",
+        message: "TMDB has no record of that. It may have been merged or removed.",
+        retryable: false
+      };
+    }
+    if (status === 429) {
+      return {
+        kind: "rate",
+        message: "TMDB is rate limiting. Wait a few seconds and try again.",
+        retryable: true
+      };
+    }
+    if (status != null && status >= 500) {
+      return {
+        kind: "server",
+        message: "TMDB is having trouble. Nothing wrong on your end.",
+        retryable: true
+      };
+    }
+    return {
+      kind: "unknown",
+      message: "That didn't work.",
+      retryable: true
+    };
+  }
+  function worthReporting(kind, background) {
+    if (!background)
+      return true;
+    return kind !== "offline";
+  }
+
+  // src/credentials.ts
+  var KEY_LABELS = {
+    tmdb: "TMDB",
+    omdb: "OMDb",
+    dtdd: "DoesTheDogDie"
+  };
+  var MissingKeyError = class extends Error {
+    constructor(key = "tmdb", msg) {
+      super(msg ?? `No ${KEY_LABELS[key]} key. Add one in Settings \u2192 Reel.`);
+      this.key = key;
+      this.name = "MissingKeyError";
+    }
+  };
+
+  // src/tmdb.ts
+  var TmdbError = class extends Error {
+    constructor(message, status) {
+      super(message);
+      this.status = status;
+      this.name = "TmdbError";
+    }
+  };
+
+  // src/ui/failure.ts
+  function diagnoseError(error) {
+    if (error instanceof MissingKeyError) {
+      return {
+        kind: "auth",
+        message: "No TMDB key is unlocked. Add or unlock one in Settings \u2192 Reel.",
+        retryable: false,
+        settings: true
+      };
+    }
+    const status = error instanceof TmdbError ? error.status : void 0;
+    return diagnose(status, navigator.onLine !== false);
+  }
+  function reportFailure(error, opts = {}) {
+    const d = diagnoseError(error);
+    if (!worthReporting(d.kind, opts.background === true)) {
+      console.warn("Reel: offline \u2014", opts.context ?? "background work", "skipped");
+      return d;
+    }
+    if (d.kind === "unknown")
+      console.warn("Reel:", opts.context ?? "failed", redact(error));
+    const notice = new Notice("", d.retryable ? 12e3 : 9e3);
+    const el = notice.noticeEl;
+    el.addClass("reel-undo-notice");
+    el.createSpan({ text: opts.context ? `${opts.context} \u2014 ${d.message}` : d.message });
+    if (d.settings)
+      return d;
+    if (d.retryable && opts.retry) {
+      const btn = el.createEl("button", { cls: "reel-undo-btn", text: "Retry", attr: { type: "button" } });
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        btn.setAttr("disabled", "true");
+        notice.hide();
+        opts.retry?.();
+      });
+    }
+    return d;
+  }
+
+  // src/ui/discoverView.ts
+  var EMPTY = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
+  var DiscoverScreen = class {
+    constructor(plugin2) {
+      this.plugin = plugin2;
+      this.rows = null;
+      this.profile = null;
+      this.results = null;
+      this.genres = [];
+      this.filters = { ...EMPTY };
+      this.loading = false;
+      this.error = null;
+      this.handled = /* @__PURE__ */ new Set();
+      this.page = 1;
+      this.exhausted = false;
+      /** "Something like this one" — a title to draw recommendations from. */
+      this.seed = null;
+      /** One-at-a-time browsing, for when you want to move fast rather than skim. */
+      this.quick = false;
+      this.quickAt = 0;
+      /** Results handed over by the recipe flow, if any. */
+      this.shortlist = null;
+      /**
+       * The title the last quick action handled, and where it sat.
+       *
+       * Undo has to put back three things, not one: the vault change, the fact
+       * that the card was marked handled, and your position in the queue.
+       * Reversing only the first leaves a title in your library that the screen
+       * still believes you dealt with.
+       */
+      this.lastAction = null;
+    }
+    get filtered() {
+      return this.seed != null || this.filters.genreId != null || this.filters.decade != null || this.filters.minRating != null;
+    }
+    reset() {
+      this.seed = null;
+      this.rows = null;
+      this.profile = null;
+      this.results = null;
+      this.error = null;
+      this.handled.clear();
+      this.page = 1;
+      this.exhausted = false;
+    }
+    render(container) {
+      container.empty();
+      container.addClass("reel-discover");
+      const staged = this.plugin.discover.takeStaged();
+      if (staged) {
+        this.shortlist = staged;
+        this.quick = true;
+        this.quickAt = 0;
+      }
+      this.paintFilters(container);
+      if (this.error) {
+        container.createDiv({ cls: "reel-error", text: this.error });
+        const retry = container.createEl("button", { cls: "reel-btn", text: "Try again" });
+        retry.addEventListener("click", () => {
+          this.error = null;
+          this.render(container);
+        });
+        return;
+      }
+      if (this.quick)
+        this.paintQuick(container);
+      else if (this.filtered)
+        this.paintResults(container);
+      else
+        this.paintForYou(container);
+    }
+    /* ------------------------------------------------------------------ */
+    /* Quick mode — one title at a time                                    */
+    /* ------------------------------------------------------------------ */
+    /**
+     * The same pool the rows draw from, flattened and de-duplicated.
+     *
+     * A title can appear in several rows — trending and your top genre often
+     * overlap — and seeing it twice in a linear run reads as the queue being
+     * stuck rather than as two separate recommendations.
+     */
+    quickPool() {
+      if (this.shortlist?.length)
+        return this.shortlist.filter((i) => !this.handled.has(i.id));
+      const source = this.filtered ? this.results ?? [] : (this.rows ?? []).flatMap((r) => r.items);
+      const seen = /* @__PURE__ */ new Set();
+      const out = [];
+      for (const item of source) {
+        if (seen.has(item.id) || this.handled.has(item.id))
+          continue;
+        seen.add(item.id);
+        out.push(item);
+      }
+      return out;
+    }
+    paintQuick(container) {
+      if (!this.filtered && !this.rows) {
+        void this.loadRows(container);
+        skeletonCards(container, 1, "Loading");
+        return;
+      }
+      if (this.filtered && !this.results) {
+        this.paintResults(container);
+        return;
+      }
+      const pool = this.quickPool();
+      if (!pool.length) {
+        const done = container.createDiv({ cls: "reel-empty" });
+        done.createDiv({ text: "Nothing left in this queue." });
+        const back = done.createEl("button", { cls: "reel-btn mod-cta", text: "Back to rows" });
+        back.addEventListener("click", () => {
+          this.quick = false;
+          this.render(container);
+        });
+        return;
+      }
+      if (this.quickAt >= pool.length)
+        this.quickAt = 0;
+      const item = pool[this.quickAt];
+      const isTv = item.media_type === "tv";
+      const title = (isTv ? item.name : item.title) ?? "Untitled";
+      const card = container.createDiv({ cls: "reel-quickcard" });
+      card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool.length}` });
+      const posterEl = card.createDiv({ cls: "reel-quickcard-poster" });
+      this.plugin.posters.attach(posterEl, {
+        posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? void 0,
+        title
+      });
+      posterEl.addEventListener("click", () => new PreviewSheet(this.plugin, item, () => this.render(container)).open());
+      const head = card.createDiv({ cls: "reel-quickcard-head" });
+      head.createSpan({ cls: "reel-quickcard-title", text: title });
+      const year = yearOf(isTv ? item.first_air_date : item.release_date);
+      if (year)
+        head.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const facts = card.createDiv({ cls: "reel-header-facts" });
+      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      if (item.vote_average)
+        facts.createSpan({ cls: "reel-dim", text: `TMDB ${item.vote_average.toFixed(1)}` });
+      if (item.overview)
+        card.createDiv({ cls: "reel-quickcard-overview", text: item.overview });
+      const step = (by) => {
+        this.quickAt = Math.max(0, this.quickAt + by);
+        this.render(container);
+      };
+      const actions = card.createDiv({ cls: "reel-quickcard-actions" });
+      const skip = actions.createEl("button", { cls: "reel-btn reel-quick-skip", text: "\u2715  Skip" });
+      skip.addEventListener("click", () => step(1));
+      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+  Watchlist" });
+      later.addEventListener("click", () => void this.quickAdd(item, true, container));
+      const seen = actions.createEl("button", { cls: "reel-btn", text: "\u2713  Seen it" });
+      seen.addEventListener("click", () => {
+        const isTvItem = item.media_type === "tv";
+        new LogSheet(this.plugin.app, this.plugin, {
+          pending: {
+            id: item.id,
+            type: isTvItem ? "tv" : "film",
+            title: (isTvItem ? item.name : item.title) ?? "Untitled"
+          }
+        }).open();
+        this.handled.add(item.id);
+        this.render(container);
+      });
+      const nav = card.createDiv({ cls: "reel-quickcard-nav" });
+      const prev = nav.createEl("button", { cls: "reel-btn", text: "\u2039 Back", attr: { type: "button" } });
+      prev.toggleClass("is-disabled", this.quickAt === 0);
+      prev.addEventListener("click", () => step(-1));
+      const never = nav.createEl("button", { cls: "reel-btn", text: "Never show this", attr: { type: "button" } });
+      never.addEventListener("click", () => {
+        void this.plugin.discover.dismiss(item.id).then(() => {
+          this.handled.add(item.id);
+          this.render(container);
+        });
+      });
+      const hint = card.createDiv({ cls: "reel-dim reel-quickcard-hint" });
+      hint.setText(
+        this.lastAction ? "Swipe to move, swipe down to take back the last one. Arrow keys and Z work too." : "Swipe, or use \u2190 and \u2192 on a keyboard."
+      );
+      if (this.lastAction) {
+        const back = card.createEl("button", {
+          cls: "reel-chip reel-quick-undo",
+          text: "Undo that",
+          attr: { type: "button" }
+        });
+        back.addEventListener("click", () => void this.undoLast(container));
+      }
+      this.wireSwipe(card, step, () => void this.undoLast(container));
+      card.setAttr("tabindex", "0");
+      card.addEventListener("keydown", (ev) => {
+        if (ev.key === "ArrowRight") {
+          ev.preventDefault();
+          step(1);
+        } else if (ev.key === "ArrowLeft") {
+          ev.preventDefault();
+          step(-1);
+        } else if (ev.key === "z" || ev.key === "Z") {
+          ev.preventDefault();
+          void this.undoLast(container);
+        }
+      });
+      card.focus({ preventScroll: true });
+    }
+    /** Add from quick mode and advance, so one tap is the whole interaction. */
+    async quickAdd(item, watchlist, container) {
+      try {
+        await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist });
+        haptic("commit");
+        this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
+        this.handled.add(item.id);
+        this.lastAction = { id: item.id, at: this.quickAt };
+        this.render(container);
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+      }
+    }
+    /**
+     * Horizontal drag to move through the queue.
+     *
+     * Only acts when the gesture is clearly sideways: the card scrolls
+     * vertically, and a swipe that stole every downward drag would make the
+     * overview unreadable on a phone.
+     */
+    /**
+     * Swipe left and right to move, down to take back what you just did.
+     *
+     * Left and right always worked. What did not was recovering from a
+     * mistake: quick mode is built to be fast, so it is the single easiest
+     * place to add a title you were only skimming past — and going *back* only
+     * showed you a card for something already in your library. The action was
+     * gone and the screen said nothing about it.
+     *
+     * Down rather than up: up is where the browser and Obsidian both put
+     * their own gestures, and a third meaning on that axis is a collision
+     * waiting to happen.
+     */
+    wireSwipe(card, step, onUndo) {
+      let startX = 0;
+      let startY = 0;
+      let tracking = false;
+      card.addEventListener(
+        "touchstart",
+        (ev) => {
+          const t = ev.touches[0];
+          if (!t)
+            return;
+          startX = t.clientX;
+          startY = t.clientY;
+          tracking = true;
+        },
+        { passive: true }
+      );
+      card.addEventListener(
+        "touchend",
+        (ev) => {
+          if (!tracking)
+            return;
+          tracking = false;
+          const t = ev.changedTouches[0];
+          if (!t)
+            return;
+          const dx = t.clientX - startX;
+          const dy = t.clientY - startY;
+          if (dy > 80 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+            onUndo();
+            return;
+          }
+          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5)
+            return;
+          step(dx < 0 ? 1 : -1);
+        },
+        { passive: true }
+      );
+    }
+    /**
+     * Take back the last thing quick mode did.
+     *
+     * Delegates the vault change to the undo service — it already knows how
+     * to reverse an add, including trashing a note it created — and handles
+     * the two things only this screen knows about: that the card was marked
+     * handled, and where you were when you did it.
+     */
+    async undoLast(container) {
+      const last = this.lastAction;
+      if (!last) {
+        new Notice("Reel: nothing to take back.");
+        return;
+      }
+      haptic("commit");
+      this.lastAction = null;
+      await this.plugin.undo.undo();
+      this.handled.delete(last.id);
+      this.quickAt = last.at;
+      this.render(container);
+    }
+    /* ------------------------------------------------------------------ */
+    /* Filter bar                                                          */
+    /* ------------------------------------------------------------------ */
+    paintFilters(container) {
+      const wrap = container.createDiv({ cls: "reel-discover-filters" });
+      const launch = wrap.createDiv({ cls: "reel-recipe-launch" });
+      const find = launch.createEl("button", { cls: "reel-btn mod-cta", attr: { type: "button" } });
+      setIcon(find.createSpan(), "wand-2");
+      find.createSpan({ text: "Find something to watch" });
+      find.addEventListener("click", () => this.plugin.openRecipe());
+      for (const saved of this.plugin.settings.recipes.slice(0, 4)) {
+        const b = launch.createEl("button", { cls: "reel-chip", text: saved.name ?? "Recipe", attr: { type: "button" } });
+        b.addEventListener("click", () => this.plugin.openRecipe(saved));
+        b.addEventListener("contextmenu", async (ev) => {
+          ev.preventDefault();
+          this.plugin.settings.recipes = this.plugin.settings.recipes.filter((r) => r !== saved);
+          await this.plugin.saveSettings();
+          this.render(container);
+        });
+      }
+      const row1 = wrap.createDiv({ cls: "reel-chips" });
+      const chip = (parent, label, active, onClick) => {
+        const b = parent.createEl("button", { cls: "reel-chip", text: label });
+        setSelected(b, active);
+        b.addEventListener("click", () => {
+          onClick();
+          this.results = null;
+          this.page = 1;
+          this.exhausted = false;
+          this.render(container);
+        });
+        return b;
+      };
+      chip(row1, "For you", !this.filtered, () => {
+        this.filters = { ...EMPTY, type: this.filters.type };
+      });
+      const setType = (next) => {
+        if (this.filters.type === next)
+          return;
+        this.filters.type = next;
+        this.rows = null;
+        this.genres = [];
+        this.filters.genreId = null;
+        this.filters.genreName = null;
+      };
+      chip(row1, "Films", this.filters.type === "movie", () => setType("movie"));
+      chip(row1, "Series", this.filters.type === "tv", () => setType("tv"));
+      const seedLabel = this.seed ? `Like ${this.seed.title}` : "Like\u2026";
+      const seedChip = chip(row1, seedLabel, !!this.seed, () => {
+        if (this.seed) {
+          this.seed = null;
+          return;
+        }
+        new SearchModal(this.plugin.app, this.plugin, {
+          placeholder: "Find me something like\u2026",
+          onPick: (item) => {
+            this.seed = {
+              id: item.id,
+              type: item.media_type === "tv" ? "tv" : "movie",
+              title: (item.media_type === "tv" ? item.name : item.title) ?? "that"
+            };
+            this.results = null;
+            this.render(container);
+          }
+        }).open();
+      });
+      seedChip.addClass("reel-chip-seed");
+      const quick = chip(row1, "Quick", this.quick, () => {
+        this.quick = !this.quick;
+        this.quickAt = 0;
+      });
+      quick.addClass("reel-chip-mode");
+      row1.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
+      if (!this.genres.length) {
+        void this.plugin.tmdb.genreList(this.filters.type).then((list) => {
+          this.genres = list;
+          this.render(container);
+        }).catch(() => {
+        });
+      }
+      for (const g of this.genres) {
+        chip(row1, g.name, this.filters.genreId === g.id, () => {
+          const on = this.filters.genreId === g.id;
+          this.filters.genreId = on ? null : g.id;
+          this.filters.genreName = on ? null : g.name;
+        });
+      }
+      const row2 = wrap.createDiv({ cls: "reel-chips" });
+      row2.createSpan({ cls: "reel-dim", text: "Decade" });
+      const nowDecade = Math.floor((/* @__PURE__ */ new Date()).getFullYear() / 10) * 10;
+      for (let d = nowDecade; d >= 1950; d -= 10) {
+        chip(row2, `${d}s`, this.filters.decade === d, () => {
+          this.filters.decade = this.filters.decade === d ? null : d;
+        });
+      }
+      row2.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
+      row2.createSpan({ cls: "reel-dim", text: "At least" });
+      for (const r of [6, 7, 8]) {
+        chip(row2, `${r}+`, this.filters.minRating === r, () => {
+          this.filters.minRating = this.filters.minRating === r ? null : r;
+        });
+      }
+      if (this.filtered) {
+        const clear = row2.createEl("button", { cls: "reel-chip", text: "\u2715 Clear" });
+        clear.addEventListener("click", () => {
+          this.filters = { ...EMPTY, type: this.filters.type };
+          this.results = null;
+          this.render(container);
+        });
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    /* For you                                                             */
+    /* ------------------------------------------------------------------ */
+    paintForYou(container) {
+      if (!this.rows) {
+        container.createDiv({ cls: "reel-loading", text: "Finding things for you\u2026" });
+        for (let i = 0; i < 3; i++)
+          skeletonCards(container, 6, "Finding things for you");
+        if (this.loading)
+          return;
+        this.loading = true;
+        void this.loadRows(container);
+        return;
+      }
+      const head = container.createDiv({ cls: "reel-discover-head" });
+      if (this.profile?.sparse) {
+        head.createDiv({
+          cls: "reel-discover-note",
+          text: "Rate a few films and these become personal \u2014 right now they're just what's popular."
+        });
+      } else if (this.profile?.genreNames.length) {
+        head.createDiv({
+          cls: "reel-discover-note",
+          text: `Based on your library \u2014 mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`
+        });
+      }
+      const reload = head.createEl("button", { cls: "reel-chip", text: "Refresh" });
+      reload.addEventListener("click", () => {
+        reload.setText("Refreshing\u2026");
+        void this.plugin.tmdb.clearDiscoverCache().then(() => {
+          this.reset();
+          this.render(container);
+        });
+      });
+      const visible = this.rows.filter((r) => r.items.some((i) => !this.handled.has(i.id)));
+      if (!visible.length) {
+        const empty = container.createDiv({ cls: "reel-empty" });
+        empty.createDiv({ text: "Nothing left to suggest \u2014 try a genre above." });
+        const dismissed = this.plugin.settings.dismissedIds.length;
+        if (dismissed) {
+          empty.createDiv({
+            cls: "reel-dim",
+            text: `${dismissed} dismissed \u2014 clear them in Settings \u2192 Reel to see them again.`
+          });
+        }
+        return;
+      }
+      for (const row of visible)
+        this.paintRow(container, row);
+    }
+    async loadRows(container) {
+      try {
+        const profile = await this.plugin.discover.taste(this.filters.type);
+        this.rows = await this.plugin.discover.rows(profile, this.filters.type);
+        this.profile = profile;
+      } catch (e) {
+        this.error = diagnoseError(e).message;
+      } finally {
+        this.loading = false;
+        this.render(container);
+      }
+    }
+    paintRow(container, row) {
+      const items = row.items.filter((i) => !this.handled.has(i.id));
+      if (!items.length)
+        return;
+      const section = container.createDiv({ cls: "reel-drow" });
+      const head = section.createDiv({ cls: "reel-drow-head" });
+      head.createDiv({ cls: "reel-drow-title", text: row.title });
+      if (row.reason)
+        head.createDiv({ cls: "reel-drow-reason", text: row.reason });
+      const strip = section.createDiv({ cls: "reel-drow-strip" });
+      for (const item of items)
+        strip.appendChild(this.card(item, container));
+      if (!Platform.isMobile) {
+        const nav = head.createDiv({ cls: "reel-drow-nav" });
+        const by = (delta) => strip.scrollBy({ left: delta, behavior: "smooth" });
+        const left = nav.createEl("button", { cls: "reel-drow-arrow" });
+        setIcon(left, "chevron-left");
+        left.addEventListener("click", () => by(-600));
+        const right = nav.createEl("button", { cls: "reel-drow-arrow" });
+        setIcon(right, "chevron-right");
+        right.addEventListener("click", () => by(600));
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    /* Filtered results                                                    */
+    /* ------------------------------------------------------------------ */
+    paintResults(container) {
+      if (!this.results) {
+        container.createDiv({ cls: "reel-loading", text: "Searching\u2026" });
+        skeletonGrid(container, 12, "Searching");
+        if (this.loading)
+          return;
+        this.loading = true;
+        const query = this.seed ? (
+          // A seed changes the source: recommendations for that title,
+          // then narrowed by whatever else is set. "An action comedy
+          // like X" means titles like X that are also action comedies.
+          this.plugin.discover.like(
+            { id: this.seed.id, type: this.seed.type },
+            {
+              genreIds: this.filters.genreId ? [this.filters.genreId] : [],
+              decade: this.filters.decade,
+              minRating: this.filters.minRating
+            }
+          )
+        ) : this.plugin.discover.search({
+          type: this.filters.type,
+          genreId: this.filters.genreId ?? void 0,
+          decade: this.filters.decade ?? void 0,
+          minRating: this.filters.minRating ?? void 0
+        });
+        void query.then((items2) => {
+          this.results = items2;
+        }).catch((e) => {
+          this.error = diagnoseError(e).message;
+        }).finally(() => {
+          this.loading = false;
+          this.render(container);
+        });
+        return;
+      }
+      const items = this.results.filter((i) => !this.handled.has(i.id));
+      const label = [
+        this.filters.minRating ? `${this.filters.minRating}+` : "",
+        this.filters.genreName ?? "",
+        this.filters.type === "tv" ? "series" : "films",
+        this.filters.decade ? `from the ${this.filters.decade}s` : "",
+        // Naming the seed matters: otherwise a narrowed set looks identical
+        // to an ordinary genre browse and you cannot tell whether the
+        // "like X" part was honoured at all.
+        this.seed ? `like ${this.seed.title}` : ""
+      ].filter(Boolean).join(" ");
+      container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
+      if (!items.length) {
+        const none = container.createDiv({ cls: "reel-empty" });
+        none.createDiv({ text: "Nothing matches those filters." });
+        const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
+        reset.addEventListener("click", () => {
+          this.filters = { ...EMPTY, type: this.filters.type };
+          this.render(container);
+        });
+        return;
+      }
+      const grid = container.createDiv({ cls: "reel-dgrid" });
+      for (const item of items)
+        grid.appendChild(this.card(item, container));
+      if (!this.exhausted) {
+        const more = container.createDiv({ cls: "reel-dgrid-more" });
+        const btn = more.createEl("button", { cls: "reel-btn", text: "Load more" });
+        btn.addEventListener("click", () => {
+          btn.setText("Loading\u2026");
+          btn.disabled = true;
+          void this.plugin.discover.search(
+            {
+              type: this.filters.type,
+              genreId: this.filters.genreId ?? void 0,
+              decade: this.filters.decade ?? void 0,
+              minRating: this.filters.minRating ?? void 0
+            },
+            this.page + 1
+          ).then((next) => {
+            this.page += 1;
+            const fresh = next.filter((n2) => !this.results?.some((r) => r.id === n2.id));
+            if (!fresh.length)
+              this.exhausted = true;
+            this.results = [...this.results ?? [], ...fresh];
+          }).catch(() => {
+            this.exhausted = true;
+          }).finally(() => this.render(container));
+        });
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    /* Cards                                                               */
+    /* ------------------------------------------------------------------ */
+    card(item, container) {
+      const isTv = item.media_type === "tv";
+      const title = (isTv ? item.name : item.title) ?? "Untitled";
+      const year = yearOf(isTv ? item.first_air_date : item.release_date);
+      const card = createDiv({ cls: "reel-dcard" });
+      const posterEl = card.createDiv({ cls: "reel-dcard-poster" });
+      posterEl.setAttr("role", "button");
+      posterEl.setAttr("tabindex", "0");
+      posterEl.setAttr("aria-label", `${title} \u2014 details`);
+      const src = this.plugin.tmdb.posterUrl(item.poster_path, "w342");
+      if (src)
+        this.plugin.posters.attach(posterEl, { posterUrl: src, title });
+      if (item.vote_average)
+        posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
+      if (isTv)
+        posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
+      const openPreview = () => new PreviewSheet(this.plugin, item, () => {
+        this.handled.add(item.id);
+        this.render(container);
+      }).open();
+      posterEl.addEventListener("click", openPreview);
+      posterEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter")
+          openPreview();
+      });
+      card.createDiv({ cls: "reel-dcard-title", text: title });
+      if (year)
+        card.createDiv({ cls: "reel-dcard-year", text: String(year) });
+      const actions = card.createDiv({ cls: "reel-dcard-actions" });
+      const button = (icon, label, cls, fn) => {
+        const b = actions.createEl("button", { cls: `reel-dcard-btn ${cls}` });
+        setIcon(b, icon);
+        b.setAttr("aria-label", `${label}: ${title}`);
+        b.setAttr("title", label);
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void Promise.resolve(fn());
+        });
+        return b;
+      };
+      button("plus", "Add to watchlist", "add", async () => {
+        await this.add(item, true);
+        this.plugin.undo.offer(`${title} \u2192 watchlist`);
+        this.handled.add(item.id);
+        this.render(container);
+      });
+      button("check", "Seen it \u2014 rate now", "seen", () => {
+        new SeenSheet(this.plugin, item, () => {
+          this.handled.add(item.id);
+          this.render(container);
+        }).open();
+      });
+      button("x", "Not interested", "skip", async () => {
+        await this.plugin.discover.dismiss(item.id);
+        this.handled.add(item.id);
+        this.render(container);
+      });
+      return card;
+    }
+    async add(item, watchlist, rating) {
+      await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist, rating });
+    }
+  };
+  var SeenSheet = class extends Modal {
+    constructor(plugin2, item, onDone) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.item = item;
+      this.onDone = onDone;
+      this.busy = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      const isTv = this.item.media_type === "tv";
+      const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
+      contentEl.createEl("h3", { cls: "reel-log-title", text: title });
+      contentEl.createDiv({ cls: "reel-log-sub", text: "Adding as watched. Rate it now, or skip." });
+      const starRow = contentEl.createDiv({ cls: "reel-rating-row big centred" });
+      renderStars(starRow, {
+        onChange: (v) => void this.save(v)
+      });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const noRating = actions.createEl("button", { cls: "reel-btn", text: "Add without rating" });
+      noRating.addEventListener("click", () => void this.save(void 0));
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+    }
+    async save(rating) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      try {
+        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: false, rating });
+        this.plugin.undo.offer(rating != null ? `Added \u2014 rated ${rating}` : "Added as watched");
+        this.onDone();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+        this.busy = false;
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+  var PreviewSheet = class extends Modal {
+    constructor(plugin2, item, onAdded, role) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.item = item;
+      this.onAdded = onAdded;
+      this.role = role;
+      this.busy = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-preview");
+      const isTv = this.item.media_type === "tv";
+      const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
+      const year = yearOf(isTv ? this.item.first_air_date : this.item.release_date);
+      if (this.role) {
+        const r = contentEl.createDiv({ cls: "reel-preview-role" });
+        r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
+        r.createSpan({ cls: "reel-preview-role-value", text: this.role });
+      }
+      const head = contentEl.createDiv({ cls: "reel-preview-head" });
+      const posterEl = head.createDiv({ cls: "reel-preview-poster" });
+      const src = this.plugin.tmdb.posterUrl(this.item.poster_path, "w342");
+      if (src)
+        posterEl.createEl("img", { attr: { src, alt: "" } });
+      const body = head.createDiv({ cls: "reel-preview-body" });
+      const h = body.createDiv({ cls: "reel-preview-title" });
+      h.createSpan({ text: title });
+      if (year)
+        h.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const facts = body.createDiv({ cls: "reel-header-facts" });
+      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      if (this.item.vote_average)
+        facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
+      if (this.item.overview)
+        contentEl.createDiv({ cls: "reel-preview-overview", text: this.item.overview });
+      void this.loadTrailer(contentEl.createDiv({ cls: "reel-preview-trailer" }), isTv);
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
+      later.addEventListener("click", () => void this.add(true, later));
+      const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it" });
+      seen.addEventListener("click", () => {
+        new LogSheet(this.plugin.app, this.plugin, {
+          pending: {
+            id: this.item.id,
+            type: isTv ? "tv" : "film",
+            title
+          }
+        }).open();
+        this.onAdded();
+        this.close();
+      });
+      const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested" });
+      nope.addEventListener("click", () => {
+        void this.plugin.discover.dismiss(this.item.id).then(() => {
+          this.onAdded();
+          this.close();
+        });
+      });
+    }
+    /**
+     * Fill the sheet out from the full TMDB record.
+     *
+     * This used to fetch the detail payload and take only the trailer and the
+     * provider list from it, which made "Full details" a promise the screen
+     * did not keep — it showed *less* than the inline role panel it was
+     * reached from. The request was already being made; almost everything
+     * below was in the response and was being discarded.
+     *
+     * Silent on failure. The sheet works without any of it, and an error
+     * notice for a missing trailer would be noise on a screen you are
+     * skimming.
+     */
+    async loadTrailer(slot, isTv) {
+      try {
+        const meta = isTv ? await this.plugin.tmdb.getShow(this.item.id) : await this.plugin.tmdb.getFilm(this.item.id);
+        this.paintFacts(slot, meta, isTv);
+        const url = trailerUrl(meta.videos?.results);
+        if (url) {
+          const play = slot.createEl("a", {
+            cls: "reel-btn mod-cta reel-trailer-btn",
+            text: "\u25B6  Watch trailer",
+            href: url
+          });
+          play.setAttr("target", "_blank");
+          play.setAttr("rel", "noopener");
+        }
+        const providers = providerNames(meta["watch/providers"], this.plugin.settings.region);
+        if (providers.length) {
+          const box = slot.createDiv({ cls: "reel-preview-providers" });
+          box.createSpan({ cls: "reel-dim", text: "Streaming on " });
+          box.createSpan({ text: providers.slice(0, 4).join(", ") });
+        }
+        this.paintLinks(slot, meta, isTv);
+      } catch {
+      }
+    }
+    /**
+     * The facts that make this "details" rather than a preview.
+     *
+     * All of it came back in the request already made for the trailer and was
+     * being discarded — genres, runtime, certification, the cast. The cast
+     * strip matters most: on a screen you reached *from* an actor, the other
+     * people in the thing are the obvious next question.
+     */
+    paintFacts(slot, meta, isTv) {
+      const facts = [];
+      const genres = (meta.genres ?? []).map((g) => g.name).filter(Boolean);
+      if (genres.length)
+        facts.push(genres.slice(0, 3).join(", "));
+      if (isTv) {
+        const show = meta;
+        if (show.number_of_episodes)
+          facts.push(`${show.number_of_episodes} episodes`);
+        if (show.status)
+          facts.push(show.status);
+      } else {
+        const runtime = meta.runtime;
+        if (runtime)
+          facts.push(formatMinutes(runtime));
+      }
+      if (facts.length)
+        slot.createDiv({ cls: "reel-preview-facts", text: facts.join(" \xB7 ") });
+      const credits = isTv ? meta.aggregate_credits : meta.credits;
+      const made = isTv ? (meta.created_by ?? []).map((c) => c.name) : (credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
+      if (made.length) {
+        slot.createDiv({
+          cls: "reel-preview-facts",
+          text: `${isTv ? "Created by" : "Directed by"} ${made.join(", ")}`
+        });
+      }
+      const cast = (credits?.cast ?? []).slice(0, 10);
+      if (!cast.length)
+        return;
+      slot.createDiv({ cls: "reel-block-title", text: "Cast" });
+      const strip = slot.createDiv({ cls: "reel-caststrip" });
+      for (const p of cast) {
+        const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+        const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+        this.plugin.people.attach(shot, p.name, p.id);
+        badgePerson(this.plugin, shot, p.id);
+        cell.createDiv({ cls: "reel-caststrip-name", text: p.name });
+        const role = (p.character ?? p.roles?.[0]?.character ?? "").trim();
+        if (role)
+          cell.createDiv({ cls: "reel-caststrip-role", text: role });
+        const id = p.id;
+        if (!id)
+          continue;
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-label", `${p.name} \u2014 open their filmography`);
+        cell.addEventListener("click", () => new PersonSheet(this.plugin, id, p.name).open());
+      }
+    }
+    /**
+     * IMDb, its parents guide, and TMDB.
+     *
+     * The parents guide needs an IMDb id, which a search result does not
+     * carry — it only arrives on the detail payload, which is why this could
+     * not be built before the fetch. Direct links, never a search: "search
+     * IMDb for this title" is a different and much worse thing.
+     */
+    paintLinks(slot, meta, isTv) {
+      const row = slot.createDiv({ cls: "reel-preview-links" });
+      const link = (text, href) => {
+        const a = row.createEl("a", { cls: "reel-chip", text, href });
+        a.setAttr("target", "_blank");
+        a.setAttr("rel", "noopener");
+      };
+      const raw = meta.external_ids?.imdb_id ?? meta.imdb_id ?? void 0;
+      const imdb = imdbUrl(raw ?? void 0);
+      if (imdb) {
+        link("IMDb", imdb);
+        link("Parents guide", `${imdb}parentalguide`);
+      }
+      link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
+    }
+    async add(watchlist, button) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      button.setText("Adding\u2026");
+      button.setAttr("disabled", "true");
+      try {
+        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist });
+        this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
+        this.onAdded();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+        button.setText("Retry");
+        button.removeAttribute("disabled");
+        this.busy = false;
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
+  // src/ui/personSheet.ts
+  var PersonSheet = class extends Modal {
+    constructor(plugin2, personId, fallbackName) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.personId = personId;
+      this.fallbackName = fallbackName;
+      this.busy = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal", "reel-person-sheet");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: this.fallbackName });
+      contentEl.createDiv({ cls: "reel-loading", text: "Loading\u2026", attr: { role: "status" } });
+      void this.load();
+    }
+    async load() {
+      let person;
+      try {
+        person = await this.plugin.tmdb.getPerson(this.personId);
+      } catch (e) {
+        this.contentEl.empty();
+        this.contentEl.createDiv({ cls: "reel-error", text: redact(e) });
+        return;
+      }
+      if (!this.contentEl.isConnected)
+        return;
+      this.contentEl.empty();
+      this.renderHead(person);
+      this.renderCredits(person);
+    }
+    renderHead(person) {
+      const head = this.contentEl.createDiv({ cls: "reel-person-head" });
+      const shot = head.createDiv({ cls: "reel-person-hero-shot" });
+      const src = this.plugin.tmdb.posterUrl(person.profile_path, "w342");
+      if (src) {
+        head.addClass("has-wash");
+        head.createDiv({ cls: "reel-person-wash" }).setCssProps({ "--reel-person-wash": `url("${src}")` });
+      }
+      if (src) {
+        const img = shot.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+        img.addEventListener("error", () => {
+          img.remove();
+          shot.addClass("is-empty");
+          shot.createSpan({ cls: "reel-placeholder-text", text: person.name.slice(0, 2) });
+        });
+      } else {
+        shot.addClass("is-empty");
+        shot.createSpan({ cls: "reel-placeholder-text", text: person.name.slice(0, 2) });
+      }
+      const body = head.createDiv({ cls: "reel-person-hero-body" });
+      body.createDiv({ cls: "reel-person-hero-name", text: person.name });
+      const facts = [];
+      if (person.known_for_department)
+        facts.push(person.known_for_department);
+      const born = yearOf(person.birthday ?? void 0);
+      const died = yearOf(person.deathday ?? void 0);
+      if (born && died)
+        facts.push(`${born}\u2013${died}`);
+      else if (born)
+        facts.push(`b. ${born}`);
+      if (facts.length)
+        body.createDiv({ cls: "reel-dim", text: facts.join(" \xB7 ") });
+      this.renderOpinion(body, person);
+      if (person.biography?.trim()) {
+        const bio = person.biography.trim();
+        const short = bio.length > 280 ? `${bio.slice(0, 280).trimEnd()}\u2026` : bio;
+        const el = this.contentEl.createDiv({ cls: "reel-person-bio", text: short });
+        if (bio.length > 280) {
+          const more = this.contentEl.createEl("button", { cls: "reel-link", text: "Read more" });
+          more.addEventListener("click", () => {
+            el.setText(bio);
+            more.remove();
+          });
+        }
+      }
+    }
+    /**
+     * Like or rate a person, which then leans your recommendations.
+     *
+     * Both, rather than one: a heart is a fast yes you will actually use on a
+     * cast list, and a rating is for the handful of people you feel strongly
+     * enough about to rank. Requiring stars for every actor you like would
+     * mean nobody records anything.
+     *
+     * Stored under settings rather than as a note, because this is a
+     * preference about how suggestions should lean — not a thing you watched.
+     */
+    renderOpinion(body, person) {
+      const key = String(person.id);
+      const store = this.plugin.settings.people;
+      const current = store[key];
+      const row = body.createDiv({ cls: "reel-person-opinion" });
+      const save = async (next) => {
+        const merged = {
+          ...store[key],
+          ...next,
+          name: person.name,
+          department: person.known_for_department
+        };
+        if (!merged.liked && merged.rating == null)
+          delete store[key];
+        else
+          store[key] = merged;
+        await this.plugin.saveSettings();
+      };
+      const heart = row.createEl("button", {
+        cls: "reel-heart reel-heart-labelled",
+        attr: { type: "button", "aria-pressed": String(!!current?.liked) }
+      });
+      const glyph = heart.createSpan({ cls: "reel-heart-glyph" });
+      const word = heart.createSpan({ cls: "reel-heart-word" });
+      const paintHeart = () => {
+        const liked = !!this.plugin.settings.people[key]?.liked;
+        heart.toggleClass("is-on", liked);
+        heart.setAttr("aria-pressed", String(liked));
+        heart.setAttr("aria-label", liked ? `${person.name} \u2014 liked` : `Like ${person.name}`);
+        glyph.setText(liked ? "\u2665" : "\u2661");
+        word.setText(liked ? "Liked" : "Like");
+      };
+      heart.addEventListener("click", () => {
+        void save({ liked: !this.plugin.settings.people[key]?.liked }).then(paintHeart);
+      });
+      paintHeart();
+      const stars2 = row.createDiv({ cls: "reel-person-stars" });
+      renderStars(stars2, {
+        value: current?.rating,
+        compact: true,
+        onChange: (v) => void save({ rating: v ?? void 0 })
+      });
+    }
+    renderCredits(person) {
+      const cast = person.combined_credits?.cast ?? [];
+      const crew = person.combined_credits?.crew ?? [];
+      const byId = /* @__PURE__ */ new Map();
+      for (const c of [...cast, ...crew]) {
+        if (!c.id || !c.poster_path)
+          continue;
+        if (!byId.has(c.id))
+          byId.set(c.id, c);
+      }
+      const credits = [...byId.values()].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+      if (!credits.length) {
+        this.contentEl.createDiv({ cls: "reel-empty", text: "No credits listed." });
+        return;
+      }
+      this.contentEl.createDiv({ cls: "reel-facet-label", text: `Known for \u2014 ${credits.length} titles` });
+      const grid = this.contentEl.createDiv({ cls: "reel-person-credits" });
+      for (const c of credits.slice(0, 60)) {
+        const type = c.media_type === "tv" ? "tv" : "film";
+        const mine = this.plugin.library.byTmdbId(c.id, type);
+        const card = grid.createDiv({ cls: "reel-person-credit" });
+        card.setAttr("role", "button");
+        card.setAttr("tabindex", "0");
+        card.toggleClass("is-mine", !!mine);
+        const poster2 = card.createDiv({ cls: "reel-person-credit-poster" });
+        this.plugin.posters.attach(poster2, {
+          posterUrl: this.plugin.tmdb.posterUrl(c.poster_path, "w342") ?? void 0,
+          title: c.title ?? c.name ?? ""
+        });
+        if (mine)
+          poster2.createSpan({ cls: "reel-person-credit-tick", text: "\u2713" });
+        card.createDiv({ cls: "reel-person-credit-title", text: c.title ?? c.name ?? "Untitled" });
+        const year = yearOf(c.release_date ?? c.first_air_date);
+        const role = c.character || c.job || "";
+        const sub = [year ? String(year) : "", role].filter(Boolean).join(" \xB7 ");
+        if (sub)
+          card.createDiv({ cls: "reel-person-credit-sub", text: sub });
+        const open = () => this.toggleRole(card, c, mine, role);
+        card.addEventListener("click", open);
+        card.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            open();
+          }
+        });
+      }
+    }
+    /**
+     * Expand a credit to show the role, with the actions spelled out.
+     *
+     * Only one panel is open at a time — a grid with six expanded cards is
+     * harder to read than the grid was, and you are comparing one credit
+     * against the rest, not several against each other.
+     */
+    toggleRole(card, credit, mine, role) {
+      const existing = card.querySelector(".reel-person-role-panel");
+      card.doc.querySelectorAll(".reel-person-role-panel").forEach((el) => el.remove());
+      card.doc.querySelectorAll(".reel-person-credit.is-open").forEach((el) => el.removeClass("is-open"));
+      if (existing)
+        return;
+      card.addClass("is-open");
+      const panel = card.createDiv({ cls: "reel-person-role-panel" });
+      if (credit.backdrop_path) {
+        const shot = panel.createDiv({ cls: "reel-person-role-still" });
+        const img = shot.createEl("img", {
+          attr: {
+            src: this.plugin.tmdb.posterUrl(credit.backdrop_path, "w500") ?? "",
+            alt: "",
+            loading: "lazy",
+            decoding: "async"
+          }
+        });
+        img.addEventListener("error", () => shot.remove());
+      }
+      if (role) {
+        panel.createDiv({ cls: "reel-person-role-label", text: credit.character ? "Played" : "Worked as" });
+        panel.createDiv({ cls: "reel-person-role-value", text: role });
+      } else {
+        panel.createDiv({ cls: "reel-dim", text: "No role recorded for this credit." });
+      }
+      if (credit.overview)
+        panel.createDiv({ cls: "reel-person-role-overview", text: credit.overview });
+      const actions = panel.createDiv({ cls: "reel-person-role-actions" });
+      const details = actions.createEl("button", {
+        cls: mine ? "reel-btn mod-cta" : "reel-btn",
+        text: mine ? "Open in your library" : "Full details"
+      });
+      details.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (mine) {
+          this.close();
+          void this.plugin.openDetail(mine);
+          return;
+        }
+        new PreviewSheet(this.plugin, credit, () => {
+        }, roleOf(credit)).open();
+      });
+      if (!mine) {
+        const add = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
+        add.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          void this.add(credit);
+        });
+      }
+    }
+    /** Add a credit to the watchlist without leaving the filmography. */
+    async add(item) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      try {
+        await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist: true });
+        this.plugin.undo.offer(`Added ${item.title ?? item.name ?? "it"} to your watchlist`);
+        this.contentEl.empty();
+        await this.load();
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+      }
+      this.busy = false;
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+  function roleOf(credit) {
+    const role = (credit.character ?? credit.job ?? "").trim();
+    return role || void 0;
+  }
+
+  // src/ui/detail.ts
+  function flagEmoji(iso) {
+    const code = iso.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code))
+      return "";
+    return String.fromCodePoint(...[...code].map((c) => 127462 + c.charCodeAt(0) - 65));
+  }
+  var FILM_STATUSES = ["watched", "watchlist", "abandoned"];
+  var TV_STATUSES = ["watching", "completed", "watchlist", "paused", "dropped"];
+  function flash(el) {
+    el.addClass("reel-flash");
+    el.setAttr("aria-live", "polite");
+    window.setTimeout(() => {
+      el.removeClass("reel-flash");
+      el.removeAttribute("aria-live");
+    }, 600);
+  }
+  var DetailScreen = class {
+    constructor(plugin2, entry, onBack, backLabel = "Library") {
+      this.plugin = plugin2;
+      this.entry = entry;
+      this.onBack = onBack;
+      this.backLabel = backLabel;
+      this.openSeason = null;
+      this.episodeCache = /* @__PURE__ */ new Map();
+      this.rootEl = null;
+    }
+    get file() {
+      const f = this.plugin.app.vault.getAbstractFileByPath(this.entry.path);
+      return f instanceof TFile ? f : null;
+    }
+    /** Repaint using the current entry, without re-reading the index. */
+    rerender() {
+      if (this.rootEl)
+        this.render(this.rootEl);
+    }
+    /**
+     * Adopt the latest indexed version of this entry.
+     *
+     * Called by the view when the library reports a change — which happens
+     * *after* `metadataCache` has reparsed the file. That event is the only
+     * reliable signal that a re-read will return the values we just wrote;
+     * this used to be a 120ms timer, which is a guess that quietly fails on a
+     * slow disk or a large vault.
+     */
+    syncFromIndex() {
+      const latest = this.plugin.library.byPath(this.entry.path);
+      if (latest)
+        this.entry = latest;
+    }
+    /** The path this screen is showing, so the view can tell if it still exists. */
+    get path() {
+      return this.entry.path;
+    }
+    render(container) {
+      this.rootEl = container;
+      container.empty();
+      container.addClass("reel-detail");
+      const e = this.entry;
+      const isTv = e.type === "tv";
+      const bar = container.createDiv({ cls: "reel-detail-bar" });
+      const back = bar.createEl("button", { cls: "reel-btn reel-back" });
+      setIcon(back.createSpan(), "arrow-left");
+      back.createSpan({ text: this.backLabel });
+      back.addEventListener("click", () => this.onBack());
+      const openNote = bar.createEl("button", { cls: "reel-btn", text: "Open note" });
+      openNote.addEventListener("click", async () => {
+        const file = this.file;
+        if (file)
+          await this.plugin.app.workspace.getLeaf(false).openFile(file);
+      });
+      const page = container.createDiv({ cls: "reel-detail-page" });
+      this.plugin.swatches.tint(page, this.plugin.posters.displayUrl(e), document.body.hasClass("theme-dark"));
+      const hero = page.createDiv({ cls: "reel-hero" });
+      this.paintBackdrop(hero, e);
+      const posterEl = hero.createDiv({ cls: "reel-hero-poster" });
+      this.plugin.posters.attach(posterEl, e);
+      const body = hero.createDiv({ cls: "reel-hero-body" });
+      const h = body.createDiv({ cls: "reel-hero-title" });
+      h.createSpan({ text: e.title });
+      const year = e.year ?? e.firstAirYear;
+      if (year)
+        h.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const sub = body.createDiv({ cls: "reel-hero-sub" });
+      const people = isTv ? e.creators : e.director;
+      if (people.length)
+        sub.createSpan({ text: people.map(unlink).join(", ") });
+      if (!isTv && e.runtime)
+        sub.createSpan({ text: formatMinutes(e.runtime) });
+      if (isTv) {
+        const seen = e.seasons.reduce((n2, s) => n2 + rangeCount(s.watched), 0);
+        sub.createSpan({ text: `${seen} of ${e.totalEpisodes ?? "?"} episodes` });
+      }
+      if (e.certification)
+        sub.createSpan({ cls: "reel-badge cert", text: e.certification });
+      const scores = body.createDiv({ cls: "reel-scores" });
+      const score = (label, value, cls, outOf) => {
+        const chip = scores.createDiv({ cls: `reel-score ${cls}` });
+        const v = chip.createDiv({ cls: "reel-score-value", text: value });
+        if (outOf)
+          v.createSpan({ cls: "reel-score-scale", text: `/${outOf}` });
+        chip.createDiv({ cls: "reel-score-label", text: label });
+      };
+      if (e.rating != null)
+        score("You", String(e.rating), "mine", "5");
+      const epAvg = this.episodeAverage();
+      if (epAvg != null)
+        score("Episodes", epAvg.toFixed(1), "mine", "5");
+      if (e.imdbRating != null) {
+        score("IMDb", e.imdbRating.toFixed(1), "imdb", "10");
+        if (e.imdbVotes) {
+          const chip = scores.lastElementChild;
+          chip?.createDiv({ cls: "reel-score-votes", text: compactCount(e.imdbVotes) });
+        }
+      }
+      if (e.metacritic != null) {
+        score("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad", "100");
+      }
+      if (e.rottenTomatoes != null)
+        score("Tomatoes", `${e.rottenTomatoes}%`, e.rottenTomatoes >= 60 ? "fresh" : "rotten");
+      if (e.tmdbRating != null)
+        score("TMDB", e.tmdbRating.toFixed(1), "", "10");
+      if (e.rating != null) {
+        const theirs = e.imdbRating ?? e.tmdbRating;
+        const source = e.imdbRating != null ? "IMDb" : "TMDB";
+        if (theirs != null) {
+          const mine = e.rating * 2;
+          const delta = Math.round((mine - theirs) * 10) / 10;
+          const text = Math.abs(delta) < 0.5 ? `Your ${e.rating} is about the same as ${source}'s ${theirs.toFixed(1)}` : `Your ${e.rating} is ${Math.abs(delta).toFixed(1)} ${delta > 0 ? "above" : "below"} ${source}, on their scale`;
+          body.createDiv({ cls: "reel-score-compare", text });
+        }
+      }
+      if (!scores.childElementCount)
+        scores.remove();
+      if (e.genres.length) {
+        const g = body.createDiv({ cls: "reel-hero-genres" });
+        e.genres.forEach((x) => g.createSpan({ cls: "reel-chip static", text: x }));
+      }
+      if (e.overview)
+        body.createDiv({ cls: "reel-hero-overview", text: e.overview });
+      const links = body.createDiv({ cls: "reel-links" });
+      if (e.trailer) {
+        const play = links.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", href: e.trailer });
+        setIcon(play.createSpan(), "play");
+        play.createSpan({ text: "Watch trailer" });
+        play.setAttr("target", "_blank");
+        play.setAttr("rel", "noopener");
+      }
+      const link = (label, url, cls) => {
+        const a = links.createEl("a", { cls: `reel-link ${cls}`, text: label, href: url });
+        a.setAttr("target", "_blank");
+        a.setAttr("rel", "noopener");
+      };
+      const imdb = imdbUrl(e.imdbId);
+      if (imdb)
+        link("IMDb", imdb, "imdb");
+      link("TMDB", tmdbUrl(e.tmdbId, e.type), "tmdb");
+      if (imdb)
+        link("Parents guide", `${imdb}parentalguide`, "guide");
+      const region = (this.plugin.settings.region || "US").toLowerCase();
+      link("JustWatch", `https://www.justwatch.com/${region}/search?q=${encodeURIComponent(e.title)}`, "justwatch");
+      if (e.type === "film")
+        link("Letterboxd", `https://letterboxd.com/tmdb/${e.tmdbId}/`, "letterboxd");
+      const cols = page.createDiv({ cls: "reel-detail-cols" });
+      const side = cols.createDiv({ cls: "reel-detail-side" });
+      const main = cols.createDiv({ cls: "reel-detail-main" });
+      this.renderControls(side);
+      this.renderActions(side);
+      this.renderMeta(side);
+      if (isTv)
+        this.renderSeasons(main);
+      else
+        this.renderHistory(main);
+      void this.renderFacets(main, isTv);
+    }
+    /* ------------------------------------------------------------------ */
+    /* Facets — everything TMDB knows, behind tabs                         */
+    /* ------------------------------------------------------------------ */
+    /**
+     * Cast, crew, production details, genres, releases and related titles.
+     *
+     * Tabbed rather than stacked because this is reference material: you come
+     * looking for one specific thing, and five collapsed sections beat one
+     * very long scroll. The payload is the same cached `getFilm`/`getShow`
+     * response the rest of the plugin uses, so opening this costs nothing
+     * after the first time.
+     */
+    async renderFacets(main, isTv) {
+      const wrap = main.createDiv({ cls: "reel-facets" });
+      wrap.createDiv({ cls: "reel-loading", text: "Loading details\u2026", attr: { role: "status" } });
+      let meta;
+      try {
+        meta = isTv ? await this.plugin.tmdb.getShow(this.entry.tmdbId) : await this.plugin.tmdb.getFilm(this.entry.tmdbId);
+      } catch (e) {
+        wrap.empty();
+        wrap.createDiv({ cls: "reel-error", text: redact(e) });
+        return;
+      }
+      if (!wrap.isConnected)
+        return;
+      wrap.empty();
+      const film2 = isTv ? void 0 : meta;
+      const cast = (isTv ? meta.aggregate_credits?.cast : film2?.credits?.cast) ?? [];
+      const crew = (isTv ? meta.aggregate_credits?.crew : film2?.credits?.crew) ?? [];
+      const related = meta.recommendations?.results ?? [];
+      if (cast.length)
+        this.renderCastStrip(wrap, cast);
+      this.renderCreditRows(wrap, cast, crew, isTv);
+      const tabs = [];
+      if (cast.length)
+        tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
+      if (crew.length)
+        tabs.push({ id: "crew", label: "Crew", render: (el) => this.renderPeople(el, crew, false) });
+      tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
+      tabs.push({ id: "story", label: "Storyline", render: (el) => this.renderStoryline(el, meta) });
+      if (this.entry.contentTopics.length || this.entry.certification) {
+        tabs.push({ id: "content", label: "Content", render: (el) => this.renderContent(el) });
+      }
+      if (meta.genres?.length)
+        tabs.push({ id: "genre", label: "Genre", render: (el) => this.renderGenres(el, meta.genres ?? []) });
+      if (film2?.release_dates?.results?.length) {
+        tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film2) });
+      }
+      if (related.length)
+        tabs.push({ id: "related", label: "Related", render: (el) => this.renderRelated(el, related) });
+      tabs.push({ id: "photos", label: "Photos", render: (el) => void this.renderPhotos(el, isTv) });
+      const reviews = meta.reviews?.results ?? [];
+      if (reviews.length) {
+        tabs.push({
+          id: "reviews",
+          label: `Reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
+          render: (el) => this.renderReviews(el, reviews)
+        });
+      }
+      if (!tabs.length)
+        return;
+      const bar = wrap.createDiv({ cls: "reel-facet-tabs" });
+      const body = wrap.createDiv({ cls: "reel-facet-body" });
+      const buttons = [];
+      const show = (i) => {
+        buttons.forEach((b, n2) => b.toggleClass("is-active", n2 === i));
+        body.empty();
+        tabs[i].render(body);
+      };
+      tabs.forEach((t, i) => {
+        const b = bar.createEl("button", { cls: "reel-facet-tab", text: t.label, attr: { type: "button" } });
+        buttons.push(b);
+        b.addEventListener("click", () => show(i));
+      });
+      show(0);
+    }
+    /**
+     * Director / Writer / Stars, as named rows of tappable names.
+     *
+     * The three questions everyone asks about a title before anything else,
+     * and each name opens that person's filmography rather than being dead
+     * text. Grouped by job so "Screenplay" and "Story" collapse into one
+     * Writer row instead of three near-identical lines.
+     */
+    renderCreditRows(wrap, cast, crew, isTv) {
+      const pick = (...jobs) => crew.filter((c) => c.job && jobs.includes(c.job)).filter((c, i, all2) => all2.findIndex((x) => x.name === c.name) === i);
+      const rows2 = [];
+      if (isTv) {
+        const creators = pick("Creator", "Executive Producer").slice(0, 3);
+        if (creators.length)
+          rows2.push({ label: creators.length > 1 ? "Creators" : "Creator", people: creators });
+      } else {
+        const directors = pick("Director");
+        if (directors.length)
+          rows2.push({ label: directors.length > 1 ? "Directors" : "Director", people: directors });
+      }
+      const writers = pick("Screenplay", "Writer", "Story", "Author").slice(0, 4);
+      if (writers.length)
+        rows2.push({ label: writers.length > 1 ? "Writers" : "Writer", people: writers });
+      const stars2 = cast.slice(0, 3);
+      if (stars2.length)
+        rows2.push({ label: "Stars", people: stars2 });
+      if (!rows2.length)
+        return;
+      const box = wrap.createDiv({ cls: "reel-credit-rows" });
+      for (const row of rows2) {
+        const line = box.createDiv({ cls: "reel-credit-row" });
+        line.createSpan({ cls: "reel-credit-label", text: row.label });
+        const names = line.createSpan({ cls: "reel-credit-names" });
+        row.people.forEach((p, i) => {
+          if (i)
+            names.createSpan({ cls: "reel-dim", text: " \xB7 " });
+          const a = names.createEl("button", { cls: "reel-credit-name", text: p.name, attr: { type: "button" } });
+          a.addEventListener("click", () => this.openPerson(p));
+        });
+      }
+    }
+    /**
+     * Top billing as a horizontal strip of circular headshots.
+     *
+     * Deliberately capped and scrollable rather than complete — the Cast tab
+     * holds the full list. This answers "who is in this" at a glance, which is
+     * a different question from "show me everyone".
+     */
+    renderCastStrip(wrap, cast) {
+      const box = wrap.createDiv({ cls: "reel-caststrip" });
+      const head = box.createDiv({ cls: "reel-caststrip-head" });
+      head.createSpan({ cls: "reel-facet-label", text: "Top cast" });
+      head.createSpan({ cls: "reel-dim", text: String(cast.length) });
+      const strip = box.createDiv({ cls: "reel-caststrip-track" });
+      for (const p of cast.slice(0, 12)) {
+        const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-label", `Find ${p.name} in your library`);
+        const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+        badgePerson(this.plugin, shot, p.id);
+        const src = this.plugin.tmdb.posterUrl(p.profile_path, "w185");
+        if (src) {
+          const img = shot.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+          img.addEventListener("error", () => {
+            img.remove();
+            shot.addClass("is-empty");
+            shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+          });
+        } else {
+          shot.addClass("is-empty");
+          shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+        }
+        cell.createDiv({ cls: "reel-caststrip-name", text: p.name });
+        const part = p.character ?? p.roles?.[0]?.character ?? "";
+        if (part)
+          cell.createDiv({ cls: "reel-caststrip-role", text: part });
+        const open = () => this.openPerson(p);
+        cell.addEventListener("click", open);
+        cell.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            open();
+          }
+        });
+      }
+    }
+    /**
+     * Open a person's filmography.
+     *
+     * TMDB gives an id on credits, but not always — aggregate credits for a
+     * show occasionally omit it. Without one there is no person to look up, so
+     * fall back to searching your own library by name rather than doing
+     * nothing at all.
+     */
+    openPerson(p) {
+      if (p.id)
+        new PersonSheet(this.plugin, p.id, p.name).open();
+      else
+        void this.plugin.openViewWithSearch(p.name);
+    }
+    /**
+     * A list of people with headshots.
+     *
+     * Tapping one searches your own library for them, which is the question
+     * you actually have standing on this screen — "what else of theirs have I
+     * seen?" — rather than opening a biography you did not ask for.
+     */
+    renderPeople(el, people, asCast) {
+      const list = el.createDiv({ cls: "reel-people" });
+      for (const p of people.slice(0, 40)) {
+        const row = list.createDiv({ cls: "reel-person" });
+        row.setAttr("role", "button");
+        row.setAttr("tabindex", "0");
+        row.setAttr("aria-label", `${p.name} \u2014 open their filmography`);
+        const shot = row.createDiv({ cls: "reel-person-shot" });
+        const src = this.plugin.tmdb.posterUrl(p.profile_path, "w185");
+        if (src) {
+          const img = shot.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+          img.addEventListener("error", () => {
+            img.remove();
+            shot.addClass("is-empty");
+            shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+          });
+        } else {
+          shot.addClass("is-empty");
+          shot.createSpan({ cls: "reel-placeholder-text", text: p.name.slice(0, 2) });
+        }
+        const body = row.createDiv({ cls: "reel-person-body" });
+        body.createDiv({ cls: "reel-person-name", text: p.name });
+        const sub = asCast ? p.character ?? p.roles?.[0]?.character ?? "" : p.job ?? "";
+        if (sub)
+          body.createDiv({ cls: "reel-person-role", text: sub });
+        const open = () => this.openPerson(p);
+        row.addEventListener("click", open);
+        row.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            open();
+          }
+        });
+      }
+    }
+    /** Studios, country, language, alternative titles, and the money. */
+    renderFacts(el, meta, isTv) {
+      const film2 = isTv ? void 0 : meta;
+      const group = (label, values) => {
+        if (!values.length)
+          return;
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: label });
+        for (const v of values)
+          box.createDiv({ cls: "reel-facet-value", text: v });
+      };
+      group("Studios", (meta.production_companies ?? []).map((c) => c.name).filter(Boolean));
+      group("Country", (film2?.production_countries ?? []).map((c) => c.name ?? "").filter(Boolean));
+      group(
+        "Language",
+        (film2?.spoken_languages ?? []).map((l) => l.english_name ?? l.name ?? "").filter(Boolean)
+      );
+      if (film2 && (film2.budget || film2.revenue)) {
+        const money = (n2) => n2 ? `$${n2.toLocaleString()}` : "not reported";
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: "Box office" });
+        box.createDiv({ cls: "reel-facet-value", text: `Budget \u2014 ${money(film2.budget)}` });
+        box.createDiv({ cls: "reel-facet-value", text: `Revenue \u2014 ${money(film2.revenue)}` });
+        if (film2.budget && film2.revenue) {
+          const x = film2.revenue / film2.budget;
+          box.createDiv({ cls: "reel-facet-value", text: `Returned ${x.toFixed(1)}\xD7 its budget` });
+        }
+      }
+      if (meta.homepage) {
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: "Official site" });
+        const a = box.createEl("a", { cls: "reel-facet-value reel-link", text: meta.homepage, href: meta.homepage });
+        a.setAttr("target", "_blank");
+        a.setAttr("rel", "noopener");
+      }
+      const alts = (film2?.alternative_titles?.titles ?? []).filter((t) => t.title).slice(0, 8).map((t) => t.iso_3166_1 ? `${t.title} (${t.iso_3166_1})` : t.title ?? "");
+      group("Also known as", alts);
+    }
+    /** Tagline, full overview, and the keywords TMDB tags a title with. */
+    renderStoryline(el, meta) {
+      if (meta.tagline)
+        el.createDiv({ cls: "reel-tagline", text: meta.tagline });
+      if (this.entry.overview)
+        el.createDiv({ cls: "reel-facet-prose", text: this.entry.overview });
+      const keywords = keywordNames(meta);
+      if (keywords.length) {
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: "Keywords" });
+        const chips = box.createDiv({ cls: "reel-chips" });
+        for (const k of keywords.slice(0, 24)) {
+          const chip = chips.createEl("button", { cls: "reel-chip", text: k, attr: { type: "button" } });
+          chip.addEventListener("click", () => void this.plugin.openViewWithSearch(k));
+        }
+      }
+    }
+    /**
+     * The parents-guide substitute.
+     *
+     * IMDb's own bands are not available through any API, so this derives the
+     * same shape from DoesTheDogDie's community votes: what share of people
+     * said a thing happens decides mild / moderate / severe. The vote counts
+     * are shown rather than hidden, because a 3-vote "severe" and a 300-vote
+     * one deserve different amounts of trust, and the link to IMDb's fuller
+     * guide sits alongside.
+     */
+    renderContent(el) {
+      const e = this.entry;
+      if (e.certification) {
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: "Certificate" });
+        box.createDiv({ cls: "reel-facet-value", text: e.certification });
+      }
+      if (e.contentTopics.length) {
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: "Reported by viewers" });
+        box.createDiv({
+          cls: "reel-dim",
+          text: "Topics a majority of DoesTheDogDie voters confirmed. Not severity-rated \u2014 IMDb's guide below grades them."
+        });
+        for (const topic of e.contentTopics.slice(0, 40)) {
+          const row = box.createDiv({ cls: "reel-content-row" });
+          row.createSpan({ cls: "reel-band reported" });
+          row.createSpan({ cls: "reel-content-name", text: topic });
+        }
+      }
+      if (e.contentFlags.length) {
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: "Flags on this note" });
+        const chips = box.createDiv({ cls: "reel-chips" });
+        for (const f of e.contentFlags) {
+          chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f] ?? f });
+        }
+      }
+      const imdb = imdbUrl(e.imdbId);
+      if (imdb) {
+        const a = el.createEl("a", { cls: "reel-btn", text: "Full parents guide on IMDb", href: `${imdb}parentalguide` });
+        a.setAttr("target", "_blank");
+        a.setAttr("rel", "noopener");
+      }
+      if (!e.contentTopics.length) {
+        el.createDiv({
+          cls: "reel-dim",
+          text: "No community content notes yet \u2014 add a DoesTheDogDie key in settings to fetch them."
+        });
+      }
+    }
+    renderGenres(el, genres) {
+      const box = el.createDiv({ cls: "reel-facet-group" });
+      box.createDiv({ cls: "reel-facet-label", text: "Genre" });
+      const chips = box.createDiv({ cls: "reel-chips" });
+      for (const g of genres) {
+        const chip = chips.createEl("button", { cls: "reel-chip", text: g.name, attr: { type: "button" } });
+        chip.addEventListener("click", () => void this.plugin.openViewWithSearch(g.name));
+      }
+    }
+    /** Per-country release dates, grouped by kind, as TMDB reports them. */
+    renderReleases(el, film2) {
+      const KIND = {
+        1: "Premiere",
+        2: "Theatrical limited",
+        3: "Theatrical",
+        4: "Digital",
+        5: "Physical",
+        6: "TV"
+      };
+      const rows2 = [];
+      for (const r of film2.release_dates?.results ?? []) {
+        for (const d of r.release_dates ?? []) {
+          rows2.push({
+            kind: KIND[d.type ?? 3] ?? "Release",
+            country: r.iso_3166_1 ?? "",
+            date: d.release_date,
+            cert: d.certification || void 0,
+            note: d.note || void 0
+          });
+        }
+      }
+      if (!rows2.length) {
+        el.createDiv({ cls: "reel-empty", text: "No release dates recorded." });
+        return;
+      }
+      const mine = (this.plugin.settings.region || "US").toUpperCase();
+      rows2.sort((a, b) => {
+        if (a.country === mine && b.country !== mine)
+          return -1;
+        if (b.country === mine && a.country !== mine)
+          return 1;
+        return (a.date ?? "").localeCompare(b.date ?? "");
+      });
+      for (const kind of Object.values(KIND)) {
+        const group = rows2.filter((r) => r.kind === kind);
+        if (!group.length)
+          continue;
+        const box = el.createDiv({ cls: "reel-facet-group" });
+        box.createDiv({ cls: "reel-facet-label", text: kind });
+        for (const r of group.slice(0, 30)) {
+          const line = box.createDiv({ cls: "reel-release-row" });
+          line.createSpan({ cls: "reel-release-date", text: r.date ? prettyDate(r.date.slice(0, 10)) : "\u2014" });
+          const flag = flagEmoji(r.country);
+          if (flag)
+            line.createSpan({ cls: "reel-release-flag", text: flag });
+          line.createSpan({ cls: "reel-release-country", text: r.country });
+          if (r.cert)
+            line.createSpan({ cls: "reel-badge cert", text: r.cert });
+          if (r.note)
+            line.createSpan({ cls: "reel-dim", text: r.note });
+        }
+      }
+    }
+    /**
+     * The full-bleed image behind the hero.
+     *
+     * Two layers, because the honest offline answer and the good online one are
+     * different images. The base is the local poster, scaled up and blurred
+     * past the point of being readable as a poster — it is already in the
+     * vault, it always exists, and blurred cover art is a defensible backdrop
+     * rather than a stand-in for one. TMDB's real backdrop then fades in over
+     * it if the note carries a path and the network cooperates.
+     *
+     * So there is never a blank hero, never a layout shift when the backdrop
+     * lands, and no second image cached to disk for the sake of decoration.
+     */
+    paintBackdrop(hero, e) {
+      const local = this.plugin.posters.displayUrl(e);
+      const remote = e.backdropPath ? this.plugin.tmdb.posterUrl(e.backdropPath, "w780") : null;
+      if (!local && !remote)
+        return;
+      hero.addClass("has-backdrop");
+      hero.toggleClass("has-art", !!remote);
+      const wrap = hero.createDiv({ cls: "reel-hero-backdrop" });
+      if (local) {
+        const base = wrap.createDiv({ cls: "reel-hero-backdrop-base" });
+        base.setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
+      }
+      if (!remote)
+        return;
+      const img = wrap.createEl("img", {
+        cls: "reel-hero-backdrop-img",
+        attr: { src: remote, alt: "", decoding: "async" }
+      });
+      const settle = () => img.addClass("is-loaded");
+      if (img.complete && img.naturalWidth > 0)
+        settle();
+      else
+        img.addEventListener("load", settle, { once: true });
+      img.addEventListener("error", () => img.remove(), { once: true });
+    }
+    /**
+     * Stills and backdrops, fetched only when the tab is opened.
+     *
+     * Lazy on purpose: images are the largest block TMDB returns, and paying
+     * for them on every title added would be a poor trade for a tab most
+     * people never open.
+     */
+    async renderPhotos(el, isTv) {
+      el.createDiv({ cls: "reel-loading", text: "Loading photos\u2026", attr: { role: "status" } });
+      try {
+        const data = await this.plugin.tmdb.getImages(this.entry.tmdbId, isTv ? "tv" : "movie");
+        if (!el.isConnected)
+          return;
+        el.empty();
+        const shots = (data.backdrops ?? []).map((b) => b.file_path).filter((p) => !!p);
+        if (!shots.length) {
+          el.createDiv({ cls: "reel-empty", text: "No photos for this title." });
+          return;
+        }
+        const grid = el.createDiv({ cls: "reel-photos" });
+        for (const path of shots.slice(0, 24)) {
+          const src = this.plugin.tmdb.posterUrl(path, "w500");
+          if (!src)
+            continue;
+          const cell = grid.createDiv({ cls: "reel-photo" });
+          const img = cell.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+          img.addEventListener("error", () => cell.remove());
+        }
+      } catch (e) {
+        if (!el.isConnected)
+          return;
+        el.empty();
+        el.createDiv({ cls: "reel-error", text: redact(e) });
+      }
+    }
+    /**
+     * Community reviews from TMDB.
+     *
+     * Excerpted and linked, never reproduced whole: these are other people's
+     * writing, often thousands of words, and a tracker has no business
+     * republishing them. The opening lines are enough to decide whether to
+     * read the rest on TMDB.
+     */
+    renderReviews(el, reviews) {
+      for (const r of reviews.slice(0, 6)) {
+        const box = el.createDiv({ cls: "reel-review" });
+        const head = box.createDiv({ cls: "reel-review-head" });
+        head.createSpan({ cls: "reel-review-author", text: r.author ?? r.author_details?.username ?? "Anonymous" });
+        const stars2 = r.author_details?.rating;
+        if (stars2 != null)
+          head.createSpan({ cls: "reel-badge", text: `${stars2}/10` });
+        if (r.created_at)
+          head.createSpan({ cls: "reel-dim", text: prettyDate(r.created_at.slice(0, 10)) });
+        const body = (r.content ?? "").trim();
+        if (body) {
+          const excerpt = body.length > 320 ? `${body.slice(0, 320).trimEnd()}\u2026` : body;
+          box.createDiv({ cls: "reel-review-body", text: excerpt });
+        }
+        if (r.url) {
+          const a = box.createEl("a", { cls: "reel-link", text: "Read on TMDB", href: r.url });
+          a.setAttr("target", "_blank");
+          a.setAttr("rel", "noopener");
+        }
+      }
+    }
+    /** Titles TMDB associates with this one — the "what next" question. */
+    renderRelated(el, rows2) {
+      const strip = el.createDiv({ cls: "reel-related" });
+      for (const r of rows2.slice(0, 20)) {
+        const card = strip.createDiv({ cls: "reel-related-card" });
+        card.setAttr("role", "button");
+        card.setAttr("tabindex", "0");
+        card.setAttr("aria-label", `${r.title ?? r.name ?? "Untitled"} \u2014 see details`);
+        const poster2 = card.createDiv({ cls: "reel-related-poster" });
+        this.plugin.posters.attach(poster2, {
+          posterUrl: this.plugin.tmdb.posterUrl(r.poster_path, "w342") ?? void 0,
+          title: r.title ?? r.name ?? ""
+        });
+        card.createDiv({ cls: "reel-related-title", text: r.title ?? r.name ?? "Untitled" });
+        const open = () => {
+          const mine = this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film");
+          if (mine)
+            void this.plugin.openDetail(mine);
+          else
+            this.plugin.openSearch({ query: r.title ?? r.name ?? "" });
+        };
+        card.addEventListener("click", open);
+        card.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            open();
+          }
+        });
+      }
+    }
+    /** Mean of every episode rating across all seasons, or null if none. */
+    episodeAverage() {
+      const values = [];
+      for (const s of this.entry.seasons) {
+        for (const v of Object.values(s.episode_ratings ?? {})) {
+          if (typeof v === "number")
+            values.push(v);
+        }
+      }
+      if (!values.length)
+        return null;
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    }
+    /* ------------------------------------------------------------------ */
+    renderControls(side) {
+      const e = this.entry;
+      const isTv = e.type === "tv";
+      const box = side.createDiv({ cls: "reel-panel" });
+      box.createDiv({ cls: "reel-panel-title", text: "Your entry" });
+      const ratingBox = box.createDiv({ cls: "reel-control" });
+      ratingBox.createDiv({ cls: "reel-field-label", text: "Rating" });
+      const starRow = ratingBox.createDiv({ cls: "reel-rating-row" });
+      renderStars(starRow, {
+        value: e.rating,
+        onChange: async (v) => {
+          const file = this.file;
+          if (!file)
+            return;
+          try {
+            await this.plugin.notes.setRating(file, v ?? null);
+            this.entry = { ...this.entry, rating: v };
+            flash(starRow);
+            this.plugin.undo.offer(v == null ? "Rating cleared" : `Rated ${v}`);
+          } catch (err) {
+            new Notice(`Reel: ${redact(err)}`);
+          }
+        }
+      });
+      const epAvg = this.episodeAverage();
+      if (isTv && epAvg != null) {
+        ratingBox.createDiv({
+          cls: "reel-hint",
+          text: `Episode average ${epAvg.toFixed(1)} \u2014 set automatically until you rate the series yourself.`
+        });
+      }
+      const likeBox = box.createDiv({ cls: "reel-control" });
+      likeBox.createDiv({ cls: "reel-field-label", text: "Liked" });
+      const heart = likeBox.createEl("button", { cls: "reel-heart", text: e.liked ? "\u2665 Liked" : "\u2661 Like" });
+      heart.toggleClass("is-on", !!e.liked);
+      heart.addEventListener("click", async () => {
+        const file = this.file;
+        if (!file)
+          return;
+        const on = await this.plugin.notes.toggleLiked(file);
+        this.entry = { ...this.entry, liked: on };
+        heart.setText(on ? "\u2665 Liked" : "\u2661 Like");
+        heart.toggleClass("is-on", on);
+        flash(heart);
+      });
+      const known = this.plugin.library.lists();
+      if (known.length || e.lists.length) {
+        const listBox = box.createDiv({ cls: "reel-control" });
+        listBox.createDiv({ cls: "reel-field-label", text: "Lists" });
+        const listRow = listBox.createDiv({ cls: "reel-status-row" });
+        for (const name of [.../* @__PURE__ */ new Set([...known, ...e.lists])].sort()) {
+          const pill = listRow.createEl("button", { cls: "reel-chip", text: name });
+          const on = () => this.entry.lists.includes(name);
+          pill.toggleClass("is-active", on());
+          pill.addEventListener("click", () => {
+            void (async () => {
+              const file = this.file;
+              if (!file)
+                return;
+              const next = on() ? this.entry.lists.filter((l) => l !== name) : [...this.entry.lists, name];
+              await this.plugin.notes.setLists(file, next);
+              this.entry = { ...this.entry, lists: next };
+              pill.toggleClass("is-active", on());
+              flash(pill);
+            })();
+          });
+        }
+      }
+      const statusBox = box.createDiv({ cls: "reel-control" });
+      statusBox.createDiv({ cls: "reel-field-label", text: "Status" });
+      const statusRow = statusBox.createDiv({ cls: "reel-status-row" });
+      for (const status of isTv ? TV_STATUSES : FILM_STATUSES) {
+        const pill = statusRow.createEl("button", { cls: "reel-chip", text: status });
+        pill.toggleClass("is-active", this.entry.status === status);
+        pill.addEventListener("click", async () => {
+          const file = this.file;
+          if (!file)
+            return;
+          await this.plugin.notes.setStatus(file, status);
+          this.entry = { ...this.entry, status };
+          statusRow.findAll(".reel-chip").forEach((c) => c.removeClass("is-active"));
+          pill.addClass("is-active");
+          flash(pill);
+        });
+      }
+    }
+    renderActions(side) {
+      const e = this.entry;
+      const isTv = e.type === "tv";
+      const box = side.createDiv({ cls: "reel-panel" });
+      const actions = box.createDiv({ cls: "reel-detail-actions" });
+      const act = (label, cta, fn) => {
+        const b = actions.createEl("button", { cls: `reel-btn${cta ? " mod-cta" : ""}`, text: label });
+        b.addEventListener("click", fn);
+        return b;
+      };
+      if (!isTv) {
+        act(e.watched.length ? "Log another watch" : "Log watch", true, () => {
+          const file = this.file;
+          if (file)
+            new LogSheet(this.plugin.app, this.plugin, { file, entry: e }).open();
+        });
+      } else {
+        const next = this.plugin.upNext.nextFor(e);
+        if (next) {
+          act(`Watched S${next.season}E${next.episode}`, true, async () => {
+            const file = this.file;
+            if (!file)
+              return;
+            await this.plugin.notes.markEpisode(file, next.season, next.episode);
+            this.plugin.undo.offer(`S${next.season}E${next.episode} watched`);
+          });
+        }
+        act("Start a rewatch", false, async () => {
+          const file = this.file;
+          if (!file)
+            return;
+          await this.plugin.notes.restartSeries(file, e.rating);
+          this.plugin.undo.offer("Progress reset \u2014 previous run recorded");
+        });
+      }
+      act("Lists", false, () => {
+        const file = this.file;
+        if (file)
+          new ListPicker(this.plugin.app, this.plugin, e, file).open();
+      });
+      act("Refresh", false, async () => {
+        try {
+          this.episodeCache.clear();
+          await this.plugin.notes.refreshMetadata(e);
+          new Notice("Metadata refreshed");
+        } catch (err) {
+          new Notice(`Reel: ${redact(err)}`);
+        }
+      });
+      const remove = actions.createEl("button", { cls: "reel-btn reel-btn-danger", text: "Remove" });
+      remove.addEventListener("click", () => {
+        if (remove.dataset.confirming !== "true") {
+          remove.dataset.confirming = "true";
+          remove.setText("Delete note?");
+          window.setTimeout(() => {
+            if (!remove.isConnected)
+              return;
+            remove.dataset.confirming = "false";
+            remove.setText("Remove");
+          }, 4e3);
+          return;
+        }
+        void (async () => {
+          const file = this.file;
+          if (!file)
+            return;
+          try {
+            await this.plugin.app.fileManager.trashFile(file);
+            new Notice(`${e.title} moved to trash`);
+            this.onBack();
+          } catch (err) {
+            new Notice(`Reel: ${redact(err)}`);
+          }
+        })();
+      });
+    }
+    /** Cast, streaming and flags as aligned rows rather than run-on lines. */
+    renderMeta(side) {
+      const e = this.entry;
+      const rows2 = [];
+      if (e.cast.length) {
+        const names = e.cast.map(unlink);
+        const paired = names.map((n2, i) => {
+          const character = e.characters[i];
+          return character ? `${n2} as ${character}` : n2;
+        });
+        rows2.push(["Cast", paired.join(" \xB7 ")]);
+      }
+      if (e.providers.length)
+        rows2.push(["Streaming", e.providers.join(", ")]);
+      if (e.collection)
+        rows2.push(["Collection", e.collection]);
+      if (e.productionCompanies.length)
+        rows2.push(["Studio", e.productionCompanies.slice(0, 3).join(", ")]);
+      if (e.contentFlags.length) {
+        rows2.push(["Contains", e.contentFlags.map((f) => FLAG_LABELS[f] ?? f).join(", ")]);
+      }
+      if (!rows2.length)
+        return;
+      const box = side.createDiv({ cls: "reel-panel" });
+      box.createDiv({ cls: "reel-panel-title", text: "Details" });
+      const dl = box.createDiv({ cls: "reel-meta" });
+      for (const [k, v] of rows2) {
+        const row = dl.createDiv({ cls: "reel-meta-row" });
+        row.createDiv({ cls: "reel-meta-key", text: k });
+        row.createDiv({ cls: "reel-meta-value", text: v });
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    renderSeasons(main) {
+      const e = this.entry;
+      const wrap = main.createDiv({ cls: "reel-panel" });
+      wrap.createDiv({ cls: "reel-panel-title", text: "Seasons" });
+      const strip = wrap.createDiv({ cls: "reel-seasons" });
+      for (const s of e.seasons) {
+        const total = s.total ?? 0;
+        const seen = rangeCount(s.watched);
+        const pill = strip.createDiv({ cls: "reel-season-pill" });
+        pill.createSpan({ cls: "reel-season-n", text: `S${s.n}` });
+        pill.createSpan({ cls: "reel-dim", text: total ? `${seen}/${total}` : String(seen) });
+        if (s.rating != null)
+          pill.createSpan({ cls: "reel-season-rating", text: `${s.rating}\u2605` });
+        if (total && seen >= total)
+          pill.addClass("is-complete");
+        else if (seen > 0)
+          pill.addClass("is-partial");
+        if (this.openSeason === s.n)
+          pill.addClass("is-open");
+        pill.setAttr("aria-expanded", String(this.openSeason === s.n));
+        pill.setCssProps({ "--reel-fill": total ? String(Math.min(1, seen / total)) : "0" });
+        pill.addEventListener("click", () => {
+          this.openSeason = this.openSeason === s.n ? null : s.n;
+          this.rerender();
+        });
+      }
+      if (this.openSeason != null)
+        void this.renderEpisodes(wrap, this.openSeason);
+    }
+    async renderEpisodes(wrap, season) {
+      const e = this.entry;
+      const listEl = wrap.createDiv({ cls: "reel-episodes" });
+      listEl.createDiv({ cls: "reel-loading", text: `Loading season ${season}\u2026`, attr: { role: "status" } });
+      let episodes = this.episodeCache.get(season);
+      if (!episodes) {
+        const ended = e.showStatus === "Ended" || e.showStatus === "Canceled";
+        try {
+          const data = await this.plugin.tmdb.getSeason(e.tmdbId, season, ended);
+          episodes = (data.episodes ?? []).filter((x) => x.episode_number > 0);
+          this.episodeCache.set(season, episodes);
+        } catch (err) {
+          listEl.empty();
+          listEl.createDiv({ cls: "reel-error", text: redact(err) });
+          return;
+        }
+      }
+      const row = e.seasons.find((s) => s.n === season);
+      const watched = new Set(parseRange(row?.watched));
+      const ratings = { ...row?.episode_ratings ?? {} };
+      listEl.empty();
+      let firstUnwatched = null;
+      const remaining = episodes.filter((x) => !watched.has(x.episode_number)).length;
+      if (remaining) {
+        listEl.createDiv({
+          cls: "reel-block-count",
+          text: `${remaining} of ${episodes.length} left in season ${season}`
+        });
+      }
+      const bulk = listEl.createDiv({ cls: "reel-season-bulk" });
+      const markAll = bulk.createEl("button", { cls: "reel-chip", text: "Mark all watched" });
+      markAll.addEventListener("click", async () => {
+        const file = this.file;
+        if (!file || !episodes)
+          return;
+        await this.plugin.notes.setSeasonRange(file, season, `1-${episodes.length}`);
+        this.plugin.undo.offer(`Season ${season} marked watched`);
+      });
+      const clear = bulk.createEl("button", { cls: "reel-chip", text: "Clear" });
+      clear.addEventListener("click", async () => {
+        const file = this.file;
+        if (!file)
+          return;
+        await this.plugin.notes.setSeasonRange(file, season, "");
+        this.plugin.undo.offer(`Season ${season} cleared`);
+      });
+      for (const ep of episodes) {
+        const n2 = ep.episode_number;
+        const epRow = listEl.createDiv({ cls: "reel-episode" });
+        epRow.toggleClass("is-watched", watched.has(n2));
+        const tick = epRow.createDiv({ cls: "reel-episode-tick" });
+        tick.createSpan({ text: "\u2713" });
+        tick.setAttr("aria-label", `Episode ${n2}`);
+        tick.setAttr("role", "button");
+        tick.setAttr("aria-label", `Toggle episode ${n2}`);
+        tick.addEventListener("click", async () => {
+          const file = this.file;
+          if (!file)
+            return;
+          haptic("tick");
+          if (watched.has(n2))
+            watched.delete(n2);
+          else
+            watched.add(n2);
+          epRow.toggleClass("is-watched", watched.has(n2));
+          const range = formatRange([...watched]);
+          await this.plugin.notes.setSeasonRange(file, season, range);
+          this.entry = {
+            ...this.entry,
+            seasons: this.entry.seasons.map((s) => s.n === season ? { ...s, watched: range } : s)
+          };
+        });
+        const epBody = epRow.createDiv({ cls: "reel-episode-body" });
+        epBody.createDiv({ cls: "reel-episode-title", text: `${n2}. ${ep.name ?? `Episode ${n2}`}` });
+        const meta = epBody.createDiv({ cls: "reel-episode-meta" });
+        if (ep.air_date)
+          meta.createSpan({ text: prettyDate(ep.air_date) });
+        if (ep.runtime)
+          meta.createSpan({ text: `${ep.runtime}m` });
+        const starWrap = epRow.createDiv({ cls: "reel-episode-stars" });
+        starWrap.setAttr("aria-label", `Rate episode ${n2}`);
+        renderStars(starWrap, {
+          value: ratings[String(n2)],
+          compact: true,
+          onChange: async (v) => {
+            const file = this.file;
+            if (!file)
+              return;
+            if (v == null)
+              delete ratings[String(n2)];
+            else {
+              ratings[String(n2)] = v;
+              watched.add(n2);
+              epRow.addClass("is-watched");
+            }
+            await this.plugin.notes.rateEpisode(file, season, n2, v ?? null);
+            this.plugin.undo.offer(v == null ? `S${season}E${n2} cleared` : `S${season}E${n2} rated ${v}`);
+          }
+        });
+        if (!firstUnwatched && !watched.has(n2)) {
+          firstUnwatched = epRow;
+        }
+      }
+      if (firstUnwatched) {
+        window.setTimeout(() => firstUnwatched?.scrollIntoView({ block: "nearest" }), 0);
+      }
+    }
+    renderHistory(main) {
+      const e = this.entry;
+      if (!e.watched.length)
+        return;
+      const wrap = main.createDiv({ cls: "reel-panel" });
+      wrap.createDiv({ cls: "reel-panel-title", text: `Watch history \u2014 ${e.watched.length}` });
+      const list = wrap.createDiv({ cls: "reel-history" });
+      for (const w of [...e.watched].reverse()) {
+        const row = list.createDiv({ cls: "reel-history-row" });
+        row.createSpan({ text: prettyDate(w.date) });
+        if (w.rating != null)
+          row.createSpan({ cls: "reel-dim", text: `\u2605 ${w.rating}` });
+        if (w.rewatch)
+          row.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
+      }
+    }
+  };
+  function cssUrl(path) {
+    return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  // src/util/blend.ts
+  function becauseText(because, cap = 3) {
+    const names = because.slice(0, cap);
+    const extra = because.length - names.length;
+    let list;
+    if (names.length === 1)
+      list = names[0];
+    else if (names.length === 2)
+      list = `${names[0]} and ${names[1]}`;
+    else
+      list = `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    if (extra > 0)
+      list += ` and ${extra} more`;
+    return `Because it's like ${list}`;
+  }
+
+  // src/util/recipe.ts
+  function emptyRecipe() {
+    return {
+      seeds: [],
+      pool: "loved",
+      genres: [],
+      genreMode: "all",
+      withoutGenres: [],
+      decades: [],
+      excludeOwned: true,
+      minAgreement: 1
+    };
+  }
+  function describeConstraints(recipe2, genreName) {
+    const out = [];
+    if (recipe2.genres.length) {
+      const joiner = recipe2.genreMode === "all" ? " and " : " or ";
+      out.push(recipe2.genres.map(genreName).join(joiner));
+    }
+    if (recipe2.withoutGenres.length)
+      out.push(`not ${recipe2.withoutGenres.map(genreName).join(" or ")}`);
+    if (recipe2.minScore != null)
+      out.push(`rated ${recipe2.minScore}+ on TMDB`);
+    if (recipe2.maxRuntime != null)
+      out.push(`under ${recipe2.maxRuntime} minutes`);
+    if (recipe2.decades.length)
+      out.push(recipe2.decades.map((d) => `${d}s`).join(" or "));
+    if (recipe2.excludeOwned)
+      out.push("not already in your library");
+    if (recipe2.minAgreement > 1)
+      out.push(`${recipe2.minAgreement}+ of your picks agree`);
+    return out;
+  }
+  function recipeKey(recipe2) {
+    return JSON.stringify({
+      seeds: [...recipe2.seeds].sort((a, b) => a - b),
+      genres: [...recipe2.genres].sort((a, b) => a - b),
+      genreMode: recipe2.genreMode,
+      withoutGenres: [...recipe2.withoutGenres].sort((a, b) => a - b),
+      minScore: recipe2.minScore ?? null,
+      maxRuntime: recipe2.maxRuntime ?? null,
+      decades: [...recipe2.decades].sort((a, b) => a - b),
+      excludeOwned: recipe2.excludeOwned,
+      minAgreement: recipe2.minAgreement
+    });
+  }
+
+  // src/ui/recipeSheet.ts
+  var POOLS = [
+    { id: "loved", label: "Loved", hint: "Rated 4+, liked, or marked for a rewatch" },
+    { id: "rewatch", label: "Would rewatch", hint: "The ones you said you'd watch again" },
+    { id: "all", label: "Everything", hint: "Anything you've logged" }
+  ];
+  var RUNTIMES = [
+    { minutes: 90, label: "90 min" },
+    { minutes: 120, label: "2 hours" },
+    { minutes: 150, label: "2\xBD hours" }
+  ];
+  var RecipeSheet = class extends Modal {
+    constructor(plugin2, saved) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.recipe = emptyRecipe();
+      this.step = "seeds";
+      this.genres = [];
+      this.results = null;
+      this.running = false;
+      /** Live match count for the current constraints; null while unknown. */
+      this.matches = null;
+      this.seedFilter = "";
+      this.genreName = (id) => this.genres.find((g) => g.id === id)?.name ?? String(id);
+      /**
+       * The live count, debounced.
+       *
+       * Every chip tap would otherwise fire a request, and tapping through six
+       * genres to find the right pair would fire six. The count is a comfort,
+       * not an answer — it can afford to arrive a third of a second late.
+       */
+      this.refreshCount = debounce(
+        () => {
+          const asked = recipeKey(this.recipe);
+          void this.plugin.discover.count(this.recipe).then((n2) => {
+            if (asked !== recipeKey(this.recipe))
+              return;
+            this.matches = n2;
+            const el = this.contentEl.querySelector(".reel-recipe-count");
+            if (el instanceof HTMLElement)
+              el.setText(this.countText());
+          }).catch(() => {
+          });
+        },
+        350,
+        true
+      );
+      if (saved)
+        this.recipe = { ...emptyRecipe(), ...saved };
+    }
+    onOpen() {
+      const { modalEl } = this;
+      modalEl.addClass("reel-modal", "reel-recipe");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      void this.plugin.tmdb.genreList("movie").then((g) => {
+        this.genres = g;
+        this.paint();
+      }).catch(() => this.paint());
+      this.paint();
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+    /* ------------------------------------------------------------------ */
+    paint() {
+      const el = this.contentEl;
+      el.empty();
+      this.paintProgress(el);
+      if (this.step === "seeds")
+        this.paintSeeds(el);
+      else if (this.step === "mood")
+        this.paintMood(el);
+      else
+        this.paintResults(el);
+    }
+    /**
+     * Where you are in three steps.
+     *
+     * Tappable backwards, never forwards: stepping back to change a seed is a
+     * thing people do constantly, and making them cancel and start again is
+     * the cheapest way to make a wizard hateful.
+     */
+    paintProgress(el) {
+      const steps = [
+        { id: "seeds", label: "Picks" },
+        { id: "mood", label: "Mood" },
+        { id: "results", label: "Results" }
+      ];
+      const order = steps.map((s) => s.id);
+      const at = order.indexOf(this.step);
+      const bar = el.createDiv({ cls: "reel-recipe-steps" });
+      for (const [i, s] of steps.entries()) {
+        const b = bar.createEl("button", { cls: "reel-recipe-step", text: s.label, attr: { type: "button" } });
+        setSelected(b, s.id === this.step, "tab");
+        b.toggleClass("is-done", i < at);
+        if (i >= at) {
+          b.setAttr("disabled", "true");
+          continue;
+        }
+        b.addEventListener("click", () => {
+          this.step = s.id;
+          this.results = null;
+          this.paint();
+        });
+      }
+    }
+    /* ---- step 1: what did you like ---------------------------------- */
+    paintSeeds(el) {
+      el.createDiv({ cls: "reel-recipe-title", text: "What are you in the mood for?" });
+      el.createDiv({
+        cls: "reel-recipe-hint",
+        text: "Pick a few you loved. The more you pick, the more the results have to agree \u2014 which is what makes them good."
+      });
+      const pools = el.createDiv({ cls: "reel-chips" });
+      for (const p of POOLS) {
+        const b = pools.createEl("button", { cls: "reel-chip", text: p.label, attr: { type: "button", title: p.hint } });
+        setSelected(b, this.recipe.pool === p.id);
+        b.addEventListener("click", () => {
+          this.recipe.pool = p.id;
+          this.paint();
+        });
+      }
+      const pool = this.plugin.discover.seedPool(this.recipe.pool);
+      if (!pool.length) {
+        const why = this.recipe.pool === "rewatch" ? "Nothing is marked 'would rewatch' yet \u2014 long-press a poster and tap Again." : this.recipe.pool === "loved" ? "Nothing rated 4 or above yet. Try Everything, or rate a few first." : "Nothing logged yet.";
+        el.createDiv({ cls: "reel-empty", text: why });
+        this.paintNav(el, { next: "Skip to mood", onNext: () => this.go("mood") });
+        return;
+      }
+      if (pool.length > 12) {
+        const search = el.createEl("input", {
+          cls: "reel-input",
+          attr: { type: "search", placeholder: "Find one of yours\u2026", enterkeyhint: "search" }
+        });
+        search.value = this.seedFilter;
+        search.addEventListener("input", () => {
+          this.seedFilter = search.value;
+          this.paintSeedGrid(grid, pool);
+        });
+      }
+      const grid = el.createDiv({ cls: "reel-recipe-seeds" });
+      this.paintSeedGrid(grid, pool);
+      const n2 = this.recipe.seeds.length;
+      this.paintNav(el, {
+        count: n2 ? `${n2} picked` : "None picked yet",
+        next: n2 ? "Next" : "Skip \u2014 just filter",
+        onNext: () => this.go("mood")
+      });
+    }
+    paintSeedGrid(grid, pool) {
+      grid.empty();
+      const q = this.seedFilter.trim().toLowerCase();
+      const rows2 = q ? pool.filter((e) => e.title.toLowerCase().includes(q)) : pool;
+      if (!rows2.length) {
+        grid.createDiv({ cls: "reel-empty", text: `Nothing of yours matches "${this.seedFilter}".` });
+        return;
+      }
+      const picked = rows2.filter((e) => this.recipe.seeds.includes(e.tmdbId));
+      const rest = rows2.filter((e) => !this.recipe.seeds.includes(e.tmdbId)).slice(0, 60);
+      for (const entry of [...picked, ...rest]) {
+        const on = this.recipe.seeds.includes(entry.tmdbId);
+        const cell = grid.createDiv({ cls: "reel-recipe-seed" });
+        cell.toggleClass("is-on", on);
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-pressed", on ? "true" : "false");
+        cell.setAttr("aria-label", `${entry.title}${on ? " \u2014 picked" : ""}`);
+        const poster2 = cell.createDiv({ cls: "reel-recipe-seed-poster" });
+        this.plugin.posters.attach(poster2, entry);
+        if (on)
+          setIcon(poster2.createDiv({ cls: "reel-recipe-seed-tick" }), "check");
+        cell.createDiv({ cls: "reel-recipe-seed-title", text: entry.title });
+        const toggle = () => {
+          haptic("tick");
+          this.recipe.seeds = on ? this.recipe.seeds.filter((id) => id !== entry.tmdbId) : [...this.recipe.seeds, entry.tmdbId];
+          this.paint();
+        };
+        cell.addEventListener("click", toggle);
+        cell.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ")
+            return;
+          ev.preventDefault();
+          toggle();
+        });
+      }
+    }
+    /* ---- step 2: constraints ---------------------------------------- */
+    paintMood(el) {
+      el.createDiv({ cls: "reel-recipe-title", text: "Narrow it down" });
+      const section = (label) => el.createDiv({ cls: "reel-recipe-label", text: label });
+      section("Genres");
+      if (this.recipe.genres.length > 1) {
+        const mode = el.createDiv({ cls: "reel-seg" });
+        for (const [value, text, hint] of [
+          ["all", "Both", "Films that are all of these"],
+          ["any", "Either", "Films that are any of these"]
+        ]) {
+          const b = mode.createEl("button", { cls: "reel-seg-btn", text, attr: { type: "button", title: hint } });
+          setSelected(b, this.recipe.genreMode === value);
+          b.addEventListener("click", () => {
+            this.recipe.genreMode = value;
+            this.refreshCount();
+            this.paint();
+          });
+        }
+      }
+      const genreRow = el.createDiv({ cls: "reel-chips" });
+      for (const g of this.genres) {
+        const included = this.recipe.genres.includes(g.id);
+        const excluded = this.recipe.withoutGenres.includes(g.id);
+        const b = genreRow.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        b.createSpan({ text: excluded ? `Not ${g.name}` : g.name });
+        b.toggleClass("is-active", included);
+        b.toggleClass("is-excluded", excluded);
+        b.setAttr("aria-pressed", included || excluded ? "true" : "false");
+        b.setAttr("aria-label", `${g.name} \u2014 ${included ? "included" : excluded ? "excluded" : "off"}. Tap to change.`);
+        b.addEventListener("click", () => {
+          haptic("tick");
+          if (included) {
+            this.recipe.genres = this.recipe.genres.filter((id) => id !== g.id);
+            this.recipe.withoutGenres = [...this.recipe.withoutGenres, g.id];
+          } else if (excluded) {
+            this.recipe.withoutGenres = this.recipe.withoutGenres.filter((id) => id !== g.id);
+          } else {
+            this.recipe.genres = [...this.recipe.genres, g.id];
+          }
+          this.refreshCount();
+          this.paint();
+        });
+      }
+      el.createDiv({ cls: "reel-recipe-hint", text: "Tap once to include, twice to rule out." });
+      section("How long have you got?");
+      const times = el.createDiv({ cls: "reel-chips" });
+      for (const r of RUNTIMES) {
+        const b = times.createEl("button", { cls: "reel-chip", text: r.label, attr: { type: "button" } });
+        setSelected(b, this.recipe.maxRuntime === r.minutes);
+        b.addEventListener("click", () => {
+          this.recipe.maxRuntime = this.recipe.maxRuntime === r.minutes ? void 0 : r.minutes;
+          this.refreshCount();
+          this.paint();
+        });
+      }
+      section("At least");
+      const scores = el.createDiv({ cls: "reel-chips" });
+      for (const s of [6, 7, 8]) {
+        const b = scores.createEl("button", { cls: "reel-chip", text: `${s}+`, attr: { type: "button" } });
+        setSelected(b, this.recipe.minScore === s);
+        b.addEventListener("click", () => {
+          this.recipe.minScore = this.recipe.minScore === s ? void 0 : s;
+          this.refreshCount();
+          this.paint();
+        });
+      }
+      section("Decade");
+      const decades = el.createDiv({ cls: "reel-chips" });
+      for (const d of [1970, 1980, 1990, 2e3, 2010, 2020]) {
+        const b = decades.createEl("button", { cls: "reel-chip", text: `${d}s`, attr: { type: "button" } });
+        const on = this.recipe.decades.includes(d);
+        setSelected(b, on);
+        b.addEventListener("click", () => {
+          this.recipe.decades = on ? this.recipe.decades.filter((x) => x !== d) : [...this.recipe.decades, d];
+          this.refreshCount();
+          this.paint();
+        });
+      }
+      if (this.recipe.seeds.length > 1) {
+        section("How closely should your picks agree?");
+        const agree = el.createDiv({ cls: "reel-chips" });
+        for (let n2 = 1; n2 <= Math.min(3, this.recipe.seeds.length); n2++) {
+          const b = agree.createEl("button", {
+            cls: "reel-chip",
+            text: n2 === 1 ? "Any of them" : `${n2}+ of them`,
+            attr: { type: "button" }
+          });
+          setSelected(b, this.recipe.minAgreement === n2);
+          b.addEventListener("click", () => {
+            this.recipe.minAgreement = n2;
+            this.paint();
+          });
+        }
+      }
+      const owned = el.createDiv({ cls: "reel-chips" });
+      const skip = owned.createEl("button", {
+        cls: "reel-chip",
+        text: "Hide what I already have",
+        attr: { type: "button" }
+      });
+      setSelected(skip, this.recipe.excludeOwned);
+      skip.addEventListener("click", () => {
+        this.recipe.excludeOwned = !this.recipe.excludeOwned;
+        this.paint();
+      });
+      this.paintNav(el, {
+        count: this.countText(),
+        next: "Show me",
+        onNext: () => {
+          this.step = "results";
+          this.results = null;
+          this.paint();
+          void this.run();
+        }
+      });
+    }
+    countText() {
+      if (this.matches == null)
+        return "Nothing narrowed yet";
+      if (this.matches === 0)
+        return "Nothing matches \u2014 try loosening something";
+      return `${this.matches.toLocaleString()} film${this.matches === 1 ? "" : "s"} match`;
+    }
+    /* ---- step 3: results -------------------------------------------- */
+    paintResults(el) {
+      const constraints = describeConstraints(this.recipe, this.genreName);
+      if (constraints.length)
+        el.createDiv({ cls: "reel-recipe-hint", text: constraints.join(" \xB7 ") });
+      if (this.results == null) {
+        skeletonGrid(el, 12, "Finding things for you");
+        return;
+      }
+      if (!this.results.length) {
+        void this.explainEmpty(el);
+        return;
+      }
+      const grid = el.createDiv({ cls: "reel-recipe-results" });
+      for (const row of this.results.slice(0, 40)) {
+        const item = row.item;
+        const title = item.title ?? item.name ?? "Untitled";
+        const card = grid.createDiv({ cls: "reel-recipe-result" });
+        const poster2 = card.createDiv({ cls: "reel-recipe-result-poster" });
+        this.plugin.posters.attach(poster2, {
+          posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w342") ?? void 0,
+          title
+        });
+        if (row.agreement > 1) {
+          poster2.createDiv({ cls: "reel-recipe-agree", text: `${row.agreement}\xD7` });
+        }
+        card.createDiv({ cls: "reel-recipe-result-title", text: title });
+        if (row.because.length) {
+          card.createDiv({ cls: "reel-recipe-because", text: becauseText(row.because) });
+        }
+        card.setAttr("role", "button");
+        card.setAttr("tabindex", "0");
+        card.setAttr("aria-label", `${title} \u2014 ${row.because.length ? becauseText(row.because) : "see details"}`);
+        card.addEventListener("click", () => this.preview(item));
+      }
+      const actions = el.createDiv({ cls: "reel-recipe-actions" });
+      const quick = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Go through them one by one" });
+      quick.addEventListener("click", () => {
+        this.plugin.discover.stage(this.results?.map((r) => r.item) ?? []);
+        this.close();
+        void this.plugin.openTab("discover");
+      });
+      const save = actions.createEl("button", { cls: "reel-btn", text: "Save this recipe" });
+      save.addEventListener("click", () => this.save());
+    }
+    /**
+     * Why nothing came back, and the one thing to change.
+     *
+     * "No results" is a dead end. Every constraint is in hand, so the culprit
+     * is computable — one count per constraint with that one removed.
+     */
+    async explainEmpty(el) {
+      const box = el.createDiv({ cls: "reel-empty-state" });
+      setIcon(box.createDiv({ cls: "reel-empty-icon" }), "search-x");
+      box.createDiv({ cls: "reel-empty-title", text: "Nothing matches all of that" });
+      const body = box.createDiv({ cls: "reel-empty-body", text: "Working out which part is the problem\u2026" });
+      let culprit = null;
+      try {
+        culprit = await this.plugin.discover.blameFor(this.recipe, this.genreName);
+      } catch {
+      }
+      if (!box.isConnected)
+        return;
+      const show = box.createEl("button", { cls: "reel-link", text: "Show the query" });
+      show.addEventListener("click", () => {
+        show.remove();
+        const dump = box.createDiv({ cls: "reel-recipe-query" });
+        const queries = this.plugin.discover.describeQueries(this.recipe);
+        dump.createDiv({ text: queries.length ? `${queries.length} query to TMDB:` : "No query \u2014 nothing constrains it." });
+        for (const q of queries)
+          dump.createEl("code", { text: q });
+        const cert = this.plugin.settings.maxCertification;
+        if (cert)
+          dump.createDiv({ text: `Content filter: certification \u2264 ${cert}. This applies to every search.` });
+        const dismissed = this.plugin.settings.dismissedIds.length;
+        if (dismissed)
+          dump.createDiv({ text: `${dismissed} title(s) hidden by "not interested".` });
+        dump.createDiv({ text: `${this.plugin.library.size} in your library, hidden: ${this.recipe.excludeOwned}` });
+      });
+      if (!culprit) {
+        body.setText(
+          "Even loosening one thing doesn't help. That usually means something outside these filters is cutting it \u2014 the query below will say what."
+        );
+        return;
+      }
+      body.setText(`It's ${culprit.label}. Drop it and you get ${culprit.without.toLocaleString()} results.`);
+      const fix = box.createDiv({ cls: "reel-empty-actions" });
+      const btn = fix.createEl("button", { cls: "reel-btn mod-cta", text: "Drop it and try again" });
+      btn.addEventListener("click", () => {
+        const key = culprit.key;
+        if (key === "minScore")
+          this.recipe.minScore = void 0;
+        else if (key === "maxRuntime")
+          this.recipe.maxRuntime = void 0;
+        else if (key === "decades")
+          this.recipe.decades = [];
+        else if (key === "withoutGenres")
+          this.recipe.withoutGenres = [];
+        else if (key === "genreMode")
+          this.recipe.genreMode = "any";
+        else if (key === "genres")
+          this.recipe.genres = [];
+        this.results = null;
+        this.paint();
+        void this.run();
+      });
+    }
+    async run() {
+      if (this.running)
+        return;
+      this.running = true;
+      try {
+        this.results = await this.plugin.discover.run(this.recipe);
+      } catch (e) {
+        this.results = [];
+        reportFailure(e, { context: "Couldn't run that", retry: () => void this.run() });
+      } finally {
+        this.running = false;
+        this.paint();
+      }
+    }
+    preview(item) {
+      new PreviewSheet(this.plugin, item, () => {
+        this.results = (this.results ?? []).filter((r) => r.item.id !== item.id);
+        this.paint();
+      }).open();
+    }
+    /**
+     * Name it and keep it.
+     *
+     * A mood you built once and can return to is what turns this from a form
+     * into a tool. Stored in settings rather than as a note — it is a
+     * preference about how to search, not a thing you watched.
+     */
+    save() {
+      const key = recipeKey(this.recipe);
+      const existing = this.plugin.settings.recipes.find((r) => recipeKey(r) === key);
+      if (existing) {
+        new Notice(`Reel: already saved as "${existing.name}".`);
+        return;
+      }
+      const suggestion = describeConstraints(this.recipe, this.genreName).filter((c) => c !== "not already in your library").slice(0, 2).join(", ") || "My recipe";
+      const modal = new Modal(this.app);
+      modal.titleEl.setText("Name this recipe");
+      const input = modal.contentEl.createEl("input", {
+        cls: "reel-input",
+        attr: { type: "text", placeholder: "Sunday afternoon" }
+      });
+      input.value = suggestion;
+      const row = modal.contentEl.createDiv({ cls: "reel-log-actions" });
+      row.createEl("button", { cls: "reel-btn", text: "Cancel" }).addEventListener("click", () => modal.close());
+      const ok = row.createEl("button", { cls: "reel-btn mod-cta", text: "Save" });
+      ok.addEventListener("click", async () => {
+        const name = input.value.trim() || suggestion;
+        this.plugin.settings.recipes = [{ ...this.recipe, name }, ...this.plugin.settings.recipes].slice(0, 20);
+        await this.plugin.saveSettings();
+        modal.close();
+        new Notice(`Reel: saved "${name}".`);
+      });
+      modal.open();
+      window.setTimeout(() => input.select(), 0);
+    }
+    /* ---- shared footer ---------------------------------------------- */
+    paintNav(el, opts) {
+      const nav = el.createDiv({ cls: "reel-recipe-nav" });
+      if (opts.count)
+        nav.createDiv({ cls: "reel-recipe-count", text: opts.count });
+      const btn = nav.createEl("button", { cls: "reel-btn mod-cta", text: opts.next, attr: { type: "button" } });
+      btn.addEventListener("click", opts.onNext);
+    }
+    go(step) {
+      this.step = step;
+      if (step === "mood")
+        this.refreshCount();
+      this.paint();
+    }
+  };
+
   // src/settings.ts
   var DEFAULT_SETTINGS = {
     keyMode: "encrypted",
@@ -1755,6 +5025,81 @@
     language: "en-US",
     noteTemplate: "\n## Notes\n\n"
   };
+
+  // harness/audit.ts
+  var SCROLLERS = [
+    "reel-chips",
+    "reel-suggest",
+    "reel-sortbar",
+    "reel-caststrip",
+    "reel-drow-strip",
+    "reel-chart-strip",
+    "reel-otd-strip",
+    "reel-recipe-seeds",
+    "reel-skel-strip",
+    "reel-related-strip",
+    "reel-preview-links"
+  ];
+  function auditScreen(view, opts) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const out = [];
+    const check = (name, ok, detail2 = "") => out.push({ name, ok, detail: detail2 });
+    check("phoneClass", view.classList.contains("is-phone") === opts.phone, "compact layout keys off this");
+    const escaped = [...view.querySelectorAll("*")].filter((el) => {
+      if (el.getBoundingClientRect().right <= vw + 1)
+        return false;
+      for (let p = el; p; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX !== "visible")
+          return false;
+        if ([...p.classList].some((c) => SCROLLERS.includes(c)))
+          return false;
+      }
+      return true;
+    });
+    check(
+      "noOverflow",
+      escaped.length === 0,
+      escaped.slice(0, 3).map((e) => e.className.split(" ")[0]).join(", ")
+    );
+    check(
+      "docNotWider",
+      document.documentElement.scrollWidth <= vw,
+      `${document.documentElement.scrollWidth} vs ${vw}`
+    );
+    const uneven = [...view.querySelectorAll(".reel-grid, .reel-recipe-results, .reel-recipe-seeds")].filter((g) => {
+      const w = getComputedStyle(g).gridTemplateColumns.split(" ").map(parseFloat).filter(Number.isFinite);
+      return w.length > 1 && Math.max(...w) - Math.min(...w) > 2;
+    });
+    check("gridTracksEqual", uneven.length === 0, uneven.map((g) => getComputedStyle(g).gridTemplateColumns).join(" | "));
+    const first = view.querySelector(".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed");
+    if (first) {
+      const top = first.getBoundingClientRect().top;
+      check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round(top / vh * 100)}%`);
+    }
+    const small = [...view.querySelectorAll('button, [role="button"], select')].filter((el) => {
+      const h = el.getBoundingClientRect().height;
+      return h > 0 && h < 44 && !el.closest(".reel-stars") && !el.closest(".reel-episode-stars");
+    });
+    const worst = /* @__PURE__ */ new Map();
+    for (const el of small) {
+      const k = el.className.split(" ")[0] || el.tagName;
+      worst.set(k, Math.min(worst.get(k) ?? 99, Math.round(el.getBoundingClientRect().height)));
+    }
+    check("touchTargets44", small.length === 0, [...worst].map(([k, h]) => `${k} ${h}px`).join(", "));
+    const tiny = /* @__PURE__ */ new Set();
+    for (const el of view.querySelectorAll("*")) {
+      if (el.childElementCount || !el.textContent?.trim())
+        continue;
+      if (el.closest(".reel-stars") || el.closest(".reel-tab-icon"))
+        continue;
+      const fs = parseFloat(getComputedStyle(el).fontSize);
+      if (fs < 12)
+        tiny.add(`${el.className.split(" ")[0] || el.tagName} ${fs}px`);
+    }
+    check("textAtLeast12px", tiny.size === 0, [...tiny].slice(0, 4).join(", "));
+    return out;
+  }
 
   // harness/main.ts
   function poster(title) {
@@ -1909,29 +5254,102 @@
     compact.createDiv({ cls: "reel-field-label", text: "Compact (episode rows)" });
     renderStars(compact.createDiv({ cls: "reel-rating-row" }), { value: 4, compact: true });
   }
+  function mountSheet(root, sheet) {
+    const shell = root.createDiv({ cls: "reel-modal-shell" });
+    sheet.modalEl = shell;
+    shell.addClass("reel-modal");
+    if (phone2)
+      shell.addClass("reel-sheet");
+    shell.appendChild(sheet.contentEl);
+    try {
+      sheet.onOpen();
+    } catch (e) {
+      sheet.contentEl.createEl("pre", { text: `sheet failed: ${String(e)}` });
+    }
+  }
+  function detail(root) {
+    root.addClass("reel-view-body");
+    const screen = new DetailScreen(plugin, SHOW, () => {
+    }, "Library");
+    screen.render(root);
+  }
+  function detailFilm(root) {
+    root.addClass("reel-view-body");
+    const screen = new DetailScreen(plugin, LIBRARY[0], () => {
+    }, "Library");
+    screen.render(root);
+  }
+  function discover(root) {
+    root.addClass("reel-view-body");
+    const screen = new DiscoverScreen(plugin);
+    screen.render(root);
+  }
+  function recipe(root) {
+    root.addClass("reel-view-body");
+    mountSheet(root, new RecipeSheet(plugin));
+  }
+  function quickrate(root) {
+    root.addClass("reel-view-body");
+    mountSheet(root, new QuickRate(plugin, LIBRARY[0], {}));
+  }
+  function logsheet(root) {
+    root.addClass("reel-view-body");
+    mountSheet(root, new LogSheet(plugin.app, plugin, { entry: LIBRARY[0], file: {} }));
+  }
   var SCREENS = {
     library,
     rows,
     stats,
     upnext,
     empties,
-    stars
+    stars,
+    detail,
+    detailFilm,
+    discover,
+    recipe,
+    quickrate,
+    logsheet
   };
   var params2 = new URLSearchParams(location.search);
   var wanted = params2.get("screen") ?? "library";
   var phone2 = params2.get("phone") !== "0";
-  var app = document.getElementById("app");
-  if (app) {
-    const view = app.createDiv({ cls: "reel-view" });
+  function mount(app2, name) {
+    const view = app2.createDiv({ cls: "reel-view" });
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
-    const paint = SCREENS[wanted] ?? library;
     try {
-      paint(view);
+      (SCREENS[name] ?? library)(view);
     } catch (e) {
       view.createEl("pre", { text: `render failed: ${String(e)}
 ${e?.stack ?? ""}` });
     }
+    return view;
+  }
+  var app = document.getElementById("app");
+  if (app && params2.get("audit") != null) {
+    const results = [];
+    for (const name of Object.keys(SCREENS)) {
+      const view = mount(app, name);
+      results.push({ screen: name, checks: auditScreen(view, { phone: phone2 }) });
+      view.remove();
+    }
+    const failures = results.flatMap((r) => r.checks.filter((c) => !c.ok).map((c) => ({ ...c, screen: r.screen })));
+    const total = results.reduce((n2, r) => n2 + r.checks.length, 0);
+    document.title = failures.length ? `FAIL ${failures.length}/${total}` : `PASS ${total}`;
+    const report = app.createDiv({ cls: "reel-audit" });
+    report.createEl("h2", { text: document.title });
+    if (!failures.length) {
+      report.createEl("p", { text: `${Object.keys(SCREENS).length} screens, nothing to report.` });
+    }
+    for (const f of failures) {
+      const row = report.createDiv({ cls: "reel-audit-row" });
+      row.createEl("strong", { text: `${f.screen} \xB7 ${f.name}` });
+      if (f.detail)
+        row.createEl("code", { text: f.detail });
+    }
+    window.REEL_AUDIT = { total, failures };
+  } else if (app) {
+    mount(app, wanted);
   }
   document.body.dataset.reelReady = "1";
 })();

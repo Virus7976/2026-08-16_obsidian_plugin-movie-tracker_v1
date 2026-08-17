@@ -11,7 +11,7 @@
     "test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
     "test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
-    "preflight": "node scripts/preflight.mjs",
+    "preflight": "node scripts/preflight.mjs && npm run audit",
     "release": "node scripts/publish.mjs",
     "doctor": "node scripts/doctor.mjs",
     "publish": "node scripts/publish.mjs",
@@ -34,7 +34,8 @@
     "test:blend": "esbuild tests/blend.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.blend.cjs --log-level=error && node tests/.blend.cjs",
     "test:cachekey": "esbuild tests/cachekey.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.cachekey.cjs --log-level=error && node tests/.cachekey.cjs",
     "test:roving": "esbuild tests/roving.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.roving.cjs --log-level=error && node tests/.roving.cjs",
-    "harness": "esbuild harness/main.ts --bundle --format=iife --alias:obsidian=./harness/shim.ts --outfile=harness/bundle.js --log-level=warning"
+    "harness": "esbuild harness/main.ts --bundle --format=iife --alias:obsidian=./harness/shim.ts --outfile=harness/bundle.js --log-level=warning",
+    "audit": "npm run harness && node scripts/audit.mjs"
   },
   "keywords": [
     "obsidian",
@@ -49,6 +50,7 @@
     "@types/node": "^20.11.30",
     "esbuild": "0.20.2",
     "obsidian": "latest",
+    "puppeteer-core": "^25.7.0",
     "tslib": "2.6.2",
     "typescript": "5.4.5"
   }

@@ -64,3 +64,9 @@ html, body {
 }
 
 .svg-icon { width: 18px; height: 18px; }
+
+/* The audit report. Plain on purpose — it is output, not part of the app. */
+.reel-audit { padding: 16px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+.reel-audit h2 { margin: 0 0 12px; font-size: 16px; }
+.reel-audit-row { padding: 6px 0; border-top: 1px solid #ddd; }
+.reel-audit-row code { display: block; color: #b00; margin-top: 2px; word-break: break-all; }

@@ -422,3 +422,25 @@ Two things it deliberately gets right, because getting them wrong makes the
 harness lie: `Platform.isPhone` is modelled (the compact rules key off it),
 and `box-sizing: border-box` is set globally the way Obsidian does. Without
 the second, the first run reported a 24px overflow that did not exist.
+
+### Running it headlessly
+
+```bash
+npm run audit
+```
+
+Serves the repo, drives a real browser at 375×812 **and** 1280×900, reads the
+audit's verdict and exits non-zero on failure. `npm run preflight` calls it, so
+a layout regression stops a release the way a failing test does.
+
+`puppeteer-core` rather than `puppeteer`: the full package downloads its own
+Chromium (~200 MB) to render six screens, and any machine that can run
+Obsidian already has a Chromium-based browser. The script finds Chrome or Edge
+on Windows, macOS and Linux; set `REEL_CHROME` to override. With no browser
+present it says so and exits 0 — a machine that cannot run the check should
+not be blocked from cutting a release by it.
+
+Running at both viewports is the point. The first headless run passed on phone
+and failed on desktop: a stats row measured 41px because the phone layout gives
+it more padding and it cleared 44 there. A check that runs at one width
+verifies one width.
