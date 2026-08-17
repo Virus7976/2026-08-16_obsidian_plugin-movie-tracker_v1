@@ -87,6 +87,11 @@ export default class ReelPlugin extends Plugin {
 
 		this.app.workspace.onLayoutReady(() => {
 			this.library.load();
+			// Cache files written before the filename carried a hash are long
+			// enough to break `git add` in a vault under version control, and
+			// nothing will ever read them again. Cleared silently on load —
+			// a cache file is never worth a notice.
+			void this.tmdb.pruneLegacyCache();
 			if (this.settings.checkNewEpisodes) void this.checkNewEpisodes();
 		});
 

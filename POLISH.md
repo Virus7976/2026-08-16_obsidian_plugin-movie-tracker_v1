@@ -48,10 +48,22 @@ Carried from round 4, where five items were listed and not built.
 - [x] **7. `npm run publish` times out.** The audit is out of `preflight` and
       into a new `npm run check` (preflight + tests + audit). A release step
       that has to be fast no longer launches a browser.
-- [ ] **8. Nothing declares `will-change`** while 37 rules animate.
-- [ ] **9. Ten focus rules** for roughly sixty interactive classes.
+- [x] **8. `will-change`.** Declared on the five things that actually move
+      under a finger, not everywhere — each hint costs the compositor a layer
+      whether or not it is used, so blanket application is a memory leak
+      wearing an optimisation's clothes.
+- [x] **9. Focus.** One `:focus-visible` rule scoped to the view, modals and
+      blocks, rather than sixty individual ones. A ring only some controls
+      have is worse than none: it teaches you the ring means something it
+      does not.
 - [ ] **10. 25 DOM nodes per grid cell**, rebuilt on every repaint. Fine at 31
       titles, not at 300 — and it gets worse on its own.
+
+- [x] **Extra — legacy cache files.** Names written before the filename
+      carried a hash were long enough to break `git add` in a vault under
+      version control, which is a plugin breaking a user's VCS over data it
+      regenerates for free. They are also unreachable, since the current
+      `cachePath` never produces those names. Pruned silently on load.
 
 ## Done
 

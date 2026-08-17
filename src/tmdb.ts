@@ -541,4 +541,43 @@ export class TmdbClient {
 			return 0;
 		}
 	}
+
+	/**
+	 * Remove cache files written under the old naming scheme.
+	 *
+	 * Before the filename carried a hash, a discover query produced names like
+	 * `rec-movie-include_adult_false_primary_release_date.gte_2000-01-01_…json`
+	 * — long enough that `git add` in the vault failed outright with "Filename
+	 * too long", which is a plugin breaking a user's version control over a
+	 * cache file it can regenerate for free.
+	 *
+	 * They are also unreachable: the current `cachePath` never produces those
+	 * names, so nothing will ever read them again. Deleting is strictly better
+	 * than leaving them to rot.
+	 *
+	 * Runs once at load, silently. A cache file is never worth a notice.
+	 */
+	async pruneLegacyCache(): Promise<number> {
+		const adapter = this.plugin.app.vault.adapter;
+		try {
+			if (!(await adapter.exists(this.cacheDir))) return 0;
+			const listing = await adapter.list(this.cacheDir);
+			let removed = 0;
+			for (const path of listing.files) {
+				const name = path.split("/").pop() ?? "";
+				// Current names are a truncated prefix plus `-<hash>.json`, so
+				// they are short and end in a hash. Anything long, or lacking
+				// that suffix, predates the scheme.
+				const current = /-[a-z0-9]{7,}\.json$/.test(name) && name.length <= 80;
+				if (current) continue;
+				await adapter.remove(path);
+				removed++;
+			}
+			return removed;
+		} catch {
+			// Best effort. A vault that will not let us tidy up is not a reason
+			// to fail loading.
+			return 0;
+		}
+	}
 }

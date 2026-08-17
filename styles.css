@@ -6498,3 +6498,61 @@ input.reel-input {
 	width: 76px;
 	text-align: center;
 }
+
+/* ------------------------------------------------------------------ */
+/* Focus                                                               */
+/* ------------------------------------------------------------------ */
+
+/* Ten focus rules covered roughly sixty interactive classes, so keyboard
+   focus was invisible on most of the app. One rule instead of sixty, because
+   a focus ring that only some controls have is worse than none — it teaches
+   you the ring means something it does not.
+ *
+ * `:focus-visible`, not `:focus`: the browser decides, so a mouse click does
+ * not leave a ring behind while a Tab press does. */
+.reel-view :focus-visible,
+.reel-modal :focus-visible,
+.reel-block :focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+	border-radius: var(--reel-radius-sm);
+}
+
+/* On a poster the ring has to sit outside the artwork, or it disappears into
+   whatever the image happens to be at the edge. */
+.reel-cell:focus-visible,
+.reel-recipe-seed:focus-visible,
+.reel-recipe-result:focus-visible,
+.reel-otd-card:focus-visible {
+	outline-offset: 3px;
+	border-radius: var(--reel-radius);
+}
+
+/* ------------------------------------------------------------------ */
+/* Compositing                                                         */
+/* ------------------------------------------------------------------ */
+
+/* Thirty-seven rules animate and nothing declared `will-change`, so every
+   transform and fade was composited from scratch. Declared only on the few
+   things that actually move under a finger — `will-change` on everything is
+   a memory leak, not an optimisation, since each hint costs the compositor a
+   layer whether or not it is used. */
+.reel-cell,
+.reel-row,
+.reel-recipe-result,
+.reel-quickcard,
+.reel-reaction {
+	will-change: transform;
+}
+
+/* Dropped once the element settles, so the layer is not held for the life of
+   the screen. */
+@media (prefers-reduced-motion: reduce) {
+	.reel-cell,
+	.reel-row,
+	.reel-recipe-result,
+	.reel-quickcard,
+	.reel-reaction {
+		will-change: auto;
+	}
+}
