@@ -350,7 +350,11 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		tally(charts, "Top actors", seenFilms, (e) => e.cast.map(unlink), undefined, undefined, plugin, true);
 		// Recurring characters are mostly a franchise signal — the same part
 		// across several films is the interesting case, so require two.
-		tally(charts, "Recurring characters", seenFilms, (e) => e.characters, undefined, undefined, plugin);
+		// Characters get no portrait and no posters. Nobody's face belongs to
+		// "Ethan Hunt" in this index, and the film poster underneath was the
+		// worst version of the same mistake — it read as a picture of the
+		// character. A bar is the honest answer.
+		tally(charts, "Recurring characters", seenFilms, (e) => e.characters, undefined, undefined, plugin, false, true);
 	}
 	if (seenShows.length) {
 		tally(charts, "Top creators", seenShows, (e) => e.creators.map(unlink), undefined, undefined, plugin);
@@ -497,6 +501,15 @@ interface Bar {
 	/** An action for rows whose answer is not a library search — a year rescopes the page. */
 	go?: () => void;
 	/**
+	 * Suppress the poster strip.
+	 *
+	 * Set for people and for characters. A character has no headshot of its
+	 * own — nobody's face belongs to "Ethan Hunt" in this index — so those
+	 * rows carry a bar rather than a portrait, and definitely not a poster
+	 * that would read as a picture of the character.
+	 */
+	noPosters?: boolean;
+	/**
 	 * The person this row is about, when it is about a person.
 	 *
 	 * Held separately from `label` because a label can carry a count or a
@@ -572,7 +585,15 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 		if (d.note) label.createDiv({ cls: "reel-chart-sub", text: d.note });
 		head.createDiv({ cls: "reel-chart-value", text: `${d.n}${suffix}` });
 
-		const posters = plugin ? (d.entries ?? []) : [];
+		// A row about a person or a character shows no posters at all.
+		//
+		// The strip is right for a genre or a decade, where the row genuinely
+		// *is* a set of titles. Under a name it was wrong twice over: a film
+		// poster beneath "Jean Reno" reads as a picture of Jean Reno, and in a
+		// small library every actor in the chart was in the same film, so the
+		// identical poster repeated down every row. The face is the thumbnail;
+		// a second, wrong one under it was the complaint.
+		const posters = plugin && !d.noPosters ? (d.entries ?? []) : [];
 		if (posters.length) {
 			const strip = row.createDiv({ cls: "reel-chart-strip" });
 			// Capped: a prolific director would otherwise push every other row
@@ -620,7 +641,9 @@ function tally(
 	minCount = 2,
 	plugin?: ReelPlugin,
 	/** True when each key is a person's name, so the row can lead with a face. */
-	people = false
+	people = false,
+	/** True for keys that are neither titles nor people — a character name. */
+	bare = false
 ): void {
 	// "Appears at least twice" keeps a large library's charts meaningful, but
 	// it empties them entirely for a small one — every director has exactly
@@ -649,7 +672,8 @@ function tally(
 			n: list.length,
 			entries: list,
 			search: label,
-			...(people ? { face: label } : {}),
+			...(people ? { face: label, noPosters: true } : {}),
+			...(bare ? { noPosters: true } : {}),
 		}));
 	bars(el, title, top, "", plugin);
 }
@@ -695,7 +719,7 @@ function ratedBy(
 			// The label carries a count in brackets — searching that string
 			// would match nothing, so the search uses the bare key.
 			search: label,
-			...(people ? { face: label } : {}),
+			...(people ? { face: label, noPosters: true } : {}),
 		}))
 		.sort((a, b) => b.n - a.n)
 		.slice(0, 8);

@@ -5671,3 +5671,53 @@ input.reel-input {
 	font-weight: var(--reel-weight-medium);
 	color: var(--text-accent);
 }
+
+/* ------------------------------------------------------------------ */
+/* Preview sheet — now actually full details                           */
+/* ------------------------------------------------------------------ */
+
+.reel-preview-facts {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	margin-bottom: var(--reel-space-1);
+}
+
+.reel-preview-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--reel-space-2);
+	margin-top: var(--reel-space-3);
+}
+
+/* Anchors styled as chips still need the chip's own line-height, since an
+   <a> does not centre its text in a fixed-height box the way a button does. */
+.reel-preview-links .reel-chip {
+	display: inline-flex;
+	align-items: center;
+	text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Chart rows                                                          */
+/* ------------------------------------------------------------------ */
+
+/* Face, name and count on one line. The name was stretching to fill the row
+   and pushing the count to the far edge, so a portrait, a name and a number
+   read as three unrelated things rather than one row. */
+.reel-chart-head {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+}
+
+.reel-chart-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	text-align: left;
+}
+
+.reel-chart-value {
+	flex: 0 0 auto;
+	margin-left: auto;
+}

@@ -13,14 +13,17 @@
 
 import { Modal, Notice, Platform, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
-import type { TmdbSearchResult } from "../types";
+import type { TmdbSearchResult, TmdbFilm, TmdbShow } from "../types";
 import type { DiscoverRow, TasteProfile } from "../discover";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { renderStars } from "./stars";
 import { SearchModal } from "./searchModal";
 import { LogSheet } from "./logSheet";
-import { trailerUrl, providerNames } from "../extract";
+import { trailerUrl, providerNames, imdbUrl, tmdbUrl } from "../extract";
+import { formatMinutes } from "../util/dates";
+import { PersonSheet } from "./personSheet";
+import { badgePerson } from "./personBadge";
 import { skeletonCards, skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
 import { setSelected } from "./a11y";
@@ -852,14 +855,23 @@ export class PreviewSheet extends Modal {
 	}
 
 	/**
-	 * Fetch the detail payload just for its trailer.
+	 * Fill the sheet out from the full TMDB record.
 	 *
-	 * Silent on failure: the sheet works without it, and an error notice for a
-	 * missing trailer would be noise on a screen you are skimming.
+	 * This used to fetch the detail payload and take only the trailer and the
+	 * provider list from it, which made "Full details" a promise the screen
+	 * did not keep — it showed *less* than the inline role panel it was
+	 * reached from. The request was already being made; almost everything
+	 * below was in the response and was being discarded.
+	 *
+	 * Silent on failure. The sheet works without any of it, and an error
+	 * notice for a missing trailer would be noise on a screen you are
+	 * skimming.
 	 */
 	private async loadTrailer(slot: HTMLElement, isTv: boolean): Promise<void> {
 		try {
 			const meta = isTv ? await this.plugin.tmdb.getShow(this.item.id) : await this.plugin.tmdb.getFilm(this.item.id);
+
+			this.paintFacts(slot, meta, isTv);
 
 			const url = trailerUrl(meta.videos?.results);
 			if (url) {
@@ -883,9 +895,98 @@ export class PreviewSheet extends Modal {
 				box.createSpan({ cls: "reel-dim", text: "Streaming on " });
 				box.createSpan({ text: providers.slice(0, 4).join(", ") });
 			}
+
+			this.paintLinks(slot, meta, isTv);
 		} catch {
 			/* neither a trailer nor a provider list is worth interrupting for */
 		}
+	}
+
+	/**
+	 * The facts that make this "details" rather than a preview.
+	 *
+	 * All of it came back in the request already made for the trailer and was
+	 * being discarded — genres, runtime, certification, the cast. The cast
+	 * strip matters most: on a screen you reached *from* an actor, the other
+	 * people in the thing are the obvious next question.
+	 */
+	private paintFacts(slot: HTMLElement, meta: TmdbFilm | TmdbShow, isTv: boolean): void {
+		const facts: string[] = [];
+
+		const genres = (meta.genres ?? []).map((g) => g.name).filter(Boolean);
+		if (genres.length) facts.push(genres.slice(0, 3).join(", "));
+
+		if (isTv) {
+			const show = meta as TmdbShow;
+			if (show.number_of_episodes) facts.push(`${show.number_of_episodes} episodes`);
+			if (show.status) facts.push(show.status);
+		} else {
+			const runtime = (meta as TmdbFilm).runtime;
+			if (runtime) facts.push(formatMinutes(runtime));
+		}
+
+		if (facts.length) slot.createDiv({ cls: "reel-preview-facts", text: facts.join(" · ") });
+
+		// Films carry `credits`; a series carries `aggregate_credits`, because
+		// an actor can play several parts across a run and TMDB merges them.
+		// Reading the wrong one gives an empty cast list and no error.
+		const credits = isTv ? (meta as TmdbShow).aggregate_credits : (meta as TmdbFilm).credits;
+
+		// Who made it, which is how most people place a title they half know.
+		const made = isTv
+			? ((meta as TmdbShow).created_by ?? []).map((c) => c.name)
+			: (credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
+		if (made.length) {
+			slot.createDiv({
+				cls: "reel-preview-facts",
+				text: `${isTv ? "Created by" : "Directed by"} ${made.join(", ")}`,
+			});
+		}
+
+		const cast = (credits?.cast ?? []).slice(0, 10);
+		if (!cast.length) return;
+		slot.createDiv({ cls: "reel-block-title", text: "Cast" });
+		const strip = slot.createDiv({ cls: "reel-caststrip" });
+		for (const p of cast) {
+			const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+			const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+			this.plugin.people.attach(shot, p.name, p.id);
+			badgePerson(this.plugin, shot, p.id);
+			cell.createDiv({ cls: "reel-caststrip-name", text: p.name });
+			const role = (p.character ?? p.roles?.[0]?.character ?? "").trim();
+			if (role) cell.createDiv({ cls: "reel-caststrip-role", text: role });
+			const id = p.id;
+			if (!id) continue;
+			cell.setAttr("role", "button");
+			cell.setAttr("tabindex", "0");
+			cell.setAttr("aria-label", `${p.name} — open their filmography`);
+			cell.addEventListener("click", () => new PersonSheet(this.plugin, id, p.name).open());
+		}
+	}
+
+	/**
+	 * IMDb, its parents guide, and TMDB.
+	 *
+	 * The parents guide needs an IMDb id, which a search result does not
+	 * carry — it only arrives on the detail payload, which is why this could
+	 * not be built before the fetch. Direct links, never a search: "search
+	 * IMDb for this title" is a different and much worse thing.
+	 */
+	private paintLinks(slot: HTMLElement, meta: TmdbFilm | TmdbShow, isTv: boolean): void {
+		const row = slot.createDiv({ cls: "reel-preview-links" });
+		const link = (text: string, href: string) => {
+			const a = row.createEl("a", { cls: "reel-chip", text, href });
+			a.setAttr("target", "_blank");
+			a.setAttr("rel", "noopener");
+		};
+
+		const raw = meta.external_ids?.imdb_id ?? (meta as TmdbFilm).imdb_id ?? undefined;
+		const imdb = imdbUrl(raw ?? undefined);
+		if (imdb) {
+			link("IMDb", imdb);
+			link("Parents guide", `${imdb}parentalguide`);
+		}
+		link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
 	}
 
 	private async add(watchlist: boolean, button: HTMLButtonElement): Promise<void> {
