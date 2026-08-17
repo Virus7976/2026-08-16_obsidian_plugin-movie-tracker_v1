@@ -6100,10 +6100,10 @@ input.reel-input {
 	max-width: 100%;
 }
 
-.reel-view.is-phone .reel-view-filters .reel-chips,
-.reel-view.is-phone .reel-suggest,
-.reel-view.is-phone .reel-sortbar,
-.reel-view.is-phone .reel-discover-filters .reel-chips {
+.reel-view.is-narrow .reel-view-filters .reel-chips,
+.reel-view.is-narrow .reel-suggest,
+.reel-view.is-narrow .reel-sortbar,
+.reel-view.is-narrow .reel-discover-filters .reel-chips {
 	flex-wrap: nowrap;
 	min-width: 0;
 	overflow-x: auto;
@@ -6112,17 +6112,17 @@ input.reel-input {
 	padding-bottom: 2px;
 }
 
-.reel-view.is-phone .reel-view-filters .reel-chips::-webkit-scrollbar,
-.reel-view.is-phone .reel-suggest::-webkit-scrollbar,
-.reel-view.is-phone .reel-sortbar::-webkit-scrollbar,
-.reel-view.is-phone .reel-discover-filters .reel-chips::-webkit-scrollbar {
+.reel-view.is-narrow .reel-view-filters .reel-chips::-webkit-scrollbar,
+.reel-view.is-narrow .reel-suggest::-webkit-scrollbar,
+.reel-view.is-narrow .reel-sortbar::-webkit-scrollbar,
+.reel-view.is-narrow .reel-discover-filters .reel-chips::-webkit-scrollbar {
 	display: none;
 }
 
 /* A chip must not shrink below its own text, or a long director's name
    compresses to an ellipsis while the row still scrolls. */
-.reel-view.is-phone .reel-chips .reel-chip,
-.reel-view.is-phone .reel-suggest .reel-chip {
+.reel-view.is-narrow .reel-chips .reel-chip,
+.reel-view.is-narrow .reel-suggest .reel-chip {
 	flex: 0 0 auto;
 }
 
@@ -6130,26 +6130,26 @@ input.reel-input {
    wrapped rows of suggestions, type chips, status chips, sort, secondary
    sort, count. The first poster started below the fold on a library holding
    32 titles. */
-.reel-view.is-phone .reel-view-filters {
+.reel-view.is-narrow .reel-view-filters {
 	padding-top: var(--reel-space-1);
 	padding-bottom: var(--reel-space-1);
 }
 
-.reel-view.is-phone .reel-view-filters > * + * {
+.reel-view.is-narrow .reel-view-filters > * + * {
 	margin-top: var(--reel-space-1);
 }
 
 /* Suggestions are a shortcut, not a filter — the newest arrival and the
    least essential. They go rather than cost a phone screen the thing it came
    to show. */
-.reel-view.is-phone .reel-suggest {
+.reel-view.is-narrow .reel-suggest {
 	display: none;
 }
 
 /* The secondary sort is a tie-breaker, and the primary dropdown already says
    what it is, so the word "Sort" in front of it does no work. */
-.reel-view.is-phone .reel-sortbar > .reel-dim,
-.reel-view.is-phone .reel-sortbar > select:nth-of-type(2) {
+.reel-view.is-narrow .reel-sortbar > .reel-dim,
+.reel-view.is-narrow .reel-sortbar > select:nth-of-type(2) {
 	display: none;
 }
 
@@ -6187,8 +6187,8 @@ input.reel-input {
 
 /* The chip row grows with the chips, so its padding comes back down to keep
    the filter stack from reclaiming the height the compact layout just won. */
-.reel-view.is-phone .reel-chips,
-.reel-view.is-phone .reel-suggest {
+.reel-view.is-narrow .reel-chips,
+.reel-view.is-narrow .reel-suggest {
 	padding-top: 0;
 }
 
@@ -6555,4 +6555,35 @@ input.reel-input {
 	.reel-reaction {
 		will-change: auto;
 	}
+}
+
+/* A phone always gets the compact layout, whatever it measures.
+ *
+ * The measured width is the primary signal because it is the one that is
+ * actually true — but if a device ever reports a wide pane while being a
+ * phone in the hand, the platform flag is a safe second trigger. Both
+ * pointing at the same rules means neither can silently fail alone. */
+.reel-view.is-phone .reel-view-filters .reel-chips,
+.reel-view.is-phone .reel-suggest,
+.reel-view.is-phone .reel-sortbar,
+.reel-view.is-phone .reel-discover-filters .reel-chips {
+	flex-wrap: nowrap;
+	min-width: 0;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+}
+
+.reel-view.is-phone .reel-suggest {
+	display: none;
+}
+
+.reel-view.is-phone .reel-sortbar > .reel-dim,
+.reel-view.is-phone .reel-sortbar > select:nth-of-type(2) {
+	display: none;
+}
+
+.reel-view.is-phone .reel-chips .reel-chip,
+.reel-view.is-phone .reel-suggest .reel-chip {
+	flex: 0 0 auto;
 }

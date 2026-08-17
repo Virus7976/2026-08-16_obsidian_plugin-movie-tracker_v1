@@ -324,6 +324,10 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	// render the desktop layout at phone width and report a fixed bug.
 	view.toggleClass("is-phone", phone);
 	view.toggleClass("is-mobile", phone);
+	// The class the compact layout actually keys off. ReelView measures its
+	// own pane; the harness mirrors that so a check here means the same thing
+	// it will mean in the app.
+	view.toggleClass("is-narrow", window.innerWidth < 600);
 	try {
 		(SCREENS[name] ?? library)(view);
 	} catch (e) {

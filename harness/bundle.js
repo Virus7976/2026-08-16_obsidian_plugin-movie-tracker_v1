@@ -5517,6 +5517,7 @@
     const view = app2.createDiv({ cls: "reel-view" });
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
+    view.toggleClass("is-narrow", window.innerWidth < 600);
     try {
       (SCREENS[name] ?? library)(view);
     } catch (e) {

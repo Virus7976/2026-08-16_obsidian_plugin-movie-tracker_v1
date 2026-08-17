@@ -124,16 +124,28 @@ export class ReelView extends ItemView {
 
 		this.contentEl.empty();
 		this.contentEl.addClass("reel-view");
-		// A class, not a width media query.
-		//
-		// `@media (max-width: 700px)` did not match on a real phone at all —
-		// Obsidian's mobile webview does not report the CSS width the rule
-		// assumed, so every "compact on mobile" rule was silently inert while
-		// looking perfectly correct in the stylesheet. `Platform.isPhone` is
-		// what the rest of the plugin already trusts, and it cannot be wrong
-		// about the thing it is describing.
 		this.contentEl.toggleClass("is-phone", Platform.isPhone);
 		this.contentEl.toggleClass("is-mobile", Platform.isMobile);
+		// The compact layout keys off `is-narrow`, which is *measured*.
+		//
+		// Two previous attempts guessed and both were wrong. A width media
+		// query never matched on a real device. `Platform.isPhone` then also
+		// failed to produce the compact layout on that same device — so
+		// whatever it reports there, it is not the thing that decides whether
+		// six filter rows fit.
+		//
+		// The pane's own width is not a guess. It is also the right question:
+		// a narrow pane on a desktop has exactly the same problem as a phone,
+		// and neither platform flag can see that.
+		this.measureWidth();
+		// The pane resizes when the window does, when a sidebar opens, and
+		// when the phone rotates. ResizeObserver catches all three; a resize
+		// listener on the window catches only the first.
+		if (typeof ResizeObserver !== "undefined") {
+			const ro = new ResizeObserver(() => this.measureWidth());
+			ro.observe(this.contentEl);
+			this.register(() => ro.disconnect());
+		}
 		// registerDomEvent, not addEventListener: Obsidian unbinds it when the
 		// view closes, so reopening the tab can't stack duplicate handlers.
 		this.registerDomEvent(this.contentEl, "keydown", this.onKey);
@@ -451,6 +463,22 @@ export class ReelView extends ItemView {
 			if (s.kind === "recent") setIcon(chip.createSpan({ cls: "reel-suggest-icon" }), "history");
 			chip.addEventListener("click", () => this.searchFor(s.query));
 		}
+	}
+
+	/**
+	 * Decide the compact layout from the pane's real width.
+	 *
+	 * 600px, because the filter stack is search + tabs + suggestions + type
+	 * chips + status chips + sort. Below that it wraps onto four rows and
+	 * pushes the first poster off the bottom of a phone screen — which is
+	 * what "I can't see anything on the library page" actually was.
+	 */
+	private measureWidth(): void {
+		const w = this.contentEl.clientWidth;
+		// Zero while the view is detached. Toggling on that would flash the
+		// compact layout in and out on every open.
+		if (w <= 0) return;
+		this.contentEl.toggleClass("is-narrow", w < 600);
 	}
 
 	private paintFilters(): void {
