@@ -93,6 +93,15 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 	const out: Check[] = [];
 	const check = (name: string, ok: boolean, detail = "") => out.push({ name, ok, detail });
 
+	// A screen that threw must fail, not pass quietly.
+	//
+	// The Discover screen had been throwing in the harness for several rounds
+	// and the audit reported it green every time — an error message in a <pre>
+	// has no overflow, no small targets and no low contrast, so every check
+	// passed on a screen that had rendered nothing at all.
+	const crashed = view.querySelector("pre");
+	check("rendered", !crashed, crashed ? (crashed.textContent ?? "").slice(0, 90) : "");
+
 	check("phoneClass", view.classList.contains("is-phone") === opts.phone, "compact layout keys off this");
 
 	// Only an element escaping the viewport with no scrolling ancestor is a

@@ -5156,6 +5156,8 @@
     const vh = window.innerHeight;
     const out = [];
     const check = (name, ok, detail2 = "") => out.push({ name, ok, detail: detail2 });
+    const crashed = view.querySelector("pre");
+    check("rendered", !crashed, crashed ? (crashed.textContent ?? "").slice(0, 90) : "");
     check("phoneClass", view.classList.contains("is-phone") === opts.phone, "compact layout keys off this");
     const escaped = [...view.querySelectorAll("*")].filter((el) => {
       if (el.getBoundingClientRect().right <= vw + 1)
@@ -5319,7 +5321,11 @@
       byTmdbId: (id) => all.find((e) => e.tmdbId === id),
       peopleIds: () => /* @__PURE__ */ new Map([["Christopher Nolan", 525]]),
       size: all.length,
-      on: () => ({})
+      on: () => ({}),
+      // The detail screen asks for these; without them it threw before
+      // drawing anything, and three screens reported green for rounds.
+      lists: () => ["Favourites", "Rewatch pile"],
+      genres: () => ["Action", "Comedy", "Drama"]
     },
     visible: (rows2) => rows2,
     hiddenCount: () => 0,
@@ -5351,6 +5357,34 @@
     }, undo: async () => null, last: null },
     swatches: { tint: () => {
     } },
+    discover: {
+      // The screen calls these on mount; without them it threw before it
+      // drew anything, and the audit called that a pass.
+      takeStaged: () => null,
+      stage: () => {
+      },
+      seedPool: () => all.filter((e) => (e.rating ?? 0) >= 4),
+      taste: async () => ({ genreIds: [28, 35], genreNames: ["Action", "Comedy"], seeds: all.slice(0, 3), directors: ["Christopher Nolan"], sparse: false }),
+      rows: async () => [
+        { id: "a", title: "More with Denzel Washington", items: all.slice(0, 8) },
+        { id: "b", title: "Because you liked Inside Man", items: all.slice(4, 12) },
+        { id: "c", title: "Trending this week", items: all.slice(2, 10) }
+      ],
+      count: async () => 100,
+      run: async () => [],
+      blameFor: async () => null,
+      describeQueries: () => [],
+      dismiss: async () => {
+      }
+    },
+    tmdb: {
+      posterUrl: (p) => p ? poster(String(p)) : null,
+      genreList: async () => [
+        { id: 28, name: "Action" },
+        { id: 35, name: "Comedy" },
+        { id: 27, name: "Horror" }
+      ]
+    },
     openSearch: () => {
     },
     openDetail: () => {

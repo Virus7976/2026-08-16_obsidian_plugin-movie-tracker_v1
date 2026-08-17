@@ -6587,3 +6587,72 @@ input.reel-input {
 .reel-view.is-phone .reel-suggest .reel-chip {
 	flex: 0 0 auto;
 }
+
+/* Two more `--text-faint`-as-text cases the contrast check found once three
+   crashed screens stopped hiding them: the wizard's step labels at 2.85:1 and
+   the chip separator dot at 2.90:1. Both are read, so both are muted. */
+.reel-recipe-step,
+.reel-chip-sep,
+.reel-chips > .reel-dim {
+	color: var(--text-muted);
+}
+
+/* The inactive steps still have to read as inactive — weight and the rule
+   under them carry that, not an unreadable colour. */
+.reel-recipe-step:not(.is-active):not(.is-done) {
+	font-weight: var(--reel-weight-normal);
+}
+
+/* The last of the faint-as-text cases, both on the detail screen and both
+   only visible once it stopped crashing in the harness. A metadata key at
+   10px and 2.57:1 is a label you are meant to read; a button at 3.60:1 in
+   dark is a control. Neither is decoration. */
+.reel-meta-key {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.reel-btn,
+.reel-btn:disabled {
+	color: var(--text-normal);
+}
+
+/* Disabled still has to look disabled — opacity says that without dropping
+   the text below a readable contrast on its own. */
+.reel-btn:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+/* The wizard's own chrome grew past half the screen once its chips reached
+   44px: step bar, title, a two-line hint, then the pool chips — 394px before
+   the first poster you are meant to pick.
+ *
+ * The hint is the part to lose on a narrow screen. It explains why picking
+ * several is better, which is worth saying once and not worth half a phone
+ * screen every time. */
+.reel-view.is-narrow .reel-recipe-hint,
+.reel-sheet .reel-recipe-hint {
+	display: none;
+}
+
+.reel-sheet .reel-recipe-steps {
+	margin-bottom: var(--reel-space-2);
+}
+
+.reel-sheet .reel-recipe-title {
+	font-size: var(--reel-text-label);
+	margin-bottom: var(--reel-space-1);
+}
+
+/* The step bar already says "Picks", so the heading beneath it repeats the
+   one word the screen has just shown you — and on a phone it costs a row of
+   posters to do it. */
+.reel-sheet .reel-recipe-title,
+.reel-view.is-narrow .reel-recipe-title {
+	display: none;
+}
+
+.reel-sheet .reel-recipe-seeds {
+	max-height: 52dvh;
+}
