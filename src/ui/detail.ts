@@ -135,9 +135,14 @@ export class DetailScreen {
 		});
 
 		const page = container.createDiv({ cls: "reel-detail-page" });
+		// Asynchronous, and deliberately not awaited: the page renders in the
+		// theme's own colours and the tint arrives a frame or two later. Making
+		// a screen wait on a canvas read would be a poor trade for a colour.
+		this.plugin.swatches.tint(page, this.plugin.posters.displayUrl(e), document.body.hasClass("theme-dark"));
 
 		/* ---- hero ------------------------------------------------------ */
 		const hero = page.createDiv({ cls: "reel-hero" });
+		this.paintBackdrop(hero, e);
 
 		const posterEl = hero.createDiv({ cls: "reel-hero-poster" });
 		this.plugin.posters.attach(posterEl, e);
@@ -689,6 +694,45 @@ export class DetailScreen {
 	}
 
 	/**
+	 * The full-bleed image behind the hero.
+	 *
+	 * Two layers, because the honest offline answer and the good online one are
+	 * different images. The base is the local poster, scaled up and blurred
+	 * past the point of being readable as a poster — it is already in the
+	 * vault, it always exists, and blurred cover art is a defensible backdrop
+	 * rather than a stand-in for one. TMDB's real backdrop then fades in over
+	 * it if the note carries a path and the network cooperates.
+	 *
+	 * So there is never a blank hero, never a layout shift when the backdrop
+	 * lands, and no second image cached to disk for the sake of decoration.
+	 */
+	private paintBackdrop(hero: HTMLElement, e: Entry): void {
+		const local = this.plugin.posters.displayUrl(e);
+		const remote = e.backdropPath ? this.plugin.tmdb.posterUrl(e.backdropPath, "w780") : null;
+		if (!local && !remote) return;
+
+		hero.addClass("has-backdrop");
+		const wrap = hero.createDiv({ cls: "reel-hero-backdrop" });
+
+		if (local) {
+			const base = wrap.createDiv({ cls: "reel-hero-backdrop-base" });
+			base.setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
+		}
+
+		if (!remote) return;
+		const img = wrap.createEl("img", {
+			cls: "reel-hero-backdrop-img",
+			attr: { src: remote, alt: "", decoding: "async" },
+		});
+		const settle = () => img.addClass("is-loaded");
+		if (img.complete && img.naturalWidth > 0) settle();
+		else img.addEventListener("load", settle, { once: true });
+		// Offline, or a path that has since been removed from TMDB. The blurred
+		// poster underneath is already doing the job, so this just tidies up.
+		img.addEventListener("error", () => img.remove(), { once: true });
+	}
+
+	/**
 	 * Stills and backdrops, fetched only when the tab is opened.
 	 *
 	 * Lazy on purpose: images are the largest block TMDB returns, and paying
@@ -1171,4 +1215,16 @@ export class DetailScreen {
 			if (w.rewatch) row.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
 		}
 	}
+}
+
+/**
+ * Make a resource path safe to drop inside a CSS `url("…")`.
+ *
+ * `getResourcePath` returns something like `app://local/C:/Users/.../603.jpg?1699`,
+ * and a vault living under a folder with a quote or a backslash in its name
+ * would otherwise close the string early and break the rule — silently, since
+ * the browser just discards the declaration and the backdrop never appears.
+ */
+function cssUrl(path: string): string {
+	return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }

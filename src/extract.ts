@@ -127,6 +127,11 @@ export function filmFields(meta: TmdbFilm, opts: ExtractOptions): Record<string,
 
 	if (meta.release_date) out.release_date = meta.release_date;
 
+	// The TMDB path, not a URL — one short string, and the size is chosen at
+	// render time. Fetched all along on the detail endpoint and thrown away,
+	// which is why the detail screen had no hero image to work with.
+	if (meta.backdrop_path) out.backdrop_path = meta.backdrop_path;
+
 	const imdb = meta.external_ids?.imdb_id ?? meta.imdb_id;
 	if (imdb) out.imdb_id = imdb;
 
@@ -178,6 +183,8 @@ export function showFields(meta: TmdbShow, opts: ExtractOptions): Record<string,
 	if (flags.length) out.content_flags = flags;
 
 	if (meta.next_episode_to_air?.air_date) out.next_air_date = meta.next_episode_to_air.air_date;
+
+	if (meta.backdrop_path) out.backdrop_path = meta.backdrop_path;
 
 	const imdb = meta.external_ids?.imdb_id;
 	if (imdb) out.imdb_id = imdb;

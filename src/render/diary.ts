@@ -12,6 +12,7 @@ import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { prettyDate } from "../util/dates";
 import { renderStarsStatic } from "../ui/stars";
+import { renderEmpty } from "../ui/empty";
 
 interface Viewing {
 	entry: Entry;
@@ -114,7 +115,18 @@ class DiaryBlock extends MarkdownRenderChild {
 		if (this.opts.limit) rows = rows.slice(0, this.opts.limit);
 
 		if (!rows.length) {
-			el.createDiv({ cls: "reel-empty", text: "No viewings logged yet." });
+			// The commonest cause by far is a library of films marked watched
+			// with no dated viewing behind them — imported notes, or an older
+			// version of Reel. Saying so is more use than "nothing here".
+			const hasFilms = this.plugin.library.all().some((e) => e.status === "watched");
+			renderEmpty(el, {
+				icon: "calendar-days",
+				title: "No viewings logged yet",
+				body: hasFilms
+					? "You have watched titles, but none carry a date. The Diary reads dates, so anything without one stays out of it — log a viewing to place it."
+					: "Log something you have seen and it appears here, newest first.",
+				actions: [{ label: "Log a viewing", primary: true, onClick: () => this.plugin.openSearch() }],
+			});
 			return;
 		}
 

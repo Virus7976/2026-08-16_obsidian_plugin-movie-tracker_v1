@@ -6,12 +6,14 @@
  * both, instead of drifting until they behave subtly differently.
  */
 
-import { Notice, TFile } from "obsidian";
+import { Menu, Notice, TFile } from "obsidian";
 import { redact } from "../secrets";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { renderStarsStatic } from "../ui/stars";
 import { QuickRate } from "../ui/quickRate";
+import { ListPicker } from "../ui/listPicker";
+import { haptic } from "../util/haptics";
 import { lastWatchDate } from "./query";
 import { prettyDate, formatMinutes } from "../util/dates";
 import { rangeCount } from "../util/ranges";
@@ -19,35 +21,50 @@ import { compactCount } from "../util/format";
 import { unlink } from "../library";
 
 /**
- * Tap opens the note; long-press (or right-click) quick-rates.
+ * Tap opens the title; long-press (or right-click) opens the actions menu.
  *
  * 500ms with an 8px movement threshold, so a scroll that starts on a poster
- * never fires the rating sheet — the single most annoying way to get this
- * wrong on a touch screen.
+ * never fires the menu — the single most annoying way to get this wrong on a
+ * touch screen. The threshold is on both axes: guarding only the vertical let
+ * a sideways swipe through a carousel trip it.
+ *
+ * The long-press used to go straight to the rating sheet, which is one action
+ * out of the six you might want and no way to reach the others without
+ * opening the title first.
  */
 function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry, onSelect?: (e: Entry) => void): void {
 	let timer: number | null = null;
 	let longPressed = false;
+	let startX = 0;
 	let startY = 0;
 
 	const cancel = () => {
 		if (timer != null) window.clearTimeout(timer);
 		timer = null;
+		cell.removeClass("is-holding");
 	};
 
-	const quickRate = () => {
+	const openMenu = (x: number, y: number) => {
 		longPressed = true;
-		const file = plugin.app.vault.getAbstractFileByPath(entry.path);
-		if (file instanceof TFile) new QuickRate(plugin, entry, file).open();
+		cell.removeClass("is-holding");
+		// Confirms the press landed *before* the menu paints. Without it the
+		// only feedback is the menu itself, so a press that was a fraction too
+		// short is indistinguishable from one the app ignored.
+		haptic("hold");
+		showActions(plugin, entry, x, y, onSelect);
 	};
 
 	cell.addEventListener("pointerdown", (e) => {
 		longPressed = false;
+		startX = e.clientX;
 		startY = e.clientY;
-		timer = window.setTimeout(quickRate, 500);
+		// A slow shrink under the finger, so the wait is visibly doing
+		// something rather than feeling like a delay before a surprise.
+		cell.addClass("is-holding");
+		timer = window.setTimeout(() => openMenu(e.clientX, e.clientY), 500);
 	});
 	cell.addEventListener("pointermove", (e) => {
-		if (Math.abs(e.clientY - startY) > 8) cancel();
+		if (Math.abs(e.clientY - startY) > 8 || Math.abs(e.clientX - startX) > 8) cancel();
 	});
 	cell.addEventListener("pointerup", cancel);
 	cell.addEventListener("pointercancel", cancel);
@@ -56,7 +73,7 @@ function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry, onSelect?
 	cell.addEventListener("contextmenu", (e) => {
 		e.preventDefault();
 		cancel();
-		quickRate();
+		openMenu(e.clientX, e.clientY);
 	});
 
 	cell.addEventListener("click", async () => {
@@ -91,6 +108,105 @@ function wireCell(plugin: ReelPlugin, cell: HTMLElement, entry: Entry, onSelect?
 				.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
 		}
 	});
+}
+
+/**
+ * The actions a title supports, without opening it.
+ *
+ * Obsidian's own `Menu`, so it looks and behaves like every other context
+ * menu in the app — a bottom sheet on a phone, a popup on desktop — rather
+ * than something Reel invented that only resembles one.
+ *
+ * The list is deliberately short and differs by what the entry already is:
+ * offering "Add to watchlist" on something already watchlisted is a row that
+ * can only disappoint.
+ */
+function showActions(
+	plugin: ReelPlugin,
+	entry: Entry,
+	x: number,
+	y: number,
+	onSelect?: (e: Entry) => void
+): void {
+	const file = plugin.app.vault.getAbstractFileByPath(entry.path);
+	if (!(file instanceof TFile)) {
+		new Notice("Reel: note not found.");
+		return;
+	}
+
+	const menu = new Menu();
+	const run = (job: Promise<unknown>) => void job.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
+
+	menu.addItem((i) =>
+		i
+			.setTitle("Open")
+			.setIcon("panel-right-open")
+			.onClick(() => {
+				if (onSelect) onSelect(entry);
+				else void plugin.app.workspace.getLeaf(false).openFile(file);
+			})
+	);
+
+	menu.addItem((i) =>
+		i
+			.setTitle(entry.rating != null ? "Change rating" : "Rate")
+			.setIcon("star")
+			.onClick(() => new QuickRate(plugin, entry, file).open())
+	);
+
+	menu.addItem((i) =>
+		i
+			.setTitle(entry.liked ? "Unlike" : "Like")
+			.setIcon("heart")
+			.onClick(() => run(plugin.notes.toggleLiked(file).then((on) => plugin.undo.offer(on ? "Liked" : "Unliked"))))
+	);
+
+	if (entry.status === "watchlist") {
+		// Marking a film watched has to record a viewing, which `setStatus`
+		// does — a bare relabel leaves it invisible to the Diary and to stats.
+		menu.addItem((i) =>
+			i
+				.setTitle("Mark watched")
+				.setIcon("check")
+				.onClick(() =>
+					run(
+						plugin.notes
+							.setStatus(file, entry.type === "tv" ? "watching" : "watched")
+							.then(() => plugin.undo.offer(`${entry.title} marked watched`))
+					)
+				)
+		);
+	} else {
+		menu.addItem((i) =>
+			i
+				.setTitle("Move to watchlist")
+				.setIcon("bookmark")
+				.onClick(() =>
+					run(
+						plugin.notes
+							.setStatus(file, "watchlist")
+							.then(() => plugin.undo.offer(`${entry.title} moved to the watchlist`))
+					)
+				)
+		);
+	}
+
+	menu.addItem((i) =>
+		i
+			.setTitle("Lists…")
+			.setIcon("list")
+			.onClick(() => new ListPicker(plugin.app, plugin, entry, file).open())
+	);
+
+	menu.addSeparator();
+	menu.addItem((i) =>
+		i
+			.setTitle("Open note")
+			.setIcon("file-text")
+			.onClick(() => void plugin.app.workspace.getLeaf(false).openFile(file))
+	);
+
+	menu.showAtPosition({ x, y });
 }
 
 export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entry[], onSelect?: (e: Entry) => void): void {

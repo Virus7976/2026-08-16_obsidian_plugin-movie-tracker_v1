@@ -19,6 +19,7 @@ import { formatMinutes, daysBetween, prettyDate, todayISO } from "../util/dates"
 import { rangeCount } from "../util/ranges";
 import { MAX_STARS, STEP } from "../util/ratings";
 import { viewings } from "./diary";
+import { renderEmpty } from "../ui/empty";
 
 export interface StatsOptions {
 	year?: number;
@@ -63,7 +64,17 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	const watched = viewings(films, opts.year);
 
 	if (!watched.length && !shows.length) {
-		el.createDiv({ cls: "reel-empty", text: "Nothing logged yet." });
+		// Stats is the one screen that can say something true and useful about
+		// its own emptiness: it is computed entirely from what you have logged,
+		// so there is nothing to fetch and nothing to wait for.
+		renderEmpty(el, {
+			icon: "bar-chart-3",
+			title: "Nothing logged yet",
+			body: "Every chart here is computed from your own notes, so this fills in as soon as you log something.",
+			actions: plugin
+				? [{ label: "Log a film", primary: true, onClick: () => plugin.openSearch() }]
+				: undefined,
+		});
 		return;
 	}
 

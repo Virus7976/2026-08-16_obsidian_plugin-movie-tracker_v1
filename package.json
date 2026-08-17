@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo",
+    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch",
     "test:content": "esbuild tests/content.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.content.cjs --log-level=error && node tests/.content.cjs",
     "test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
     "test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
@@ -26,7 +26,8 @@
     "test:library": "esbuild tests/library.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.library.cjs --log-level=error && node tests/.library.cjs",
     "test:notes": "esbuild tests/notes.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.notes.cjs --log-level=error && node tests/.notes.cjs",
     "test:posters": "esbuild tests/posters.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.posters.cjs --log-level=error && node tests/.posters.cjs",
-    "test:undo": "esbuild tests/undo.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.undo.cjs --log-level=error && node tests/.undo.cjs"
+    "test:undo": "esbuild tests/undo.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.undo.cjs --log-level=error && node tests/.undo.cjs",
+    "test:swatch": "esbuild tests/swatch.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.swatch.cjs --log-level=error && node tests/.swatch.cjs"
   },
   "keywords": [
     "obsidian",

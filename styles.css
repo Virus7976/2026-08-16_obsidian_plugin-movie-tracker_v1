@@ -4705,3 +4705,259 @@ input.reel-input {
 		width: 96px;
 	}
 }
+
+/* ------------------------------------------------------------------ */
+/* Hero backdrop                                                       */
+/* ------------------------------------------------------------------ */
+
+/* The detail screen used to open on a poster beside a block of text on the
+   page background — accurate, and indistinguishable from a settings pane.
+   A full-bleed image behind the hero is the layout every tracker worth
+   copying uses, and it costs one string in frontmatter. */
+.reel-hero.has-backdrop {
+	position: relative;
+	padding: 20px;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	isolation: isolate;
+}
+
+.reel-hero-backdrop {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+}
+
+/* The offline layer: the local poster, scaled well past its size and blurred
+   until it is no longer readable as cover art. Always present, so the hero is
+   never blank and never shifts when the real backdrop lands. */
+.reel-hero-backdrop-base {
+	position: absolute;
+	/* Overhang, because a 40px blur samples past the edges and would
+	   otherwise leave a pale halo around all four sides. */
+	inset: -40px;
+	background-image: var(--reel-backdrop);
+	background-size: cover;
+	background-position: center 22%;
+	filter: blur(28px) saturate(1.25);
+	transform: scale(1.08);
+}
+
+.reel-hero-backdrop-img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center 22%;
+	opacity: 0;
+	transition: opacity 220ms ease-out;
+}
+
+.reel-hero-backdrop-img.is-loaded {
+	opacity: 1;
+}
+
+/* The scrim is what makes the text legible over an image nobody chose for
+   contrast. Heavier at the bottom, where the title and the scores sit, and
+   in the theme's own background colour so it belongs to the page rather than
+   being a grey wash over it. */
+.reel-hero-backdrop::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(
+			to bottom,
+			rgb(from var(--background-primary) r g b / 0.55) 0%,
+			rgb(from var(--background-primary) r g b / 0.78) 55%,
+			rgb(from var(--background-primary) r g b / 0.95) 100%
+		);
+}
+
+/* `rgb(from …)` is recent. Where it is unsupported the whole declaration is
+   dropped and the text would sit on a raw photograph, so this plain fallback
+   is declared first and only overridden where relative colours parse. */
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-hero-backdrop::after {
+		background: linear-gradient(
+			to bottom,
+			rgba(0, 0, 0, 0.45) 0%,
+			rgba(0, 0, 0, 0.72) 55%,
+			rgba(0, 0, 0, 0.92) 100%
+		);
+	}
+}
+
+/* The poster sits proud of the backdrop rather than inside it — the overlap
+   is what reads as depth. */
+.reel-hero.has-backdrop .reel-hero-poster {
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 700px) {
+	.reel-hero.has-backdrop {
+		/* Full-bleed on a phone: the padding either side of the page would
+		   otherwise frame the image and halve the effect. */
+		margin: 0 calc(-1 * var(--reel-gutter, 12px));
+		border-radius: 0;
+		padding: 16px var(--reel-gutter, 12px);
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Poster accent                                                       */
+/* ------------------------------------------------------------------ */
+
+/* SwatchStore reads the dominant hue out of the cached poster and sets
+   --reel-accent on the detail page. Only the `has-accent` rules below use it,
+   so a poster with no defensible colour — greyscale, mostly black, a remote
+   image that taints the canvas — simply leaves the page in the theme's own
+   colours rather than tinting it wrongly.
+
+   Used sparingly on purpose. The point is that a Dune page and an Alien page
+   are recognisably different screens, not that either becomes a colour
+   scheme. Body text, controls and backgrounds are all left alone. */
+
+/* The title is the one piece of text that should carry it. */
+.reel-detail-page.has-accent .reel-hero-title {
+	text-shadow: 0 1px 18px hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.35);
+}
+
+/* A rule under each section heading — the smallest mark that repeats down the
+   whole page, so the colour is present without ever being loud. */
+.reel-detail-page.has-accent .reel-panel-title::after {
+	content: "";
+	display: block;
+	width: 28px;
+	height: 2px;
+	margin-top: 6px;
+	border-radius: 2px;
+	background: var(--reel-accent);
+}
+
+/* Your own rating, distinguished from the borrowed ones beside it. */
+.reel-detail-page.has-accent .reel-score.mine {
+	border-color: hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.55);
+	background: hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.12);
+}
+
+.reel-detail-page.has-accent .reel-hero-poster {
+	box-shadow:
+		0 6px 24px rgba(0, 0, 0, 0.45),
+		0 0 0 1px hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.35);
+}
+
+/* The season strip's progress, which is the one bar on the page that means
+   "how far through *this* are you". The fill is drawn by ::after, so the
+   accent has to reach the pseudo-element rather than the bar itself. */
+.reel-detail-page.has-accent .reel-progress::after {
+	background: var(--reel-accent);
+}
+
+.reel-detail-page.has-accent .reel-chip.static {
+	border-color: hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.4);
+}
+
+/* The tint arrives after the first paint, so without this the page visibly
+   changes colour under the reader. */
+.reel-detail-page {
+	transition: none;
+}
+
+.reel-detail-page.has-accent .reel-panel-title::after,
+.reel-detail-page.has-accent .reel-score.mine,
+.reel-detail-page.has-accent .reel-hero-poster {
+	transition:
+		background-color 260ms ease-out,
+		border-color 260ms ease-out,
+		box-shadow 260ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-detail-page.has-accent .reel-panel-title::after,
+	.reel-detail-page.has-accent .reel-score.mine,
+	.reel-detail-page.has-accent .reel-hero-poster {
+		transition: none;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Empty states                                                        */
+/* ------------------------------------------------------------------ */
+
+/* These used to be one line of grey text floating in an empty pane, which is
+   what a screen that has failed looks like. They are also the first thing a
+   new user sees on most tabs, so they are worth more than a sentence. */
+.reel-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: 10px;
+	padding: 44px 20px 48px;
+	margin: 0 auto;
+	/* Capped, or the body text runs the full width of a monitor and stops
+	   reading as a short explanation. */
+	max-width: 380px;
+}
+
+.reel-empty-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 56px;
+	height: 56px;
+	border-radius: 50%;
+	background: var(--background-modifier-form-field);
+	color: var(--text-muted);
+	margin-bottom: 2px;
+}
+
+.reel-empty-icon .svg-icon {
+	width: 26px;
+	height: 26px;
+}
+
+.reel-empty-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.reel-empty-body {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	line-height: 1.5;
+}
+
+.reel-empty-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	justify-content: center;
+	margin-top: 6px;
+}
+
+/* The buttons elsewhere stretch to fill their row, which here would give a
+   single action the full 380px. */
+.reel-empty-actions .reel-btn {
+	flex: 0 0 auto;
+}
+
+/* The press-and-hold state. Feedback while the 500ms runs, so the wait is
+   visibly doing something rather than being a delay before a surprise. */
+.reel-cell.is-holding,
+.reel-row.is-holding {
+	transform: scale(0.97);
+	transition: transform 420ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-cell.is-holding,
+	.reel-row.is-holding {
+		transform: none;
+		opacity: 0.75;
+		transition: none;
+	}
+}

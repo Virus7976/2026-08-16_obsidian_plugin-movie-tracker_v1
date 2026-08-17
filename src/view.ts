@@ -23,6 +23,7 @@ import { sortEntries } from "./render/query";
 import { prettyDate } from "./util/dates";
 import { redact } from "./secrets";
 import { renderStarsStatic } from "./ui/stars";
+import { renderEmpty } from "./ui/empty";
 
 export const REEL_VIEW = "reel-view";
 
@@ -567,11 +568,16 @@ export class ReelView extends ItemView {
 				// A dead end otherwise: the reason a title isn't in your library
 				// is usually that you haven't added it yet, and that is exactly
 				// what you came here to do.
-				const none = this.bodyEl.createDiv({ cls: "reel-empty" });
-				none.createDiv({ text: `Nothing in your library matches "${this.query}".` });
-				const find = none.createEl("button", { cls: "reel-btn mod-cta", text: "Search TMDB for it" });
 				const carried = this.query;
-				find.addEventListener("click", () => this.plugin.openSearch({ query: carried }));
+				renderEmpty(this.bodyEl, {
+					icon: "search-x",
+					title: `Nothing matches "${carried}"`,
+					body: "Nothing in your library, at least. It may just not be in there yet.",
+					actions: [
+						{ label: "Search TMDB for it", primary: true, onClick: () => this.plugin.openSearch({ query: carried }) },
+						{ label: "Clear search", onClick: () => this.searchFor("") },
+					],
+				});
 			} else {
 				this.renderFirstRun(this.bodyEl);
 			}

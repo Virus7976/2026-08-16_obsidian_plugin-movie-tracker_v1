@@ -9,6 +9,7 @@ import { Importer } from "./importer";
 import { DtddClient, OmdbClient } from "./enrich";
 import { DiscoverEngine } from "./discover";
 import { UndoService } from "./undo";
+import { SwatchStore } from "./swatches";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
 import { LogSheet } from "./ui/logSheet";
@@ -52,6 +53,7 @@ export default class ReelPlugin extends Plugin {
 	dtdd!: DtddClient;
 	discover!: DiscoverEngine;
 	undo!: UndoService;
+	swatches!: SwatchStore;
 
 
 	async onload(): Promise<void> {
@@ -67,6 +69,7 @@ export default class ReelPlugin extends Plugin {
 		this.omdb = new OmdbClient(this);
 		this.dtdd = new DtddClient(this);
 		this.discover = new DiscoverEngine(this);
+		this.swatches = new SwatchStore();
 		this.undo = new UndoService(this);
 		// Steps hold a path, and a path stops meaning anything the moment the
 		// note behind it is renamed or deleted.

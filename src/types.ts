@@ -62,6 +62,15 @@ export interface Entry {
 	poster?: string;
 	/** Remote poster from an import, until the backfill stores a local copy. */
 	posterUrl?: string;
+	/**
+	 * TMDB's backdrop path, e.g. `/nMKdUUepR0i5zn0y1T4CsSB5chy.jpg`.
+	 *
+	 * A path rather than a URL, so the size is chosen at render time. Not
+	 * cached to disk like the poster: a hero image is one screen's decoration,
+	 * and the blurred local poster stands in for it perfectly well offline.
+	 * Doubling the vault's image weight for that would be a bad trade.
+	 */
+	backdropPath?: string;
 	tmdbRating?: number;
 	status: string;
 	rating?: number;
@@ -213,6 +222,8 @@ export interface TmdbFilm {
 	runtime?: number;
 	genres?: { id: number; name: string }[];
 	poster_path?: string | null;
+	/** The wide still, used as the detail screen's hero image. */
+	backdrop_path?: string | null;
 	vote_average?: number;
 	popularity?: number;
 	original_language?: string;
@@ -252,6 +263,8 @@ export interface TmdbShow {
 	number_of_episodes?: number;
 	genres?: { id: number; name: string }[];
 	poster_path?: string | null;
+	/** The wide still, used as the detail screen's hero image. */
+	backdrop_path?: string | null;
 	vote_average?: number;
 	overview?: string;
 	status?: string;

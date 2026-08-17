@@ -13,6 +13,7 @@ import { nextEpisode, rangeCount } from "../util/ranges";
 import { prettyDate, todayISO } from "../util/dates";
 import { redact } from "../secrets";
 import { haptic } from "../util/haptics";
+import { renderEmpty } from "../ui/empty";
 import { SeasonSheet } from "../ui/seasonSheet";
 
 export interface NextUp {
@@ -99,7 +100,24 @@ class UpNextPainter {
 		const hidden = everything.length - rows.length;
 
 		if (!rows.length) {
-			el.createDiv({ cls: "reel-empty", text: "Nothing in progress. Add a series and tick an episode." });
+			// The library may be full and simply have nothing part-watched, or
+			// it may be a fresh install. Those want different offers, and the
+			// old single sentence made the same one to both.
+			const bare = !this.plugin.library.shows().length;
+			renderEmpty(el, {
+				icon: "tv",
+				title: bare ? "No series yet" : "Nothing part-watched",
+				body: bare
+					? "Add a series and this becomes the screen you open every night — one row per show, one tap to tick the next episode."
+					: "Every series you have is either finished or not started. Tick an episode and it appears here.",
+				actions: [
+					{
+						label: bare ? "Find a series" : "Add a series",
+						primary: true,
+						onClick: () => this.plugin.openSearch(),
+					},
+				],
+			});
 			return;
 		}
 
