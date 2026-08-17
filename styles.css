@@ -6226,12 +6226,19 @@ input.reel-input {
 }
 
 /* The denominator still has to read as subordinate to the score beside it,
-   which it did by being 9px. Weight and colour do that job instead, and
-   neither costs legibility. */
+   which it did by being 9px.
+ *
+ * The first attempt used `--text-faint` at 0.85 opacity, which measured
+ * 2.85:1 against white — WCAG AA wants 4.5:1 for text this size. Fixing
+ * legibility by making something unreadable a different way is not a fix,
+ * and it passed 78/78 because the audit checked size and not contrast.
+ *
+ * `--text-muted` at full opacity is the theme's own answer to "quieter but
+ * still readable", and it measures 5.1:1. Weight alone carries the rest of
+ * the subordination. */
 .reel-score-scale {
 	font-weight: var(--reel-weight-normal);
-	color: var(--text-faint);
-	opacity: 0.85;
+	color: var(--text-muted);
 }
 
 /* A stats fact row is clickable, so it is a target. 41px on desktop — caught
@@ -6241,4 +6248,134 @@ input.reel-input {
 .reel-fact {
 	min-height: 44px;
 	align-items: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* Contrast                                                            */
+/* ------------------------------------------------------------------ */
+
+/* `--text-faint` is Obsidian's decoration colour, not a text colour. Reel was
+   using it for things people actually read — vote counts, tile subtitles, the
+   heart, the "Try" label — and it measures 2.57–2.85:1 against a light
+   background where WCAG AA wants 4.5:1.
+ *
+ * `--text-muted` is the theme's own answer to "quieter but still readable"
+ * and measures 5.1:1. Faint stays only on the two places it is genuinely
+ * decorative: a separator dot, and a placeholder behind an image. */
+.reel-tile-sub,
+.reel-stats .reel-tile-sub,
+.reel-score-votes,
+.reel-score-scale,
+.reel-suggest-label,
+.reel-search-icon,
+.reel-row-overview,
+.reel-heart,
+.reel-heart-glyph,
+.reel-otd-date,
+.reel-recipe-hint,
+.reel-empty-body,
+.reel-preview-role-label {
+	color: var(--text-muted);
+}
+
+/* The liked state has to stay distinguishable from the unliked one, and it
+   was doing that with faint-vs-normal. Colour carries it now. */
+.reel-heart.is-on,
+.reel-heart.is-on .reel-heart-glyph {
+	color: var(--color-red, #e5484d);
+}
+
+/* ------------------------------------------------------------------ */
+/* Overlapping targets                                                 */
+/* ------------------------------------------------------------------ */
+
+/* The clear button sits inside the search field, which is correct — but at
+   44px it covered the text you were typing. The field now reserves that
+   width instead of the button floating over it. This is the same family as
+   "the rating UI shifted while I was typing": two controls sharing pixels. */
+.reel-search-wrap {
+	position: relative;
+}
+
+.reel-search-input {
+	padding-right: 48px;
+}
+
+.reel-search-clear {
+	position: absolute;
+	right: 2px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: transparent;
+	border: none;
+	box-shadow: none;
+}
+
+/* A clickable stats row overlapped its neighbour once it grew to 44px. The
+   first attempt pulled them together with a negative margin, which created
+   the overlap it was meant to remove — the audit caught that immediately. */
+.reel-fact + .reel-fact {
+	border-top: none;
+}
+
+/* Two rows sharing one border line overlap by that line. Only visible on
+   desktop, where the rows are wide enough for the audit to see it — which is
+   the third bug this week that existed at one viewport and not the other. */
+.reel-fact {
+	border-bottom-width: 0;
+	box-shadow: inset 0 -1px 0 var(--background-modifier-border);
+}
+
+/* ------------------------------------------------------------------ */
+/* Touch feedback                                                      */
+/* ------------------------------------------------------------------ */
+
+/* Seven rules gave a hover response and no touch equivalent, so those
+   controls answered a mouse and said nothing to a thumb. A press state is
+   the only feedback a touch device can give before the action lands. */
+.reel-chip:active,
+.reel-btn:active,
+.reel-tab:active,
+.reel-cell:active,
+.reel-row:active,
+.reel-fact:active,
+.reel-otd-card:active,
+.reel-recipe-seed:active,
+.reel-recipe-result:active,
+.reel-caststrip-cell:active,
+.reel-person:active {
+	background: var(--background-modifier-hover);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.reel-cell:active,
+	.reel-row:active,
+	.reel-recipe-result:active {
+		transform: scale(0.98);
+	}
+}
+
+/* The year chips sat on top of the first stats tile — the chip row has no
+   bottom margin and the tile grid no top, so the two met exactly. Caught by
+   the overlap check, which is the one thing a static read of the markup
+   cannot see. */
+.reel-stats .reel-chips {
+	margin-bottom: var(--reel-space-3);
+}
+
+.reel-stats .reel-tiles {
+	margin-top: 0;
+}
+
+/* The inactive segment measured 3.75:1 — quieter than its neighbour, and
+   below AA. `--text-normal` on the segment's own background is 5.1:1, and
+   the active segment is already distinguished by its background rather than
+   by the other one being hard to read. */
+.reel-log .reel-seg .reel-seg-btn,
+.reel-seg-btn {
+	color: var(--text-normal);
+}
+
+.reel-seg-btn:not(.is-active) {
+	opacity: 0.85;
 }

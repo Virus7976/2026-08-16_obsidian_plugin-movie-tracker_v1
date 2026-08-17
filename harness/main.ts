@@ -14,7 +14,7 @@
  */
 
 import "./shim";
-import { LIBRARY, SHOW } from "./fixtures";
+import { LIBRARY, SHOW, AWKWARD, LONG_SHOW } from "./fixtures";
 import type { Entry } from "../src/types";
 import { renderPosterGrid, renderRowList } from "../src/render/grid";
 import { paintStats } from "../src/render/stats";
@@ -53,7 +53,10 @@ function poster(title: string): string {
 /* The smallest plugin the renderers will accept                       */
 /* ------------------------------------------------------------------ */
 
-const all = [...LIBRARY, SHOW];
+// The awkward rows are in the main set on purpose. Keeping them on a
+// separate screen would mean the library grid is only ever checked against
+// well-behaved data, which is not the question.
+const all = [...LIBRARY, SHOW, ...AWKWARD, LONG_SHOW];
 
 const plugin = {
 	settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
@@ -238,6 +241,13 @@ function detail(root: HTMLElement): void {
 	screen.render(root);
 }
 
+function longshow(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	// 34 seasons. The season strip is the one control whose layout depends on
+	// how much data it is given.
+	new DetailScreen(plugin, LONG_SHOW, () => {}, "Library").render(root);
+}
+
 function detailFilm(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	// The longest title in the fixtures, because the hero is where a long name
@@ -290,6 +300,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	recipe,
 	quickrate,
 	logsheet,
+	longshow,
 };
 
 /* ------------------------------------------------------------------ */

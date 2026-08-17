@@ -293,6 +293,59 @@
     lastWatched: { season: 2, episode: 3, date: "2026-08-15" },
     overview: "The everyday lives of office employees in the Scranton, Pennsylvania branch of the fictional Dunder Mifflin Paper Company."
   };
+  var AWKWARD = [
+    // No poster at all. Common on obscure titles and on everything until the
+    // backfill runs, and it is the case where the placeholder has to hold the
+    // grid's shape by itself.
+    film({ title: "A Film With No Poster", year: 1974, genres: ["Drama"], rating: 3 }),
+    // A title long enough to break a grid track, which is exactly how the
+    // unequal-columns bug got in.
+    film({
+      title: "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb, and Several Other Things Besides",
+      year: 1964,
+      rating: 5,
+      genres: ["Comedy", "War"],
+      director: ["Stanley Kubrick"]
+    }),
+    // Nothing recorded but the title. An import leaves hundreds of these.
+    film({ title: "Untitled Import", status: "watchlist" }),
+    // Non-Latin script, which sizes and wraps differently from English.
+    film({ title: "\u4E03\u4EBA\u306E\u4F8D", year: 1954, rating: 5, genres: ["Drama"], director: ["\u9ED2\u6FA4\u660E"], runtime: 207 }),
+    // A single character, at the other end from the long one.
+    film({ title: "M", year: 1931, rating: 4.5, genres: ["Crime"] }),
+    // Every badge at once: certification, watchlist flag, rating, heart. They
+    // all overlay the same poster corner region.
+    film({
+      title: "Everything At Once",
+      year: 2020,
+      rating: 4.5,
+      liked: true,
+      wouldRewatch: true,
+      status: "watchlist",
+      certification: "NC-17",
+      genres: ["Action", "Comedy", "Drama", "Thriller", "Horror", "Romance"],
+      imdbRating: 9.9,
+      imdbVotes: 24e5,
+      metacritic: 100,
+      rottenTomatoes: 100,
+      tmdbRating: 9.9
+    })
+  ];
+  var LONG_SHOW = {
+    ...film({ title: "A Very Long Running Series Indeed", genres: ["Drama"] }),
+    type: "tv",
+    firstAirYear: 1989,
+    totalEpisodes: 750,
+    episodeRuntime: 22,
+    status: "watching",
+    creators: ["Someone With A Considerably Long Name Attached"],
+    seasons: Array.from({ length: 34 }, (_, i) => ({
+      n: i + 1,
+      watched: i < 20 ? `1-${22}` : "",
+      total: 22
+    })),
+    lastWatched: { season: 20, episode: 22, date: "2026-01-01" }
+  };
 
   // src/secrets.ts
   var guarded = /* @__PURE__ */ new Set();
@@ -5027,6 +5080,35 @@
   };
 
   // harness/audit.ts
+  function luminance(colour) {
+    const parts = colour.match(/[\d.]+/g);
+    if (!parts || parts.length < 3)
+      return null;
+    if (parts.length > 3 && Number(parts[3]) === 0)
+      return null;
+    const [r, g, b] = parts.slice(0, 3).map((v) => {
+      const c = Number(v) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function contrastRatio(fg, bg) {
+    const a = luminance(fg);
+    const b = luminance(bg);
+    if (a == null || b == null)
+      return null;
+    const [hi, lo] = a > b ? [a, b] : [b, a];
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  function backdropOf(el) {
+    for (let p = el; p; p = p.parentElement) {
+      const bg = getComputedStyle(p).backgroundColor;
+      const parts = bg.match(/[\d.]+/g);
+      if (parts && (parts.length < 4 || Number(parts[3]) > 0.5))
+        return bg;
+    }
+    return getComputedStyle(document.body).backgroundColor;
+  }
   var SCROLLERS = [
     "reel-chips",
     "reel-suggest",
@@ -5098,6 +5180,85 @@
         tiny.add(`${el.className.split(" ")[0] || el.tagName} ${fs}px`);
     }
     check("textAtLeast12px", tiny.size === 0, [...tiny].slice(0, 4).join(", "));
+    const lowContrast = [];
+    const probe = document.createElement("div");
+    probe.style.background = "var(--interactive-accent)";
+    document.body.appendChild(probe);
+    const accentColour = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    for (const el of view.querySelectorAll("*")) {
+      if (el.childElementCount || !el.textContent?.trim())
+        continue;
+      if (el.closest(".reel-stars"))
+        continue;
+      const cs = getComputedStyle(el);
+      const bgHere = backdropOf(el);
+      if (bgHere === accentColour)
+        continue;
+      if (el.closest(".reel-heart, .reel-cell-heart, .reel-reaction-icon")) {
+        const iconRatio = contrastRatio(cs.color, bgHere);
+        if (iconRatio != null && iconRatio < 3) {
+          lowContrast.push(`${el.className.split(" ")[0]} ${iconRatio.toFixed(2)}:1 (icon)`);
+        }
+        continue;
+      }
+      if (cs.visibility === "hidden" || cs.display === "none")
+        continue;
+      const size = parseFloat(cs.fontSize);
+      const bold = Number(cs.fontWeight) >= 700;
+      const large = size >= 24 || bold && size >= 18.66;
+      const ratio = contrastRatio(cs.color, backdropOf(el));
+      if (ratio != null && ratio < (large ? 3 : 4.5)) {
+        lowContrast.push(`${el.className.split(" ")[0] || el.tagName} ${ratio.toFixed(2)}:1`);
+      }
+    }
+    check("contrastAA", lowContrast.length === 0, [...new Set(lowContrast)].slice(0, 4).join(", "));
+    const targets = [...view.querySelectorAll('button, [role="button"], a, select, input')].filter((el) => {
+      const b = el.getBoundingClientRect();
+      return b.width > 0 && b.height > 0;
+    });
+    const overlaps = [];
+    for (let i = 0; i < targets.length && overlaps.length < 3; i++) {
+      for (let j = i + 1; j < targets.length; j++) {
+        const a = targets[i];
+        const b = targets[j];
+        if (a.contains(b) || b.contains(a))
+          continue;
+        const floats = (el) => {
+          for (let p = el; p; p = p.parentElement) {
+            const pos = getComputedStyle(p).position;
+            if (pos === "sticky" || pos === "fixed" || pos === "absolute")
+              return true;
+          }
+          return false;
+        };
+        if (floats(a) || floats(b))
+          continue;
+        const inside = (x, y) => x.left >= y.left - 1 && x.right <= y.right + 1 && x.top >= y.top - 1 && x.bottom <= y.bottom + 1;
+        if (inside(a.getBoundingClientRect(), b.getBoundingClientRect()))
+          continue;
+        if (inside(b.getBoundingClientRect(), a.getBoundingClientRect()))
+          continue;
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+        const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+        if (w > 3 && h > 3) {
+          overlaps.push(`${a.className.split(" ")[0]} \xD7 ${b.className.split(" ")[0]}`);
+          break;
+        }
+      }
+    }
+    check("noOverlappingTargets", overlaps.length === 0, overlaps.join(", "));
+    const tallChips = [...view.querySelectorAll(".reel-chip")].filter(
+      (el) => el.getBoundingClientRect().height > 56
+    );
+    check("chipsNotOversized", tallChips.length === 0, `${tallChips.length} over 56px`);
+    const walls = [...view.querySelectorAll(".reel-view-filters, .reel-view-header, .reel-tabs")].filter((el) => {
+      const b = el.getBoundingClientRect();
+      return b.height > vh * 0.33;
+    });
+    check("chromeNotAWall", walls.length === 0, walls.map((e) => `${e.className.split(" ")[0]} ${Math.round(e.getBoundingClientRect().height)}px`).join(", "));
     return out;
   }
 
@@ -5114,7 +5275,7 @@
 	</svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
-  var all = [...LIBRARY, SHOW];
+  var all = [...LIBRARY, SHOW, ...AWKWARD, LONG_SHOW];
   var plugin = {
     settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
     app: { vault: { getAbstractFileByPath: () => null }, workspace: { getLeaf: () => null } },
@@ -5273,6 +5434,11 @@
     }, "Library");
     screen.render(root);
   }
+  function longshow(root) {
+    root.addClass("reel-view-body");
+    new DetailScreen(plugin, LONG_SHOW, () => {
+    }, "Library").render(root);
+  }
   function detailFilm(root) {
     root.addClass("reel-view-body");
     const screen = new DetailScreen(plugin, LIBRARY[0], () => {
@@ -5308,7 +5474,8 @@
     discover,
     recipe,
     quickrate,
-    logsheet
+    logsheet,
+    longshow
   };
   var params2 = new URLSearchParams(location.search);
   var wanted = params2.get("screen") ?? "library";

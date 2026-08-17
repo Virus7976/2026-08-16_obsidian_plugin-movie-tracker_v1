@@ -131,3 +131,73 @@ export const SHOW: Entry = {
 	overview:
 		"The everyday lives of office employees in the Scranton, Pennsylvania branch of the fictional Dunder Mifflin Paper Company.",
 } as Entry;
+
+/**
+ * The rows a real library actually contains.
+ *
+ * The first fixture set was thirty English films with posters and one series.
+ * Every one of them was well-behaved, so the harness could only prove the
+ * layout handled well-behaved data — which was never the question. These are
+ * the shapes that break things, and each is a row somebody genuinely has.
+ */
+export const AWKWARD: Entry[] = [
+	// No poster at all. Common on obscure titles and on everything until the
+	// backfill runs, and it is the case where the placeholder has to hold the
+	// grid's shape by itself.
+	film({ title: "A Film With No Poster", year: 1974, genres: ["Drama"], rating: 3 }),
+
+	// A title long enough to break a grid track, which is exactly how the
+	// unequal-columns bug got in.
+	film({
+		title:
+			"Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb, and Several Other Things Besides",
+		year: 1964,
+		rating: 5,
+		genres: ["Comedy", "War"],
+		director: ["Stanley Kubrick"],
+	}),
+
+	// Nothing recorded but the title. An import leaves hundreds of these.
+	film({ title: "Untitled Import", status: "watchlist" }),
+
+	// Non-Latin script, which sizes and wraps differently from English.
+	film({ title: "七人の侍", year: 1954, rating: 5, genres: ["Drama"], director: ["黒澤明"], runtime: 207 }),
+
+	// A single character, at the other end from the long one.
+	film({ title: "M", year: 1931, rating: 4.5, genres: ["Crime"] }),
+
+	// Every badge at once: certification, watchlist flag, rating, heart. They
+	// all overlay the same poster corner region.
+	film({
+		title: "Everything At Once",
+		year: 2020,
+		rating: 4.5,
+		liked: true,
+		wouldRewatch: true,
+		status: "watchlist",
+		certification: "NC-17",
+		genres: ["Action", "Comedy", "Drama", "Thriller", "Horror", "Romance"],
+		imdbRating: 9.9,
+		imdbVotes: 2_400_000,
+		metacritic: 100,
+		rottenTomatoes: 100,
+		tmdbRating: 9.9,
+	}),
+];
+
+/** A show long enough that its season strip is the layout problem. */
+export const LONG_SHOW: Entry = {
+	...film({ title: "A Very Long Running Series Indeed", genres: ["Drama"] }),
+	type: "tv",
+	firstAirYear: 1989,
+	totalEpisodes: 750,
+	episodeRuntime: 22,
+	status: "watching",
+	creators: ["Someone With A Considerably Long Name Attached"],
+	seasons: Array.from({ length: 34 }, (_, i) => ({
+		n: i + 1,
+		watched: i < 20 ? `1-${22}` : "",
+		total: 22,
+	})),
+	lastWatched: { season: 20, episode: 22, date: "2026-01-01" },
+} as Entry;
