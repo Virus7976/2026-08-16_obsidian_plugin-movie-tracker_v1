@@ -21,6 +21,7 @@ import { MAX_STARS, STEP } from "../util/ratings";
 import { viewings } from "./diary";
 import { renderEmpty } from "../ui/empty";
 import { setSelected } from "../ui/a11y";
+import { attachOpinion, opinionOf } from "../ui/personBadge";
 
 export interface StatsOptions {
 	year?: number;
@@ -563,6 +564,7 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 		if (d.face && plugin) {
 			const shot = head.createDiv({ cls: "reel-chart-face" });
 			plugin.people.attach(shot, d.face, faces?.get(d.face));
+			attachOpinion(shot, opinionOf(plugin, faces?.get(d.face)));
 		}
 
 		const label = head.createDiv({ cls: "reel-chart-label", text: d.label });

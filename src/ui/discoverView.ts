@@ -766,13 +766,21 @@ class SeenSheet extends Modal {
 }
 
 /** Preview before committing — for when you want the overview first. */
-class PreviewSheet extends Modal {
+export class PreviewSheet extends Modal {
 	private busy = false;
 
 	constructor(
 		private plugin: ReelPlugin,
 		private item: TmdbSearchResult,
-		private onAdded: () => void
+		private onAdded: () => void,
+		/**
+		 * Who the person you arrived from played in this.
+		 *
+		 * Carried across the navigation rather than looked up again: the
+		 * filmography already knows it, and refetching the credits to answer
+		 * a question that was on screen a moment ago would be absurd.
+		 */
+		private role?: string
 	) {
 		super(plugin.app);
 	}
@@ -786,6 +794,13 @@ class PreviewSheet extends Modal {
 		const isTv = this.item.media_type === "tv";
 		const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
 		const year = yearOf(isTv ? this.item.first_air_date : this.item.release_date);
+
+		// Above everything, because it is why you tapped through.
+		if (this.role) {
+			const r = contentEl.createDiv({ cls: "reel-preview-role" });
+			r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
+			r.createSpan({ cls: "reel-preview-role-value", text: this.role });
+		}
 
 		const head = contentEl.createDiv({ cls: "reel-preview-head" });
 		const posterEl = head.createDiv({ cls: "reel-preview-poster" });

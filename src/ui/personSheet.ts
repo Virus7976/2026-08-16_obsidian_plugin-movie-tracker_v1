@@ -15,6 +15,8 @@
 
 import { Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
+import { PreviewSheet } from "./discoverView";
+import { badgePerson } from "./personBadge";
 import type { TmdbPerson, TmdbPersonCredit } from "../types";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
@@ -65,6 +67,16 @@ export class PersonSheet extends Modal {
 
 		const shot = head.createDiv({ cls: "reel-person-hero-shot" });
 		const src = this.plugin.tmdb.posterUrl(person.profile_path, "w342");
+
+		// Their own portrait behind them, scaled up and blurred past being
+		// readable as a photograph — the same trick the film hero uses. It
+		// costs no extra request, since it is the image already loading, and
+		// it gives the sheet a colour that belongs to the person rather than
+		// a flat panel that looks the same for everyone.
+		if (src) {
+			head.addClass("has-wash");
+			head.createDiv({ cls: "reel-person-wash" }).setCssProps({ "--reel-person-wash": `url("${src}")` });
+		}
 		if (src) {
 			const img = shot.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
 			img.addEventListener("error", () => {
@@ -295,14 +307,30 @@ export class PersonSheet extends Modal {
 		if (credit.overview) panel.createDiv({ cls: "reel-person-role-overview", text: credit.overview });
 
 		const actions = panel.createDiv({ cls: "reel-person-role-actions" });
-		if (mine) {
-			const openIt = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open in your library" });
-			openIt.addEventListener("click", (ev) => {
-				ev.stopPropagation();
+
+		// The full screen, whether or not you own it. Previously a title you
+		// did not have offered only "+ Watchlist" — so the one thing you might
+		// actually want from a filmography, "what *is* this", was reachable
+		// only by adding it to your library first.
+		const details = actions.createEl("button", {
+			cls: mine ? "reel-btn mod-cta" : "reel-btn",
+			text: mine ? "Open in your library" : "Full details",
+		});
+		details.addEventListener("click", (ev) => {
+			ev.stopPropagation();
+			if (mine) {
 				this.close();
 				void this.plugin.openDetail(mine);
-			});
-		} else {
+				return;
+			}
+			// Not owned, so there is no note and no detail screen. The preview
+			// sheet is the same information from TMDB directly — overview,
+			// scores, providers, trailer — and it carries the role across, so
+			// the answer to "who was he in this" survives the navigation.
+			new PreviewSheet(this.plugin, credit, () => {}, roleOf(credit)).open();
+		});
+
+		if (!mine) {
 			const add = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
 			add.addEventListener("click", (ev) => {
 				ev.stopPropagation();
@@ -330,4 +358,16 @@ export class PersonSheet extends Modal {
 	onClose(): void {
 		this.contentEl.empty();
 	}
+}
+
+/**
+ * What this person did on this title.
+ *
+ * A cast credit carries `character`, a crew credit carries `job`, and a
+ * person can appear in a filmography under either — a director who also
+ * acted in one of their own films has both kinds of row.
+ */
+function roleOf(credit: { character?: string; job?: string }): string | undefined {
+	const role = (credit.character ?? credit.job ?? "").trim();
+	return role || undefined;
 }

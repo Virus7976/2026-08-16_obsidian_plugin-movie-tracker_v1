@@ -39,6 +39,7 @@ import { unlink } from "../library";
 import { compactCount } from "../util/format";
 import { ContentFlag, FLAG_LABELS } from "../content";
 import { haptic } from "../util/haptics";
+import { badgePerson } from "./personBadge";
 
 /**
  * "GB" → 🇬🇧.
@@ -446,6 +447,9 @@ export class DetailScreen {
 			cell.setAttr("aria-label", `Find ${p.name} in your library`);
 
 			const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+			// Your own view of this person, wherever they appear. Rating an
+			// actor used to be visible only on the screen where you set it.
+			badgePerson(this.plugin, shot, p.id);
 			const src = this.plugin.tmdb.posterUrl(p.profile_path, "w185");
 			if (src) {
 				const img = shot.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
