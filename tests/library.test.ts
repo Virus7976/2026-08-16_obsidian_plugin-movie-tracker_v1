@@ -236,5 +236,62 @@ const film = (id: number, extra: Record<string, unknown> = {}) => ({
 	eq(lib.size, 1, "rebuilding repeatedly does not duplicate entries");
 }
 
+/* ---- name to person id, which is how a face gets found ---- */
+
+// The whole mechanism rests on `cast` and `cast_ids` staying positionally
+// aligned. A shift by one does not fail loudly — it puts one actor's photo
+// under another actor's name, which is worse than showing no photo at all.
+{
+	const lib = makeLibrary([
+		{
+			path: "Movies/Mission.md",
+			fm: {
+				tmdb_id: 954,
+				title: "Mission: Impossible",
+				cast: ["Tom Cruise", "Jon Voight", "Jean Reno"],
+				cast_ids: [500, 13565, 24045],
+			},
+		},
+	]);
+	const ids = lib.peopleIds();
+	eq(ids.get("Tom Cruise"), 500, "the first name maps to the first id");
+	eq(ids.get("Jean Reno"), 24045, "and the last to the last");
+}
+
+// TMDB occasionally has a credit with no id. Dropping it would shorten the id
+// list and shift every name after it onto the wrong person, so extract writes
+// a 0 and the index has to skip it rather than trust it.
+{
+	const lib = makeLibrary([
+		{
+			path: "Movies/Gap.md",
+			fm: { tmdb_id: 1, title: "Gap", cast: ["First", "Unknown", "Third"], cast_ids: [11, 0, 33] },
+		},
+	]);
+	const ids = lib.peopleIds();
+	eq(ids.get("First"), 11, "a name before the gap is unaffected");
+	eq(ids.get("Unknown"), undefined, "the credit with no id maps to nobody");
+	eq(ids.get("Third"), 33, "and the name after the gap is still correct");
+}
+
+// Notes written before headshots existed, and every imported one, carry no
+// ids at all. That has to be an empty map, not a crash.
+{
+	const lib = makeLibrary([{ path: "Movies/Old.md", fm: { tmdb_id: 1, title: "Old", cast: ["Someone"] } }]);
+	eq(lib.peopleIds().size, 0, "a note with no cast_ids contributes nobody");
+}
+
+// The map is memoised. If the cache outlived an index change, a renamed or
+// re-imported note would keep serving the old pairing — the wrong-face bug
+// arriving by a different route.
+{
+	const lib = makeLibrary([
+		{ path: "Movies/A.md", fm: { tmdb_id: 1, title: "A", cast: ["Actor"], cast_ids: [7] } },
+	]);
+	eq(lib.peopleIds().get("Actor"), 7, "the map builds");
+	lib.rebuild();
+	eq(lib.peopleIds().get("Actor"), 7, "and is still correct after a rebuild drops it");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

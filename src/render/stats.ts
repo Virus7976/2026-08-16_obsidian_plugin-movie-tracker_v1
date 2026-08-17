@@ -344,15 +344,15 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	// "[[People/X|X]]" and "X" tally separately.
 	if (seenFilms.length) {
 		tally(charts, "Top directors", seenFilms, (e) => e.director.map(unlink), undefined, undefined, plugin);
-		ratedBy(charts, "Directors you rate highest", seenFilms, (e) => e.director.map(unlink), 2, plugin);
-		tally(charts, "Top actors", seenFilms, (e) => e.cast.map(unlink), undefined, undefined, plugin);
+		ratedBy(charts, "Directors you rate highest", seenFilms, (e) => e.director.map(unlink), 2, plugin, true);
+		tally(charts, "Top actors", seenFilms, (e) => e.cast.map(unlink), undefined, undefined, plugin, true);
 		// Recurring characters are mostly a franchise signal — the same part
 		// across several films is the interesting case, so require two.
 		tally(charts, "Recurring characters", seenFilms, (e) => e.characters, undefined, undefined, plugin);
 	}
 	if (seenShows.length) {
 		tally(charts, "Top creators", seenShows, (e) => e.creators.map(unlink), undefined, undefined, plugin);
-		tally(charts, "Top actors — TV", seenShows, (e) => e.cast.map(unlink), undefined, undefined, plugin);
+		tally(charts, "Top actors — TV", seenShows, (e) => e.cast.map(unlink), undefined, undefined, plugin, true);
 	}
 
 	tally(charts, "Genres", seenAll, (e) => e.genres, 10, undefined, plugin);
@@ -494,6 +494,14 @@ interface Bar {
 	search?: string;
 	/** An action for rows whose answer is not a library search — a year rescopes the page. */
 	go?: () => void;
+	/**
+	 * The person this row is about, when it is about a person.
+	 *
+	 * Held separately from `label` because a label can carry a count or a
+	 * qualifier, and the lookup needs the bare name. Set only where a face
+	 * makes sense — a director or an actor, never a genre or a decade.
+	 */
+	face?: string;
 }
 
 /**
@@ -528,6 +536,10 @@ function providerSplit(el: HTMLElement, rows: Entry[], plugin?: ReelPlugin): voi
 function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?: ReelPlugin): void {
 	if (!data.length) return;
 	const max = Math.max(...data.map((d) => d.n), 1);
+	// Resolved once for the whole chart rather than per row. The map is
+	// memoised on the index, but reaching for it twelve times per chart across
+	// eight charts is still eight times more work than reaching for it once.
+	const faces = data.some((d) => d.face) ? plugin?.library.peopleIds() : undefined;
 	const box = el.createDiv({ cls: "reel-chart" });
 	box.createDiv({ cls: "reel-chart-title", text: title });
 	const body = box.createDiv({ cls: "reel-chart-body" });
@@ -541,6 +553,17 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 		// row counts turns the chart into the thing it is describing — the
 		// posters are the bar, and their number is the count.
 		const head = row.createDiv({ cls: "reel-chart-head" });
+
+		// A person's row leads with their face. It used to lead with a film
+		// poster, which is the right *data* — that is the film they were in —
+		// but a poster under a person's name implies a photo of that person,
+		// so it read as a bug. In a small library it looked like a worse one:
+		// every actor was in the same film, so every row showed the same image.
+		if (d.face && plugin) {
+			const shot = head.createDiv({ cls: "reel-chart-face" });
+			plugin.people.attach(shot, d.face, faces?.get(d.face));
+		}
+
 		const label = head.createDiv({ cls: "reel-chart-label", text: d.label });
 		label.setAttr("title", d.note ? `${d.label} — ${d.note}` : d.label);
 		if (d.note) label.createDiv({ cls: "reel-chart-sub", text: d.note });
@@ -592,7 +615,9 @@ function tally(
 	pick: (e: Entry) => string[],
 	limit = 8,
 	minCount = 2,
-	plugin?: ReelPlugin
+	plugin?: ReelPlugin,
+	/** True when each key is a person's name, so the row can lead with a face. */
+	people = false
 ): void {
 	// "Appears at least twice" keeps a large library's charts meaningful, but
 	// it empties them entirely for a small one — every director has exactly
@@ -616,7 +641,13 @@ function tally(
 		.filter(([, list]) => list.length >= floor)
 		.sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
 		.slice(0, limit)
-		.map(([label, list]) => ({ label, n: list.length, entries: list, search: label }));
+		.map(([label, list]) => ({
+			label,
+			n: list.length,
+			entries: list,
+			search: label,
+			...(people ? { face: label } : {}),
+		}));
 	bars(el, title, top, "", plugin);
 }
 
@@ -631,7 +662,8 @@ function ratedBy(
 	rows: Entry[],
 	pick: (e: Entry) => string[],
 	min = 2,
-	plugin?: ReelPlugin
+	plugin?: ReelPlugin,
+	people = false
 ): void {
 	const sums = new Map<string, { total: number; n: number }>();
 	// Every rated title per key, best first — the posters carry the row.
@@ -660,6 +692,7 @@ function ratedBy(
 			// The label carries a count in brackets — searching that string
 			// would match nothing, so the search uses the bare key.
 			search: label,
+			...(people ? { face: label } : {}),
 		}))
 		.sort((a, b) => b.n - a.n)
 		.slice(0, 8);

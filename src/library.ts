@@ -83,6 +83,9 @@ export class Library extends Events {
 		return p.startsWith(film + "/") || p.startsWith(series + "/");
 	}
 
+	/** Dropped on every index change; see peopleIds(). */
+	private peopleCache: Map<string, number> | null = null;
+
 	private upsert(file: TFile, quiet = false): void {
 		const fm = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter;
 		// A non-numeric id would index as NaN, and NaN never equals itself — so
@@ -99,6 +102,11 @@ export class Library extends Events {
 	}
 
 	private emitChange(): void {
+		// Every path that changes the index ends here, which makes it the one
+		// place the name-to-person map can be dropped without hunting for
+		// callers. A stale entry would show one actor's photo under another's
+		// name — a wrong face is worse than no face.
+		this.peopleCache = null;
 		this.trigger("changed");
 	}
 
@@ -136,6 +144,42 @@ export class Library extends Events {
 
 	byTmdbId(id: number, type?: Entry["type"]): Entry | undefined {
 		return this.all().find((e) => e.tmdbId === id && (!type || e.type === type));
+	}
+
+	/**
+	 * Every person the library knows, by name.
+	 *
+	 * Stats works in names — a chart row is "Jean Reno", not a person id —
+	 * because that is what the frontmatter carries and what the charts group
+	 * on. To show a face, that name has to become an id again, and the only
+	 * place the pairing exists is the positional alignment between `cast` and
+	 * `cast_ids` on each note.
+	 *
+	 * Memoised, and dropped whenever the index changes. Building it per call
+	 * would be fine at three titles and quadratic on the stats page at three
+	 * hundred — one pass over the library for every chart row. A stale map is
+	 * the real danger, since it would put one actor's photo under another's
+	 * name, so the cache is invalidated rather than refreshed.
+	 */
+	peopleIds(): Map<string, number> {
+		if (this.peopleCache) return this.peopleCache;
+
+		const out = new Map<string, number>();
+		const pair = (names: string[], ids: number[]) => {
+			for (let i = 0; i < names.length; i++) {
+				const id = ids[i];
+				// A zero is the placeholder for a credit TMDB gave no id for.
+				if (!id) continue;
+				const name = unlink(names[i]);
+				if (name && !out.has(name)) out.set(name, id);
+			}
+		};
+		for (const entry of this.entries.values()) {
+			pair(entry.cast, entry.castIds);
+			pair(entry.director, entry.directorIds);
+		}
+		this.peopleCache = out;
+		return out;
 	}
 
 	get size(): number {
@@ -267,6 +311,8 @@ function toEntry(file: TFile, fm: Record<string, unknown>, seriesFolder: string)
 		poster: fm.poster ? String(fm.poster) : undefined,
 		posterUrl: fm.poster_url ? String(fm.poster_url) : undefined,
 		backdropPath: fm.backdrop_path ? String(fm.backdrop_path) : undefined,
+		castIds: toNumberArray(fm.cast_ids),
+		directorIds: toNumberArray(fm.director_ids),
 		tmdbRating: numberOrUndef(fm.tmdb_rating),
 		status: String(fm.status ?? (type === "tv" ? "watching" : "watched")),
 		rating: numberOrUndef(fm.rating),
@@ -316,6 +362,21 @@ function numberOrUndef(v: unknown): number | undefined {
 	if (v == null || v === "") return undefined;
 	const n = Number(v);
 	return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Person ids, kept positionally aligned with the names beside them.
+ *
+ * A non-numeric entry becomes 0 rather than being dropped: shortening the
+ * list would shift every id after the gap onto the wrong person, which is a
+ * far worse failure than one missing photo.
+ */
+function toNumberArray(v: unknown): number[] {
+	if (!Array.isArray(v)) return [];
+	return v.map((x) => {
+		const n = Number(x);
+		return Number.isFinite(n) && n > 0 ? n : 0;
+	});
 }
 
 function toStringArray(v: unknown): string[] {

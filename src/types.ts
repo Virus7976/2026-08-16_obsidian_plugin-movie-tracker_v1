@@ -71,6 +71,16 @@ export interface Entry {
 	 * Doubling the vault's image weight for that would be a bad trade.
 	 */
 	backdropPath?: string;
+	/**
+	 * TMDB person ids, positionally aligned with `cast` and `director`.
+	 *
+	 * Kept alongside the names rather than replacing them: the names are what
+	 * you read in the note and what a person-link points at, and the ids are
+	 * only how Reel finds a photo. Empty on any note written before headshots
+	 * existed, and on every imported one.
+	 */
+	castIds: number[];
+	directorIds: number[];
 	tmdbRating?: number;
 	status: string;
 	rating?: number;

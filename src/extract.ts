@@ -83,6 +83,17 @@ function round1(n: number): number {
 	return Math.round(n * 10) / 10;
 }
 
+/**
+ * TMDB person ids, positionally aligned with the names beside them.
+ *
+ * A zero stands in for a credit with no id rather than being dropped, so the
+ * two arrays stay the same length — a shorter id list would silently shift
+ * every name after the gap onto the wrong person.
+ */
+function idsOf(rows: { id?: number }[]): number[] {
+	return rows.map((r) => (typeof r.id === "number" ? r.id : 0));
+}
+
 /* ------------------------------------------------------------------ */
 /* Films                                                               */
 /* ------------------------------------------------------------------ */
@@ -90,12 +101,20 @@ function round1(n: number): number {
 export function filmFields(meta: TmdbFilm, opts: ExtractOptions): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
 
-	const directors = (meta.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
-	if (directors.length) out.director = directors.map((d) => personLink(d, opts));
+	const directorRows = (meta.credits?.crew ?? []).filter((c) => c.job === "Director");
+	if (directorRows.length) {
+		out.director = directorRows.map((d) => personLink(d.name, opts));
+		out.director_ids = idsOf(directorRows);
+	}
 
 	const castRows = (meta.credits?.cast ?? []).slice(0, opts.castLimit);
 	if (castRows.length) {
 		out.cast = castRows.map((c) => personLink(c.name, opts));
+		// Positionally aligned with `cast`, which is what lets a name in the
+		// stats — where only the name survives — be turned back into a person.
+		// Without an id the only way to find someone's photo is to search TMDB
+		// by name, and names are not unique.
+		out.cast_ids = idsOf(castRows);
 		const characters = castRows.map((c) => characterOf(c)).filter(Boolean);
 		if (characters.length) out.characters = characters;
 	}
@@ -153,6 +172,7 @@ export function showFields(meta: TmdbShow, opts: ExtractOptions): Record<string,
 	const castRows = (meta.aggregate_credits?.cast ?? []).slice(0, opts.castLimit);
 	if (castRows.length) {
 		out.cast = castRows.map((c) => personLink(c.name, opts));
+		out.cast_ids = idsOf(castRows);
 		const characters = castRows.map((c) => characterOf(c)).filter(Boolean);
 		if (characters.length) out.characters = characters;
 	}

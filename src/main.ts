@@ -10,6 +10,7 @@ import { DtddClient, OmdbClient } from "./enrich";
 import { DiscoverEngine } from "./discover";
 import { UndoService } from "./undo";
 import { SwatchStore } from "./swatches";
+import { PeopleStore } from "./people";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
 import { LogSheet } from "./ui/logSheet";
@@ -54,6 +55,7 @@ export default class ReelPlugin extends Plugin {
 	discover!: DiscoverEngine;
 	undo!: UndoService;
 	swatches!: SwatchStore;
+	people!: PeopleStore;
 
 
 	async onload(): Promise<void> {
@@ -70,6 +72,7 @@ export default class ReelPlugin extends Plugin {
 		this.dtdd = new DtddClient(this);
 		this.discover = new DiscoverEngine(this);
 		this.swatches = new SwatchStore();
+		this.people = new PeopleStore(this);
 		this.undo = new UndoService(this);
 		// Steps hold a path, and a path stops meaning anything the moment the
 		// note behind it is renamed or deleted.
@@ -395,6 +398,27 @@ export default class ReelPlugin extends Plugin {
 						return;
 					}
 					new Notice(`Reel: cached ${n} poster${n === 1 ? "" : "s"}.`);
+				} catch (e) {
+					new Notice(`Reel: ${redact(e)}`);
+				}
+			},
+		});
+
+		this.addCommand({
+			id: "backfill-headshots",
+			name: "Download missing headshots",
+			callback: async () => {
+				try {
+					const n = await this.people.backfill();
+					if (n < 0) {
+						new Notice("Reel: stopping after the current headshot.");
+						return;
+					}
+					new Notice(
+						n
+							? `Reel: cached ${n} headshot${n === 1 ? "" : "s"}.`
+							: "Reel: nothing to fetch — add or refresh a title first, since only notes written since 0.7.45 carry the cast ids a photo is found by."
+					);
 				} catch (e) {
 					new Notice(`Reel: ${redact(e)}`);
 				}
