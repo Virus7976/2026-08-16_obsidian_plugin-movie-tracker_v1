@@ -10,6 +10,7 @@ import { DtddClient, OmdbClient } from "./enrich";
 import { DiscoverEngine } from "./discover";
 import { UndoService } from "./undo";
 import { SwatchStore } from "./swatches";
+import { reportFailure, offline } from "./ui/failure";
 import { PeopleStore } from "./people";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
@@ -234,6 +235,17 @@ export default class ReelPlugin extends Plugin {
 			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
 			return;
 		}
+		// Checked before opening, not after failing. Searching TMDB is the one
+		// thing in Reel that genuinely cannot work offline, and a modal that
+		// opens, spins, then errors is a worse way to learn that than a
+		// sentence saying so.
+		if (offline()) {
+			new Notice(
+				"Reel: you're offline — searching TMDB needs a connection. Everything already in your library still works.",
+				7000
+			);
+			return;
+		}
 		new SearchModal(this.app, this, opts).open();
 	}
 
@@ -378,10 +390,17 @@ export default class ReelPlugin extends Plugin {
 			name: "Refresh metadata from TMDB",
 			checkCallback: (checking) =>
 				this.withEntry(checking, (entry) => {
-					void this.notes
-						.refreshMetadata(entry)
-						.then(() => new Notice("Reel: metadata refreshed."))
-						.catch((e) => new Notice(`Reel: ${redact(e)}`));
+					const run = () =>
+						void this.notes
+							.refreshMetadata(entry)
+							.then(() => new Notice("Reel: metadata refreshed."))
+							.catch((e) =>
+								reportFailure(e, {
+									context: `Couldn't refresh ${entry.title}`,
+									retry: run,
+								})
+							);
+					run();
 				}),
 		});
 
@@ -484,10 +503,12 @@ export default class ReelPlugin extends Plugin {
 			name: "Fetch ratings and content notes for this title",
 			checkCallback: (checking) =>
 				this.withEntry(checking, (entry, file) => {
-					void this.notes
-						.enrich(file, { title: entry.title, year: entry.year ?? entry.firstAirYear, imdbId: entry.imdbId })
-						.then(() => new Notice("Reel: enrichment done."))
-						.catch((e) => new Notice(`Reel: ${redact(e)}`));
+					const run = () =>
+						void this.notes
+							.enrich(file, { title: entry.title, year: entry.year ?? entry.firstAirYear, imdbId: entry.imdbId })
+							.then(() => new Notice("Reel: enrichment done."))
+							.catch((e) => reportFailure(e, { context: "Enrichment failed", retry: run }));
+					run();
 				}),
 		});
 

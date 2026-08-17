@@ -24,6 +24,7 @@ import { trailerUrl, providerNames } from "../extract";
 import { skeletonCards, skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
 import { setSelected } from "./a11y";
+import { diagnoseError } from "./failure";
 
 interface Filters {
 	genreId: number | null;
@@ -485,7 +486,10 @@ export class DiscoverScreen {
 			this.rows = await this.plugin.discover.rows(profile, this.filters.type);
 			this.profile = profile;
 		} catch (e) {
-			this.error = redact(e);
+			// The diagnosis, not the raw error. A retry button already
+			// existed here, but above a redacted stack fragment — so it told
+			// you to try again without telling you whether that could help.
+			this.error = diagnoseError(e).message;
 		} finally {
 			this.loading = false;
 			this.render(container);
@@ -550,7 +554,7 @@ export class DiscoverScreen {
 					this.results = items;
 				})
 				.catch((e: unknown) => {
-					this.error = redact(e);
+					this.error = diagnoseError(e).message;
 				})
 				.finally(() => {
 					this.loading = false;
