@@ -30,7 +30,7 @@ import type ReelPlugin from "./main";
 import type { Entry, TmdbSearchResult } from "./types";
 import { unlink } from "./library";
 import { blend, type Blended } from "./util/blend";
-import { toDiscoverParams, blame, type Recipe, type SeedPool, type Culprit } from "./util/recipe";
+import { toDiscoverParams, blame, matchesRecipe, type Recipe, type SeedPool, type Culprit } from "./util/recipe";
 
 export interface DiscoverRow {
 	id: string;
@@ -557,7 +557,10 @@ export class DiscoverEngine {
 		}
 		for (const id of this.plugin.settings.dismissedIds) owned.add(id);
 
-		const queries = this.queriesFor(recipe);
+		// Only the seedless path needs /discover now. With seeds the candidates
+		// come from /recommendations and are filtered against the recipe
+		// directly, which is both exact and one fewer request.
+		const queries = recipe.seeds.length ? [] : this.queriesFor(recipe);
 		// One request per decade, merged. De-duplicated by id, since a title
 		// cannot be in two decades but a caller could pass the same one twice.
 		const constrained = queries.length
@@ -597,13 +600,15 @@ export class DiscoverEngine {
 
 		let out = blend(sets, { exclude: owned, minAgreement: recipe.minAgreement });
 
-		// Narrow against the constrained set. An id present in /discover under
-		// these parameters satisfies them; TMDB will not tell us that about a
-		// recommendation directly.
-		if (constrained) {
-			const allowed = new Set(constrained.results.map((r) => r.id));
-			out = out.filter((b) => allowed.has(b.item.id));
-		}
+		// Filter each candidate against the recipe directly.
+		//
+		// This used to intersect with page one of /discover, which asks two
+		// unrelated twenty-item samples to overlap — twenty recommendations
+		// against twenty results drawn from thousands. They almost never did,
+		// which is why "action comedy from the 2000s, rated 7+" reported
+		// nothing while 6,181 films matched. Dropping a constraint appeared to
+		// help only because it changed *which* twenty came back.
+		out = out.filter((b) => matchesRecipe(b.item, recipe));
 
 		return out.filter((b) => b.item.poster_path);
 	}

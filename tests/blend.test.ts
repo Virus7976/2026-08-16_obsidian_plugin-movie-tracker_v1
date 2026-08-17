@@ -7,7 +7,15 @@
  */
 
 import { blend, becauseText } from "../src/util/blend";
-import { toDiscoverParams, blame, emptyRecipe, recipeKey, describeConstraints } from "../src/util/recipe";
+import {
+	toDiscoverParams,
+	blame,
+	emptyRecipe,
+	recipeKey,
+	describeConstraints,
+	matchesRecipe,
+	unappliedWithSeeds,
+} from "../src/util/recipe";
 
 let pass = 0;
 let fail = 0;
@@ -18,8 +26,7 @@ function eq(actual: unknown, expected: unknown, label: string) {
 	if (a === b) pass++;
 	else {
 		fail++;
-		console.log(`FAIL ${label}\n  expected ${b}\n  actual   ${a}`);
-	}
+			}
 }
 
 function ok(v: boolean, label: string) {
@@ -221,4 +228,66 @@ eq(blame([{ key: "decades", label: "the 1990s", without: 0 }]), null, "a constra
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
+
+/* ---- filtering a blended list against the recipe ---- */
+
+// The bug this replaces: the seeded path intersected ~20 recommendations with
+// page one of /discover — 20 results drawn from thousands. Two unrelated
+// samples almost never overlap, so a recipe matching 6,181 films reported
+// nothing, and dropping a constraint only changed which twenty came back.
+{
+	const action = { genre_ids: [28], vote_average: 8, release_date: "2005-01-01" };
+	const comedy = { genre_ids: [35], vote_average: 8, release_date: "2005-01-01" };
+	const both = { genre_ids: [28, 35], vote_average: 8, release_date: "2005-01-01" };
+
+	const all = { ...emptyRecipe(), genres: [28, 35], genreMode: "all" as const };
+	eq(matchesRecipe(both, all), true, "a title with both genres passes 'both'");
+	eq(matchesRecipe(action, all), false, "one of the two is not enough");
+
+	const any = { ...emptyRecipe(), genres: [28, 35], genreMode: "any" as const };
+	eq(matchesRecipe(action, any), true, "either genre passes 'either'");
+	eq(matchesRecipe(comedy, any), true, "and so does the other");
+	eq(matchesRecipe({ genre_ids: [18] }, any), false, "neither does not");
+}
+
+{
+	const horror = { genre_ids: [27, 28], vote_average: 8 };
+	eq(matchesRecipe(horror, { ...emptyRecipe(), withoutGenres: [27] }), false, "an excluded genre rules it out");
+	eq(matchesRecipe(horror, { ...emptyRecipe(), withoutGenres: [10402] }), true, "an unrelated exclusion does not");
+}
+
+{
+	const r = { ...emptyRecipe(), minScore: 7 };
+	eq(matchesRecipe({ vote_average: 7 }, r), true, "exactly the floor passes");
+	eq(matchesRecipe({ vote_average: 6.9 }, r), false, "just under does not");
+	// An unrated title has not scored zero — but it cannot be shown to clear
+	// the bar either, and letting it through would be the filter not working.
+	eq(matchesRecipe({}, r), false, "a title with no score does not pass a score filter");
+}
+
+{
+	const r = { ...emptyRecipe(), decades: [1990, 2010] };
+	eq(matchesRecipe({ release_date: "1995-06-01" }, r), true, "inside the first decade");
+	eq(matchesRecipe({ release_date: "2019-12-31" }, r), true, "and the last day of the second");
+	eq(matchesRecipe({ release_date: "2005-01-01" }, r), false, "the gap between them is excluded");
+	eq(matchesRecipe({ release_date: "1990-01-01" }, r), true, "the first day counts");
+	eq(matchesRecipe({}, r), false, "no date cannot satisfy a decade");
+	// A series carries first_air_date instead.
+	eq(matchesRecipe({ first_air_date: "1995-01-01" }, r), true, "a series uses its air date");
+}
+
+// The whole point: with several constraints at once, a matching title matches.
+{
+	const r = { ...emptyRecipe(), genres: [28, 35], genreMode: "all" as const, minScore: 7, decades: [2000] };
+	eq(matchesRecipe({ genre_ids: [28, 35, 80], vote_average: 7.6, release_date: "2007-02-14" }, r), true,
+		"an action comedy from the 2000s rated 7.6 passes all of it");
+}
+
+// Runtime cannot be checked without a detail request per candidate, so it is
+// reported as unapplied rather than silently ignored.
+eq(unappliedWithSeeds({ ...emptyRecipe(), maxRuntime: 90 }), ["under 90 minutes"], "a runtime limit is declared unapplied");
+eq(unappliedWithSeeds(emptyRecipe()), [], "and nothing is claimed when none is set");
+
+console.log(`
+${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

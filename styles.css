@@ -6393,3 +6393,108 @@ input.reel-input {
 .reel-fact > * {
 	min-width: 0;
 }
+
+/* A static chip is a label, not a target.
+ *
+ * The 44px minimum was applied to every `.reel-chip`, which turned the genre
+ * labels on the detail screen into tall ovals with their text floating in the
+ * middle — three of them side by side, none looking aligned with the others.
+ * They are not tappable, so the touch-target floor does not apply; it is for
+ * things you press. */
+.reel-chip.static {
+	min-height: 0;
+	display: inline-flex;
+	align-items: center;
+	padding: 5px 12px;
+	cursor: default;
+}
+
+/* The row they sit in aligns them on one baseline rather than letting each
+   find its own height. */
+.reel-hero-genres {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--reel-space-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Trailer                                                             */
+/* ------------------------------------------------------------------ */
+
+/* At the top of the sheet, because it is what you want before a synopsis —
+   it used to sit below the entire cast list, off the bottom of the screen. */
+.reel-trailer {
+	position: relative;
+	aspect-ratio: 16 / 9;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-secondary);
+	margin-bottom: var(--reel-space-3);
+}
+
+.reel-trailer-play {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	border: none;
+	background: none;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.reel-trailer-play img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* The play badge, over a scrim so it reads against any frame. */
+.reel-trailer-icon {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 34px;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.28);
+	text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.reel-trailer-play:hover .reel-trailer-icon,
+.reel-trailer-play:active .reel-trailer-icon {
+	background: rgba(0, 0, 0, 0.4);
+}
+
+.reel-trailer-frame {
+	width: 100%;
+	height: 100%;
+	border: none;
+	display: block;
+}
+
+/* The preview sheet's cast row needs the same track the detail screen uses;
+   without it the cells stacked one per line and left the sheet mostly empty. */
+.reel-preview .reel-caststrip-track,
+.reel-caststrip-track {
+	display: flex;
+	gap: var(--reel-space-3);
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+	padding-bottom: var(--reel-space-1);
+}
+
+.reel-caststrip-track::-webkit-scrollbar {
+	display: none;
+}
+
+.reel-caststrip-cell {
+	flex: 0 0 76px;
+	width: 76px;
+	text-align: center;
+}

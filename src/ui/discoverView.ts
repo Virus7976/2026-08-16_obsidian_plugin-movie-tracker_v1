@@ -986,18 +986,11 @@ export class PreviewSheet extends Modal {
 		try {
 			const meta = isTv ? await this.plugin.tmdb.getShow(this.item.id) : await this.plugin.tmdb.getFilm(this.item.id);
 
-			this.paintFacts(slot, meta, isTv);
 
 			const url = trailerUrl(meta.videos?.results);
-			if (url) {
-				const play = slot.createEl("a", {
-					cls: "reel-btn mod-cta reel-trailer-btn",
-					text: "▶  Watch trailer",
-					href: url,
-				});
-				play.setAttr("target", "_blank");
-				play.setAttr("rel", "noopener");
-			}
+			if (url) this.paintTrailer(slot, url);
+
+			this.paintFacts(slot, meta, isTv);
 
 			// Where you can actually watch it, from the payload already
 			// fetched for the trailer — so this costs nothing extra. Doing it
@@ -1061,7 +1054,10 @@ export class PreviewSheet extends Modal {
 		const cast = (credits?.cast ?? []).slice(0, 10);
 		if (!cast.length) return;
 		slot.createDiv({ cls: "reel-block-title", text: "Cast" });
-		const strip = slot.createDiv({ cls: "reel-caststrip" });
+		// The track is where the flex row lives — appending cells straight into
+		// `.reel-caststrip` gave one cell per line and a screen of blank space
+		// beside them.
+		const strip = slot.createDiv({ cls: "reel-caststrip" }).createDiv({ cls: "reel-caststrip-track" });
 		for (const p of cast) {
 			const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
 			const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
@@ -1102,6 +1098,47 @@ export class PreviewSheet extends Modal {
 			link("Parents guide", `${imdb}parentalguide`);
 		}
 		link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
+	}
+
+	/**
+	 * The trailer, playable in place.
+	 *
+	 * Click-to-load rather than an iframe on arrival: an embed that mounts
+	 * itself costs a YouTube request and a set of cookies for every card you
+	 * so much as glance at, and most of them you close again. The poster frame
+	 * is free, and one tap is a fair price for the thing you asked for.
+	 */
+	private paintTrailer(slot: HTMLElement, url: string): void {
+		const id = /[?&]v=([\w-]{6,})/.exec(url)?.[1] ?? /youtu\.be\/([\w-]{6,})/.exec(url)?.[1];
+		if (!id) {
+			const link = slot.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", text: "▶  Watch trailer", href: url });
+			link.setAttr("target", "_blank");
+			link.setAttr("rel", "noopener");
+			return;
+		}
+
+		const box = slot.createDiv({ cls: "reel-trailer" });
+		const play = box.createEl("button", { cls: "reel-trailer-play", attr: { type: "button" } });
+		// YouTube's own still, so the placeholder is the actual first frame
+		// rather than a grey rectangle.
+		play.createEl("img", { attr: { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "", loading: "lazy" } });
+		play.createDiv({ cls: "reel-trailer-icon", text: "▶" });
+		play.setAttr("aria-label", "Play the trailer");
+
+		play.addEventListener("click", () => {
+			const frame = box.createEl("iframe", {
+				cls: "reel-trailer-frame",
+				attr: {
+					// nocookie, and only once you have asked for it.
+					src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`,
+					allow: "accelerometer; autoplay; encrypted-media; picture-in-picture",
+					allowfullscreen: "true",
+					title: "Trailer",
+				},
+			});
+			play.remove();
+			frame.focus();
+		});
 	}
 
 	private async add(watchlist: boolean, button: HTMLButtonElement): Promise<void> {

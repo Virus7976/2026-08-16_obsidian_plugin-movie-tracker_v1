@@ -172,3 +172,71 @@ export function recipeKey(recipe: Recipe): string {
 		minAgreement: recipe.minAgreement,
 	});
 }
+
+/**
+ * Does this title satisfy the recipe?
+ *
+ * Checked against the search result itself rather than by asking whether the
+ * id appears in a `/discover` response — which is what the seeded path did,
+ * and it was close to guaranteed to return nothing.
+ *
+ * `/recommendations` returns about twenty titles per seed. `/discover`
+ * returns page one: twenty titles out of, in one real case, 6,181. Taking the
+ * intersection of those two sets asks two unrelated twenty-item samples to
+ * overlap, which they almost never do — so "action comedy from the 2000s,
+ * rated 7+" reported nothing while thousands of films matched. Dropping a
+ * constraint appeared to fix it only because it changed *which* twenty came
+ * back.
+ *
+ * A search result carries `genre_ids`, `vote_average` and a release date, so
+ * three of the four constraints can be evaluated exactly, on the actual
+ * title, with no second request.
+ */
+export function matchesRecipe(
+	// Describes what it reads, not the whole shape. No index signature: that
+	// makes every concrete type structurally incompatible, which is the same
+	// trap the blend function hit.
+	item: {
+		genre_ids?: number[];
+		vote_average?: number;
+		release_date?: string;
+		first_air_date?: string;
+	},
+	recipe: Recipe
+): boolean {
+	const genres = item.genre_ids ?? [];
+
+	if (recipe.genres.length) {
+		const ok =
+			recipe.genreMode === "all"
+				? recipe.genres.every((g) => genres.includes(g))
+				: recipe.genres.some((g) => genres.includes(g));
+		if (!ok) return false;
+	}
+
+	if (recipe.withoutGenres.some((g) => genres.includes(g))) return false;
+
+	if (recipe.minScore != null) {
+		// A title with no score has not been rated, which is not the same as
+		// scoring zero — but it cannot be shown to clear the bar either.
+		if ((item.vote_average ?? 0) < recipe.minScore) return false;
+	}
+
+	if (recipe.decades.length) {
+		const date = item.release_date ?? item.first_air_date ?? "";
+		const year = Number(date.slice(0, 4));
+		if (!Number.isFinite(year) || year <= 0) return false;
+		if (!recipe.decades.some((d) => year >= d && year <= d + 9)) return false;
+	}
+
+	// Runtime is deliberately not checked here: a search result does not carry
+	// one, and fetching a detail request per candidate to filter a list would
+	// cost twenty requests to answer one question. The seeded path states this
+	// rather than silently ignoring the limit.
+	return true;
+}
+
+/** Constraints that cannot be applied to a blended list without extra requests. */
+export function unappliedWithSeeds(recipe: Recipe): string[] {
+	return recipe.maxRuntime != null ? [`under ${recipe.maxRuntime} minutes`] : [];
+}

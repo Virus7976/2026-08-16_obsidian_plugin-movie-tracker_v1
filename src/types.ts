@@ -136,6 +136,12 @@ export interface TmdbSearchResult {
 	poster_path?: string | null;
 	overview?: string;
 	vote_average?: number;
+	/**
+	 * Genre ids, which search and discover both return and the type never
+	 * declared. Needed to check a recipe against a candidate without a second
+	 * request per title.
+	 */
+	genre_ids?: number[];
 	/** TMDB sends this on every result; only /discover lets us exclude it up front. */
 	adult?: boolean;
 }
