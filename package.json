@@ -33,7 +33,8 @@
     "test:milestones": "esbuild tests/milestones.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.milestones.cjs --log-level=error && node tests/.milestones.cjs",
     "test:blend": "esbuild tests/blend.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.blend.cjs --log-level=error && node tests/.blend.cjs",
     "test:cachekey": "esbuild tests/cachekey.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.cachekey.cjs --log-level=error && node tests/.cachekey.cjs",
-    "test:roving": "esbuild tests/roving.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.roving.cjs --log-level=error && node tests/.roving.cjs"
+    "test:roving": "esbuild tests/roving.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.roving.cjs --log-level=error && node tests/.roving.cjs",
+    "harness": "esbuild harness/main.ts --bundle --format=iife --alias:obsidian=./harness/shim.ts --outfile=harness/bundle.js --log-level=warning"
   },
   "keywords": [
     "obsidian",

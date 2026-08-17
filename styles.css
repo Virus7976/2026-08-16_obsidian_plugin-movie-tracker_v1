@@ -320,13 +320,23 @@ body {
    breakpoint ladder, so it behaves in a split pane too. */
 .reel-grid {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	/* minmax(0, 1fr), not 1fr.
+	 *
+	 * A bare `1fr` track has an automatic minimum of min-content, so a title
+	 * set to `white-space: nowrap` forces its column wider than its share.
+	 * The harness caught this as columns of 317px, 125px and 173px inside a
+	 * 351px grid — one film with a long name stretching its column to fit
+	 * and squeezing the other two. Every poster in the row was a different
+	 * width, and the grid overflowed the pane. */
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: var(--reel-gap);
+	min-width: 0;
 }
 
 @media (min-width: 500px) {
 	.reel-grid {
 		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	min-width: 0;
 	}
 }
 
@@ -928,7 +938,7 @@ body {
 
 .reel-tiles {
 	display: grid;
-	grid-template-columns: repeat(2, 1fr);
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: var(--reel-gap);
 	margin-bottom: 14px;
 }
@@ -936,6 +946,7 @@ body {
 @media (min-width: 520px) {
 	.reel-tiles {
 		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	min-width: 0;
 	}
 }
 
@@ -2183,6 +2194,7 @@ input.reel-input {
 @media (min-width: 760px) {
 	.reel-chart-grid {
 		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+	min-width: 0;
 	}
 }
 
@@ -2202,7 +2214,7 @@ input.reel-input {
 
 @media (min-width: 620px) {
 	.reel-facts {
-		grid-template-columns: repeat(2, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: var(--reel-space-2) var(--reel-space-5);
 	}
 }
@@ -2642,6 +2654,7 @@ input.reel-input {
 @media (min-width: 900px) {
 	.reel-tiles {
 		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	min-width: 0;
 	}
 }
 
@@ -2652,6 +2665,7 @@ input.reel-input {
 @media (min-width: 900px) {
 	.reel-grid {
 		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	min-width: 0;
 	}
 }
 
@@ -3145,6 +3159,7 @@ input.reel-input {
 .reel-dgrid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+	min-width: 0;
 	gap: var(--reel-space-4) var(--reel-space-3);
 }
 
@@ -3808,6 +3823,7 @@ input.reel-input {
 .reel-photos {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	min-width: 0;
 	gap: var(--reel-space-2);
 }
 
@@ -3874,6 +3890,7 @@ input.reel-input {
 .reel-person-credits {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+	min-width: 0;
 	gap: var(--reel-space-3);
 	margin-top: 8px;
 }
@@ -4824,6 +4841,7 @@ input.reel-input {
 .reel-skel-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	min-width: 0;
 	gap: var(--reel-space-3);
 	padding: 4px 0;
 }
@@ -5829,6 +5847,7 @@ input.reel-input {
 .reel-recipe-seeds {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+	min-width: 0;
 	gap: var(--reel-space-3);
 	max-height: 46vh;
 	max-height: 46dvh;
@@ -5941,6 +5960,7 @@ input.reel-input {
 .reel-recipe-results {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	min-width: 0;
 	gap: var(--reel-space-3);
 	padding: var(--reel-space-1) 0;
 }

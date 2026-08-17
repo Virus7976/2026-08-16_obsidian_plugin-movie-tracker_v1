@@ -397,3 +397,28 @@ TMDB.
 ## Licence
 
 MIT.
+
+## Checking the layout
+
+Reel's layout could only be verified by shipping it and waiting for a
+screenshot. That cost three regressions in a row, including a set of
+"compact on mobile" rules keyed on a width media query that never matched on
+a real device — inert while reading as perfectly correct.
+
+```bash
+npm run harness
+npx serve -l 5599 .
+```
+
+Then open `http://localhost:5599/harness/?screen=library&phone=1` at a phone
+viewport and paste `harness/audit.js` into the console.
+
+The harness runs the **real** renderers against the **real** stylesheet, so a
+screen that looks wrong there is wrong in the app. `?screen=` takes
+`library`, `rows`, `stats`, `upnext`, `empties` or `stars`; `?phone=0` gives
+the desktop layout.
+
+Two things it deliberately gets right, because getting them wrong makes the
+harness lie: `Platform.isPhone` is modelled (the compact rules key off it),
+and `box-sizing: border-box` is set globally the way Obsidian does. Without
+the second, the first run reported a 24px overflow that did not exist.

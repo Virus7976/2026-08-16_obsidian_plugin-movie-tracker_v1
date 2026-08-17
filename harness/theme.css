@@ -1,0 +1,66 @@
+/* The variables Obsidian's own theme supplies.
+ *
+ * Reel never hard-codes a colour — every one is an Obsidian CSS variable, so
+ * without these the harness would render unstyled and prove nothing. Values
+ * are the defaults from Obsidian's light theme, close enough that spacing and
+ * contrast behave the way they do in the app.
+ */
+:root {
+	--background-primary: #ffffff;
+	--background-primary-alt: #f5f6f8;
+	--background-secondary: #f2f3f5;
+	--background-secondary-alt: #e3e5e8;
+	--background-modifier-border: #ddd;
+	--background-modifier-border-hover: #c8c8c8;
+	--background-modifier-hover: rgba(0, 0, 0, 0.05);
+	--background-modifier-form-field: #fff;
+	--text-normal: #222;
+	--text-muted: #6e6e6e;
+	--text-faint: #999;
+	--text-accent: #705dcf;
+	--text-on-accent: #fff;
+	--interactive-accent: #7b6cd9;
+	--interactive-accent-hover: #6a5bc4;
+	--color-red: #e5484d;
+	--color-green: #16a34a;
+	--font-ui-smaller: 12px;
+	--font-ui-small: 13px;
+	--font-ui-medium: 15px;
+	--font-ui-large: 20px;
+	--font-ui-larger: 24px;
+	--radius-s: 4px;
+	--radius-m: 8px;
+}
+
+
+/* Obsidian sets this globally, and without it the harness lies.
+ *
+ * The first measurement reported the header and filter bar as 399px wide on
+ * a 375px viewport — exactly their 24px of horizontal padding — which looks
+ * like a real overflow bug and is not one. A harness that does not match the
+ * host on something this basic will send you chasing faults that only exist
+ * in the harness.
+ */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 16px;
+}
+
+/* The view fills the pane in Obsidian; here it fills the window, so the
+   scroll behaviour and the sticky footers are the same. */
+#app, .reel-view {
+	height: 100vh;
+	height: 100dvh;
+}
+
+.svg-icon { width: 18px; height: 18px; }
