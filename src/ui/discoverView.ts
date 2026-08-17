@@ -23,6 +23,7 @@ import { LogSheet } from "./logSheet";
 import { trailerUrl, providerNames } from "../extract";
 import { skeletonCards, skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
+import { setSelected } from "./a11y";
 
 interface Filters {
 	genreId: number | null;
@@ -307,7 +308,7 @@ export class DiscoverScreen {
 		const row1 = wrap.createDiv({ cls: "reel-chips" });
 		const chip = (parent: HTMLElement, label: string, active: boolean, onClick: () => void) => {
 			const b = parent.createEl("button", { cls: "reel-chip", text: label });
-			b.toggleClass("is-active", active);
+			setSelected(b, active);
 			b.addEventListener("click", () => {
 				onClick();
 				this.results = null;

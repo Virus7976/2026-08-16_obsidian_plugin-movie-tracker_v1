@@ -20,6 +20,7 @@ import { rangeCount } from "../util/ranges";
 import { MAX_STARS, STEP } from "../util/ratings";
 import { viewings } from "./diary";
 import { renderEmpty } from "../ui/empty";
+import { setSelected } from "../ui/a11y";
 
 export interface StatsOptions {
 	year?: number;
@@ -87,7 +88,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		const bar = el.createDiv({ cls: "reel-chips" });
 		const chip = (label: string, active: boolean, year?: number) => {
 			const b = bar.createEl("button", { cls: "reel-chip", text: label });
-			b.toggleClass("is-active", active);
+			setSelected(b, active);
 			b.addEventListener("click", () => paintStats(plugin, el, { ...opts, year }));
 		};
 		chip("All time", opts.year == null, undefined);

@@ -150,8 +150,16 @@ class DiaryBlock extends MarkdownRenderChild {
 			}
 
 			const row = list.createDiv({ cls: "reel-diary-row" });
+			// Was an unnamed button. The day number, the poster and the stars
+			// are all visual, so there was nothing at all to announce.
 			row.setAttr("role", "button");
 			row.setAttr("tabindex", "0");
+			row.setAttr(
+				"aria-label",
+				`${v.entry.title}, watched ${prettyDate(v.date)}${
+					v.rating != null ? `, rated ${v.rating} out of 5` : ""
+				}`
+			);
 
 			row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
 

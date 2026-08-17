@@ -467,6 +467,10 @@ export class DetailScreen {
 			const row = list.createDiv({ cls: "reel-person" });
 			row.setAttr("role", "button");
 			row.setAttr("tabindex", "0");
+			// Unnamed before this: the photo has an empty alt (it is
+			// decorative) and the name is a child span, so there was nothing
+			// for the row itself to announce.
+			row.setAttr("aria-label", `${p.name} — open their filmography`);
 
 			const shot = row.createDiv({ cls: "reel-person-shot" });
 			const src = this.plugin.tmdb.posterUrl(p.profile_path, "w185");
@@ -814,6 +818,7 @@ export class DetailScreen {
 			const card = strip.createDiv({ cls: "reel-related-card" });
 			card.setAttr("role", "button");
 			card.setAttr("tabindex", "0");
+			card.setAttr("aria-label", `${r.title ?? r.name ?? "Untitled"} — see details`);
 			const poster = card.createDiv({ cls: "reel-related-poster" });
 			this.plugin.posters.attach(poster, {
 				posterUrl: this.plugin.tmdb.posterUrl(r.poster_path, "w342") ?? undefined,

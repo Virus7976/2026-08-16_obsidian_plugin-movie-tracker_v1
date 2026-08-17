@@ -24,6 +24,7 @@ import { prettyDate } from "./util/dates";
 import { redact } from "./secrets";
 import { renderStarsStatic } from "./ui/stars";
 import { renderEmpty } from "./ui/empty";
+import { setSelected } from "./ui/a11y";
 
 export const REEL_VIEW = "reel-view";
 
@@ -284,7 +285,9 @@ export class ReelView extends ItemView {
 
 	private paint(): void {
 		this.contentEl.findAll(".reel-tab").forEach((el) => {
-			el.toggleClass("is-active", el.dataset.tab === this.tab);
+			// aria-current, not aria-pressed: this is "which screen am I on",
+			// and a tab announced as "pressed" describes the wrong thing.
+			setSelected(el, el.dataset.tab === this.tab, "tab");
 		});
 
 		// Every library change repaints, and rebuilding the body resets its
@@ -378,7 +381,7 @@ export class ReelView extends ItemView {
 				["tv", "Series"],
 			] as const) {
 				const b = bar.createEl("button", { cls: "reel-chip", text: label });
-				b.toggleClass("is-active", this.statsScope === scope);
+				setSelected(b, this.statsScope === scope);
 				b.addEventListener("click", () => {
 					this.statsScope = scope;
 					this.paint();
@@ -411,7 +414,7 @@ export class ReelView extends ItemView {
 
 		const chip = (label: string, active: boolean, onClick: () => void) => {
 			const b = bar.createEl("button", { cls: "reel-chip", text: label });
-			b.toggleClass("is-active", active);
+			setSelected(b, active);
 			b.addEventListener("click", () => {
 				onClick();
 				this.paint();
@@ -639,7 +642,7 @@ export class ReelView extends ItemView {
 			const bar = this.filterEl.createDiv({ cls: "reel-chips" });
 			const chip = (label: string, active: boolean, year: number | null) => {
 				const b = bar.createEl("button", { cls: "reel-chip", text: label });
-				b.toggleClass("is-active", active);
+				setSelected(b, active);
 				b.addEventListener("click", () => {
 					this.diaryYear = year;
 					this.paint();

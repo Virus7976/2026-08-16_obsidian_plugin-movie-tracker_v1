@@ -52,6 +52,100 @@ body {
 	--reel-shadow-raised: 0 1px 3px rgba(0, 0, 0, 0.16);
 	--reel-shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.34);
 	--reel-shadow-poster: 0 3px 14px rgba(0, 0, 0, 0.22);
+
+	/* Type.
+	 *
+	 * Obsidian's own --font-ui-* steps sit close together — smaller, small and
+	 * medium are roughly 12, 13 and 15px — and Reel was using two of them for
+	 * nearly everything: 91 uses of small, 61 of smaller, 14 of medium, two of
+	 * large, none of larger. A heading, the number it introduced and the
+	 * caption beneath it all arrived at about the same weight, so nothing had
+	 * rank. Relative to the theme's base rather than fixed pixels, so a reader
+	 * who scales their font still gets a scale. */
+	--reel-text-hero: 1.55em;
+	--reel-text-title: 1.2em;
+	--reel-text-label: 0.88em;
+	--reel-text-caption: 0.8em;
+
+	/* Weight carries rank at least as well as size, and it costs no space —
+	   which matters far more on a phone than a bigger heading would. */
+	--reel-weight-strong: 700;
+	--reel-weight-medium: 600;
+
+	/* Tight for headings, where a loose line looks unmoored; loose for prose,
+	   where a tight one is hard to read. Two values used deliberately, rather
+	   than the 44 one-off line-heights this replaces. */
+	--reel-leading-tight: 1.2;
+	--reel-leading-body: 1.55;
+}
+
+/* ------------------------------------------------------------------ *
+ * Type roles
+ *
+ * By role, not by element, so the same class means the same rank on every
+ * screen and a new screen inherits the hierarchy instead of inventing one.
+ * ------------------------------------------------------------------ */
+
+.reel-t-hero {
+	font-size: var(--reel-text-hero);
+	font-weight: var(--reel-weight-strong);
+	line-height: var(--reel-leading-tight);
+	letter-spacing: -0.015em;
+}
+
+.reel-t-title {
+	font-size: var(--reel-text-title);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+	letter-spacing: -0.005em;
+}
+
+.reel-t-label {
+	font-size: var(--reel-text-label);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+}
+
+.reel-t-caption {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-tight);
+	color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------------ *
+ * Truncation
+ *
+ * There were 13 text-overflow rules and 6 line-clamps, each written where it
+ * happened to be needed, so a long title truncated in the grid, wrapped in
+ * the row list and overflowed somewhere else.
+ *
+ * `min-width: 0` is the part that is always missed: a flex or grid child
+ * defaults to min-content width, so ellipsis silently does nothing inside a
+ * flex row until it is set. Several of the existing rules had exactly that
+ * bug and simply never truncated.
+ * ------------------------------------------------------------------ */
+
+.reel-truncate {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-clamp-2,
+.reel-clamp-3 {
+	min-width: 0;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-clamp-2 {
+	-webkit-line-clamp: 2;
+}
+
+.reel-clamp-3 {
+	-webkit-line-clamp: 3;
 }
 
 .reel-block {
@@ -5078,4 +5172,134 @@ input.reel-input {
 	display: flex;
 	align-items: center;
 	gap: var(--reel-space-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Rank                                                                */
+/* ------------------------------------------------------------------ */
+
+/* The type roles above, pointed at the classes that already exist. Doing it
+   here rather than adding a class at 150 call sites means the hierarchy is
+   stated in one place and can be read as a whole — which is the only way to
+   tell whether it is actually a hierarchy.
+
+   These come after every earlier rule on purpose: they are correcting the
+   one-off sizes those rules set, and equal specificity means source order
+   decides. */
+
+/* Level 1 — the title of the thing you are looking at. Only ever one. */
+.reel-hero-title,
+.reel-person-hero-name {
+	font-size: var(--reel-text-hero);
+	font-weight: var(--reel-weight-strong);
+	line-height: var(--reel-leading-tight);
+	letter-spacing: -0.015em;
+}
+
+/* Level 2 — the name of a section, and the headline numbers, which are the
+   thing a stats page is actually for. */
+.reel-chart-title,
+.reel-panel-title,
+.reel-block-title,
+.reel-tile-value,
+.reel-detail-section-title {
+	font-size: var(--reel-text-title);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+	letter-spacing: -0.005em;
+}
+
+/* Section names are also set in small caps, which separates them from
+   content without needing more size — the page stays dense. */
+.reel-chart-title,
+.reel-panel-title,
+.reel-block-title {
+	font-size: var(--reel-text-label);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+}
+
+/* Level 3 — the name of one row or card. Reads as content, not chrome. */
+.reel-cell-title,
+.reel-row-title,
+.reel-upnext-title,
+.reel-chart-label,
+.reel-dcard-title,
+.reel-diary-title,
+.reel-episode-title {
+	font-size: var(--reel-text-label);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+}
+
+/* Level 4 — everything supporting. Deliberately quiet, and quiet by colour
+   as much as by size, because four sizes is already the most a screen this
+   dense can carry. */
+.reel-cell-year,
+.reel-row-meta,
+.reel-upnext-meta,
+.reel-chart-sub,
+.reel-tile-label,
+.reel-tile-sub,
+.reel-score-label,
+.reel-hero-sub,
+.reel-person-credit-sub,
+.reel-diary-meta,
+.reel-episode-meta {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-tight);
+	color: var(--text-muted);
+}
+
+/* Prose is the one thing that gets a loose line. An overview set at the same
+   leading as a label is a wall. */
+.reel-hero-overview,
+.reel-row-overview,
+.reel-empty-body,
+.reel-episode-body {
+	line-height: var(--reel-leading-body);
+}
+
+/* Truncation, applied to the classes that need it rather than wherever it
+   was noticed. Titles get one line in dense lists and two where the row is
+   tall enough to carry it; overviews are always clamped, since a 400-word
+   synopsis in a card is not a design anyone chose. */
+.reel-cell-title,
+.reel-chart-label,
+.reel-upnext-title,
+.reel-diary-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-row-title,
+.reel-dcard-title {
+	min-width: 0;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+.reel-hero-overview,
+.reel-row-overview {
+	min-width: 0;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+}
+
+/* The flex parents. Ellipsis does nothing inside a flex row until the child
+   is allowed below its min-content width, which is why several of the
+   existing text-overflow rules never actually truncated anything. */
+.reel-cell-caption,
+.reel-row-body,
+.reel-upnext-body,
+.reel-chart-head,
+.reel-dcard-body {
+	min-width: 0;
 }

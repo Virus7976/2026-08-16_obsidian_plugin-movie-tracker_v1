@@ -209,13 +209,29 @@ function showActions(
 	menu.showAtPosition({ x, y });
 }
 
+/**
+ * Label a title's card for anyone not looking at it.
+ *
+ * The visible card carries the year, the rating and the status as separate
+ * marks; announced one after another those are three unrelated fragments. One
+ * sentence is what a person would actually say about the row.
+ */
+function describe(el: HTMLElement, entry: Entry): void {
+	const bits = [entry.title];
+	const year = entry.year ?? entry.firstAirYear;
+	if (year) bits.push(String(year));
+	if (entry.rating != null) bits.push(`rated ${entry.rating} out of 5`);
+	if (entry.status === "watchlist") bits.push("on your watchlist");
+	el.setAttr("role", "button");
+	el.setAttr("tabindex", "0");
+	el.setAttr("aria-label", bits.join(", "));
+}
+
 export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entry[], onSelect?: (e: Entry) => void): void {
 	const grid = el.createDiv({ cls: "reel-grid" });
 	for (const entry of rows) {
 		const cell = grid.createDiv({ cls: "reel-cell" });
-		cell.setAttr("role", "button");
-		cell.setAttr("tabindex", "0");
-		cell.setAttr("aria-label", entry.title);
+		describe(cell, entry);
 
 		const posterEl = cell.createDiv({ cls: "reel-cell-poster" });
 		plugin.posters.attach(posterEl, entry);
@@ -249,8 +265,11 @@ export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]
 	const list = el.createDiv({ cls: "reel-list" });
 	for (const entry of rows) {
 		const row = list.createDiv({ cls: "reel-row" });
-		row.setAttr("role", "button");
-		row.setAttr("tabindex", "0");
+		// This one had no label at all — `role="button"` with nothing to
+		// announce, so the entire row list read as a column of unnamed
+		// buttons. The grid beside it was labelled. That is exactly the drift
+		// that comes of writing the same three lines in fourteen places.
+		describe(row, entry);
 
 		if (!compact) {
 			const thumb = row.createDiv({ cls: "reel-row-thumb" });
