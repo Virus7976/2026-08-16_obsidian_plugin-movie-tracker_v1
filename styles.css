@@ -1532,7 +1532,14 @@ input.reel-input {
  * tall as the space it is given, and `overflow-y: auto` still scrolls it.
  */
 .reel-view-body {
-	flex: 1 1 auto;
+	/* `flex: none` — the height is set explicitly by `ReelView.sizeBody()`.
+	 *
+	 * This element is a scroll container (`overflow-y: auto`), and a scroll
+	 * container's automatic minimum size is zero, so flex is always entitled to
+	 * collapse it to nothing. Six CSS attempts failed on that one rule. The
+	 * height is measured arithmetic now: view height, minus the other children,
+	 * recomputed whenever either changes. */
+	flex: none;
 	overflow-y: auto;
 	-webkit-overflow-scrolling: touch;
 	padding: 8px 12px calc(24px + env(safe-area-inset-bottom));
@@ -7684,6 +7691,8 @@ input.reel-input {
 		transition: none;
 	}
 }
+
+
 
 
 

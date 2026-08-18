@@ -28,7 +28,7 @@ import { renderEmpty } from "./ui/empty";
 import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
 import { unlink } from "./library";
-import { measure, stampWidth, stampChromeInsets, topInset } from "./util/panewidth";
+import { measure, stampWidth, stampChromeInsets, topInset, sizeBody } from "./util/panewidth";
 
 export const REEL_VIEW = "reel-view";
 
@@ -691,7 +691,10 @@ export class ReelView extends ItemView {
 		this.lastWidth = measure(this.contentEl);
 		stampWidth(this.contentEl, this.lastWidth);
 		this.measureTopInset();
+		if (this.bodyEl) sizeBody(this.contentEl, this.bodyEl);
 	}
+
+
 
 	/**
 	 * How much of the view's top edge Obsidian is already covering.

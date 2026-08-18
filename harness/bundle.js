@@ -5737,6 +5737,21 @@
     if (el !== document.body)
       document.body.setCssProps(vars);
   }
+  function sizeBody(view, body) {
+    const cs = getComputedStyle(view);
+    const inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    if (!(inner > 0))
+      return;
+    let used = 0;
+    for (const child of Array.from(view.children)) {
+      if (child === body || !(child instanceof HTMLElement))
+        continue;
+      if (getComputedStyle(child).display === "none")
+        continue;
+      used += child.getBoundingClientRect().height;
+    }
+    body.setCssProps({ height: `${Math.max(120, Math.round(inner - used))}px` });
+  }
 
   // harness/main.ts
   function poster(title) {
@@ -6040,6 +6055,9 @@ ${e?.stack ?? ""}` });
     }
     stampWidth(view, measure(view) || window.innerWidth);
     stampChromeInsets(view);
+    const realBody = view.querySelector(":scope > .reel-view-body");
+    if (realBody)
+      sizeBody(view, realBody);
     return view;
   }
   var app = document.getElementById("app");

@@ -211,3 +211,36 @@ export function keyboardInset(): () => void {
 		document.body.setCssProps({ "--reel-keyboard": "0px" });
 	};
 }
+
+/**
+ * Give a view's scrolling body an explicit height.
+ *
+ * `.reel-view-body` has `overflow-y: auto`, which makes it a scroll container,
+ * and a scroll container's automatic minimum size is **zero**. Flex is
+ * therefore always entitled to collapse it to nothing, and on a real device it
+ * did: measured at 32px while holding a 5772px grid, which the user saw as a
+ * white screen with the tops of two posters.
+ *
+ * Six attempts to express this as CSS failed on that one rule. The height is
+ * arithmetic — the view's inner height minus its other children — so it is
+ * stated rather than negotiated.
+ *
+ * Shared between the plugin and the harness for the same reason `stampWidth`
+ * is: a check written about the app is worthless if the harness lays out
+ * differently.
+ */
+export function sizeBody(view: HTMLElement, body: HTMLElement): void {
+	const cs = getComputedStyle(view);
+	const inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+	if (!(inner > 0)) return;
+
+	let used = 0;
+	for (const child of Array.from(view.children)) {
+		if (child === body || !(child instanceof HTMLElement)) continue;
+		if (getComputedStyle(child).display === "none") continue;
+		used += child.getBoundingClientRect().height;
+	}
+	// A floor rather than a layout: a nonsense mid-transition measurement should
+	// give a short body, never a blank screen.
+	body.setCssProps({ height: `${Math.max(120, Math.round(inner - used))}px` });
+}

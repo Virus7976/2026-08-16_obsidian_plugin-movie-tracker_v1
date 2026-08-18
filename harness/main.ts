@@ -29,7 +29,7 @@ import { QuickRate } from "../src/ui/quickRate";
 import { LogSheet } from "../src/ui/logSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { auditScreen, type Check } from "./audit";
-import { measure, stampWidth, stampChromeInsets } from "../src/util/panewidth";
+import { measure, stampWidth, stampChromeInsets, sizeBody } from "../src/util/panewidth";
 
 /* ------------------------------------------------------------------ */
 /* A poster that always loads                                          */
@@ -493,6 +493,10 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	// harness would model Obsidian's overlays and then not compensate for them,
 	// which reports a bug the shipped code does not have.
 	stampChromeInsets(view);
+	// The same sizing the app performs. Without it the harness lays out a body
+	// the app never produces, and a check about the app reports on the rig.
+	const realBody = view.querySelector<HTMLElement>(":scope > .reel-view-body");
+	if (realBody) sizeBody(view, realBody);
 	return view;
 }
 
