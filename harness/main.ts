@@ -419,7 +419,17 @@ function mountObsidianChrome(app: HTMLElement): void {
 	const header = app.createDiv({ cls: "view-header obsidian-chrome" });
 	header.createDiv({ cls: "view-header-title", text: "Reel" });
 	header.createEl("button", { cls: "clickable-icon", text: "☰", attr: { "aria-label": "Menu" } });
-	app.createDiv({ cls: "mobile-toolbar obsidian-chrome" }).createEl("button", {
+	/*
+	 * The bottom bar carries a name this code does not know.
+	 *
+	 * A real device reported `.mobile-toolbar: absent` and `.mobile-navbar:
+	 * absent` while a navigation bar sat on top of the last row of posters —
+	 * the body had `is-floating-nav`, so Obsidian was drawing something under a
+	 * third name. Naming it `.mobile-toolbar` here would let the named-selector
+	 * path find it and leave the fallback untested, which is how the header
+	 * fault survived three fixes.
+	 */
+	app.createDiv({ cls: "harness-unnamed-nav obsidian-chrome" }).createEl("button", {
 		cls: "clickable-icon",
 		text: "＋",
 		attr: { "aria-label": "New" },

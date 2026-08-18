@@ -88,7 +88,7 @@ html, body {
 	height: var(--harness-chrome-top, 48px);
 }
 
-.mobile-toolbar.obsidian-chrome {
+.harness-unnamed-nav.obsidian-chrome {
 	bottom: 0;
 	height: var(--harness-chrome-bottom, 48px);
 	justify-content: flex-end;

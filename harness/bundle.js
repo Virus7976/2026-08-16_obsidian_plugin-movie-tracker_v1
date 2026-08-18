@@ -5851,7 +5851,7 @@
     const header = app2.createDiv({ cls: "view-header obsidian-chrome" });
     header.createDiv({ cls: "view-header-title", text: "Reel" });
     header.createEl("button", { cls: "clickable-icon", text: "\u2630", attr: { "aria-label": "Menu" } });
-    app2.createDiv({ cls: "mobile-toolbar obsidian-chrome" }).createEl("button", {
+    app2.createDiv({ cls: "harness-unnamed-nav obsidian-chrome" }).createEl("button", {
       cls: "clickable-icon",
       text: "\uFF0B",
       attr: { "aria-label": "New" }

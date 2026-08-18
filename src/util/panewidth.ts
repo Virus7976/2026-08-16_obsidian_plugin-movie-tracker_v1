@@ -70,6 +70,39 @@ const BOTTOM_CHROME = ".mobile-toolbar, .mobile-navbar, .status-bar";
  * covering anything, and where several are real the one reaching furthest down
  * is the one to clear.
  */
+/**
+ * Whatever is floating over the bottom of the screen, whatever it is called.
+ *
+ * The named selectors above are guesses at class names, and on a real device
+ * both missed: the snapshot reported `.mobile-toolbar: absent` and
+ * `.mobile-navbar: absent` while a navigation bar was plainly sitting on top of
+ * the last row of posters. The body carried `is-floating-nav`, so Obsidian was
+ * drawing something under a name this code does not know.
+ *
+ * Guessing harder is the wrong answer — the next Obsidian release renames it
+ * again. Ask the layout instead: a fixed or sticky element, anchored in the
+ * bottom quarter of the screen, wide enough to matter, and not ours. That
+ * describes a floating toolbar regardless of what anyone calls it.
+ */
+function findFloatingBottomBar(view: DOMRect): HTMLElement | null {
+	const floor = window.innerHeight * 0.75;
+	let highest: HTMLElement | null = null;
+	for (const el of Array.from(document.body.querySelectorAll<HTMLElement>("*"))) {
+		// Reel's own sheets and anything inside the view are not chrome.
+		if (el.closest(".reel-view, .reel-modal, .modal-container")) continue;
+		const cs = getComputedStyle(el);
+		if (cs.position !== "fixed" && cs.position !== "sticky") continue;
+		if (cs.visibility === "hidden" || cs.display === "none") continue;
+		const r = el.getBoundingClientRect();
+		// Anchored low, meaningfully sized, and actually over the view.
+		if (r.height < 24 || r.width < view.width * 0.4) continue;
+		if (r.top < floor || r.top > window.innerHeight - 8) continue;
+		if (r.right < view.left || r.left > view.right) continue;
+		if (!highest || r.top < highest.getBoundingClientRect().top) highest = el;
+	}
+	return highest;
+}
+
 function pickChrome(root: ParentNode, selector: string): HTMLElement | null {
 	let best: HTMLElement | null = null;
 	let bestArea = 0;
@@ -108,7 +141,7 @@ export function stampChromeInsets(el: HTMLElement, root: ParentNode = document):
 	const header = pickChrome(root, TOP_CHROME);
 	const top = header ? clamp(header.getBoundingClientRect().bottom - rect.top) : 0;
 
-	const bar = pickChrome(root, BOTTOM_CHROME);
+	const bar = pickChrome(root, BOTTOM_CHROME) ?? findFloatingBottomBar(rect);
 	const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
 
 	const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
