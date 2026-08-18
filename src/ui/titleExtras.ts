@@ -157,3 +157,35 @@ export async function paintExtras(
 		/* none of this is worth interrupting a decision for */
 	}
 }
+
+/**
+ * The trailer, whether or not the note already knows about it.
+ *
+ * The detail screen only drew one when `entry.trailer` was in frontmatter,
+ * which is written at note-creation time. A series added before that field
+ * existed — or one whose trailer TMDB published later — simply had no player,
+ * and the screen gave no hint that a trailer was a thing it could show. "Where's
+ * the trailer" is the reasonable response to that.
+ *
+ * Uses the known URL when there is one, and otherwise asks TMDB. The response
+ * is cached and a title you interact with needed it anyway.
+ */
+export async function paintTrailerFor(
+	plugin: ReelPlugin,
+	slot: HTMLElement,
+	id: number,
+	isTv: boolean,
+	known?: string
+): Promise<void> {
+	if (known) {
+		paintTrailer(slot, known);
+		return;
+	}
+	try {
+		const meta = isTv ? await plugin.tmdb.getShow(id) : await plugin.tmdb.getFilm(id);
+		const url = trailerUrl(meta.videos?.results);
+		if (url) paintTrailer(slot, url);
+	} catch {
+		/* no trailer is not worth interrupting a page for */
+	}
+}

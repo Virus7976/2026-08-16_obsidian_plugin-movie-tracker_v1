@@ -35,7 +35,7 @@ import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
-import { paintTrailer } from "./titleExtras";
+import { paintTrailerFor } from "./titleExtras";
 import { unlink } from "../library";
 import { compactCount } from "../util/format";
 import { ContentFlag, FLAG_LABELS } from "../content";
@@ -244,7 +244,9 @@ export class DetailScreen {
 		 * arrival would cost a YouTube request and a set of cookies on every
 		 * title you open, most of which you close again.
 		 */
-		if (e.trailer) paintTrailer(body.createDiv({ cls: "reel-detail-trailer" }), e.trailer);
+		// Always offered, not only when frontmatter happens to carry it — a note
+		// written before the field existed had no player and no explanation.
+		void paintTrailerFor(this.plugin, body.createDiv({ cls: "reel-detail-trailer" }), e.tmdbId, isTv, e.trailer);
 
 		const links = body.createDiv({ cls: "reel-links" });
 

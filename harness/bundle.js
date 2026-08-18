@@ -2454,6 +2454,19 @@
     } catch {
     }
   }
+  async function paintTrailerFor(plugin2, slot, id, isTv, known) {
+    if (known) {
+      paintTrailer(slot, known);
+      return;
+    }
+    try {
+      const meta = isTv ? await plugin2.tmdb.getShow(id) : await plugin2.tmdb.getFilm(id);
+      const url = trailerUrl(meta.videos?.results);
+      if (url)
+        paintTrailer(slot, url);
+    } catch {
+    }
+  }
 
   // src/ui/discoverView.ts
   var EMPTY = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
@@ -3842,8 +3855,7 @@
       }
       if (e.overview)
         body.createDiv({ cls: "reel-hero-overview", text: e.overview });
-      if (e.trailer)
-        paintTrailer(body.createDiv({ cls: "reel-detail-trailer" }), e.trailer);
+      void paintTrailerFor(this.plugin, body.createDiv({ cls: "reel-detail-trailer" }), e.tmdbId, isTv, e.trailer);
       const links = body.createDiv({ cls: "reel-links" });
       const link = (label, url, cls) => {
         const a = links.createEl("a", { cls: `reel-link ${cls}`, text: label, href: url });

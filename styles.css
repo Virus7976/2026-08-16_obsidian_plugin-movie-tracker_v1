@@ -7266,6 +7266,25 @@ input.reel-input {
 
 
 
+
+/* A full bleed has to bleed both ways.
+ *
+ * `.reel-hero.has-backdrop` takes `margin: 0 -12px` to run its backdrop to the
+ * screen edge, but `max-width: 100%` held it at the *parent's* width. So it
+ * moved 12px left without growing: over the edge on the left, 12px short on the
+ * right. Measured on the detail screen as L=12 R=339 inside a container of
+ * L=24 R=351 — the whole hero sitting off-centre, which is what "everything is
+ * shifted left" was.
+ *
+ * The width has to grow by exactly what the margins take, or the bleed is a
+ * nudge rather than a bleed. */
+.reel-view:not(.is-w700) .reel-hero.has-backdrop {
+	width: calc(100% + 2 * var(--reel-gutter, 12px));
+	max-width: none;
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */
