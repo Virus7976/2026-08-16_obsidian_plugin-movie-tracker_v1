@@ -29,6 +29,7 @@ import { registerCalendarBlock } from "./render/calendar";
 import { REEL_VIEW, ReelView } from "./view";
 import { policyBreach, ContentPolicy } from "./content";
 import { redact } from "./secrets";
+import { uiSnapshot } from "./ui/snapshot";
 import { confirm } from "./ui/confirm";
 import { todayISO } from "./util/dates";
 import type { Entry } from "./types";
@@ -348,6 +349,32 @@ export default class ReelPlugin extends Plugin {
 		 *
 		 * No vault contents, no key, nothing but geometry.
 		 */
+		/*
+		 * The whole screen, as text.
+		 *
+		 * Layout diagnostics below reports what Reel believes about itself.
+		 * This reports what is actually on the glass — Obsidian's chrome
+		 * included — and, critically, which controls have something drawn on
+		 * top of them. Works from any screen, not just the Reel view, because
+		 * the bugs live at the seam between Reel and the app around it.
+		 */
+		this.addCommand({
+			id: "copy-ui-snapshot",
+			name: "Copy UI snapshot",
+			callback: () => {
+				const text = uiSnapshot();
+				void navigator.clipboard
+					.writeText(text)
+					.then(() => new Notice(`UI snapshot copied — ${text.length.toLocaleString()} characters.`))
+					.catch(() => {
+						// A phone that refuses the clipboard would otherwise
+						// lose the whole point, so fall back to a file the user
+						// can open and copy from by hand.
+						void this.writeSnapshotFile(text);
+					});
+			},
+		});
+
 		this.addCommand({
 			id: "copy-layout-diagnostics",
 			name: "Copy layout diagnostics",
@@ -730,6 +757,25 @@ export default class ReelPlugin extends Plugin {
 	 * added — an unknown key is somebody's data, not litter.
 	 */
 	private storedRaw: Record<string, unknown> = {};
+
+	/**
+	 * Last resort for the snapshot: write it into the vault.
+	 *
+	 * Obsidian mobile does not always grant clipboard access, and a diagnostic
+	 * that cannot leave the phone is no diagnostic at all.
+	 */
+	private async writeSnapshotFile(text: string): Promise<void> {
+		const path = "Reel UI snapshot.md";
+		try {
+			const existing = this.app.vault.getAbstractFileByPath(path);
+			const body = `\`\`\`\n${text}\n\`\`\`\n`;
+			if (existing instanceof TFile) await this.app.vault.modify(existing, body);
+			else await this.app.vault.create(path, body);
+			new Notice(`Clipboard unavailable — snapshot written to "${path}".`, 8000);
+		} catch (e) {
+			new Notice(`Reel: could not save the snapshot — ${redact(e)}`, 8000);
+		}
+	}
 
 	/** Where Obsidian keeps this plugin's `data.json`. */
 	private dataPath(): string {

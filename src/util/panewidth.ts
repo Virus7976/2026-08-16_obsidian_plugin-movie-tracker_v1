@@ -47,3 +47,47 @@ export function measure(el: HTMLElement): number {
 	const w = el.clientWidth || Math.round(el.getBoundingClientRect().width);
 	return Number.isFinite(w) && w > 0 ? w : 0;
 }
+
+/** Obsidian's own chrome, in the order it is worth asking about. */
+const TOP_CHROME = ".view-header";
+const BOTTOM_CHROME = ".mobile-toolbar, .mobile-navbar, .status-bar";
+
+/**
+ * How far Obsidian's chrome reaches over the top and bottom of a view.
+ *
+ * On a phone Obsidian draws its header and its toolbar *over* the content
+ * rather than beside it. Reel has been bitten at both ends: the toolbar covered
+ * the tab bar, and the header covered the search field — visible, correctly
+ * sized, and completely untappable.
+ *
+ * The previous fix for the bottom was a hardcoded 72px, which the comment
+ * itself admitted was a guess at the user's settings and their phone's gesture
+ * bar. Measuring costs the same and cannot be wrong.
+ *
+ * Clamped to 160px: a mid-transition reading must not push the whole screen
+ * down. Negative means the chrome sits properly above or below, which needs no
+ * compensation at all.
+ */
+export function stampChromeInsets(el: HTMLElement, root: ParentNode = document): void {
+	const rect = el.getBoundingClientRect();
+	const clamp = (n: number): number => Math.round(Math.min(Math.max(n, 0), 160));
+
+	const header = root.querySelector<HTMLElement>(TOP_CHROME);
+	const top = header ? clamp(header.getBoundingClientRect().bottom - rect.top) : 0;
+
+	const bar = root.querySelector<HTMLElement>(BOTTOM_CHROME);
+	const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
+
+	const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
+	el.setCssProps(vars);
+	// Mirrored onto <body> so sheets get them too. A modal is not inside the
+	// view, and its action row is pinned to the bottom — which is exactly where
+	// the floating toolbar is. A "Save" button you cannot reach is worse than a
+	// covered poster, because there is no way to scroll it clear.
+	if (el !== document.body) document.body.setCssProps(vars);
+}
+
+/** The measured top overlap, for the diagnostics dump. */
+export function topInset(el: HTMLElement): number {
+	return parseInt(el.style.getPropertyValue("--reel-top-inset") || "0", 10) || 0;
+}

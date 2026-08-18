@@ -63,6 +63,44 @@ html, body {
 	height: 100dvh;
 }
 
+/* Obsidian's mobile chrome, modelled as the overlays it actually is. These
+   sizes come from the device diagnostics, not from a guess: a 384px-wide phone
+   reporting a 379px pane means the app draws over the edges rather than
+   shrinking the content to fit beside them. */
+.obsidian-chrome {
+	position: fixed;
+	left: 0;
+	right: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0 12px;
+	background: var(--background-secondary);
+	pointer-events: auto;
+}
+
+.view-header.obsidian-chrome {
+	top: 0;
+	height: 48px;
+}
+
+.mobile-toolbar.obsidian-chrome {
+	bottom: 0;
+	height: 48px;
+	justify-content: flex-end;
+}
+
+.obsidian-chrome .clickable-icon {
+	min-width: 40px;
+	min-height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	background: transparent;
+}
+
 /* Reel docked in a sidebar: a narrow pane inside a wide window. The pane is
    what the layout has, and the window is what the old media queries asked. */
 /* No `overflow: hidden`. Clipping the pane would hide the very thing the

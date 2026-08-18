@@ -73,6 +73,25 @@ export interface Check {
 }
 
 /** Containers that are *meant* to have children past their edge. */
+/** Everything a finger is meant to be able to reach. */
+const TAPPABLE = 'button, input, select, textarea, a, [role="button"], [contenteditable="true"], .clickable-icon';
+
+/**
+ * Can the user scroll this element out from under whatever is covering it?
+ *
+ * An ancestor that scrolls vertically and has somewhere left to go means yes.
+ * Anything in fixed chrome — a search bar, a tab row — means no, and that is
+ * the case worth failing a build over.
+ */
+function scrollableOut(el: HTMLElement, stopAt: HTMLElement): boolean {
+	for (let p: HTMLElement | null = el.parentElement; p; p = p.parentElement) {
+		const cs = getComputedStyle(p);
+		if ((cs.overflowY === "auto" || cs.overflowY === "scroll") && p.scrollHeight > p.clientHeight + 1) return true;
+		if (p === stopAt) break;
+	}
+	return false;
+}
+
 const SCROLLERS = [
 	"reel-chips",
 	"reel-suggest",
@@ -198,6 +217,44 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 		worst.set(k, Math.min(worst.get(k) ?? 99, Math.round(el.getBoundingClientRect().height)));
 	}
 	check("touchTargets44", small.length === 0, [...worst].map(([k, h]) => `${k} ${h}px`).join(", "));
+
+	/*
+	 * Is anything drawn on top of a control?
+	 *
+	 * The search field was visible, correctly sized, high-contrast and
+	 * completely untappable for several releases, because Obsidian's own header
+	 * was painted over it. All 176 checks passed it: every one of them asks
+	 * about size, position or colour, and none asked the only question a finger
+	 * asks — "what is actually at this point?".
+	 *
+	 * `elementFromPoint` asks exactly that. A hit that is neither the control
+	 * nor inside it means the tap lands somewhere else.
+	 */
+	const blocked: string[] = [];
+	for (const el of Array.from(view.querySelectorAll<HTMLElement>(TAPPABLE))) {
+		const r = el.getBoundingClientRect();
+		if (r.width < 2 || r.height < 2) continue;
+		const cx = r.left + r.width / 2;
+		const cy = r.top + r.height / 2;
+		// Off-screen is a scrolling question, not a stacking one.
+		if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight) continue;
+		const hit = document.elementFromPoint(cx, cy);
+		if (!hit || hit === el || el.contains(hit) || hit.contains(el)) continue;
+		/*
+		 * Content passing beneath a floating bar is not a bug — it is how a
+		 * phone works, and the body carries enough bottom padding to scroll the
+		 * last row clear. What is a bug is a control that can never be reached,
+		 * because nothing it sits in can move it out from under the chrome.
+		 *
+		 * Flagging both would mean flagging every list on every screen, and a
+		 * check that fires constantly is one that gets ignored — which is how
+		 * the search field stayed buried for several releases in the first
+		 * place.
+		 */
+		if (scrollableOut(el, view)) continue;
+		blocked.push(`${el.className.split(" ")[0] || el.tagName} under ${hit.className.split(" ")[0] || hit.tagName}`);
+	}
+	check("controlsNotCovered", blocked.length === 0, [...new Set(blocked)].slice(0, 4).join(", "));
 
 	// Text below 12px on a phone.
 	const tiny = new Set<string>();

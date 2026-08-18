@@ -29,7 +29,7 @@ import { QuickRate } from "../src/ui/quickRate";
 import { LogSheet } from "../src/ui/logSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { auditScreen, type Check } from "./audit";
-import { measure, stampWidth } from "../src/util/panewidth";
+import { measure, stampWidth, stampChromeInsets } from "../src/util/panewidth";
 
 /* ------------------------------------------------------------------ */
 /* A poster that always loads                                          */
@@ -374,6 +374,29 @@ if (paneWidth > 0) {
 document.body.classList.toggle("theme-dark", params.get("dark") === "1");
 document.body.classList.toggle("theme-light", params.get("dark") !== "1");
 
+/*
+ * Obsidian's own mobile chrome, at the sizes it really uses.
+ *
+ * The harness rendered `.reel-view` into a bare page. The app wraps it in a
+ * workspace leaf with a header above and a floating toolbar below, and *both*
+ * have now caused bugs: the toolbar covered the tab bar, and the header covered
+ * the search field for several releases while every check reported green.
+ *
+ * Modelled as overlays rather than as siblings deliberately — overlaying is the
+ * behaviour that caused the harm, so it is the behaviour worth testing against.
+ */
+function mountObsidianChrome(app: HTMLElement): void {
+	if (!phone) return;
+	const header = app.createDiv({ cls: "view-header obsidian-chrome" });
+	header.createDiv({ cls: "view-header-title", text: "Reel" });
+	header.createEl("button", { cls: "clickable-icon", text: "☰", attr: { "aria-label": "Menu" } });
+	app.createDiv({ cls: "mobile-toolbar obsidian-chrome" }).createEl("button", {
+		cls: "clickable-icon",
+		text: "＋",
+		attr: { "aria-label": "New" },
+	});
+}
+
 /** Render one screen into a fresh, correctly-classed view root. */
 function mount(app: HTMLElement, name: string): HTMLElement {
 	const view = app.createDiv({ cls: "reel-view" });
@@ -407,10 +430,16 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 		body.createEl("pre", { text: `render failed: ${String(e)}\n${(e as Error)?.stack ?? ""}` });
 	}
 	stampWidth(view, measure(view) || window.innerWidth);
+	// The same call the app makes, against the same chrome. Without it the
+	// harness would model Obsidian's overlays and then not compensate for them,
+	// which reports a bug the shipped code does not have.
+	stampChromeInsets(view);
 	return view;
 }
 
 const app = document.getElementById("app");
+
+if (app) mountObsidianChrome(app);
 
 if (app && params.get("audit") != null) {
 	/**

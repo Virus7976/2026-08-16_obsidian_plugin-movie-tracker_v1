@@ -1057,7 +1057,10 @@ input.reel-input {
 	max-height: 88vh;
 	max-height: 88dvh;
 	border-radius: 16px 16px 0 0;
-	padding-bottom: calc(12px + env(safe-area-inset-bottom));
+	/* Clear Obsidian's floating toolbar, measured rather than assumed. A sheet
+	   pins its actions to the bottom, which is precisely where that toolbar
+	   sits — and unlike a list, there is nothing to scroll to reach them. */
+	padding-bottom: calc(12px + var(--reel-bottom-inset, 0px) + env(safe-area-inset-bottom));
 	overflow-y: auto;
 	animation: reel-sheet-in 180ms ease-out;
 }
@@ -1335,12 +1338,18 @@ input.reel-input {
 
 /* ---------------- the Reel view ---------------- */
 
+/* `--reel-top-inset` / `--reel-bottom-inset` are measured by
+   `stampChromeInsets`: how far Obsidian's own header and floating toolbar reach
+   over this view. Applied here rather than on Reel's header row, because a
+   screen that renders without that row was still being covered. Zero wherever
+   the chrome stacks properly. */
 .reel-view {
-	padding: 0;
+	padding: var(--reel-top-inset, 0px) 0 0 0;
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	overflow: hidden;
+	box-sizing: border-box;
 }
 
 /* `--reel-top-inset` is measured by `ReelView.measureTopInset`: how far
@@ -1351,7 +1360,7 @@ input.reel-input {
 	display: flex;
 	gap: var(--reel-space-2);
 	align-items: center;
-	padding: calc(10px + var(--reel-top-inset, 0px)) 12px 10px 12px;
+	padding: 10px 12px 10px 12px;
 	padding-left: max(12px, env(safe-area-inset-left));
 	padding-right: max(12px, env(safe-area-inset-right));
 	border-bottom: 1px solid var(--background-modifier-border);
@@ -1506,7 +1515,7 @@ input.reel-input {
 	.reel-view-body {
 		order: 3;
 		/* Clear the floating toolbar so the last row is reachable. */
-		padding-bottom: calc(72px + env(safe-area-inset-bottom));
+		padding-bottom: calc(var(--reel-bottom-inset, 48px) + 24px + env(safe-area-inset-bottom));
 	}
 
 	.reel-view-filters {
@@ -6750,7 +6759,7 @@ input.reel-input {
 	.reel-view-body {
 	order: 3;
 	/* Clear the floating toolbar so the last row is reachable. */
-	padding-bottom: calc(72px + env(safe-area-inset-bottom));
+	padding-bottom: calc(var(--reel-bottom-inset, 48px) + 24px + env(safe-area-inset-bottom));
 	}
 	
 	.reel-view-filters {

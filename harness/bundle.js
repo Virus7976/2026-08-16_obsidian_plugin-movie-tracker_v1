@@ -5178,6 +5178,17 @@
     }
     return getComputedStyle(document.body).backgroundColor;
   }
+  var TAPPABLE = 'button, input, select, textarea, a, [role="button"], [contenteditable="true"], .clickable-icon';
+  function scrollableOut(el, stopAt) {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if ((cs.overflowY === "auto" || cs.overflowY === "scroll") && p.scrollHeight > p.clientHeight + 1)
+        return true;
+      if (p === stopAt)
+        break;
+    }
+    return false;
+  }
   var SCROLLERS = [
     "reel-chips",
     "reel-suggest",
@@ -5255,6 +5266,23 @@
       worst.set(k, Math.min(worst.get(k) ?? 99, Math.round(el.getBoundingClientRect().height)));
     }
     check("touchTargets44", small.length === 0, [...worst].map(([k, h]) => `${k} ${h}px`).join(", "));
+    const blocked = [];
+    for (const el of Array.from(view.querySelectorAll(TAPPABLE))) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2)
+        continue;
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight)
+        continue;
+      const hit = document.elementFromPoint(cx, cy);
+      if (!hit || hit === el || el.contains(hit) || hit.contains(el))
+        continue;
+      if (scrollableOut(el, view))
+        continue;
+      blocked.push(`${el.className.split(" ")[0] || el.tagName} under ${hit.className.split(" ")[0] || hit.tagName}`);
+    }
+    check("controlsNotCovered", blocked.length === 0, [...new Set(blocked)].slice(0, 4).join(", "));
     const tiny = /* @__PURE__ */ new Set();
     for (const el of view.querySelectorAll("*")) {
       if (el.childElementCount || !el.textContent?.trim())
@@ -5364,6 +5392,20 @@
   function measure(el) {
     const w = el.clientWidth || Math.round(el.getBoundingClientRect().width);
     return Number.isFinite(w) && w > 0 ? w : 0;
+  }
+  var TOP_CHROME = ".view-header";
+  var BOTTOM_CHROME = ".mobile-toolbar, .mobile-navbar, .status-bar";
+  function stampChromeInsets(el, root = document) {
+    const rect = el.getBoundingClientRect();
+    const clamp = (n2) => Math.round(Math.min(Math.max(n2, 0), 160));
+    const header = root.querySelector(TOP_CHROME);
+    const top = header ? clamp(header.getBoundingClientRect().bottom - rect.top) : 0;
+    const bar = root.querySelector(BOTTOM_CHROME);
+    const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
+    const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
+    el.setCssProps(vars);
+    if (el !== document.body)
+      document.body.setCssProps(vars);
   }
 
   // harness/main.ts
@@ -5630,6 +5672,18 @@
   }
   document.body.classList.toggle("theme-dark", params2.get("dark") === "1");
   document.body.classList.toggle("theme-light", params2.get("dark") !== "1");
+  function mountObsidianChrome(app2) {
+    if (!phone2)
+      return;
+    const header = app2.createDiv({ cls: "view-header obsidian-chrome" });
+    header.createDiv({ cls: "view-header-title", text: "Reel" });
+    header.createEl("button", { cls: "clickable-icon", text: "\u2630", attr: { "aria-label": "Menu" } });
+    app2.createDiv({ cls: "mobile-toolbar obsidian-chrome" }).createEl("button", {
+      cls: "clickable-icon",
+      text: "\uFF0B",
+      attr: { "aria-label": "New" }
+    });
+  }
   function mount(app2, name) {
     const view = app2.createDiv({ cls: "reel-view" });
     view.toggleClass("is-phone", phone2);
@@ -5643,9 +5697,12 @@
 ${e?.stack ?? ""}` });
     }
     stampWidth(view, measure(view) || window.innerWidth);
+    stampChromeInsets(view);
     return view;
   }
   var app = document.getElementById("app");
+  if (app)
+    mountObsidianChrome(app);
   if (app && params2.get("audit") != null) {
     const results = [];
     for (const name of Object.keys(SCREENS)) {

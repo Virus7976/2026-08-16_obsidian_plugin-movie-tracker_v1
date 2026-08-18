@@ -28,7 +28,7 @@ import { renderEmpty } from "./ui/empty";
 import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
 import { unlink } from "./library";
-import { measure, stampWidth } from "./util/panewidth";
+import { measure, stampWidth, stampChromeInsets, topInset } from "./util/panewidth";
 
 export const REEL_VIEW = "reel-view";
 
@@ -501,15 +501,10 @@ export class ReelView extends ItemView {
 	 * and exactly the covered distance when it does not.
 	 */
 	private measureTopInset(): void {
-		const header = this.containerEl.querySelector<HTMLElement>(".view-header");
-		const top = this.contentEl.getBoundingClientRect().top;
-		const covered = header ? header.getBoundingClientRect().bottom - top : 0;
-		// Clamped: a negative reading means the header sits above us, which is
-		// the correct arrangement and needs no compensation. The ceiling stops
-		// a mid-transition measurement from pushing the whole screen down.
-		const inset = Math.round(Math.min(Math.max(covered, 0), 120));
-		this.lastTopInset = inset;
-		this.contentEl.setCssProps({ "--reel-top-inset": `${inset}px` });
+		// Searched from the document rather than this view's container, because
+		// on a phone Obsidian's header is not inside the leaf it covers.
+		stampChromeInsets(this.contentEl);
+		this.lastTopInset = topInset(this.contentEl);
 	}
 
 	/**
