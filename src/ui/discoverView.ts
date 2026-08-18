@@ -217,6 +217,23 @@ export class DiscoverScreen {
 		const title = (isTv ? item.name : item.title) ?? "Untitled";
 
 		const card = container.createDiv({ cls: "reel-quickcard" });
+		/*
+		 * The card takes its colour from the poster it is showing.
+		 *
+		 * `swatches.tint` has existed since the detail screen was built and had
+		 * exactly one call site, so every other screen rendered in theme grey
+		 * regardless of what was on it. Quick mode is the best possible place
+		 * for the second: one card at a time, one poster to read, and it is the
+		 * screen where a title has to make an impression in about a second.
+		 *
+		 * Fire-and-forget — the card draws in the theme's own colours and the
+		 * tint arrives a frame later.
+		 */
+		this.plugin.swatches.tint(
+			card,
+			this.plugin.tmdb.posterUrl(item.poster_path, "w342"),
+			document.body.hasClass("theme-dark")
+		);
 
 		card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool.length}` });
 

@@ -7599,6 +7599,94 @@ input.reel-input {
 
 
 
+
+/* ================================================================== *
+ * Premium pass — colour, weight, numbers, touch                      *
+ * ================================================================== */
+
+/* ---- Poster colour, where it was already available ---------------- *
+ *
+ * `swatches.tint` reads a dominant colour from artwork and had one call site,
+ * so a library of thrillers and a library of pastel comedies rendered
+ * identically. `has-accent` and `--reel-accent` arrive a frame after paint; the
+ * stylesheet decides what they mean, which keeps every contrast judgement in
+ * one file. */
+.reel-quickcard.has-accent {
+	background: linear-gradient(
+		to bottom,
+		hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.16),
+		transparent 55%
+	);
+}
+
+/* The poster's own colour while it loads, rather than a grey rectangle — so a
+   card resolves *into* its artwork instead of replacing a placeholder with it. */
+.reel-poster-loading.has-accent {
+	background: hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.35);
+}
+
+/* ---- A regular weight ------------------------------------------- *
+ *
+ * The stylesheet had 500, 600 and 700 and nothing lighter, so body text was
+ * semi-bold and nothing could be emphatic because everything already was.
+ * Prose gets 400; weight now means something. */
+.reel-quickcard-overview,
+.reel-preview-overview,
+.reel-detail-overview,
+.reel-titles-review,
+.reel-discover-note,
+.reel-empty-body,
+.reel-fact-value,
+.reel-cell-year,
+.reel-dcard-year {
+	font-weight: 400;
+}
+
+/* ---- Numbers that do not shift ----------------------------------- *
+ *
+ * A rating going 4 → 5, or a count 9 → 10, moved everything beside it because
+ * proportional digits are different widths. Small, constant, and precisely the
+ * sort of thing that reads as unfinished without being nameable. */
+.reel-score-value,
+.reel-tile-value,
+.reel-chart-value,
+.reel-dcard-score,
+.reel-fold-count,
+.reel-titles-count,
+.reel-block-count,
+.reel-view-count,
+.reel-cell-year,
+.reel-dcard-year {
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---- Press feedback on the thing you touch most ------------------ *
+ *
+ * A poster is the primary control on most of these screens and had no response
+ * to a finger. The scale is deliberately small: enough to feel mechanical,
+ * short enough not to delay the tap it confirms. */
+.reel-cell:active .reel-cell-poster,
+.reel-dcard:active .reel-dcard-poster,
+.reel-titles-row:active .reel-titles-poster {
+	transform: scale(0.97);
+}
+
+.reel-cell-poster,
+.reel-dcard-poster,
+.reel-titles-poster {
+	transition: transform 120ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-cell-poster,
+	.reel-dcard-poster,
+	.reel-titles-poster {
+		transition: none;
+	}
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */

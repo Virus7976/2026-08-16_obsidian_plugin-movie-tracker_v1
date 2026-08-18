@@ -2663,6 +2663,11 @@
       const isTv = item.media_type === "tv";
       const title = (isTv ? item.name : item.title) ?? "Untitled";
       const card = container.createDiv({ cls: "reel-quickcard" });
+      this.plugin.swatches.tint(
+        card,
+        this.plugin.tmdb.posterUrl(item.poster_path, "w342"),
+        document.body.hasClass("theme-dark")
+      );
       card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool.length}` });
       const posterEl = card.createDiv({ cls: "reel-quickcard-poster" });
       this.plugin.posters.attach(posterEl, {
