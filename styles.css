@@ -7173,6 +7173,99 @@ input.reel-input {
 
 
 
+
+/* ------------------------------------------------------------------ */
+/* The search field: absent until asked for, then it grows out         */
+/* ------------------------------------------------------------------ */
+
+/* Collapsed means *gone*, not "zero-width with the icon still showing".
+ *
+ * `.reel-search-icon` is absolutely positioned, so it escaped the collapsed
+ * grid track and sat there as a magnifier next to the navigation — a magnifier
+ * that is a decorative span and does nothing when tapped. That is the whole of
+ * "there are two search boxes" and "the search isn't even working": the one
+ * within reach was never a control, and the one that works is up in Obsidian's
+ * header. One magnifier now, and it is the one that does something. */
+.reel-view:not(.is-w700) .reel-view-header:not(.is-open) .reel-search-wrap {
+	display: none;
+}
+
+/* Open, it grows out of the header rather than appearing. The row is what the
+   field emerges from, so the motion starts at zero height and full width —
+   which reads as the header opening rather than a box being placed on top. */
+.reel-view:not(.is-w700) .reel-view-header.is-open .reel-search-wrap {
+	display: flex;
+	animation: reel-search-in 180ms cubic-bezier(0.32, 0.72, 0, 1);
+	transform-origin: top center;
+}
+
+@keyframes reel-search-in {
+	from {
+		opacity: 0;
+		transform: scaleY(0.6) translateY(-6px);
+	}
+	to {
+		opacity: 1;
+		transform: scaleY(1) translateY(0);
+	}
+}
+
+.reel-view:not(.is-w700) .reel-view-header.is-open {
+	padding-top: var(--reel-space-2);
+	padding-bottom: var(--reel-space-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-view .reel-search-wrap {
+		animation: none;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* The detail screen's pinned bar                                      */
+/* ------------------------------------------------------------------ */
+
+/* `space-between` threw the two buttons into opposite corners of a 384px
+   screen, so they read as two unrelated controls rather than one bar. Back is
+   the primary action and goes first; "Open note" is secondary and sits beside
+   it, not a screen-width away. */
+.reel-view:not(.is-w620) .reel-detail-bar {
+	justify-content: flex-start;
+	gap: var(--reel-space-2);
+}
+
+/* Secondary *placement*, not secondary size or colour.
+ *
+ * The first attempt made this button 40px and `--text-muted`, and the audit
+ * caught both immediately: 40px is below the 44px the README promises, and
+ * muted-on-transparent measured 4.09:1 against a 4.5:1 minimum. Making a
+ * control quieter by shrinking it and fading it is making it worse at being a
+ * control. It earns its lower priority by sitting apart and losing its fill —
+ * the target and the legibility stay. */
+.reel-view:not(.is-w620) .reel-detail-bar .reel-btn:not(.reel-back) {
+	margin-left: auto;
+	/* Not transparent. A see-through button on a blurred translucent bar is
+	   text over whatever photograph happens to be behind it — the check read
+	   1.31:1, and it was right about the real thing, not just the measurement.
+	   Lower priority comes from position and the missing accent fill, not from
+	   removing the surface the label needs to be readable on. */
+	background: var(--background-primary);
+	border-color: var(--background-modifier-border);
+}
+
+/* The bar is pinned, so the page has to start below it rather than under it —
+   otherwise the first thing you see is a poster with a slab across its top. */
+.reel-view:not(.is-w620) .reel-detail-page {
+	padding-top: var(--reel-space-2);
+}
+
+
+
+
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */
