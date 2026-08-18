@@ -389,14 +389,21 @@ body {
 	text-transform: uppercase;
 }
 
+/* A scrim the width of the stars, not a slab the width of the poster.
+ *
+ * The old rule stretched a 55%-black bar across the bottom of every rated
+ * poster, which hid the artwork the grid exists to show and made a wall of
+ * thumbnails look heavier than it is. A gradient fading upward keeps the stars
+ * legible over any image while letting the poster read as a poster. */
 .reel-cell-rating {
 	position: absolute;
 	left: 4px;
 	bottom: 4px;
-	right: 4px;
-	padding: 2px 4px;
+	width: fit-content;
+	max-width: calc(100% - 8px);
+	padding: 1px 5px 2px;
 	border-radius: var(--reel-radius-sm);
-	background: rgba(0, 0, 0, 0.55);
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.34));
 }
 
 .reel-cell-rating .reel-star {
@@ -413,15 +420,34 @@ body {
 	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
+/* The status flag and the certification badge both claimed the top-left corner
+   and drew on top of each other — "Watchlist" came out half-covered by an "R"
+   and clipped by the card edge besides. The certification keeps the corner
+   because it is the shorter of the two and always fits; the flag drops beneath
+   it, but only when there is one to drop beneath. */
 .reel-cell-flag {
 	position: absolute;
 	top: 0;
 	left: 0;
+	max-width: calc(100% - 4px);
 	font-size: 10px;
 	padding: 2px 6px;
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 	border-bottom-right-radius: 6px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-cell-poster:has(.reel-cell-cert) .reel-cell-flag {
+	top: 24px;
+	border-top-right-radius: 6px;
+}
+
+/* And the heart keeps the other corner to itself. */
+.reel-cell-heart {
+	z-index: 2;
 }
 
 .reel-cell-progress {
@@ -6726,6 +6752,181 @@ input.reel-input {
 	font-family: ui-monospace, Menlo, Consolas, monospace;
 	font-size: var(--reel-text-caption);
 	word-break: break-word;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Mobile density pass                                                 */
+/*                                                                     */
+/* From a real screenshot at 379px: header, tabs, filter chips, sort   */
+/* and count together took roughly 700px of a 2316px screen before the */
+/* first poster. Nothing here changes what the app can do — it changes */
+/* how much of the phone the app spends saying it.                     */
+/* ------------------------------------------------------------------ */
+
+/* Two columns, not three.
+ *
+ * Three columns at 379px leaves about 110px per caption, which truncated
+ * "The Equalizer" to "The Equaliz…" — twice in one screen. A library whose
+ * titles cannot be read is a wall of thumbnails. */
+.reel-view:not(.is-w400) .reel-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Obsidian mobile hides its scrollbars. A visible track down the side of the
+   grid is the single loudest "this is a web page" signal on the screen. */
+.reel-view:not(.is-w700) ::-webkit-scrollbar {
+	width: 0;
+	height: 0;
+}
+
+.reel-view:not(.is-w700) .reel-view-body {
+	scrollbar-width: none;
+}
+
+/* The tap target stays 44px; the pill stops looking like one.
+ *
+ * `min-height: 44px` was applied to the chip itself, so an accessibility
+ * minimum became a visual style and every filter turned into a lozenge. The
+ * height moves to an overlay that extends past the chip on both sides: the
+ * finger still gets its 44px, the eye gets a 32px chip. */
+/*
+ * A 44px chip that looks 32px.
+ *
+ * Two earlier attempts hung a 44px overlay off a 32px chip, and both were
+ * clipped — first by the row's `overflow-y: hidden`, then by whichever parent a
+ * given chip happened to sit in. Chasing parents one at a time was never going
+ * to end.
+ *
+ * So the *box* stays 44px, which is what a finger and `elementFromPoint` both
+ * measure, and the pill is painted by a pseudo-element inset 6px top and
+ * bottom. Nothing can clip that, because it lives inside the element it
+ * decorates. `isolation: isolate` stops the `z-index: -1` escaping behind an
+ * ancestor's background, which would leave the pill invisible rather than
+ * merely underneath the label.
+ */
+.reel-view:not(.is-w700) .reel-chip {
+	min-height: 44px;
+	/* The vertical padding *is* the tap area, and the background does not paint
+	   into it: `background-clip: content-box` leaves a 32px pill inside a 44px
+	   box. The colour stays on the element itself, where the contrast check can
+	   still read it — a pseudo-element pill measured 1.00:1 there, because
+	   moving the paint somewhere the tool cannot see is not the same as being
+	   legible. */
+	padding: 6px 14px;
+	background-clip: content-box;
+	border: none;
+}
+
+/* The row has to be exactly as tall as the hit area it contains.
+ *
+ * The first attempt put a 44px overlay on a 32px chip and left the row at its
+ * old height, where `overflow-y: hidden` clipped the overlay — so the tap area
+ * was still 32px and the audit was right to fail it. Centring the chip in a
+ * 44px row makes the overlay fit precisely: the height that used to be chip is
+ * now row, and the finger gets all of it. */
+.reel-view:not(.is-w700) .reel-chips,
+.reel-view:not(.is-w700) .reel-suggest {
+	min-height: 44px;
+	align-items: center;
+	padding-top: 0;
+	padding-bottom: 0;
+}
+
+.reel-view:not(.is-w700) .reel-chip::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	height: 44px;
+	transform: translateY(-50%);
+}
+
+/* The count was a centred, dashed-bordered box floating in its own band of
+   empty space — it read as a placeholder that had failed to load. It is a
+   label. It should look like one, and share a line with the sort. */
+.reel-view-count,
+.reel-block-count {
+	border: none;
+	background: transparent;
+	padding: 0;
+	margin: 0;
+	text-align: left;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.reel-view:not(.is-w700) .reel-sortbar {
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: var(--reel-space-2);
+	padding-bottom: var(--reel-space-1);
+}
+
+/* A sort control, not a call to action. Full-width and accent-weighted, it
+   read as the primary button on the screen; it is a statement of the current
+   order, which is a quieter job. */
+.reel-view:not(.is-w700) .reel-select {
+	flex: 0 1 auto;
+	width: auto;
+	max-width: 60%;
+	min-height: 34px;
+	background: transparent;
+	border: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+/* A row that scrolls should look like it does.
+ *
+ * The tab row and the chip row both run off the right edge with no hint —
+ * "Stats" was sliced in half and read as a rendering fault rather than as an
+ * invitation to swipe. A mask fades the last few pixels instead. */
+.reel-view:not(.is-w700) .reel-tabs,
+.reel-view:not(.is-w700) .reel-chips {
+	-webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent 100%);
+	mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent 100%);
+}
+
+/* Once scrolled to the end there is nothing more to promise, so the fade goes
+   — otherwise the last chip looks permanently half-drawn. */
+.reel-view:not(.is-w700) .reel-tabs.is-scroll-end,
+.reel-view:not(.is-w700) .reel-chips.is-scroll-end {
+	-webkit-mask-image: none;
+	mask-image: none;
+}
+
+/* Reclaimed vertical space, itemised. */
+.reel-view:not(.is-w700) .reel-view-header {
+	padding-top: var(--reel-space-2);
+	padding-bottom: var(--reel-space-2);
+}
+
+.reel-view:not(.is-w700) .reel-tab {
+	min-height: 44px;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view:not(.is-w700) .reel-cell-caption {
+	padding-top: 2px;
+}
+
+
+/* A 44px chip box needs a 44px line to sit on.
+ *
+ * Growing the chip from 34px to 44px made wrapped rows overlap: the line-gap
+ * was tuned to the old height, so the second row's chips were drawn across the
+ * centre of the first row's — reachable-looking, and not reachable. Caught by
+ * `controlsNotCovered` as "reel-chip under reel-chip". */
+.reel-view:not(.is-w700) .reel-chips,
+.reel-view:not(.is-w700) .reel-suggest,
+.reel-view:not(.is-w700) .reel-recipe-steps,
+.reel-view:not(.is-w700) .reel-recipe-launch,
+.reel-view:not(.is-w700) .reel-discover-filters .reel-chips {
+	row-gap: var(--reel-space-2);
+	align-content: flex-start;
 }
 
 /* === generated: pane-measured mirrors of the compact rules === */

@@ -5256,9 +5256,26 @@
       const top = first.getBoundingClientRect().top;
       check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round(top / vh * 100)}%`);
     }
+    const reaches44 = (el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const top = r.top + r.height / 2 - 21;
+      const bottom = r.top + r.height / 2 + 21;
+      const hits = (y) => {
+        if (y < 0 || y > window.innerHeight || cx < 0 || cx > window.innerWidth)
+          return false;
+        const hit = document.elementFromPoint(cx, y);
+        return !!hit && (hit === el || el.contains(hit));
+      };
+      return hits(top) && hits(bottom);
+    };
     const small = [...view.querySelectorAll('button, [role="button"], select')].filter((el) => {
       const h = el.getBoundingClientRect().height;
-      return h > 0 && h < 44 && !el.closest(".reel-stars") && !el.closest(".reel-episode-stars");
+      if (h <= 0 || el.closest(".reel-stars") || el.closest(".reel-episode-stars"))
+        return false;
+      if (h >= 44)
+        return false;
+      return !reaches44(el);
     });
     const worst = /* @__PURE__ */ new Map();
     for (const el of small) {
@@ -5704,8 +5721,14 @@ ${e?.stack ?? ""}` });
   if (app)
     mountObsidianChrome(app);
   if (app && params2.get("audit") != null) {
+    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate"]);
+    const skipped = [];
     const results = [];
     for (const name of Object.keys(SCREENS)) {
+      if (paneWidth > 0 && MODAL_SCREENS.has(name)) {
+        skipped.push(name);
+        continue;
+      }
       const view = mount(app, name);
       results.push({ screen: name, checks: auditScreen(view, { phone: phone2 }) });
       view.remove();
@@ -5724,7 +5747,7 @@ ${e?.stack ?? ""}` });
       if (f.detail)
         row.createEl("code", { text: f.detail });
     }
-    window.REEL_AUDIT = { total, failures };
+    window.REEL_AUDIT = { total, failures, skipped };
   } else if (app) {
     mount(app, wanted);
   }

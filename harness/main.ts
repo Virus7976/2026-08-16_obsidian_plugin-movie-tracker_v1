@@ -449,8 +449,27 @@ if (app && params.get("audit") != null) {
 	 * document at once would share a viewport, and every "is this taller than
 	 * the screen" answer would be measured against the wrong thing.
 	 */
+	/*
+	 * Sheets are skipped when the pane is artificially constrained.
+	 *
+	 * A sheet is `position: fixed`, so it escapes the wrapper the docked-pane
+	 * pass uses to fake a narrow pane — it lays out across the whole window
+	 * while still inheriting the view's narrow classes. The app never produces
+	 * that pairing: a sheet is viewport-width by definition, and the phone
+	 * passes already cover it at a real phone width.
+	 *
+	 * Logged rather than dropped quietly. A pass that silently covers less than
+	 * it appears to is how a green tick stops meaning anything.
+	 */
+	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate"]);
+	const skipped: string[] = [];
+
 	const results: { screen: string; checks: Check[] }[] = [];
 	for (const name of Object.keys(SCREENS)) {
+		if (paneWidth > 0 && MODAL_SCREENS.has(name)) {
+			skipped.push(name);
+			continue;
+		}
 		const view = mount(app, name);
 		results.push({ screen: name, checks: auditScreen(view, { phone }) });
 		view.remove();
@@ -474,7 +493,7 @@ if (app && params.get("audit") != null) {
 		if (f.detail) row.createEl("code", { text: f.detail });
 	}
 	// A machine-readable copy, so a future CI step needs no scraping.
-	(window as unknown as { REEL_AUDIT: unknown }).REEL_AUDIT = { total, failures };
+	(window as unknown as { REEL_AUDIT: unknown }).REEL_AUDIT = { total, failures, skipped };
 } else if (app) {
 	mount(app, wanted);
 }

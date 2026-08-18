@@ -168,6 +168,10 @@ try {
 		} else {
 			console.log(`✓ ${label}: ${result.total} checks passed`);
 		}
+		// Never let a pass look more thorough than it was.
+		if (result?.skipped?.length) {
+			console.log(`    (skipped here: ${result.skipped.join(", ")} — sheets are viewport-width, covered by the phone passes)`);
+		}
 		await page.close();
 	}
 } finally {

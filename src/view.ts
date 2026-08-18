@@ -219,6 +219,10 @@ export class ReelView extends ItemView {
 			});
 			btn.dataset.tab = t.id;
 		}
+		// The row runs off the right edge on a phone, where "Stats" was sliced
+		// in half and read as a rendering fault. A fade says "there is more"; it
+		// has to go once there is not, or the last tab looks half-drawn.
+		this.trackScrollEnd(tabBar);
 
 		this.filterEl = root.createDiv({ cls: "reel-view-filters" });
 		this.bodyEl = root.createDiv({ cls: "reel-view-body" });
@@ -478,6 +482,28 @@ export class ReelView extends ItemView {
 	 * pushes the first poster off the bottom of a phone screen — which is
 	 * what "I can't see anything on the library page" actually was.
 	 */
+	/**
+	 * Keep `is-scroll-end` in step with a horizontally scrolling row.
+	 *
+	 * The edge fade that advertises "there is more this way" becomes a lie the
+	 * moment there is not — the last item then looks permanently half-painted.
+	 * Also applied when the row does not overflow at all, which is the common
+	 * case on a wide pane.
+	 */
+	private trackScrollEnd(row: HTMLElement): void {
+		const sync = (): void => {
+			const done = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
+			row.toggleClass("is-scroll-end", done);
+		};
+		this.registerDomEvent(row, "scroll", sync);
+		if (typeof ResizeObserver !== "undefined") {
+			const ro = new ResizeObserver(sync);
+			ro.observe(row);
+			this.register(() => ro.disconnect());
+		}
+		sync();
+	}
+
 	private measureWidth(): void {
 		this.lastWidth = measure(this.contentEl);
 		stampWidth(this.contentEl, this.lastWidth);

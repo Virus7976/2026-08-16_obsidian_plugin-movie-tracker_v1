@@ -207,9 +207,37 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 
 	// The stylesheet's own promise. Stars are excluded: the widget is one
 	// 44px control split into halves, so its parts are legitimately smaller.
+	/*
+	 * The *tap* area, not the painted box.
+	 *
+	 * This used to read `getBoundingClientRect().height`, which conflates two
+	 * different things: how big a control looks and how big it is to a finger.
+	 * Enforcing 44px on the box turned every filter chip into a lozenge and ate
+	 * a third of a phone screen — an accessibility minimum had quietly become a
+	 * visual style.
+	 *
+	 * A chip can be 32px tall and still take a 44px hit, via an overlay that
+	 * extends past it. `elementFromPoint` at the edges of the band is what a
+	 * finger would actually find there, so it measures the thing that matters.
+	 */
+	const reaches44 = (el: HTMLElement): boolean => {
+		const r = el.getBoundingClientRect();
+		const cx = r.left + r.width / 2;
+		const top = r.top + r.height / 2 - 21;
+		const bottom = r.top + r.height / 2 + 21;
+		const hits = (y: number): boolean => {
+			if (y < 0 || y > window.innerHeight || cx < 0 || cx > window.innerWidth) return false;
+			const hit = document.elementFromPoint(cx, y);
+			return !!hit && (hit === el || el.contains(hit));
+		};
+		return hits(top) && hits(bottom);
+	};
+
 	const small = [...view.querySelectorAll<HTMLElement>('button, [role="button"], select')].filter((el) => {
 		const h = el.getBoundingClientRect().height;
-		return h > 0 && h < 44 && !el.closest(".reel-stars") && !el.closest(".reel-episode-stars");
+		if (h <= 0 || el.closest(".reel-stars") || el.closest(".reel-episode-stars")) return false;
+		if (h >= 44) return false;
+		return !reaches44(el);
 	});
 	const worst = new Map<string, number>();
 	for (const el of small) {
