@@ -29,6 +29,7 @@ import { QuickRate } from "../src/ui/quickRate";
 import { LogSheet } from "../src/ui/logSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { auditScreen, type Check } from "./audit";
+import { measure, stampWidth } from "../src/util/panewidth";
 
 /* ------------------------------------------------------------------ */
 /* A poster that always loads                                          */
@@ -352,6 +353,21 @@ const params = new URLSearchParams(location.search);
 const wanted = params.get("screen") ?? "library";
 const phone = params.get("phone") !== "0";
 
+/**
+ * Constrain the pane without touching the window.
+ *
+ * This is the case the stylesheet used to get wrong and the harness could not
+ * see: Reel docked in a sidebar on a wide desktop. Every `@media (min-width:
+ * 900px)` rule matched — the window really was that wide — and a 375px pane
+ * was handed a three-column grid. The harness only ever tested a narrow pane
+ * in a narrow window, where the two happen to agree, so it always passed.
+ */
+const paneWidth = Number(params.get("pane") ?? "") || 0;
+if (paneWidth > 0) {
+	document.body.setCssProps({ "--reel-harness-pane": `${paneWidth}px` });
+	document.body.addClass("reel-harness-narrow-pane");
+}
+
 // Obsidian puts the theme on <body>, and every Reel colour resolves from
 // there. The harness has to do the same, or a dark-theme check would quietly
 // measure light-theme colours and pass.
@@ -365,15 +381,32 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	// render the desktop layout at phone width and report a fixed bug.
 	view.toggleClass("is-phone", phone);
 	view.toggleClass("is-mobile", phone);
-	// The class the compact layout actually keys off. ReelView measures its
-	// own pane; the harness mirrors that so a check here means the same thing
-	// it will mean in the app.
-	view.toggleClass("is-narrow", window.innerWidth < 600);
+	// The classes the compact layout keys off, produced by the *same function*
+	// the plugin calls. The harness used to compute `is-narrow` from
+	// `window.innerWidth`, which meant it was testing its own arithmetic rather
+	// than the app's — and the app's is where the bug was.
+	//
+	// Stamped twice: once before the screen draws, because some screens read
+	// their own layout as they build; once after, on the width the pane
+	// actually ended up with.
+	stampWidth(view, measure(view) || window.innerWidth);
+	/*
+	 * Screens draw into a `.reel-view-body` *child*, as they do in the app.
+	 *
+	 * The harness used to put both classes on one element, so every screen
+	 * rendered as a direct flex item of the view rather than as block content
+	 * inside a scrolling body. That is not the box tree the app builds, and it
+	 * gave the stats grid a different containing block — a 76px overflow that
+	 * exists nowhere but here. A harness that models the wrong DOM reports
+	 * bugs the user does not have and misses the ones they do.
+	 */
+	const body = view.createDiv({ cls: "reel-view-body" });
 	try {
-		(SCREENS[name] ?? library)(view);
+		(SCREENS[name] ?? library)(body);
 	} catch (e) {
-		view.createEl("pre", { text: `render failed: ${String(e)}\n${(e as Error)?.stack ?? ""}` });
+		body.createEl("pre", { text: `render failed: ${String(e)}\n${(e as Error)?.stack ?? ""}` });
 	}
+	stampWidth(view, measure(view) || window.innerWidth);
 	return view;
 }
 

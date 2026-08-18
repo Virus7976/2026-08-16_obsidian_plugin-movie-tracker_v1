@@ -28,6 +28,7 @@ import { renderEmpty } from "./ui/empty";
 import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
 import { unlink } from "./library";
+import { measure, stampWidth } from "./util/panewidth";
 
 export const REEL_VIEW = "reel-view";
 
@@ -95,6 +96,8 @@ export class ReelView extends ItemView {
 	private moving: "forward" | "back" | "sideways" | null = null;
 	/** Where each tab was scrolled to, so coming back lands where you left. */
 	private tabScroll = new Map<string, number>();
+	/** Last measured pane width, surfaced by the diagnostics dump. */
+	private lastWidth = 0;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -474,11 +477,28 @@ export class ReelView extends ItemView {
 	 * what "I can't see anything on the library page" actually was.
 	 */
 	private measureWidth(): void {
-		const w = this.contentEl.clientWidth;
-		// Zero while the view is detached. Toggling on that would flash the
-		// compact layout in and out on every open.
-		if (w <= 0) return;
-		this.contentEl.toggleClass("is-narrow", w < 600);
+		this.lastWidth = measure(this.contentEl);
+		stampWidth(this.contentEl, this.lastWidth);
+	}
+
+	/**
+	 * What the layout currently believes about itself, in one string.
+	 *
+	 * Two layout bugs have now been reported on a device I cannot see, and
+	 * neither reproduced in the harness. Guessing a fourth time is worse than
+	 * asking. This is what the Copy diagnostics button in settings reads.
+	 */
+	diagnostics(): string {
+		const el = this.contentEl;
+		const cls = Array.from(el.classList).filter((c) => c.startsWith("is-"));
+		return [
+			`tab: ${this.tab}`,
+			`pane width: ${this.lastWidth || "unmeasured"} (clientWidth ${el.clientWidth}, rect ${Math.round(el.getBoundingClientRect().width)})`,
+			`window: ${window.innerWidth}×${window.innerHeight}`,
+			`classes: ${cls.join(" ") || "none"}`,
+			`platform: phone=${Platform.isPhone} mobile=${Platform.isMobile}`,
+			`ResizeObserver: ${typeof ResizeObserver !== "undefined"}`,
+		].join("\n");
 	}
 
 	private paintFilters(): void {

@@ -335,6 +335,37 @@ export default class ReelPlugin extends Plugin {
 
 		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });
 
+		/*
+		 * What the layout thinks it is, on the device it is running on.
+		 *
+		 * Two layout bugs have been reported from a phone, and neither
+		 * reproduced in the harness — so the harness and that phone disagree
+		 * about something, and no amount of guessing from here will say what.
+		 * This reports the measured pane width, the classes that came out of
+		 * it, and what the platform flags claim, which is the whole input to
+		 * every layout decision Reel makes.
+		 *
+		 * No vault contents, no key, nothing but geometry.
+		 */
+		this.addCommand({
+			id: "copy-layout-diagnostics",
+			name: "Copy layout diagnostics",
+			checkCallback: (checking) => {
+				const view = this.app.workspace.getLeavesOfType(REEL_VIEW)[0]?.view;
+				if (!(view instanceof ReelView)) return false;
+				if (!checking) {
+					const text = view.diagnostics();
+					void navigator.clipboard
+						.writeText(text)
+						.then(() => new Notice("Layout diagnostics copied."))
+						// A clipboard that refuses is not a reason to lose the
+						// answer — show it instead, so it can still be read.
+						.catch(() => new Notice(text, 15000));
+				}
+				return true;
+			},
+		});
+
 		this.addCommand({ id: "add-watchlist", name: "Add to watchlist", callback: () => this.openSearch({ watchlist: true }) });
 
 		this.addCommand({

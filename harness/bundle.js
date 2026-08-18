@@ -5182,7 +5182,8 @@
     "reel-preview-links"
   ];
   function auditScreen(view, opts) {
-    const vw = window.innerWidth;
+    const paneRight = view.getBoundingClientRect().right;
+    const vw = Math.min(window.innerWidth, Math.round(paneRight) || window.innerWidth);
     const vh = window.innerHeight;
     const out = [];
     const check = (name, ok, detail2 = "") => out.push({ name, ok, detail: detail2 });
@@ -5205,10 +5206,24 @@
       escaped.length === 0,
       escaped.slice(0, 3).map((e) => e.className.split(" ")[0]).join(", ")
     );
+    const wide = [...view.querySelectorAll("*")].filter((el) => {
+      if (el.getBoundingClientRect().right <= paneRight + 1)
+        return false;
+      for (let p = el.parentElement; p && p !== view; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX !== "visible")
+          return false;
+        if ([...p.classList].some((c) => SCROLLERS.includes(c)))
+          return false;
+      }
+      return true;
+    }).map((el) => `${el.className.split(" ")[0] || el.tagName} +${Math.round(el.getBoundingClientRect().right - paneRight)}px`);
+    const bodies = [...view.querySelectorAll(".reel-view-body")];
+    const sliding = bodies.filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => `${b.scrollWidth} vs ${b.clientWidth}`);
+    check("bodyNoSideScroll", sliding.length === 0, sliding.join(", "));
     check(
-      "docNotWider",
-      document.documentElement.scrollWidth <= vw,
-      `${document.documentElement.scrollWidth} vs ${vw}`
+      "paneNotWider",
+      view.scrollWidth <= view.clientWidth + 1,
+      `${view.scrollWidth} vs ${view.clientWidth}${wide.length ? ` \u2014 ${[...new Set(wide)].slice(0, 4).join(", ")}` : ""}`
     );
     const uneven = [...view.querySelectorAll(".reel-grid, .reel-recipe-results, .reel-recipe-seeds")].filter((g) => {
       const w = getComputedStyle(g).gridTemplateColumns.split(" ").map(parseFloat).filter(Number.isFinite);
@@ -5323,6 +5338,22 @@
     });
     check("chromeNotAWall", walls.length === 0, walls.map((e) => `${e.className.split(" ")[0]} ${Math.round(e.getBoundingClientRect().height)}px`).join(", "));
     return out;
+  }
+
+  // src/util/panewidth.ts
+  var WIDTH_STEPS = [400, 500, 520, 620, 700, 760, 800, 900];
+  var NARROW_AT = 600;
+  function stampWidth(el, width) {
+    const w = Number.isFinite(width) && width > 0 ? width : 0;
+    const narrow = w > 0 ? w < NARROW_AT : true;
+    el.toggleClass("is-narrow", narrow);
+    el.toggleClass("is-wide", !narrow);
+    for (const step of WIDTH_STEPS)
+      el.toggleClass(`is-w${step}`, w >= step);
+  }
+  function measure(el) {
+    const w = el.clientWidth || Math.round(el.getBoundingClientRect().width);
+    return Number.isFinite(w) && w > 0 ? w : 0;
   }
 
   // harness/main.ts
@@ -5582,19 +5613,26 @@
   var params2 = new URLSearchParams(location.search);
   var wanted = params2.get("screen") ?? "library";
   var phone2 = params2.get("phone") !== "0";
+  var paneWidth = Number(params2.get("pane") ?? "") || 0;
+  if (paneWidth > 0) {
+    document.body.setCssProps({ "--reel-harness-pane": `${paneWidth}px` });
+    document.body.addClass("reel-harness-narrow-pane");
+  }
   document.body.classList.toggle("theme-dark", params2.get("dark") === "1");
   document.body.classList.toggle("theme-light", params2.get("dark") !== "1");
   function mount(app2, name) {
     const view = app2.createDiv({ cls: "reel-view" });
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
-    view.toggleClass("is-narrow", window.innerWidth < 600);
+    stampWidth(view, measure(view) || window.innerWidth);
+    const body = view.createDiv({ cls: "reel-view-body" });
     try {
-      (SCREENS[name] ?? library)(view);
+      (SCREENS[name] ?? library)(body);
     } catch (e) {
-      view.createEl("pre", { text: `render failed: ${String(e)}
+      body.createEl("pre", { text: `render failed: ${String(e)}
 ${e?.stack ?? ""}` });
     }
+    stampWidth(view, measure(view) || window.innerWidth);
     return view;
   }
   var app = document.getElementById("app");

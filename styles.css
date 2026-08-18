@@ -333,11 +333,17 @@ body {
 	min-width: 0;
 }
 
-@media (min-width: 500px) {
-	.reel-grid {
-		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+/* Pane width, not window width.
+ *
+ * Every rule below used to be a `@media (min-width: …)` query. A media query
+ * asks how wide the *window* is; the layout only ever had the *pane*. Docked
+ * in a sidebar on a desktop, a 375px Reel pane matched all of them at once and
+ * got a three-column grid it had no room for. `is-wNNN` is stamped by
+ * `ReelView.measureWidth` from the pane's own measured width, so the two can
+ * no longer disagree. */
+.reel-view.is-w500 .reel-grid {
+	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
 	min-width: 0;
-	}
 }
 
 .reel-cell {
@@ -943,11 +949,9 @@ body {
 	margin-bottom: 14px;
 }
 
-@media (min-width: 520px) {
-	.reel-tiles {
-		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+.reel-view.is-w520 .reel-tiles {
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 	min-width: 0;
-	}
 }
 
 .reel-tile {
@@ -2051,15 +2055,13 @@ input.reel-input {
 }
 
 /* Desktop: poster and details side by side with room to breathe. */
-@media (min-width: 800px) {
-	.reel-detail-poster {
-		flex: 0 0 180px;
-		width: 180px;
-	}
+.reel-view.is-w800 .reel-detail-poster {
+	flex: 0 0 180px;
+	width: 180px;
+}
 
-	.reel-detail-title {
-		font-size: 1.9em;
-	}
+.reel-view.is-w800 .reel-detail-title {
+	font-size: 1.9em;
 }
 
 /* ================================================================== *
@@ -2159,26 +2161,24 @@ input.reel-input {
 }
 
 /* Side by side once there's room, rather than a tall column on a monitor. */
-@media (min-width: 800px) {
-	.reel-rate-card {
-		flex-direction: row;
-		align-items: flex-start;
-		text-align: left;
-		gap: var(--reel-space-5);
-	}
+.reel-view.is-w800 .reel-rate-card {
+	flex-direction: row;
+	align-items: flex-start;
+	text-align: left;
+	gap: var(--reel-space-5);
+}
 
-	.reel-rate-poster {
-		flex: 0 0 190px;
-		max-width: none;
-	}
+.reel-view.is-w800 .reel-rate-poster {
+	flex: 0 0 190px;
+	max-width: none;
+}
 
-	.reel-rate-card .reel-header-facts {
-		justify-content: flex-start;
-	}
+.reel-view.is-w800 .reel-rate-card .reel-header-facts {
+	justify-content: flex-start;
+}
 
-	.reel-rating-row.centred {
-		justify-content: flex-start;
-	}
+.reel-view.is-w800 .reel-rating-row.centred {
+	justify-content: flex-start;
 }
 
 /* ---------------- stats ---------------- */
@@ -2191,11 +2191,9 @@ input.reel-input {
 	gap: var(--reel-space-4);
 }
 
-@media (min-width: 760px) {
-	.reel-chart-grid {
-		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+.reel-view.is-w760 .reel-chart-grid {
+	grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 	min-width: 0;
-	}
 }
 
 .reel-chart {
@@ -2212,11 +2210,10 @@ input.reel-input {
 	margin-bottom: 16px;
 }
 
-@media (min-width: 620px) {
-	.reel-facts {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: var(--reel-space-2) var(--reel-space-5);
-	}
+.reel-view.is-w620 .reel-facts,
+.reel-modal.is-w620 .reel-facts {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--reel-space-2) var(--reel-space-5);
 }
 
 .reel-fact {
@@ -2369,11 +2366,9 @@ input.reel-input {
 	align-items: start;
 }
 
-@media (min-width: 900px) {
-	.reel-detail-cols {
-		/* Fixed sidebar, flexible main: the episode list is what needs room. */
-		grid-template-columns: 330px minmax(0, 1fr);
-	}
+.reel-view.is-w900 .reel-detail-cols {
+	/* Fixed sidebar, flexible main: the episode list is what needs room. */
+	grid-template-columns: 330px minmax(0, 1fr);
 }
 
 .reel-detail-side,
@@ -2474,14 +2469,17 @@ input.reel-input {
 	grid-column: 2;
 }
 
-@media (min-width: 620px) {
-	.reel-episode {
-		grid-template-columns: 30px minmax(0, 1fr) auto;
-	}
+/* `.reel-episode` renders in two places: the detail screen (inside the pane)
+   and the season sheet (a modal, which really is viewport-width). Hence both
+   a measured rule and a media query scoped to the modal. */
+.reel-view.is-w620 .reel-episode,
+.reel-modal.is-w620 .reel-episode {
+	grid-template-columns: 30px minmax(0, 1fr) auto;
+}
 
-	.reel-episode-stars {
-		grid-column: 3;
-	}
+.reel-view.is-w620 .reel-episode-stars,
+.reel-modal.is-w620 .reel-episode-stars {
+	grid-column: 3;
 }
 
 .reel-episode-body {
@@ -2615,11 +2613,9 @@ input.reel-input {
 	border-radius: var(--reel-radius-sm);
 }
 
-@media (min-width: 700px) {
-	.reel-upnext-thumb {
-		flex: 0 0 68px;
-		width: 68px;
-	}
+.reel-view.is-w700 .reel-upnext-thumb {
+	flex: 0 0 68px;
+	width: 68px;
 }
 
 /* ---------------- diary ---------------- */
@@ -2651,22 +2647,18 @@ input.reel-input {
 	max-width: 1400px;
 }
 
-@media (min-width: 900px) {
-	.reel-tiles {
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+.reel-view.is-w900 .reel-tiles {
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 	min-width: 0;
-	}
 }
 
 /* ---------------- poster grid ---------------- */
 
 /* Cap the column count so a wide monitor doesn't produce sixteen tiny
    posters per row. */
-@media (min-width: 900px) {
-	.reel-grid {
-		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+.reel-view.is-w900 .reel-grid {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 	min-width: 0;
-	}
 }
 
 /* Rate mode is keyboard-driven on desktop, so it needs a visible focus ring
@@ -2821,11 +2813,9 @@ input.reel-input {
 	justify-content: start;
 }
 
-@media (min-width: 900px) {
-	.reel-grid {
-		grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
-		justify-content: center;
-	}
+.reel-view.is-w900 .reel-grid {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
+	justify-content: center;
 }
 
 /* The rating slab across the poster was the ugliest thing on screen.
@@ -2895,10 +2885,8 @@ input.reel-input {
 	border: 1px solid var(--background-modifier-border);
 }
 
-@media (min-width: 800px) {
-	.reel-rate-card {
-		align-items: center;
-	}
+.reel-view.is-w800 .reel-rate-card {
+	align-items: center;
 }
 
 .reel-rate-actions,
@@ -3084,11 +3072,9 @@ input.reel-input {
 	color: var(--text-faint);
 }
 
-@media (min-width: 900px) {
-	.reel-dcard {
-		flex: 0 0 150px;
-		width: 150px;
-	}
+.reel-view.is-w900 .reel-dcard {
+	flex: 0 0 150px;
+	width: 150px;
 }
 
 /* ---------------- preview ---------------- */
@@ -3163,13 +3149,16 @@ input.reel-input {
 	gap: var(--reel-space-4) var(--reel-space-3);
 }
 
-@media (min-width: 900px) {
-	.reel-dgrid {
-		grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
-		justify-content: center;
-	}
+.reel-view.is-w900 .reel-dgrid {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
+	justify-content: center;
 }
 
+/* A grid cell sizes itself; the fixed width above is for the scrolling strip.
+   Scoped through `.reel-view` deliberately — the `is-w900` rule it overrides
+   now carries a class of its own, so this needs the matching weight to still
+   win. Losing it would pin every grid card to 150px. */
+.reel-view .reel-dgrid .reel-dcard,
 .reel-dgrid .reel-dcard {
 	flex: none;
 	width: auto;
@@ -6100,6 +6089,56 @@ input.reel-input {
 	max-width: 100%;
 }
 
+/* The same defect, in the lists — found only once the audit started measuring
+ * against the *pane* instead of the window.
+ *
+ * A `.reel-row` is a flex row whose automatic minimum size is its min-content
+ * width: thumb, title, meta chips and two 44px buttons. On a 375px phone that
+ * came to 403px, and because nothing in the chain was allowed to be narrower
+ * than its contents, the floor propagated all the way up — the list, and then
+ * the screen, simply became 403px wide and everything shifted sideways.
+ *
+ * Every one of these is a container whose children already know how to shrink
+ * (`.reel-row-body` is `flex: 1` with `min-width: 0`, the title ellipsises).
+ * They were never given permission to.
+ */
+/* The same floor, one layout mode over. A `1fr` grid track still has a
+   min-content minimum, so a single long stat widened its own column and, with
+   `auto-fill`, every other column to match. The text wraps instead. */
+.reel-tile {
+	min-width: 0;
+}
+
+.reel-tile-value,
+.reel-tile-label,
+.reel-tile-sub {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.reel-list,
+.reel-row,
+.reel-upnext,
+.reel-upnext-row,
+.reel-upnext-body,
+.reel-diary,
+.reel-rate,
+.reel-stats,
+.reel-detail,
+.reel-skel,
+.reel-skel-grid,
+.reel-skel-rows {
+	min-width: 0;
+	max-width: 100%;
+}
+
+/* The trailing controls are fixed-size and must stay so — they are 44px
+   targets — but they must not be what forces the row wide. */
+.reel-upnext-actions,
+.reel-row-actions {
+	flex: 0 0 auto;
+}
+
 .reel-view.is-narrow .reel-view-filters .reel-chips,
 .reel-view.is-narrow .reel-suggest,
 .reel-view.is-narrow .reel-sortbar,
@@ -6674,4 +6713,214 @@ input.reel-input {
 	font-family: ui-monospace, Menlo, Consolas, monospace;
 	font-size: var(--reel-text-caption);
 	word-break: break-word;
+}
+
+/* === generated: pane-measured mirrors of the compact rules === */
+
+/* Written by scripts/mirror-compact.mjs — do not edit by hand. */
+
+/*
+ * Tabs go at the TOP on mobile, not the bottom.
+ *
+ * A bottom tab bar is the right pattern for a normal phone app, but this
+ * runs inside Obsidian, which puts its own floating toolbar over the
+ * bottom of every view. That toolbar sat directly on top of the tab row —
+ * Library and Stats were half-visible at the edges and nothing in between
+ * could be tapped at all, so the app had no working navigation.
+ *
+ * Padding the bar upward would mean guessing that toolbar's height, which
+ * changes with the user's settings and their phone's gesture bar. Moving
+ * out of its way entirely is the only version that cannot be covered.
+ */
+.reel-view:not(.is-w700) .reel-tabs {
+	order: 1;
+	border-top: none;
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding-bottom: 0;
+	}
+	
+	.reel-view {
+	flex-direction: column;
+	}
+	
+	.reel-view-body {
+	order: 3;
+	/* Clear the floating toolbar so the last row is reachable. */
+	padding-bottom: calc(72px + env(safe-area-inset-bottom));
+	}
+	
+	.reel-view-filters {
+	order: 2;
+	}
+	
+	.reel-tab.is-active {
+	border-bottom-color: transparent;
+	border-top: 2px solid var(--interactive-accent);
+	margin-top: -2px;
+}
+
+.reel-view:not(.is-w500) .reel-select {
+	flex: 1 1 auto;
+	max-width: none;
+}
+
+.reel-view:not(.is-w620) .reel-hero {
+	gap: var(--reel-space-3);
+	}
+	
+	.reel-hero-poster {
+	flex: 0 0 108px;
+	width: 108px;
+	}
+	
+	.reel-hero-title {
+	font-size: 1.3em;
+	}
+	
+	.reel-detail-actions .reel-btn {
+	flex: 1 1 100%;
+	}
+	
+	.reel-meta-row {
+	grid-template-columns: 1fr;
+	gap: 2px;
+}
+
+.reel-view:not(.is-w620) .reel-fact {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	}
+	
+	.reel-fact-value {
+	text-align: left;
+	white-space: normal;
+	overflow: visible;
+	text-overflow: clip;
+	line-height: 1.4;
+	}
+	
+	/* A label column of up to 8em on a 375px screen leaves the bar about
+	150px — and the series-progress chart labels are film titles, so they
+	were unreadable. Label on its own line, bar full width beneath. */
+	.reel-chart-row {
+	grid-template-columns: 1fr 3em;
+	grid-template-areas:
+	"label label"
+	"track value";
+	gap: var(--reel-space-1) var(--reel-space-2);
+	min-height: 0;
+	padding-bottom: var(--reel-space-2);
+	}
+	
+	.reel-chart-label {
+	grid-area: label;
+	white-space: normal;
+	overflow: visible;
+	color: var(--text-normal);
+	}
+	
+	.reel-chart-track {
+	grid-area: track;
+	}
+	
+	.reel-chart-value {
+	grid-area: value;
+}
+
+.reel-view:not(.is-w400) .reel-tiles {
+	grid-template-columns: 1fr 1fr;
+	gap: var(--reel-space-2);
+	}
+	
+	.reel-tile {
+	padding: var(--reel-space-3);
+	}
+	
+	.reel-tile-value {
+	font-size: 1.35em;
+}
+
+.reel-view:not(.is-w620) .reel-dcard-btn {
+	min-height: 38px;
+}
+
+/*
+ * Two tiles across, not four. At 375px a four-across grid gave each tile
+ * about 80px, which is narrower than the numbers it had to hold — labels
+ * wrapped to three lines and the value clipped.
+ */
+.reel-view:not(.is-w700) .reel-stats .reel-tiles {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--reel-space-2);
+	}
+	
+	.reel-stats .reel-tile {
+	padding: var(--reel-space-3) var(--reel-space-3);
+	min-height: 76px;
+	}
+	
+	.reel-stats .reel-tile-value {
+	font-size: 1.5em;
+	}
+	
+	.reel-stats .reel-chart {
+	padding: var(--reel-space-3) var(--reel-space-3);
+	}
+	
+	/* Narrower label column: 7.5rem of a 375px screen left almost nothing for
+	the bar itself, so the chart stopped communicating anything. */
+	.reel-stats .reel-facts {
+	padding: 2px 12px;
+	}
+	
+	.reel-stats .reel-fact {
+	/* Label above value rather than a squeezed two-column row, which
+	truncated titles like "You liked far more than most". */
+	flex-direction: column;
+	gap: 1px;
+	}
+	
+	.reel-stats .reel-fact-value {
+	text-align: left;
+}
+
+/* Label above names — 5.5rem of a narrow screen left three stars
+   wrapping one word per line. */
+.reel-view:not(.is-w700) .reel-credit-row {
+	flex-direction: column;
+	gap: 2px;
+	}
+	
+	.reel-credit-label {
+	flex: none;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.reel-view:not(.is-w700) .reel-chart-thumb {
+	width: 22px;
+	height: 33px;
+	flex-basis: 22px;
+}
+
+.reel-view:not(.is-w700) .reel-chart-thumb {
+	width: 34px;
+	height: 51px;
+	flex-basis: 34px;
+}
+
+.reel-view:not(.is-w700) .reel-skel-card {
+	flex-basis: 96px;
+	width: 96px;
+}
+
+.reel-view:not(.is-w700) .reel-hero.has-backdrop {
+	/* Full-bleed on a phone: the padding either side of the page would
+	otherwise frame the image and halve the effect. */
+	margin: 0 calc(-1 * var(--reel-gutter, 12px));
+	border-radius: 0;
+	padding: 16px var(--reel-gutter, 12px);
 }

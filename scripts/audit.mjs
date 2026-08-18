@@ -27,9 +27,30 @@ import { readFile, access } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
+import * as esbuild from "esbuild";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PORT = 5600;
+
+/*
+ * Build the harness before serving it.
+ *
+ * This used to be a separate `npm run harness` step, which meant running the
+ * runner directly served whatever bundle happened to be on disk. An afternoon
+ * of edits to the checks sat unbuilt while five passes reported green — the
+ * audit was testing code from hours earlier and saying so to nobody.
+ *
+ * A check that can silently test the wrong build is worse than no check: it
+ * spends the trust of a green tick without earning it.
+ */
+await esbuild.build({
+	entryPoints: [join(ROOT, "harness/main.ts")],
+	bundle: true,
+	format: "iife",
+	alias: { obsidian: join(ROOT, "harness/shim.ts") },
+	outfile: join(ROOT, "harness/bundle.js"),
+	logLevel: "warning",
+});
 
 /** Where a Chromium-based browser usually lives, by platform. */
 const CANDIDATES = {
@@ -110,20 +131,32 @@ try {
 	// vault and vice versa, and Reel has no theme rules of its own — which is
 	// correct, and exactly why nobody has ever checked that the variables
 	// carry it.
-	for (const { phone, dark } of [
+	for (const { phone, dark, pane } of [
 		{ phone: 1, dark: 0 },
 		{ phone: 1, dark: 1 },
 		{ phone: 0, dark: 0 },
 		{ phone: 0, dark: 1 },
+		// Reel docked in a sidebar: a phone-width pane in a desktop window.
+		//
+		// The four passes above only ever put a narrow pane in a narrow window,
+		// where pane width and window width agree — so no check could see the
+		// layout asking the wrong one of the two. This pass is the case where
+		// they disagree, which is the bug the `is-wNNN` classes exist to fix.
+		{ phone: 0, dark: 0, pane: 375 },
 	]) {
 		const page = await browser.newPage();
 		// A real phone viewport, and a desktop one — the compact layout is a
 		// separate code path and a regression in either is a regression.
 		await page.setViewport(phone ? { width: 375, height: 812 } : { width: 1280, height: 900 });
-		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}`, { waitUntil: "networkidle0" });
+		const paneArg = pane ? `&pane=${pane}` : "";
+		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}${paneArg}`, {
+			waitUntil: "networkidle0",
+		});
 
 		const result = await page.evaluate(() => window.REEL_AUDIT);
-		const label = `${phone ? "phone 375x812" : "desktop 1280x900"} ${dark ? "dark" : "light"}`;
+		const label = pane
+			? `docked pane ${pane}px in 1280x900 ${dark ? "dark" : "light"}`
+			: `${phone ? "phone 375x812" : "desktop 1280x900"} ${dark ? "dark" : "light"}`;
 
 		if (!result) {
 			console.log(`✗ ${label}: the audit did not run — the harness failed to load.`);

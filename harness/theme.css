@@ -63,6 +63,16 @@ html, body {
 	height: 100dvh;
 }
 
+/* Reel docked in a sidebar: a narrow pane inside a wide window. The pane is
+   what the layout has, and the window is what the old media queries asked. */
+/* No `overflow: hidden`. Clipping the pane would hide the very thing the
+   checks measure — a 330px sidebar in a 375px pane has to stay visible to be
+   caught. Obsidian's real leaf does clip; the harness deliberately does not. */
+body.reel-harness-narrow-pane #app {
+	width: var(--reel-harness-pane);
+	max-width: var(--reel-harness-pane);
+}
+
 .svg-icon { width: 18px; height: 18px; }
 
 /* The audit report. Plain on purpose — it is output, not part of the app. */

@@ -67,6 +67,47 @@ Carried from round 4, where five items were listed and not built.
 
 ## Done
 
+### Round 6 — the layout was asking the wrong question
+
+The stylesheet decided its layout from `@media (min-width: …)`, which asks how
+wide the *window* is. Reel lives in a pane. Docked in a sidebar, a 375px pane
+matched every desktop rule at once; `measureWidth` meanwhile *returned early*
+when the width read as 0 — detached leaf, hidden tab, not yet laid out — which
+left the desktop layout in place with no later resize to correct it.
+
+- **Fail safe, not open.** An unmeasured width now means compact. Compact is
+  tight on a wide screen; wide is unusable on a narrow one.
+- **`is-wNNN` replaces the width media queries** for anything inside the pane,
+  stamped from the pane's own measurement. Sheets keep their queries — a modal
+  really is viewport-sized, and mirroring it made the mirror outrank the
+  deliberate rules written for sheets (it capped the recipe seed list at 40dvh
+  and threw away the 52dvh a sheet is meant to get).
+- **`npm run audit` builds the harness itself.** It did not, so running the
+  runner directly served whatever bundle was on disk. An afternoon of edits to
+  the checks sat unbuilt while five passes reported green.
+
+Three things this round got wrong, recorded because the pattern repeats:
+
+1. **A new pass that proved nothing.** The docked-pane pass passed on the old
+   stylesheet too. `overflow: hidden` on the harness pane was hiding exactly
+   what the checks needed to see — and the checks measured against
+   `window.innerWidth`, the same mistake as the stylesheet.
+2. **Four "bugs" that were the harness's fault.** Once the checks measured the
+   pane, `rows`, `upnext`, `stats` and `empties` all overflowed. They were
+   artifacts: the harness put `.reel-view` and `.reel-view-body` on one
+   element, so every screen rendered as a flex item instead of block content in
+   a scroller. With the *old* stylesheet and the *corrected* harness, all four
+   pass. The `min-width: 0` additions are hardening, not fixes.
+3. **The only proof is a check that fails before and passes after.** That is
+   `bodyNoSideScroll`: the body is a scroll container, so a too-wide detail grid
+   slides inside it rather than bursting the pane, and no width check could see
+   it. Docked at 375px it scrolled 138px sideways on the old stylesheet.
+
+Still unreproduced: the two bugs reported from the phone. `Copy layout
+diagnostics` reports the measured width, the classes it produced and the
+platform flags — geometry only — because the harness and that device disagree
+about something and guessing from here has now failed four times.
+
 ### Round 4 — the audit's blind spots
 Contrast, overlap and ceiling checks (78 → 137). `--text-faint` was being used
 for text people read, on nine screens. Eleven controls gained `:active` states.

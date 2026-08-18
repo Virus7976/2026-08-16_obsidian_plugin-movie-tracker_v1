@@ -88,7 +88,19 @@ const SCROLLERS = [
 ];
 
 export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[] {
-	const vw = window.innerWidth;
+	/*
+	 * Width is measured from the *pane*, not the window.
+	 *
+	 * This used to read `window.innerWidth`, which is the same mistake the
+	 * stylesheet was making and the reason the audit could not catch it: with
+	 * Reel docked in a 375px sidebar of a 1280px window, a three-column grid
+	 * spilled 300px out of the pane and every overflow check still passed,
+	 * because nothing had escaped the *window*.
+	 *
+	 * The pane is the space the layout actually has. Nothing may leave it.
+	 */
+	const paneRight = view.getBoundingClientRect().right;
+	const vw = Math.min(window.innerWidth, Math.round(paneRight) || window.innerWidth);
 	const vh = window.innerHeight;
 	const out: Check[] = [];
 	const check = (name: string, ok: boolean, detail = "") => out.push({ name, ok, detail });
@@ -120,10 +132,44 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 		escaped.slice(0, 3).map((e) => (e as HTMLElement).className.split(" ")[0]).join(", ")
 	);
 
+	// The pane's own scroll width, for the same reason: with Reel docked, the
+	// document is legitimately as wide as the window and says nothing about
+	// whether the view fits the space it was given.
+	//
+	// A bare "427 vs 375" says something is wrong and nothing about what, so
+	// the widest offenders are named. Anything inside a scroller is skipped:
+	// a strip is *supposed* to be wider than its frame.
+	const wide = [...view.querySelectorAll<HTMLElement>("*")]
+		.filter((el) => {
+			if (el.getBoundingClientRect().right <= paneRight + 1) return false;
+			for (let p = el.parentElement; p && p !== view; p = p.parentElement) {
+				if (getComputedStyle(p).overflowX !== "visible") return false;
+				if ([...p.classList].some((c) => SCROLLERS.includes(c))) return false;
+			}
+			return true;
+		})
+		.map((el) => `${el.className.split(" ")[0] || el.tagName} +${Math.round(el.getBoundingClientRect().right - paneRight)}px`);
+	/*
+	 * The body must not scroll sideways.
+	 *
+	 * `paneNotWider` cannot see this on its own: `.reel-view-body` is a scroll
+	 * container, so content too wide for it scrolls inside rather than bursting
+	 * the pane, and the view's own `scrollWidth` never changes. The screen still
+	 * slides under the thumb, which is what "everything is shifted sideways"
+	 * looks like from the outside.
+	 *
+	 * Strips scroll horizontally on purpose. The body never should.
+	 */
+	const bodies = [...view.querySelectorAll<HTMLElement>(".reel-view-body")];
+	const sliding = bodies
+		.filter((b) => b.scrollWidth > b.clientWidth + 1)
+		.map((b) => `${b.scrollWidth} vs ${b.clientWidth}`);
+	check("bodyNoSideScroll", sliding.length === 0, sliding.join(", "));
+
 	check(
-		"docNotWider",
-		document.documentElement.scrollWidth <= vw,
-		`${document.documentElement.scrollWidth} vs ${vw}`
+		"paneNotWider",
+		view.scrollWidth <= view.clientWidth + 1,
+		`${view.scrollWidth} vs ${view.clientWidth}${wide.length ? ` — ${[...new Set(wide)].slice(0, 4).join(", ")}` : ""}`
 	);
 
 	// Unequal fr tracks mean content is sizing a column that should share.
