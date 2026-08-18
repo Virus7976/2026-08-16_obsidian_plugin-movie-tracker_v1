@@ -5545,6 +5545,29 @@
   }
   var TOP_CHROME = ".view-header";
   var BOTTOM_CHROME = ".mobile-toolbar, .mobile-navbar, .status-bar";
+  function findFloatingBottomBar(view) {
+    const floor = window.innerHeight * 0.75;
+    let highest = null;
+    for (const el of Array.from(document.body.querySelectorAll("*"))) {
+      if (el.closest(".reel-view, .reel-modal, .modal-container"))
+        continue;
+      const cs = getComputedStyle(el);
+      if (cs.position !== "fixed" && cs.position !== "sticky")
+        continue;
+      if (cs.visibility === "hidden" || cs.display === "none")
+        continue;
+      const r = el.getBoundingClientRect();
+      if (r.height < 24 || r.width < view.width * 0.4)
+        continue;
+      if (r.top < floor || r.top > window.innerHeight - 8)
+        continue;
+      if (r.right < view.left || r.left > view.right)
+        continue;
+      if (!highest || r.top < highest.getBoundingClientRect().top)
+        highest = el;
+    }
+    return highest;
+  }
   function pickChrome(root, selector) {
     let best = null;
     let bestArea = 0;
@@ -5565,7 +5588,7 @@
     const clamp = (n2) => Math.round(Math.min(Math.max(n2, 0), 160));
     const header = pickChrome(root, TOP_CHROME);
     const top = header ? clamp(header.getBoundingClientRect().bottom - rect.top) : 0;
-    const bar = pickChrome(root, BOTTOM_CHROME);
+    const bar = pickChrome(root, BOTTOM_CHROME) ?? findFloatingBottomBar(rect);
     const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
     const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
     el.setCssProps(vars);
@@ -5678,6 +5701,10 @@
   };
   function library(root) {
     const header = root.createDiv({ cls: "reel-view-header" });
+    const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
+    navBtn.createSpan({ cls: "reel-nav-icon", text: "\u25A3" });
+    navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
+    navBtn.createSpan({ cls: "reel-nav-chevron", text: "\u25BE" });
     const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
     wrap.createSpan({ cls: "reel-search-icon", text: "\u2315" });
     wrap.createEl("input", {

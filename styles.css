@@ -6757,6 +6757,64 @@ input.reel-input {
 
 
 
+
+/* ------------------------------------------------------------------ */
+/* Navigation as a dropdown                                            */
+/*                                                                     */
+/* The six-tab row cost 45px of an 823px screen and spent the whole    */
+/* time fighting Obsidian's floating header for the same strip — the   */
+/* search field was buried under it, then the tabs were. A row that    */
+/* must sit exactly clear of a bar whose height nobody controls will   */
+/* be wrong again on the next device.                                  */
+/* ------------------------------------------------------------------ */
+
+.reel-nav-btn {
+	display: none;
+	align-items: center;
+	gap: var(--reel-space-1);
+	flex: 0 0 auto;
+	min-height: 44px;
+	padding: 0 var(--reel-space-2);
+	background: transparent;
+	border: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	cursor: pointer;
+	white-space: nowrap;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-nav-btn:active {
+	background: var(--background-modifier-hover);
+	border-radius: var(--reel-radius);
+}
+
+.reel-nav-chevron {
+	display: flex;
+	color: var(--text-muted);
+}
+
+.reel-nav-icon {
+	display: flex;
+}
+
+/* Narrow: the dropdown replaces the row entirely. */
+.reel-view:not(.is-w700) .reel-nav-btn {
+	display: flex;
+}
+
+.reel-view:not(.is-w700) .reel-tabs {
+	display: none;
+}
+
+/* Wide: there is room for the row and no floating header to argue with. */
+.reel-view.is-w700 .reel-nav-btn {
+	display: none;
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */
@@ -7165,18 +7223,18 @@ input.reel-input {
  * is what left it visible and untappable. Now it collapses to nothing until
  * the header's search action asks for it — one less row of chrome on a screen
  * that was spending a third of itself on chrome. */
-.reel-view:not(.is-w700) .reel-view-header {
+/* Only the *search field* collapses now, not the whole row — the row carries
+   the navigation dropdown, which must always be reachable. Collapsing the lot
+   was what left the phone with no way to change section. */
+.reel-view:not(.is-w700) .reel-search-wrap {
 	display: grid;
-	grid-template-rows: 0fr;
-	padding-top: 0;
-	padding-bottom: 0;
-	border-bottom: none;
-	transition: grid-template-rows 160ms ease;
+	grid-template-columns: 0fr;
+	transition: grid-template-columns 160ms ease;
 }
 
-.reel-view:not(.is-w700) .reel-view-header > * {
+.reel-view:not(.is-w700) .reel-search-wrap > * {
 	overflow: hidden;
-	min-height: 0;
+	min-width: 0;
 	/* Not merely clipped — gone.
 	 *
 	 * A collapsed row whose contents are only squashed still holds focusable
@@ -7187,15 +7245,12 @@ input.reel-input {
 	visibility: hidden;
 }
 
-.reel-view:not(.is-w700) .reel-view-header.is-open > * {
+.reel-view:not(.is-w700) .reel-view-header.is-open .reel-search-wrap > * {
 	visibility: visible;
 }
 
-.reel-view:not(.is-w700) .reel-view-header.is-open {
-	grid-template-rows: 1fr;
-	padding-top: var(--reel-space-2);
-	padding-bottom: var(--reel-space-2);
-	border-bottom: 1px solid var(--background-modifier-border);
+.reel-view:not(.is-w700) .reel-view-header.is-open .reel-search-wrap {
+	grid-template-columns: 1fr;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -8,7 +8,7 @@
  * as you move between them.
  */
 
-import { ItemView, Platform, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, Platform, WorkspaceLeaf, setIcon } from "obsidian";
 import type ReelPlugin from "./main";
 import type { Entry } from "./types";
 import { renderPosterGrid, renderRowList } from "./render/grid";
@@ -149,8 +149,28 @@ export class ReelView extends ItemView {
 		if (typeof ResizeObserver !== "undefined") {
 			const ro = new ResizeObserver(() => this.measureWidth());
 			ro.observe(this.contentEl);
+			/*
+			 * Watch Obsidian's header too, not just our own pane.
+			 *
+			 * The inset was measured once during `onOpen`, when the header has
+			 * not been laid out and reports 0×0 — so the compensation computed
+			 * as zero. Nothing re-measured it, because the observer only watched
+			 * `contentEl` and *our* size had not changed. The result on a device
+			 * was the tab row sitting under Obsidian's header with no way to
+			 * reach it.
+			 *
+			 * The header is the thing whose size we are compensating for, so it
+			 * is the thing to watch.
+			 */
+			const header = this.containerEl.closest(".workspace-leaf")?.querySelector(".view-header");
+			if (header instanceof HTMLElement) ro.observe(header);
 			this.register(() => ro.disconnect());
 		}
+		// And once more after layout settles, for the case where the header is
+		// not in the tree yet at all. Cheap, and the alternative is a screen
+		// nobody can navigate.
+		this.app.workspace.onLayoutReady(() => this.measureWidth());
+		this.registerDomEvent(window, "resize", () => this.measureWidth());
 		// registerDomEvent, not addEventListener: Obsidian unbinds it when the
 		// view closes, so reopening the tab can't stack duplicate handlers.
 		this.registerDomEvent(this.contentEl, "keydown", this.onKey);
@@ -185,6 +205,24 @@ export class ReelView extends ItemView {
 		 */
 		const header = root.createDiv({ cls: "reel-view-header" });
 		this.headerEl = header;
+
+		/*
+		 * Navigation is a dropdown on a phone, not a row of six tabs.
+		 *
+		 * The tab row cost 45px of a 823px screen and spent the whole time
+		 * fighting Obsidian's floating header for the same strip — first the
+		 * search field was buried under it, then the tabs were. A row that must
+		 * be exactly clear of a bar whose height nobody controls is a row that
+		 * will be wrong again on the next device.
+		 *
+		 * One control that says where you are and opens a menu cannot collide
+		 * with anything, needs no horizontal scrolling, and stops "Stats" being
+		 * sliced off the right edge. The full row stays on a wide pane, where
+		 * there is room and no floating header to argue with.
+		 */
+		const nav = header.createEl("button", { cls: "reel-nav-btn", attr: { type: "button" } });
+		this.navEl = nav;
+		nav.addEventListener("click", (ev) => this.openNav(ev));
 
 		const searchWrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
 		setIcon(searchWrap.createSpan({ cls: "reel-search-icon" }), "search");
@@ -253,6 +291,8 @@ export class ReelView extends ItemView {
 	private filterEl!: HTMLElement;
 	/** The search row, collapsed on a phone until the header action asks for it. */
 	private headerEl!: HTMLElement;
+	/** The dropdown that replaces the tab row on a narrow pane. */
+	private navEl: HTMLElement | null = null;
 	private searchEl: HTMLInputElement | null = null;
 	/** Where the list was when a detail screen was opened over it. */
 	private listScroll = 0;
@@ -439,6 +479,7 @@ export class ReelView extends ItemView {
 
 	private paintTab(): void {
 		this.clearScreenClasses();
+		this.paintNav();
 		if (this.tab === "library") {
 			this.paintFilters();
 			this.paintLibrary();
@@ -529,6 +570,46 @@ export class ReelView extends ItemView {
 	 * pushes the first poster off the bottom of a phone screen — which is
 	 * what "I can't see anything on the library page" actually was.
 	 */
+	/**
+	 * The tab list, as a menu.
+	 *
+	 * Uses Obsidian's own `Menu`, so it inherits the theme, the dismiss
+	 * behaviour and the safe-area handling rather than reimplementing three
+	 * things that are easy to get subtly wrong on a phone.
+	 */
+	private openNav(ev: MouseEvent): void {
+		const menu = new Menu();
+		for (const t of TABS) {
+			menu.addItem((item) =>
+				item
+					.setTitle(t.label)
+					.setIcon(t.icon)
+					// A tick, so the menu also answers "where am I" — which is
+					// the other half of what the tab row was doing.
+					.setChecked(this.tab === t.id)
+					.onClick(() => {
+						this.tab = t.id;
+						this.plugin.settings.lastTab = t.id;
+						void this.plugin.saveSettings();
+						this.clearSearch();
+						this.paint();
+					})
+			);
+		}
+		menu.showAtMouseEvent(ev);
+	}
+
+	/** Keep the dropdown's label in step with the tab it names. */
+	private paintNav(): void {
+		if (!this.navEl) return;
+		this.navEl.empty();
+		const current = TABS.find((t) => t.id === this.tab);
+		setIcon(this.navEl.createSpan({ cls: "reel-nav-icon" }), current?.icon ?? "layout-grid");
+		this.navEl.createSpan({ cls: "reel-nav-label", text: current?.label ?? "Library" });
+		setIcon(this.navEl.createSpan({ cls: "reel-nav-chevron" }), "chevron-down");
+		this.navEl.setAttr("aria-label", `${current?.label ?? "Library"} — change section`);
+	}
+
 	/**
 	 * Show or hide the search row.
 	 *

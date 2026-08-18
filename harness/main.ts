@@ -151,6 +151,13 @@ const plugin = {
  */
 function library(root: HTMLElement): void {
 	const header = root.createDiv({ cls: "reel-view-header" });
+	// The navigation dropdown that replaces the tab row on a narrow pane. The
+	// harness has to build it or the audit measures a header that no longer
+	// matches the one that ships.
+	const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
+	navBtn.createSpan({ cls: "reel-nav-icon", text: "▣" });
+	navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
+	navBtn.createSpan({ cls: "reel-nav-chevron", text: "▾" });
 	const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
 	wrap.createSpan({ cls: "reel-search-icon", text: "⌕" });
 	wrap.createEl("input", {
