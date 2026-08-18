@@ -386,56 +386,57 @@ export default class ReelPlugin extends Plugin {
 		});
 
 		/*
-		 * The same snapshot, taken later.
+		 * Capture when the keyboard appears, rather than on a countdown.
 		 *
-		 * The instant command cannot capture a keyboard-open screen: running it
-		 * requires the command palette, and opening the palette dismisses the
-		 * keyboard. So the one state that has defeated four releases — the stats
-		 * page with search focused — is precisely the state the tool cannot see.
+		 * The countdown was the wrong shape twice over. Obsidian draws its notice
+		 * across the top of the screen, covering the very header action you have to
+		 * tap to open search — and making it `pointer-events: none` so taps could
+		 * pass through also made it impossible to dismiss. The tool obstructed the
+		 * action it was asking for, then refused to go away.
 		 *
-		 * Ten seconds is enough to dismiss the palette, tap the field, let the
-		 * keyboard settle and leave it there. The Notice counts down so it is
-		 * obvious the capture has not happened yet.
+		 * The keyboard is the signal, so wait for the keyboard. `visualViewport`
+		 * shrinks when it opens; that fires, the layout is given a moment to
+		 * settle, and the snapshot is taken with no timer and nothing on screen.
 		 */
 		this.addCommand({
-			id: "copy-ui-snapshot-delayed",
-			name: "Copy UI snapshot after 10 seconds",
+			id: "snapshot-on-keyboard",
+			name: "Snapshot the next time the keyboard opens",
 			callback: () => {
-				const notice = new Notice("Snapshot in 10s — set the screen up now.", 0);
-				/*
-				 * The countdown must not be tappable.
-				 *
-				 * Obsidian draws notices over the top of the view, and this one
-				 * sits exactly where Reel's search field is — so the notice
-				 * telling you to set the screen up was itself blocking the tap
-				 * that sets the screen up. A diagnostic that prevents the thing
-				 * it is diagnosing is worse than no diagnostic.
-				 *
-				 * `pointer-events: none` lets every tap through while the
-				 * message stays readable. `noticeEl` rather than `messageEl`
-				 * because the latter arrived in 1.8.7 and this plugin supports
-				 * 1.7.2.
-				 */
-				(notice as unknown as { noticeEl?: HTMLElement }).noticeEl?.setCssProps({ "pointer-events": "none" });
-				let left = 10;
-				const tick = window.setInterval(() => {
-					left -= 1;
-					if (left > 0) {
-						// Short, because a long message is a bigger obstruction
-						// even when it cannot be tapped.
-						notice.setMessage(`Snapshot in ${left}s…`);
-						return;
-					}
-					window.clearInterval(tick);
-					notice.hide();
-					void uiSnapshot().then((text) =>
-						navigator.clipboard
-							.writeText(text)
-							.then(() => new Notice(`UI snapshot copied — ${text.length.toLocaleString()} characters.`))
-							.catch(() => void this.writeSnapshotFile(text))
-					);
-				}, 1000);
-				this.register(() => window.clearInterval(tick));
+				const vv = window.visualViewport;
+				if (!vv) {
+					new Notice("This device cannot report keyboard size; use the plain snapshot.", 6000);
+					return;
+				}
+				// Short and self-dismissing: it is confirmation, not an instruction
+				// that has to stay on screen while you work.
+				new Notice("Armed. Open the keyboard.", 2500);
+
+				let done = false;
+				const onResize = (): void => {
+					const covered = window.innerHeight - vv.height - vv.offsetTop;
+					// 120px is comfortably more than a URL bar and comfortably less
+					// than any software keyboard.
+					if (done || covered < 120) return;
+					done = true;
+					vv.removeEventListener("resize", onResize);
+					// Let the reflow the keyboard triggers finish before measuring,
+					// or the capture records the layout mid-transition.
+					window.setTimeout(() => {
+						void uiSnapshot().then((text) =>
+							navigator.clipboard
+								.writeText(text)
+								.then(() => new Notice(`Snapshot copied — ${text.length.toLocaleString()} characters.`, 4000))
+								.catch(() => void this.writeSnapshotFile(text))
+						);
+					}, 500);
+				};
+				vv.addEventListener("resize", onResize);
+				// Disarm after a minute rather than listening forever.
+				const giveUp = window.setTimeout(() => vv.removeEventListener("resize", onResize), 60000);
+				this.register(() => {
+					window.clearTimeout(giveUp);
+					vv.removeEventListener("resize", onResize);
+				});
 			},
 		});
 
