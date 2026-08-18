@@ -28,6 +28,7 @@ import { skeletonCards, skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
 import { setSelected } from "./a11y";
 import { diagnoseError } from "./failure";
+import { gestureIntent } from "../util/gesture";
 
 interface Filters {
 	genreId: number | null;
@@ -404,29 +405,23 @@ export class DiscoverScreen {
 				const dx = t.clientX - startX;
 				const dy = t.clientY - startY;
 
-				/*
-				 * Down, and clearly not a horizontal swipe that drifted.
-				 *
-				 * Two extra conditions, both learned the hard way: the content
-				 * has to have been at the top when the finger went down, and
-				 * there has to be something to take back.
-				 *
-				 * Without the first, a drag down is indistinguishable from an
-				 * ordinary scroll up — which is what this gesture was actually
-				 * doing, on every single scroll. Without the second, the reward
-				 * for scrolling was a notice saying there was nothing to undo:
-				 * the app interrupting you to report that it had misread you.
-				 *
-				 * 140px rather than 80: a deliberate pull, not a flick.
-				 */
-				if (atTop && this.lastAction && dy > 140 && Math.abs(dy) > Math.abs(dx) * 1.5) {
-					onUndo();
-					return;
+				// The decision lives in `gestureIntent`, which is pure and
+				// tested. It got this wrong once in a way that only showed up on
+				// a device — every upward scroll fired undo — and a rule that
+				// subtle should not be re-derived inline each time it is touched.
+				switch (gestureIntent({ dx, dy, atTop, canUndo: this.lastAction != null })) {
+					case "undo":
+						onUndo();
+						return;
+					case "next":
+						step(1);
+						return;
+					case "previous":
+						step(-1);
+						return;
+					default:
+						return;
 				}
-
-				// Comfortably horizontal, and far enough to be deliberate.
-				if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-				step(dx < 0 ? 1 : -1);
 			},
 			{ passive: true }
 		);
@@ -606,19 +601,35 @@ export class DiscoverScreen {
 	/* For you                                                             */
 	/* ------------------------------------------------------------------ */
 
-	private paintForYou(container: HTMLElement): void {
-		if (!this.rows) {
-			// Three sections' worth, because that is roughly what comes back —
-			// the page ends up close to the height it will be, so nothing jumps
-			// when the results land.
-			container.createDiv({ cls: "reel-loading", text: "Finding things for you…" });
-			for (let i = 0; i < 3; i++) skeletonCards(container, 6, "Finding things for you");
-			if (this.loading) return;
-			this.loading = true;
-			void this.loadRows(container);
-			return;
+	/**
+	 * Does a title already in hand satisfy the current filters?
+	 *
+	 * Used to narrow the shelves without a round trip. The server answers the
+	 * same question better — it can see every title, not the sixty already
+	 * loaded — but it cannot answer it *instantly*, and instant is what stops
+	 * the screen changing shape under you.
+	 */
+	private matchesFilters(item: TmdbSearchResult): boolean {
+		const f = this.filters;
+		if (f.minRating != null && (item.vote_average ?? 0) < f.minRating) return false;
+		if (f.genreId != null && !(item.genre_ids ?? []).includes(f.genreId)) return false;
+		if (f.decade != null) {
+			const year = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
+			if (!Number.isFinite(year) || year < f.decade || year >= f.decade + 10) return false;
 		}
+		return true;
+	}
 
+	/**
+	 * The bit of the screen that must not move when a filter changes.
+	 *
+	 * Shared by the personalised view and the filtered one. Picking a minimum
+	 * rating used to replace shelves with a flat grid — same data, entirely
+	 * different screen — so the app appeared to navigate somewhere when the
+	 * user had only narrowed what they were already looking at. A filter should
+	 * change what is in the list, never what kind of list it is.
+	 */
+	private paintHead(container: HTMLElement): void {
 		const head = container.createDiv({ cls: "reel-discover-head" });
 		if (this.profile?.sparse) {
 			head.createDiv({
@@ -641,6 +652,38 @@ export class DiscoverScreen {
 				this.render(container);
 			});
 		});
+	}
+
+	/**
+	 * The shelves you were already looking at, narrowed.
+	 *
+	 * Drawn before the fetched results and from titles already in memory, so
+	 * the moment a chip is tapped the screen answers with the same shelves
+	 * holding fewer things. The fetch then adds what it finds underneath.
+	 */
+	private paintNarrowedRows(container: HTMLElement): boolean {
+		if (!this.rows) return false;
+		const narrowed = this.rows
+			.map((r) => ({ ...r, items: r.items.filter((i) => !this.handled.has(i.id) && this.matchesFilters(i)) }))
+			.filter((r) => r.items.length);
+		for (const row of narrowed) this.paintRow(container, row);
+		return narrowed.length > 0;
+	}
+
+	private paintForYou(container: HTMLElement): void {
+		if (!this.rows) {
+			// Three sections' worth, because that is roughly what comes back —
+			// the page ends up close to the height it will be, so nothing jumps
+			// when the results land.
+			container.createDiv({ cls: "reel-loading", text: "Finding things for you…" });
+			for (let i = 0; i < 3; i++) skeletonCards(container, 6, "Finding things for you");
+			if (this.loading) return;
+			this.loading = true;
+			void this.loadRows(container);
+			return;
+		}
+
+		this.paintHead(container);
 
 		const visible = this.rows.filter((r) => r.items.some((i) => !this.handled.has(i.id)));
 		if (!visible.length) {
@@ -705,9 +748,26 @@ export class DiscoverScreen {
 	/* ------------------------------------------------------------------ */
 
 	private paintResults(container: HTMLElement): void {
+		/*
+		 * The same screen, narrowed — not a different screen.
+		 *
+		 * Tapping a minimum rating used to replace the personalised shelves with
+		 * a flat grid: same subject, entirely different layout, so the app
+		 * appeared to navigate somewhere when the user had only narrowed what
+		 * they were already looking at.
+		 *
+		 * The head and the shelves are drawn first, from titles already in
+		 * memory, so the answer is instant and the page keeps its shape. The
+		 * fetch then adds whatever it finds underneath — which is the part only
+		 * the server can do, since it can see every title rather than the sixty
+		 * already loaded.
+		 */
+		this.paintHead(container);
+		const hadRows = this.paintNarrowedRows(container);
+
 		if (!this.results) {
-			container.createDiv({ cls: "reel-loading", text: "Searching…" });
-			skeletonGrid(container, 12, "Searching");
+			container.createDiv({ cls: "reel-loading", text: hadRows ? "Looking for more…" : "Searching…" });
+			skeletonGrid(container, hadRows ? 6 : 12, "Searching");
 			if (this.loading) return;
 			this.loading = true;
 			const query = this.seed
@@ -757,6 +817,8 @@ export class DiscoverScreen {
 			.filter(Boolean)
 			.join(" ");
 
+		// Titled, because it is no longer the only thing on the screen.
+		if (hadRows) container.createDiv({ cls: "reel-drow-title", text: "More matches" });
 		container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
 
 
@@ -764,7 +826,11 @@ export class DiscoverScreen {
 			// Narrow filters are easy to stack and hard to remember; undoing
 			// them by hand means finding which chip is still lit.
 			const none = container.createDiv({ cls: "reel-empty" });
-			none.createDiv({ text: "Nothing matches those filters." });
+			none.createDiv({
+				text: hadRows
+					? "Nothing more beyond what's above."
+					: "Nothing matches those filters.",
+			});
 			const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
 			reset.addEventListener("click", () => {
 				this.filters = { ...EMPTY, type: this.filters.type };

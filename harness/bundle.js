@@ -2273,6 +2273,20 @@
     return d;
   }
 
+  // src/util/gesture.ts
+  var HORIZONTAL_MIN = 60;
+  var VERTICAL_MIN = 140;
+  var STRAIGHTNESS = 1.5;
+  function gestureIntent(drag) {
+    const { dx, dy, atTop, canUndo } = drag;
+    if (atTop && canUndo && dy > VERTICAL_MIN && Math.abs(dy) > Math.abs(dx) * STRAIGHTNESS) {
+      return "undo";
+    }
+    if (Math.abs(dx) < HORIZONTAL_MIN || Math.abs(dx) < Math.abs(dy) * STRAIGHTNESS)
+      return "none";
+    return dx < 0 ? "next" : "previous";
+  }
+
   // src/ui/discoverView.ts
   var EMPTY = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
   var DiscoverScreen = class {
@@ -2574,13 +2588,19 @@
             return;
           const dx = t.clientX - startX;
           const dy = t.clientY - startY;
-          if (atTop && this.lastAction && dy > 140 && Math.abs(dy) > Math.abs(dx) * 1.5) {
-            onUndo();
-            return;
+          switch (gestureIntent({ dx, dy, atTop, canUndo: this.lastAction != null })) {
+            case "undo":
+              onUndo();
+              return;
+            case "next":
+              step(1);
+              return;
+            case "previous":
+              step(-1);
+              return;
+            default:
+              return;
           }
-          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5)
-            return;
-          step(dx < 0 ? 1 : -1);
         },
         { passive: true }
       );
@@ -2720,17 +2740,37 @@
     /* ------------------------------------------------------------------ */
     /* For you                                                             */
     /* ------------------------------------------------------------------ */
-    paintForYou(container) {
-      if (!this.rows) {
-        container.createDiv({ cls: "reel-loading", text: "Finding things for you\u2026" });
-        for (let i = 0; i < 3; i++)
-          skeletonCards(container, 6, "Finding things for you");
-        if (this.loading)
-          return;
-        this.loading = true;
-        void this.loadRows(container);
-        return;
+    /**
+     * Does a title already in hand satisfy the current filters?
+     *
+     * Used to narrow the shelves without a round trip. The server answers the
+     * same question better — it can see every title, not the sixty already
+     * loaded — but it cannot answer it *instantly*, and instant is what stops
+     * the screen changing shape under you.
+     */
+    matchesFilters(item) {
+      const f = this.filters;
+      if (f.minRating != null && (item.vote_average ?? 0) < f.minRating)
+        return false;
+      if (f.genreId != null && !(item.genre_ids ?? []).includes(f.genreId))
+        return false;
+      if (f.decade != null) {
+        const year = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
+        if (!Number.isFinite(year) || year < f.decade || year >= f.decade + 10)
+          return false;
       }
+      return true;
+    }
+    /**
+     * The bit of the screen that must not move when a filter changes.
+     *
+     * Shared by the personalised view and the filtered one. Picking a minimum
+     * rating used to replace shelves with a flat grid — same data, entirely
+     * different screen — so the app appeared to navigate somewhere when the
+     * user had only narrowed what they were already looking at. A filter should
+     * change what is in the list, never what kind of list it is.
+     */
+    paintHead(container) {
       const head = container.createDiv({ cls: "reel-discover-head" });
       if (this.profile?.sparse) {
         head.createDiv({
@@ -2751,6 +2791,34 @@
           this.render(container);
         });
       });
+    }
+    /**
+     * The shelves you were already looking at, narrowed.
+     *
+     * Drawn before the fetched results and from titles already in memory, so
+     * the moment a chip is tapped the screen answers with the same shelves
+     * holding fewer things. The fetch then adds what it finds underneath.
+     */
+    paintNarrowedRows(container) {
+      if (!this.rows)
+        return false;
+      const narrowed = this.rows.map((r) => ({ ...r, items: r.items.filter((i) => !this.handled.has(i.id) && this.matchesFilters(i)) })).filter((r) => r.items.length);
+      for (const row of narrowed)
+        this.paintRow(container, row);
+      return narrowed.length > 0;
+    }
+    paintForYou(container) {
+      if (!this.rows) {
+        container.createDiv({ cls: "reel-loading", text: "Finding things for you\u2026" });
+        for (let i = 0; i < 3; i++)
+          skeletonCards(container, 6, "Finding things for you");
+        if (this.loading)
+          return;
+        this.loading = true;
+        void this.loadRows(container);
+        return;
+      }
+      this.paintHead(container);
       const visible = this.rows.filter((r) => r.items.some((i) => !this.handled.has(i.id)));
       if (!visible.length) {
         const empty = container.createDiv({ cls: "reel-empty" });
@@ -2806,9 +2874,11 @@
     /* Filtered results                                                    */
     /* ------------------------------------------------------------------ */
     paintResults(container) {
+      this.paintHead(container);
+      const hadRows = this.paintNarrowedRows(container);
       if (!this.results) {
-        container.createDiv({ cls: "reel-loading", text: "Searching\u2026" });
-        skeletonGrid(container, 12, "Searching");
+        container.createDiv({ cls: "reel-loading", text: hadRows ? "Looking for more\u2026" : "Searching\u2026" });
+        skeletonGrid(container, hadRows ? 6 : 12, "Searching");
         if (this.loading)
           return;
         this.loading = true;
@@ -2851,10 +2921,14 @@
         // "like X" part was honoured at all.
         this.seed ? `like ${this.seed.title}` : ""
       ].filter(Boolean).join(" ");
+      if (hadRows)
+        container.createDiv({ cls: "reel-drow-title", text: "More matches" });
       container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
       if (!items.length) {
         const none = container.createDiv({ cls: "reel-empty" });
-        none.createDiv({ text: "Nothing matches those filters." });
+        none.createDiv({
+          text: hadRows ? "Nothing more beyond what's above." : "Nothing matches those filters."
+        });
         const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
         reset.addEventListener("click", () => {
           this.filters = { ...EMPTY, type: this.filters.type };
