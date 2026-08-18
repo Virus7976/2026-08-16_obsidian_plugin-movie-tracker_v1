@@ -402,11 +402,28 @@ export default class ReelPlugin extends Plugin {
 			name: "Copy UI snapshot after 10 seconds",
 			callback: () => {
 				const notice = new Notice("Snapshot in 10s — set the screen up now.", 0);
+				/*
+				 * The countdown must not be tappable.
+				 *
+				 * Obsidian draws notices over the top of the view, and this one
+				 * sits exactly where Reel's search field is — so the notice
+				 * telling you to set the screen up was itself blocking the tap
+				 * that sets the screen up. A diagnostic that prevents the thing
+				 * it is diagnosing is worse than no diagnostic.
+				 *
+				 * `pointer-events: none` lets every tap through while the
+				 * message stays readable. `noticeEl` rather than `messageEl`
+				 * because the latter arrived in 1.8.7 and this plugin supports
+				 * 1.7.2.
+				 */
+				(notice as unknown as { noticeEl?: HTMLElement }).noticeEl?.setCssProps({ "pointer-events": "none" });
 				let left = 10;
 				const tick = window.setInterval(() => {
 					left -= 1;
 					if (left > 0) {
-						notice.setMessage(`Snapshot in ${left}s — set the screen up now.`);
+						// Short, because a long message is a bigger obstruction
+						// even when it cannot be tapped.
+						notice.setMessage(`Snapshot in ${left}s…`);
 						return;
 					}
 					window.clearInterval(tick);
