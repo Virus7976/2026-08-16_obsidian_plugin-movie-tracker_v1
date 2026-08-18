@@ -472,11 +472,21 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	 * exists nowhere but here. A harness that models the wrong DOM reports
 	 * bugs the user does not have and misses the ones they do.
 	 */
-	const body = view.createDiv({ cls: "reel-view-body" });
+	/*
+	 * `library` builds the whole view — header, tabs, filters *and* body — just
+	 * as `ReelView.build()` does, so it needs the view root. Every other screen
+	 * is body content and gets a body.
+	 *
+	 * Handing the body to `library` produced a `.reel-view-body` nested inside
+	 * another one, a tree the app never builds. The inner body is not a flex
+	 * child of `.reel-view`, so it cannot take the sizing that governs the real
+	 * one — and a check written about the real body was reporting on a fake.
+	 */
+	const target = name === "library" ? view : view.createDiv({ cls: "reel-view-body" });
 	try {
-		(SCREENS[name] ?? library)(body);
+		(SCREENS[name] ?? library)(target);
 	} catch (e) {
-		body.createEl("pre", { text: `render failed: ${String(e)}\n${(e as Error)?.stack ?? ""}` });
+		target.createEl("pre", { text: `render failed: ${String(e)}\n${(e as Error)?.stack ?? ""}` });
 	}
 	stampWidth(view, measure(view) || window.innerWidth);
 	// The same call the app makes, against the same chrome. Without it the

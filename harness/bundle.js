@@ -5500,6 +5500,8 @@
       }
       return true;
     }).map((el) => `${el.className.split(" ")[0] || el.tagName} +${Math.round(el.getBoundingClientRect().right - paneRight)}px`);
+    const clipped = [...view.querySelectorAll(".reel-view-body")].filter((b) => b.getBoundingClientRect().bottom > view.getBoundingClientRect().bottom + 2).map((b) => `${Math.round(b.getBoundingClientRect().height)} in a ${Math.round(view.getBoundingClientRect().height)} view`);
+    check("bodyScrollsNotClips", clipped.length === 0, clipped.join(", "));
     const bodies = [...view.querySelectorAll(".reel-view-body")];
     const sliding = bodies.filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => `${b.scrollWidth} vs ${b.clientWidth}`);
     check("bodyNoSideScroll", sliding.length === 0, sliding.join(", "));
@@ -6024,11 +6026,11 @@
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
     stampWidth(view, measure(view) || window.innerWidth);
-    const body = view.createDiv({ cls: "reel-view-body" });
+    const target = name === "library" ? view : view.createDiv({ cls: "reel-view-body" });
     try {
-      (SCREENS[name] ?? library)(body);
+      (SCREENS[name] ?? library)(target);
     } catch (e) {
-      body.createEl("pre", { text: `render failed: ${String(e)}
+      target.createEl("pre", { text: `render failed: ${String(e)}
 ${e?.stack ?? ""}` });
     }
     stampWidth(view, measure(view) || window.innerWidth);

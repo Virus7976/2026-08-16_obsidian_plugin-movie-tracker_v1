@@ -1517,6 +1517,22 @@ input.reel-input {
 
 .reel-view-body {
 	flex: 1;
+	/* `min-height: 0`, without which none of the rest of this rule works.
+	 *
+	 * A flex item defaults to `min-height: auto` — "never shrink below my
+	 * content" — so `flex: 1` proposes sharing the space and `auto` refuses, and
+	 * the content wins. The body grew to its full height (measured at 5187px
+	 * inside an 812px view), `.reel-view` clipped it at `overflow: hidden`, and
+	 * `overflow-y: auto` never engaged because nothing had ever constrained the
+	 * element. Everything past the fold was not scrolled-away; it was gone.
+	 *
+	 * Invisible on a tall screen and total on a short one, which is why it only
+	 * became obvious with a keyboard open — and why several screenshots of "a
+	 * blank page" on different tabs were all this one line.
+	 *
+	 * The horizontal twin was fixed weeks ago with `min-width: 0` across a dozen
+	 * containers. Nobody thought to check the other axis. */
+	min-height: 0;
 	overflow-y: auto;
 	-webkit-overflow-scrolling: touch;
 	padding: 8px 12px calc(24px + env(safe-area-inset-bottom));
@@ -7574,6 +7590,8 @@ input.reel-input {
 .reel-modal {
 	box-shadow: var(--reel-shadow-overlay);
 }
+
+
 
 
 

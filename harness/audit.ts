@@ -204,6 +204,27 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 	 *
 	 * Strips scroll horizontally on purpose. The body never should.
 	 */
+	/*
+	 * The body must scroll, not overflow its frame.
+	 *
+	 * A flex item defaults to `min-height: auto` — "never shrink below my
+	 * content" — so `flex: 1` and `overflow-y: auto` together still let the body
+	 * grow to full content height. `.reel-view` clips at `overflow: hidden`, and
+	 * everything past the fold becomes unreachable rather than scrollable: the
+	 * scroller never engages, because nothing ever constrained it.
+	 *
+	 * Invisible on a tall screen and total on a short one, which is why it
+	 * surfaced only with a keyboard open — and why four screenshots of "a blank
+	 * page" were the same bug on different tabs.
+	 *
+	 * The horizontal twin of this was fixed weeks ago with `min-width: 0` on a
+	 * dozen containers. The vertical axis was never checked.
+	 */
+	const clipped = [...view.querySelectorAll<HTMLElement>(".reel-view-body")]
+		.filter((b) => b.getBoundingClientRect().bottom > view.getBoundingClientRect().bottom + 2)
+		.map((b) => `${Math.round(b.getBoundingClientRect().height)} in a ${Math.round(view.getBoundingClientRect().height)} view`);
+	check("bodyScrollsNotClips", clipped.length === 0, clipped.join(", "));
+
 	const bodies = [...view.querySelectorAll<HTMLElement>(".reel-view-body")];
 	const sliding = bodies
 		.filter((b) => b.scrollWidth > b.clientWidth + 1)
