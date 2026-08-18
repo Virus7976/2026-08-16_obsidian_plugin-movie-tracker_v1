@@ -171,6 +171,28 @@ export class ReelView extends ItemView {
 		// nobody can navigate.
 		this.app.workspace.onLayoutReady(() => this.measureWidth());
 		this.registerDomEvent(window, "resize", () => this.measureWidth());
+		/*
+		 * The keyboard changes the available height without resizing us.
+		 *
+		 * A software keyboard does not shrink the layout viewport, so neither
+		 * the `ResizeObserver` on `contentEl` nor `window.resize` necessarily
+		 * fires when it opens. The body therefore kept the height computed for
+		 * the taller screen, and the difference showed as dead space below the
+		 * results — better than the 32px collapse, still wrong.
+		 *
+		 * `visualViewport` is the only thing that reports the change, so it is
+		 * the thing to listen to.
+		 */
+		const vv = window.visualViewport;
+		if (vv) {
+			const remeasure = (): void => this.measureWidth();
+			vv.addEventListener("resize", remeasure);
+			vv.addEventListener("scroll", remeasure);
+			this.register(() => {
+				vv.removeEventListener("resize", remeasure);
+				vv.removeEventListener("scroll", remeasure);
+			});
+		}
 		// registerDomEvent, not addEventListener: Obsidian unbinds it when the
 		// view closes, so reopening the tab can't stack duplicate handlers.
 		this.registerDomEvent(this.contentEl, "keydown", this.onKey);

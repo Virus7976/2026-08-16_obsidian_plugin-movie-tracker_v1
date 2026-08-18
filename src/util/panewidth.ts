@@ -231,8 +231,25 @@ export function keyboardInset(): () => void {
  */
 export function sizeBody(view: HTMLElement, body: HTMLElement): void {
 	const cs = getComputedStyle(view);
-	const inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+	let inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
 	if (!(inner > 0)) return;
+
+	/*
+	 * Never taller than what the keyboard leaves.
+	 *
+	 * The view's own height does not shrink when a keyboard opens — the layout
+	 * viewport is unchanged and the keyboard is simply drawn over it. So the
+	 * arithmetic below would hand the body a height that runs underneath the
+	 * keyboard, and the part you cannot see reads as dead space.
+	 *
+	 * `visualViewport` knows what is actually visible; clamp to it.
+	 */
+	const vv = window.visualViewport;
+	if (vv) {
+		const visibleBottom = vv.offsetTop + vv.height;
+		const room = visibleBottom - view.getBoundingClientRect().top - (parseFloat(cs.paddingTop) || 0);
+		if (room > 0) inner = Math.min(inner, room);
+	}
 
 	let used = 0;
 	for (const child of Array.from(view.children)) {

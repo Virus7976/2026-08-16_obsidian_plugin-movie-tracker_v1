@@ -5739,9 +5739,16 @@
   }
   function sizeBody(view, body) {
     const cs = getComputedStyle(view);
-    const inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    let inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
     if (!(inner > 0))
       return;
+    const vv = window.visualViewport;
+    if (vv) {
+      const visibleBottom = vv.offsetTop + vv.height;
+      const room = visibleBottom - view.getBoundingClientRect().top - (parseFloat(cs.paddingTop) || 0);
+      if (room > 0)
+        inner = Math.min(inner, room);
+    }
     let used = 0;
     for (const child of Array.from(view.children)) {
       if (child === body || !(child instanceof HTMLElement))
