@@ -4444,13 +4444,21 @@ input.reel-input {
 
 /* Every bar answers "which ones were those?" — so every bar is a control.
  *
- * The 6px bleed either side widens the hit area past the text. It is implicated
- * in the 5px sideways scroll on the stats page, but removing it made the
- * overflow *worse* — 356px to 363px — so the row's width is not simply
- * container-plus-twelve and the bleed is not the cause.
+ * The 6px bleed either side widens the hit area past the text, and it *was*
+ * behind the 5px sideways scroll — but not the way two earlier guesses assumed.
+ * Measuring the chain finally showed it:
  *
- * Left exactly as it was until the real chain is measured. Two speculative
- * fixes in a row is where guessing stops being cheaper than looking. */
+ *     .reel-chart-grid  w=327   the grid
+ *     .reel-chart       w=339   the item, twelve wider than its own track
+ *     .reel-chart-row   w=349   margin: 0 -6px
+ *
+ * The row is parent-plus-twelve, that becomes the chart's min-content, and a
+ * grid item with `min-width: auto` cannot shrink below it. Removing the bleed
+ * made things worse because it changed the row's width without giving the
+ * chart room, so the item still could not fit.
+ *
+ * The fix is to give the bleed somewhere to bleed *into*: 6px of padding on the
+ * body it sits in, so the row's outer edge lands exactly on the container's. */
 .reel-stats .reel-chart-row.is-clickable {
 	cursor: pointer;
 	border-radius: var(--reel-radius);
@@ -7073,6 +7081,94 @@ input.reel-input {
 	.reel-fold-summary::after {
 		transition: none;
 	}
+}
+
+
+
+
+/* The bleed needs room, and the grid item needs permission to shrink. Together
+   these are the 5px sideways scroll on the stats page — measured, not guessed:
+   the row is parent-plus-twelve, that becomes the chart's min-content, and a
+   grid item with `min-width: auto` cannot go below its min-content. */
+.reel-chart-body {
+	padding-left: 6px;
+	padding-right: 6px;
+}
+
+.reel-chart {
+	min-width: 0;
+}
+
+
+
+
+/* ------------------------------------------------------------------ */
+/* The pinned back bar, treated the way a phone treats one             */
+/* ------------------------------------------------------------------ */
+
+/* An opaque slab sliding over artwork reads as a bug; the same bar with the
+   content faintly visible through it reads as a layer. That is the whole of
+   the difference between "the white bar comes up too high" and a header doing
+   its job — it is not the position that was wrong, it is that an opaque
+   rectangle mid-poster has no explanation.
+ *
+ * `backdrop-filter` is what iOS, Android and Obsidian's own mobile chrome all
+ * use here. The solid colour stays as a fallback: without it, a browser that
+ * ignores the filter would render text over a photograph. */
+.reel-view:not(.is-w620) .reel-detail-bar {
+	background: var(--background-primary);
+	background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+	-webkit-backdrop-filter: saturate(180%) blur(14px);
+	backdrop-filter: saturate(180%) blur(14px);
+	border-bottom: 1px solid var(--background-modifier-border);
+	/* Clear of the measured chrome, so it pins where the content starts rather
+	   than where the viewport does. */
+	top: 0;
+	z-index: 6;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+	.reel-view:not(.is-w620) .reel-detail-bar {
+		background: var(--background-primary);
+	}
+}
+
+/* The hero's own breathing room. A poster, a title and four numbers stacked
+   with no rhythm is what "could use some work aligning" meant — the parts were
+   all left-aligned by then, and still evenly spaced enough to read as a list
+   rather than as a header. */
+.reel-view:not(.is-w620) .reel-hero-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2);
+}
+
+.reel-view:not(.is-w620) .reel-hero-title {
+	line-height: 1.2;
+}
+
+.reel-view:not(.is-w620) .reel-hero-sub {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--reel-space-1) var(--reel-space-3);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+/* Scores sit on one scrolling line rather than wrapping into a ragged block. */
+.reel-view:not(.is-w620) .reel-scores {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	scrollbar-width: none;
+	padding-bottom: 2px;
+}
+
+.reel-view:not(.is-w620) .reel-scores::-webkit-scrollbar {
+	display: none;
+}
+
+.reel-view:not(.is-w620) .reel-score {
+	flex: 0 0 auto;
 }
 
 
