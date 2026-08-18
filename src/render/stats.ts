@@ -684,7 +684,31 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 			row.setAttr("role", "button");
 			row.setAttr("tabindex", "0");
 			row.setAttr("aria-label", d.go ? `Show ${d.label} only` : `Show titles matching ${d.label}`);
-			const open = d.go ?? (() => void plugin.openViewWithSearch(d.search ?? d.label, "stats"));
+			/*
+			 * Answer over the page, not by leaving it.
+			 *
+			 * A bar used to run a Library search, which is the right answer to
+			 * "which seven were the dramas?" delivered in the wrong place — you
+			 * lose the chart you asked from and have to navigate back. The sheet
+			 * shows the same titles with your ratings attached.
+			 *
+			 * Falls back to the search when the term matches nothing in the
+			 * index, since a sheet saying "no titles" is less use than a search
+			 * that can look wider than the visible set.
+			 */
+			const term = (d.search ?? d.label).toLowerCase();
+			const matches = plugin
+				.visible(plugin.library.all())
+				.filter((e) =>
+					[e.title, ...(e.genres ?? []), ...(e.director ?? []), ...(e.cast ?? []), ...(e.creators ?? [])]
+						.filter(Boolean)
+						.some((v) => String(v).toLowerCase().includes(term))
+				);
+			const open =
+				d.go ??
+				(matches.length
+					? () => new TitlesSheet(plugin, d.label, matches, `${title} — ${d.n}`).open()
+					: () => void plugin.openViewWithSearch(d.search ?? d.label, "stats"));
 			row.addEventListener("click", open);
 			row.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {

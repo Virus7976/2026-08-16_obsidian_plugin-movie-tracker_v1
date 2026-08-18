@@ -1466,7 +1466,11 @@
         row.setAttr("role", "button");
         row.setAttr("tabindex", "0");
         row.setAttr("aria-label", d.go ? `Show ${d.label} only` : `Show titles matching ${d.label}`);
-        const open = d.go ?? (() => void plugin2.openViewWithSearch(d.search ?? d.label, "stats"));
+        const term = (d.search ?? d.label).toLowerCase();
+        const matches = plugin2.visible(plugin2.library.all()).filter(
+          (e) => [e.title, ...e.genres ?? [], ...e.director ?? [], ...e.cast ?? [], ...e.creators ?? []].filter(Boolean).some((v) => String(v).toLowerCase().includes(term))
+        );
+        const open = d.go ?? (matches.length ? () => new TitlesSheet(plugin2, d.label, matches, `${title} \u2014 ${d.n}`).open() : () => void plugin2.openViewWithSearch(d.search ?? d.label, "stats"));
         row.addEventListener("click", open);
         row.addEventListener("keydown", (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
