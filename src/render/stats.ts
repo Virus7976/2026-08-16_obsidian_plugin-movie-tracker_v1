@@ -616,12 +616,32 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 	 * announced correctly by a screen reader and searchable by the browser's own
 	 * find, none of which a div with a click handler gets for free.
 	 */
-	const box = el.createDiv({ cls: "reel-chart" });
-	const fold = box.createEl("details", { cls: "reel-fold" });
-	const summary = fold.createEl("summary", { cls: "reel-fold-summary" });
-	summary.createDiv({ cls: "reel-chart-title", text: title });
-	summary.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
-	const body = fold.createDiv({ cls: "reel-chart-body" });
+	/*
+	 * A button and a div, not `<details>`.
+	 *
+	 * `<details>` was the right instinct — free keyboard support, correct
+	 * announcement — and the wrong element here, because themes style it. On a
+	 * real device every closed section rendered as an empty bordered box: the
+	 * theme's own `details` rules drew a frame, and the collapsed body left it
+	 * hollow. A stack of empty form fields is what "the stats page needs a
+	 * complete rework" was looking at.
+	 *
+	 * Owning the markup means the appearance is ours. The accessibility comes
+	 * back explicitly through `aria-expanded` and a real button, which is what
+	 * `<details>` was giving for free.
+	 */
+	const box = el.createDiv({ cls: "reel-chart reel-fold" });
+	const toggle = box.createEl("button", { cls: "reel-fold-toggle", attr: { type: "button" } });
+	toggle.createDiv({ cls: "reel-chart-title", text: title });
+	toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
+	const body = box.createDiv({ cls: "reel-chart-body" });
+
+	const setOpen = (open: boolean): void => {
+		box.toggleClass("is-open", open);
+		toggle.setAttr("aria-expanded", String(open));
+	};
+	setOpen(false);
+	toggle.addEventListener("click", () => setOpen(!box.hasClass("is-open")));
 	for (const d of data) {
 		const row = body.createDiv({ cls: "reel-chart-row" });
 

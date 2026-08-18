@@ -1428,12 +1428,17 @@
       return;
     const max = Math.max(...data.map((d) => d.n), 1);
     const faces = data.some((d) => d.face) ? plugin2?.library.peopleIds() : void 0;
-    const box = el.createDiv({ cls: "reel-chart" });
-    const fold = box.createEl("details", { cls: "reel-fold" });
-    const summary = fold.createEl("summary", { cls: "reel-fold-summary" });
-    summary.createDiv({ cls: "reel-chart-title", text: title });
-    summary.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
-    const body = fold.createDiv({ cls: "reel-chart-body" });
+    const box = el.createDiv({ cls: "reel-chart reel-fold" });
+    const toggle = box.createEl("button", { cls: "reel-fold-toggle", attr: { type: "button" } });
+    toggle.createDiv({ cls: "reel-chart-title", text: title });
+    toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
+    const body = box.createDiv({ cls: "reel-chart-body" });
+    const setOpen = (open) => {
+      box.toggleClass("is-open", open);
+      toggle.setAttr("aria-expanded", String(open));
+    };
+    setOpen(false);
+    toggle.addEventListener("click", () => setOpen(!box.hasClass("is-open")));
     for (const d of data) {
       const row = body.createDiv({ cls: "reel-chart-row" });
       const head = row.createDiv({ cls: "reel-chart-head" });

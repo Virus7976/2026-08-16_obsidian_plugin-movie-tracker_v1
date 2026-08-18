@@ -7285,6 +7285,119 @@ input.reel-input {
 
 
 
+
+/* ------------------------------------------------------------------ */
+/* Stats sections: a list, not a stack of empty boxes                  */
+/* ------------------------------------------------------------------ */
+
+/* Each section is one row that names itself and opens. Closed, it is 52px of
+   text and a count — no frame, no hollow interior, nothing to mistake for an
+   input. Themes style `<details>`; nothing styles this. */
+.reel-fold {
+	border: none;
+	background: transparent;
+	padding: 0;
+	margin: 0;
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.reel-fold:last-child {
+	border-bottom: none;
+}
+
+.reel-fold-toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-3);
+	width: 100%;
+	min-height: 52px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	color: var(--text-normal);
+	cursor: pointer;
+	text-align: left;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-fold-toggle:active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-fold-count {
+	margin-left: auto;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+/* One chevron, ours, pointing the way it should in both states. */
+.reel-fold-toggle::after {
+	content: "";
+	flex: 0 0 auto;
+	width: 7px;
+	height: 7px;
+	margin-right: 2px;
+	border-right: 2px solid var(--text-faint);
+	border-bottom: 2px solid var(--text-faint);
+	transform: rotate(-45deg);
+	transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.reel-fold.is-open > .reel-fold-toggle::after {
+	transform: rotate(45deg);
+}
+
+/* Closed is closed: no height, no border, nothing to render as an empty box. */
+.reel-fold > .reel-chart-body {
+	display: none;
+}
+
+.reel-fold.is-open > .reel-chart-body {
+	display: block;
+	padding-bottom: var(--reel-space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-fold-toggle::after {
+		transition: none;
+	}
+}
+
+/* The grid was spacing eight cards; it is a list now, so the gap goes. */
+.reel-view:not(.is-w700) .reel-chart-grid {
+	display: block;
+}
+
+.reel-view:not(.is-w700) .reel-stats .reel-chart {
+	margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* The pinned bar stops being pinned                                   */
+/* ------------------------------------------------------------------ */
+
+/* Twice reported as blocking the screen, and both fixes treated the symptom —
+ * first the width, then the translucency. A bar pinned to the top of a 823px
+ * phone screen is simply spending height on navigation that the header dropdown
+ * already provides, and covering the artwork it sits over the whole time.
+ *
+ * It scrolls away now. "Back" is where you left it at the top of the page, and
+ * changing section never depended on this bar — that is what the dropdown in
+ * the header is for. */
+.reel-view:not(.is-w620) .reel-detail-bar {
+	position: static;
+	background: transparent;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	border-bottom: none;
+	padding-top: 0;
+	padding-bottom: var(--reel-space-2);
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */
@@ -7889,15 +8002,20 @@ input.reel-input {
 
 /* A section heading, in Obsidian's own idiom: small, muted, uppercase,
    separated by a rule rather than by a container. */
+/* No border on the title.
+ *
+ * It sat in a flex row, so it shrank to the text and underlined the *words*
+ * rather than dividing anything — a short rule floating mid-row under each
+ * heading, at a different width every time. That is the "random line". The
+ * divider belongs to the row, not to the label. */
 .reel-view:not(.is-w700) .reel-stats .reel-chart-title {
-	font-size: var(--font-ui-smaller);
+	font-size: var(--font-ui-small);
 	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	color: var(--text-muted);
-	padding-bottom: var(--reel-space-1);
-	margin-bottom: var(--reel-space-2);
-	border-bottom: 1px solid var(--background-modifier-border);
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--text-normal);
+	text-align: left;
+	min-width: 0;
 }
 
 /* The label gets a line of its own and the bar gets the width. A chart whose
