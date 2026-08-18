@@ -29,6 +29,7 @@ import { haptic } from "../util/haptics";
 import { setSelected } from "./a11y";
 import { diagnoseError } from "./failure";
 import { gestureIntent } from "../util/gesture";
+import { paintExtras, paintLinks as paintLinksShared, paintTrailer as paintTrailerShared, paintCast } from "./titleExtras";
 
 interface Filters {
 	genreId: number | null;
@@ -236,6 +237,20 @@ export class DiscoverScreen {
 		if (item.vote_average) facts.createSpan({ cls: "reel-dim", text: `TMDB ${item.vote_average.toFixed(1)}` });
 
 		if (item.overview) card.createDiv({ cls: "reel-quickcard-overview", text: item.overview });
+
+		/*
+		 * The trailer, the cast and the links — where the decision is made.
+		 *
+		 * Quick mode is the screen you say yes or no on, and it had the least to
+		 * go on: a poster, a line of text and three buttons. Everything needed to
+		 * actually judge a title lived behind a sheet you reach *after* deciding
+		 * to look closer, which is the wrong way round.
+		 *
+		 * Loaded per card and in the background, from a cached request a title
+		 * you add would have needed anyway. The buttons below are drawn first and
+		 * work immediately, so this never stands between you and an answer.
+		 */
+		void paintExtras(this.plugin, card.createDiv({ cls: "reel-quickcard-extras" }), item.id, isTv);
 
 		/* ---- actions ---- */
 		const step = (by: number) => {
@@ -1212,20 +1227,7 @@ export class PreviewSheet extends Modal {
 	 * IMDb for this title" is a different and much worse thing.
 	 */
 	private paintLinks(slot: HTMLElement, meta: TmdbFilm | TmdbShow, isTv: boolean): void {
-		const row = slot.createDiv({ cls: "reel-preview-links" });
-		const link = (text: string, href: string) => {
-			const a = row.createEl("a", { cls: "reel-chip", text, href });
-			a.setAttr("target", "_blank");
-			a.setAttr("rel", "noopener");
-		};
-
-		const raw = meta.external_ids?.imdb_id ?? (meta as TmdbFilm).imdb_id ?? undefined;
-		const imdb = imdbUrl(raw ?? undefined);
-		if (imdb) {
-			link("IMDb", imdb);
-			link("Parents guide", `${imdb}parentalguide`);
-		}
-		link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
+		paintLinksShared(slot, meta, isTv);
 	}
 
 	/**
@@ -1237,36 +1239,7 @@ export class PreviewSheet extends Modal {
 	 * is free, and one tap is a fair price for the thing you asked for.
 	 */
 	private paintTrailer(slot: HTMLElement, url: string): void {
-		const id = /[?&]v=([\w-]{6,})/.exec(url)?.[1] ?? /youtu\.be\/([\w-]{6,})/.exec(url)?.[1];
-		if (!id) {
-			const link = slot.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", text: "▶  Watch trailer", href: url });
-			link.setAttr("target", "_blank");
-			link.setAttr("rel", "noopener");
-			return;
-		}
-
-		const box = slot.createDiv({ cls: "reel-trailer" });
-		const play = box.createEl("button", { cls: "reel-trailer-play", attr: { type: "button" } });
-		// YouTube's own still, so the placeholder is the actual first frame
-		// rather than a grey rectangle.
-		play.createEl("img", { attr: { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "", loading: "lazy" } });
-		play.createDiv({ cls: "reel-trailer-icon", text: "▶" });
-		play.setAttr("aria-label", "Play the trailer");
-
-		play.addEventListener("click", () => {
-			const frame = box.createEl("iframe", {
-				cls: "reel-trailer-frame",
-				attr: {
-					// nocookie, and only once you have asked for it.
-					src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`,
-					allow: "accelerometer; autoplay; encrypted-media; picture-in-picture",
-					allowfullscreen: "true",
-					title: "Trailer",
-				},
-			});
-			play.remove();
-			frame.focus();
-		});
+		paintTrailerShared(slot, url);
 	}
 
 	private async add(watchlist: boolean, button: HTMLButtonElement): Promise<void> {

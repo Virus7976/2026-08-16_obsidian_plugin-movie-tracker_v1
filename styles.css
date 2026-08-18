@@ -7012,6 +7012,108 @@ input.reel-input {
 	border: none;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Cast, on the screen where the decision is made                      */
+/* ------------------------------------------------------------------ */
+
+/* `.reel-caststrip` was already listed as a scroller in the audit but had no
+   rules of its own — it was only ever used by the detail screen, which styled
+   its own children. Now three surfaces draw it, so it has a definition. */
+.reel-castcard {
+	flex: 0 0 72px;
+	width: 72px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	scroll-snap-align: start;
+}
+
+.reel-castface {
+	position: relative;
+	width: 72px;
+	height: 72px;
+	border-radius: var(--reel-radius-full);
+	overflow: hidden;
+	background: var(--background-secondary);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-castface img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* Your rating, on the face. The whole point of rating an actor is that it
+   shows up where the actor does, rather than only on the screen you set it. */
+.reel-castmark {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	padding: 1px 5px;
+	border-radius: var(--reel-radius-full) 0 var(--reel-radius-full) 0;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1.4;
+}
+
+.reel-castmark-heart {
+	color: var(--text-on-accent);
+}
+
+.reel-castname {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.2;
+	/* Two lines then stop: a cast strip of ragged heights reads as broken. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-castrole {
+	font-size: 11px;
+	color: var(--text-muted);
+	line-height: 1.2;
+	display: -webkit-box;
+	-webkit-line-clamp: 1;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* The extras arrive after the card has already drawn, so they get their own
+   stack rather than reflowing anything above them. */
+.reel-quickcard-extras {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-3);
+	min-width: 0;
+	max-width: 100%;
+}
+
+.reel-quickcard-extras:empty {
+	display: none;
+}
+
+
+/* The embedded trailer on the detail screen. Full width of the column, 16:9,
+   and above the link row — it is the thing being offered, not one of a set of
+   destinations. */
+.reel-detail-trailer {
+	min-width: 0;
+	max-width: 100%;
+	margin-bottom: var(--reel-space-3);
+}
+
+.reel-detail-trailer:empty {
+	display: none;
+}
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */

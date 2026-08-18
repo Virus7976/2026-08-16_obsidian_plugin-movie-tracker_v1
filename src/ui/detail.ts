@@ -35,6 +35,7 @@ import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
+import { paintTrailer } from "./titleExtras";
 import { unlink } from "../library";
 import { compactCount } from "../util/format";
 import { ContentFlag, FLAG_LABELS } from "../content";
@@ -230,18 +231,22 @@ export class DetailScreen {
 
 		if (e.overview) body.createDiv({ cls: "reel-hero-overview", text: e.overview });
 
-		const links = body.createDiv({ cls: "reel-links" });
+		/*
+		 * The trailer plays here, rather than in a browser.
+		 *
+		 * It had button weight already, which fixed it being missed — but it
+		 * still threw you out of Obsidian to watch thirty seconds of footage and
+		 * then made you find your way back. Embedding keeps the decision on the
+		 * screen where the rest of the decision is.
+		 *
+		 * Above the links, because it is the thing being offered rather than one
+		 * of a row of destinations. Still click-to-load: mounting an iframe on
+		 * arrival would cost a YouTube request and a set of cookies on every
+		 * title you open, most of which you close again.
+		 */
+		if (e.trailer) paintTrailer(body.createDiv({ cls: "reel-detail-trailer" }), e.trailer);
 
-		// The trailer was a small text link among two others and was missed
-		// entirely. It's the one link anyone actually wants, so it gets button
-		// weight and the others stay as links.
-		if (e.trailer) {
-			const play = links.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", href: e.trailer });
-			setIcon(play.createSpan(), "play");
-			play.createSpan({ text: "Watch trailer" });
-			play.setAttr("target", "_blank");
-			play.setAttr("rel", "noopener");
-		}
+		const links = body.createDiv({ cls: "reel-links" });
 
 		const link = (label: string, url: string, cls: string) => {
 			const a = links.createEl("a", { cls: `reel-link ${cls}`, text: label, href: url });

@@ -2287,6 +2287,90 @@
     return dx < 0 ? "next" : "previous";
   }
 
+  // src/ui/titleExtras.ts
+  function paintTrailer(slot, url) {
+    const id = /[?&]v=([\w-]{6,})/.exec(url)?.[1] ?? /youtu\.be\/([\w-]{6,})/.exec(url)?.[1];
+    if (!id) {
+      const link = slot.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", text: "\u25B6  Watch trailer", href: url });
+      link.setAttr("target", "_blank");
+      link.setAttr("rel", "noopener");
+      return;
+    }
+    const box = slot.createDiv({ cls: "reel-trailer" });
+    const play = box.createEl("button", { cls: "reel-trailer-play", attr: { type: "button" } });
+    play.createEl("img", { attr: { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "", loading: "lazy" } });
+    play.createDiv({ cls: "reel-trailer-icon", text: "\u25B6" });
+    play.setAttr("aria-label", "Play the trailer");
+    play.addEventListener("click", () => {
+      const frame = box.createEl("iframe", {
+        cls: "reel-trailer-frame",
+        attr: {
+          src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`,
+          title: "Trailer",
+          allow: "accelerometer; autoplay; encrypted-media; picture-in-picture",
+          allowfullscreen: "true",
+          frameborder: "0"
+        }
+      });
+      play.remove();
+      frame.focus();
+    });
+  }
+  function paintLinks(slot, meta, isTv) {
+    const row = slot.createDiv({ cls: "reel-preview-links" });
+    const link = (text, href) => {
+      const a = row.createEl("a", { cls: "reel-chip", text, href });
+      a.setAttr("target", "_blank");
+      a.setAttr("rel", "noopener");
+    };
+    const raw = meta.external_ids?.imdb_id ?? meta.imdb_id ?? void 0;
+    const imdb = imdbUrl(raw ?? void 0);
+    if (imdb) {
+      link("IMDb", imdb);
+      link("Parents guide", `${imdb}parentalguide`);
+    }
+    link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
+  }
+  function paintCast(plugin2, slot, meta, isTv) {
+    const credits = isTv ? meta.aggregate_credits : meta.credits;
+    const cast = (credits?.cast ?? []).slice(0, 12);
+    if (!cast.length)
+      return;
+    const strip = slot.createDiv({ cls: "reel-caststrip" });
+    for (const person of cast) {
+      const card = strip.createDiv({ cls: "reel-castcard" });
+      const face = card.createDiv({ cls: "reel-castface" });
+      const src = person.profile_path ? plugin2.tmdb.posterUrl(person.profile_path, "w185") : null;
+      if (src)
+        face.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
+      else
+        plugin2.people.attach(face, person.name);
+      const held = opinionOf(plugin2, person.id);
+      if (held) {
+        const mark = face.createDiv({ cls: "reel-castmark" });
+        if (held.rating != null)
+          mark.createSpan({ text: `\u2605 ${held.rating}` });
+        else if (held.liked)
+          mark.createSpan({ cls: "reel-castmark-heart", text: "\u2665" });
+      }
+      card.createDiv({ cls: "reel-castname", text: person.name });
+      const role = Array.isArray(person.roles) ? (person.roles ?? []).map((r) => r.character).join(", ") : person.character;
+      if (role)
+        card.createDiv({ cls: "reel-castrole", text: role });
+    }
+  }
+  async function paintExtras(plugin2, slot, id, isTv) {
+    try {
+      const meta = isTv ? await plugin2.tmdb.getShow(id) : await plugin2.tmdb.getFilm(id);
+      const url = trailerUrl(meta.videos?.results);
+      if (url)
+        paintTrailer(slot, url);
+      paintCast(plugin2, slot, meta, isTv);
+      paintLinks(slot, meta, isTv);
+    } catch {
+    }
+  }
+
   // src/ui/discoverView.ts
   var EMPTY = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
   var DiscoverScreen = class {
@@ -2457,6 +2541,7 @@
         facts.createSpan({ cls: "reel-dim", text: `TMDB ${item.vote_average.toFixed(1)}` });
       if (item.overview)
         card.createDiv({ cls: "reel-quickcard-overview", text: item.overview });
+      void paintExtras(this.plugin, card.createDiv({ cls: "reel-quickcard-extras" }), item.id, isTv);
       const step = (by) => {
         this.quickAt = Math.max(0, this.quickAt + by);
         this.render(container);
@@ -3235,19 +3320,7 @@
      * IMDb for this title" is a different and much worse thing.
      */
     paintLinks(slot, meta, isTv) {
-      const row = slot.createDiv({ cls: "reel-preview-links" });
-      const link = (text, href) => {
-        const a = row.createEl("a", { cls: "reel-chip", text, href });
-        a.setAttr("target", "_blank");
-        a.setAttr("rel", "noopener");
-      };
-      const raw = meta.external_ids?.imdb_id ?? meta.imdb_id ?? void 0;
-      const imdb = imdbUrl(raw ?? void 0);
-      if (imdb) {
-        link("IMDb", imdb);
-        link("Parents guide", `${imdb}parentalguide`);
-      }
-      link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
+      paintLinks(slot, meta, isTv);
     }
     /**
      * The trailer, playable in place.
@@ -3258,32 +3331,7 @@
      * is free, and one tap is a fair price for the thing you asked for.
      */
     paintTrailer(slot, url) {
-      const id = /[?&]v=([\w-]{6,})/.exec(url)?.[1] ?? /youtu\.be\/([\w-]{6,})/.exec(url)?.[1];
-      if (!id) {
-        const link = slot.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", text: "\u25B6  Watch trailer", href: url });
-        link.setAttr("target", "_blank");
-        link.setAttr("rel", "noopener");
-        return;
-      }
-      const box = slot.createDiv({ cls: "reel-trailer" });
-      const play = box.createEl("button", { cls: "reel-trailer-play", attr: { type: "button" } });
-      play.createEl("img", { attr: { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "", loading: "lazy" } });
-      play.createDiv({ cls: "reel-trailer-icon", text: "\u25B6" });
-      play.setAttr("aria-label", "Play the trailer");
-      play.addEventListener("click", () => {
-        const frame = box.createEl("iframe", {
-          cls: "reel-trailer-frame",
-          attr: {
-            // nocookie, and only once you have asked for it.
-            src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`,
-            allow: "accelerometer; autoplay; encrypted-media; picture-in-picture",
-            allowfullscreen: "true",
-            title: "Trailer"
-          }
-        });
-        play.remove();
-        frame.focus();
-      });
+      paintTrailer(slot, url);
     }
     async add(watchlist, button) {
       if (this.busy)
@@ -3710,14 +3758,9 @@
       }
       if (e.overview)
         body.createDiv({ cls: "reel-hero-overview", text: e.overview });
+      if (e.trailer)
+        paintTrailer(body.createDiv({ cls: "reel-detail-trailer" }), e.trailer);
       const links = body.createDiv({ cls: "reel-links" });
-      if (e.trailer) {
-        const play = links.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", href: e.trailer });
-        setIcon(play.createSpan(), "play");
-        play.createSpan({ text: "Watch trailer" });
-        play.setAttr("target", "_blank");
-        play.setAttr("rel", "noopener");
-      }
       const link = (label, url, cls) => {
         const a = links.createEl("a", { cls: `reel-link ${cls}`, text: label, href: url });
         a.setAttr("target", "_blank");
