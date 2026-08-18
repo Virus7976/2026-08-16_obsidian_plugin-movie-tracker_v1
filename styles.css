@@ -41,21 +41,35 @@ body {
 	   it is that two sections separated by different-but-similar numbers
 	   never line up, and the eye reads that as sloppiness without being
 	   able to point at what is wrong. */
-	--reel-space-1: 4px;
-	--reel-space-2: 8px;
-	--reel-space-3: 12px;
-	--reel-space-4: 16px;
-	--reel-space-5: 24px;
-	--reel-space-6: 32px;
+	/* Aliased onto Obsidian's documented foundations, with the old values as
+	   fallbacks.
+	 *
+	 * Obsidian publishes a `--size-4-N` scale (N × 4px) and `--radius-s/m/l`
+	 * under Foundations, and a theme is free to change them. Reel was declaring
+	 * its own pixels, which meant a theme could restyle the whole app and Reel
+	 * would keep its own spacing — the thing that makes a plugin read as
+	 * imported rather than part of the app.
+	 *
+	 * The fallbacks matter: they are the values that were here, so nothing
+	 * moves on a theme that does not define the scale. */
+	--reel-space-1: var(--size-4-1, 4px);
+	--reel-space-2: var(--size-4-2, 8px);
+	--reel-space-3: var(--size-4-3, 12px);
+	--reel-space-4: var(--size-4-4, 16px);
+	--reel-space-5: var(--size-4-6, 24px);
+	--reel-space-6: var(--size-4-8, 32px);
 
 	/* The page margin. Was referenced by the hero and never defined, so it
 	   was falling back to 12px — right by luck rather than by rule. */
 	--reel-gutter: 12px;
 	--reel-gap: var(--reel-space-3);
 
-	--reel-radius-sm: 4px;
-	--reel-radius: 8px;
-	--reel-radius-lg: 16px;
+	/* Same reasoning. A theme that rounds everything hard, or not at all, now
+	   carries Reel with it. `--radius-full` has no Obsidian equivalent, so it
+	   stays a literal. */
+	--reel-radius-sm: var(--radius-s, 4px);
+	--reel-radius: var(--radius-m, 8px);
+	--reel-radius-lg: var(--radius-l, 16px);
 	--reel-radius-full: 999px;
 
 	/* Three levels, so a surface reads as *above* another rather than

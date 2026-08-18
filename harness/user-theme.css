@@ -87,3 +87,21 @@ button {
 	border-radius: 6px;
 	padding: 6px 12px;
 }
+
+/* A theme that redefines Obsidian's documented foundations.
+ *
+ * Reel aliases its spacing and radii onto `--size-4-N` and `--radius-*`, so a
+ * theme changing them should carry Reel with it. Changing them here is how that
+ * claim gets tested rather than asserted — if a layout only holds at 4px
+ * spacing, it breaks here. */
+body {
+	--size-4-1: 5px;
+	--size-4-2: 10px;
+	--size-4-3: 14px;
+	--size-4-4: 18px;
+	--size-4-6: 26px;
+	--size-4-8: 34px;
+	--radius-s: 2px;
+	--radius-m: 12px;
+	--radius-l: 20px;
+}
