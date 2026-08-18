@@ -356,7 +356,36 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		for (const v of watched) byMonth[parseInt(v.date.slice(5, 7), 10) - 1]++;
 		const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 		if (byMonth.some((n) => n > 0)) {
-			bars(charts, "By month", trimEmpty(byMonth.map((n, i) => ({ label: names[i], n }))));
+			/*
+			 * These used to be inert, and the comment above explained why:
+			 * "January" is not a property of a film, so a Library search for it
+			 * matches nothing. That was a good reason to do nothing when a
+			 * search was the only way to answer.
+			 *
+			 * It stopped being true when the sheet arrived. The viewing dates
+			 * are right here — the set of films watched in August is something
+			 * this function already knows and was throwing away.
+			 */
+			// `entries` is what turns a row into posters rather than a bar —
+			// the plumbing was already there and this chart was not using it.
+			const monthEntries = (i: number): Entry[] => [
+				...new Set(watched.filter((v) => parseInt(v.date.slice(5, 7), 10) - 1 === i).map((v) => v.entry)),
+			];
+			bars(
+				charts,
+				"By month",
+				trimEmpty(
+					byMonth.map((n, i) => {
+						const rows = n ? monthEntries(i) : [];
+						return {
+							label: names[i],
+							n,
+							entries: rows,
+							go: n ? () => new TitlesSheet(plugin, names[i], rows, `Watched in ${names[i]}`).open() : undefined,
+						};
+					})
+				)
+			);
 		}
 
 		const byWeekday = new Array(7).fill(0);
@@ -365,7 +394,23 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			if (!Number.isNaN(d.getTime())) byWeekday[d.getDay()]++;
 		}
 		const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-		if (byWeekday.some((n) => n > 0)) bars(charts, "By day of week", byWeekday.map((n, i) => ({ label: days[i], n })));
+		if (byWeekday.some((n) => n > 0)) {
+			bars(
+				charts,
+				"By day of week",
+				byWeekday.map((n, i) => {
+					const rows = n
+						? [...new Set(watched.filter((v) => new Date(v.date + "T00:00:00").getDay() === i).map((v) => v.entry))]
+						: [];
+					return {
+						label: days[i],
+						n,
+						entries: rows,
+						go: n ? () => new TitlesSheet(plugin, days[i], rows, `Watched on a ${days[i]}`).open() : undefined,
+					};
+				})
+			);
+		}
 	}
 
 	if (rated.length) {
@@ -631,7 +676,25 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 	 * `<details>` was giving for free.
 	 */
 	const box = el.createDiv({ cls: "reel-chart reel-fold" });
-	const toggle = box.createEl("button", { cls: "reel-fold-toggle", attr: { type: "button" } });
+	/*
+	 * A div with a button role, not a `<button>`.
+	 *
+	 * The theme styles bare buttons — background, radius, padding — so every
+	 * collapsed section came out as a filled rounded box, which is the second
+	 * time a theme's opinion about an element has decided how Reel looks. The
+	 * first was `<details>`. The rule that keeps emerging: where Reel owns the
+	 * surface, use an element nobody has opinions about, and put the semantics
+	 * back on by hand.
+	 */
+	const toggle = box.createDiv({ cls: "reel-fold-toggle" });
+	toggle.setAttr("role", "button");
+	toggle.setAttr("tabindex", "0");
+	toggle.addEventListener("keydown", (ev: KeyboardEvent) => {
+		if (ev.key === "Enter" || ev.key === " ") {
+			ev.preventDefault();
+			toggle.click();
+		}
+	});
 	toggle.createDiv({ cls: "reel-chart-title", text: title });
 	toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
 	const body = box.createDiv({ cls: "reel-chart-body" });

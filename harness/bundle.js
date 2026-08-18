@@ -1287,7 +1287,24 @@
         byMonth[parseInt(v.date.slice(5, 7), 10) - 1]++;
       const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       if (byMonth.some((n2) => n2 > 0)) {
-        bars(charts, "By month", trimEmpty(byMonth.map((n2, i) => ({ label: names[i], n: n2 }))));
+        const monthEntries = (i) => [
+          ...new Set(watched.filter((v) => parseInt(v.date.slice(5, 7), 10) - 1 === i).map((v) => v.entry))
+        ];
+        bars(
+          charts,
+          "By month",
+          trimEmpty(
+            byMonth.map((n2, i) => {
+              const rows2 = n2 ? monthEntries(i) : [];
+              return {
+                label: names[i],
+                n: n2,
+                entries: rows2,
+                go: n2 ? () => new TitlesSheet(plugin2, names[i], rows2, `Watched in ${names[i]}`).open() : void 0
+              };
+            })
+          )
+        );
       }
       const byWeekday = new Array(7).fill(0);
       for (const v of watched) {
@@ -1296,8 +1313,21 @@
           byWeekday[d.getDay()]++;
       }
       const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      if (byWeekday.some((n2) => n2 > 0))
-        bars(charts, "By day of week", byWeekday.map((n2, i) => ({ label: days[i], n: n2 })));
+      if (byWeekday.some((n2) => n2 > 0)) {
+        bars(
+          charts,
+          "By day of week",
+          byWeekday.map((n2, i) => {
+            const rows2 = n2 ? [...new Set(watched.filter((v) => (/* @__PURE__ */ new Date(v.date + "T00:00:00")).getDay() === i).map((v) => v.entry))] : [];
+            return {
+              label: days[i],
+              n: n2,
+              entries: rows2,
+              go: n2 ? () => new TitlesSheet(plugin2, days[i], rows2, `Watched on a ${days[i]}`).open() : void 0
+            };
+          })
+        );
+      }
     }
     if (rated.length) {
       const buckets = [];
@@ -1429,7 +1459,15 @@
     const max = Math.max(...data.map((d) => d.n), 1);
     const faces = data.some((d) => d.face) ? plugin2?.library.peopleIds() : void 0;
     const box = el.createDiv({ cls: "reel-chart reel-fold" });
-    const toggle = box.createEl("button", { cls: "reel-fold-toggle", attr: { type: "button" } });
+    const toggle = box.createDiv({ cls: "reel-fold-toggle" });
+    toggle.setAttr("role", "button");
+    toggle.setAttr("tabindex", "0");
+    toggle.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        toggle.click();
+      }
+    });
     toggle.createDiv({ cls: "reel-chart-title", text: title });
     toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
     const body = box.createDiv({ cls: "reel-chart-body" });
