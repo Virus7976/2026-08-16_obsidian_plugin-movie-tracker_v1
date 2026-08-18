@@ -1,5 +1,6 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, addIcon } from "obsidian";
 import { DEFAULT_SETTINGS, ReelSettingTab, ReelSettings } from "./settings";
+import { canPersist, mergeForSave } from "./util/settingsguard";
 import { CredentialStore, MissingKeyError } from "./credentials";
 import { TmdbClient } from "./tmdb";
 import { Library } from "./library";
@@ -716,12 +717,109 @@ export default class ReelPlugin extends Plugin {
 
 	/* ------------------------------------------------------------------ */
 
-	async loadSettings(): Promise<void> {
-		const stored = (await this.loadData()) as Partial<ReelSettings> | null;
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, stored ?? {});
+	/**
+	 * True once settings have been read *successfully*. Nothing may be written
+	 * before that, because writing what we failed to read destroys it.
+	 */
+	private settingsLoaded = false;
+	/**
+	 * The stored object exactly as it was on disk.
+	 *
+	 * Kept so a save re-emits fields this version does not know about. Rolling
+	 * back to an older Reel should not silently strip whatever a newer one
+	 * added — an unknown key is somebody's data, not litter.
+	 */
+	private storedRaw: Record<string, unknown> = {};
+
+	/** Where Obsidian keeps this plugin's `data.json`. */
+	private dataPath(): string {
+		return `${this.app.vault.configDir}/plugins/${this.manifest.id}/data.json`;
 	}
 
-	async saveSettings(): Promise<void> {
-		await this.saveData(this.settings);
+	/**
+	 * Read settings, and refuse to guess when the read fails.
+	 *
+	 * `loadData()` returns null for two unrelated reasons: there is no file
+	 * yet, and the file could not be read or parsed. The old code treated both
+	 * as "fresh install" and fell back to defaults — where `keyBlob` is null.
+	 * Since `saveSettings()` runs on ordinary actions (switching tabs writes
+	 * `lastTab`), the first tap after a bad read wrote null over the encrypted
+	 * keys. That is almost certainly the update that "forgot my APIs", and it
+	 * was unrecoverable.
+	 *
+	 * The file's *existence* is what separates the two cases, and the adapter
+	 * can answer that even when parsing cannot.
+	 */
+	async loadSettings(): Promise<void> {
+		let stored: Partial<ReelSettings> | null = null;
+		let read = false;
+		try {
+			stored = (await this.loadData()) as Partial<ReelSettings> | null;
+			read = true;
+		} catch (e) {
+			console.error("Reel: settings could not be read", e);
+		}
+
+		if (!canPersist({ read, stored, fileExists: await this.dataFileExists() })) {
+			// A file is there and we could not make sense of it. Run on
+			// defaults so the plugin still works, but never persist them.
+			this.settingsLoaded = false;
+			this.settings = Object.assign({}, DEFAULT_SETTINGS);
+			console.error("Reel: settings file exists but could not be parsed — saving is disabled to protect it.");
+			new Notice(
+				"Reel: your settings file could not be read, so saving is switched off to avoid overwriting it. " +
+					"Your API keys are still in data.json. Reload Obsidian; if this repeats, that file needs a look.",
+				0
+			);
+			return;
+		}
+
+		this.storedRaw = (stored ?? {}) as Record<string, unknown>;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, stored ?? {});
+		this.settingsLoaded = true;
+	}
+
+	private async dataFileExists(): Promise<boolean> {
+		try {
+			return await this.app.vault.adapter.exists(this.dataPath());
+		} catch {
+			// If we cannot even ask, assume it is there. Declining to save is
+			// recoverable; overwriting an encrypted key blob is not.
+			return true;
+		}
+	}
+
+	/**
+	 * Persist settings.
+	 *
+	 * `clearingKeys` is how a caller says it means to remove the stored
+	 * credentials — switching to session-only storage, or "forget my keys".
+	 * Without it, a save that would blank a credential that previously had a
+	 * value is treated as a bug and the old value is kept.
+	 *
+	 * The asymmetry is deliberate. Every other field here is a preference worth
+	 * seconds; `keyBlob` is an encrypted secret typed once, with no recovery.
+	 * Refusing a legitimate clear costs one more tap. Writing an accidental one
+	 * costs the key.
+	 */
+	async saveSettings(opts: { clearingKeys?: boolean } = {}): Promise<void> {
+		if (!this.settingsLoaded) {
+			console.warn("Reel: refusing to save settings — they were never read successfully.");
+			return;
+		}
+
+		const merged = mergeForSave(
+			this.settings as unknown as Record<string, unknown>,
+			this.storedRaw,
+			opts.clearingKeys
+		);
+		if (!opts.clearingKeys && merged.keyBlob !== this.settings.keyBlob) {
+			console.warn("Reel: a save would have cleared the encrypted keys; kept the stored value.");
+		}
+		await this.saveData(merged);
+		this.storedRaw = merged;
+		// Keep the in-memory copy consistent with what is now on disk.
+		this.settings.keyBlob = merged.keyBlob as ReelSettings["keyBlob"];
+		this.settings.keysPlain = merged.keysPlain as ReelSettings["keysPlain"];
 	}
 }

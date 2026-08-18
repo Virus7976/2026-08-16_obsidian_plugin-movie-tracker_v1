@@ -196,8 +196,14 @@ export class CredentialStore {
 			s.keysPlain = bundle;
 			s.keyBlob = null;
 		} else if (mode === "session") {
+			// Session mode means "hold these in memory only", so clearing what
+			// is on disk is the whole point rather than an accident.
 			s.keysPlain = null;
 			s.keyBlob = null;
+			s.keyNames = Object.keys(bundle) as KeyName[];
+			this.adopt(bundle);
+			await this.plugin.saveSettings({ clearingKeys: true });
+			return true;
 		} else {
 			const pass = await PassphraseModal.prompt(this.plugin.app, {
 				title: this.hasStoredKey ? "Confirm passphrase" : "Set a passphrase",
@@ -273,7 +279,8 @@ export class CredentialStore {
 		s.keyNames = [];
 		this.plaintext = null;
 		forgetGuarded();
-		await this.plugin.saveSettings();
+		// The one place the user genuinely means to lose them.
+		await this.plugin.saveSettings({ clearingKeys: true });
 	}
 
 	lock(): void {
