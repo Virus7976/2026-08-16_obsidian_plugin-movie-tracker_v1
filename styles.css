@@ -7452,6 +7452,133 @@ input.reel-input {
 
 
 
+
+/* ================================================================== *
+ * Design pass — three decisions, applied everywhere                  *
+ *                                                                     *
+ * The stylesheet had accumulated 61 borders, 175 backgrounds, 116     *
+ * radii and 32 shadows. Nearly every element carried a border *and* a *
+ * fill *and* a radius *and* a shadow. Nothing was wrong; nothing had  *
+ * been decided. When everything is emphasised nothing recedes, so     *
+ * nothing leads — which is the whole of why the screen read as cheap. *
+ *                                                                     *
+ * These override rather than edit sixty places, so the decisions are  *
+ * legible in one block and reversible as a unit.                      *
+ * ================================================================== */
+
+/* ---- 1. A surface is filled OR outlined, never both --------------- *
+ *
+ * Filled wins. An outline draws the eye to an edge, which is the least
+ * interesting part of any card; a fill states the surface and gets out of the
+ * way. It is also what Obsidian's own panels do, so the app stops looking like
+ * two design languages sharing a screen. */
+.reel-tile,
+.reel-chart,
+.reel-quickcard,
+.reel-block,
+.reel-error-state,
+.reel-facts,
+.reel-preview,
+.reel-castcard,
+.reel-titles-row,
+.reel-dcard {
+	border: none;
+}
+
+/* Chips and buttons carry a fill; the border was a second voice saying the same
+   thing more quietly. Kept on the *inactive* chip only, where the fill is too
+   faint to define an edge on its own. */
+.reel-btn,
+.reel-log .reel-seg .reel-seg-btn {
+	border-color: transparent;
+}
+
+.reel-btn.mod-cta {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: transparent;
+}
+
+/* Dividers survive — a rule between two rows is a real division, not decoration.
+   Everything else that was a border is now a fill or nothing. */
+
+/* ---- 2. The artwork is the product ------------------------------- *
+ *
+ * Posters are the only genuine content on most of these screens, and they were
+ * consistently smaller than the chrome around them. The caption recedes to a
+ * label so the image carries the row, and the grid gives its width to the art
+ * rather than to gaps. */
+.reel-view:not(.is-w700) .reel-grid {
+	gap: var(--reel-space-3) var(--reel-space-2);
+}
+
+.reel-view:not(.is-w700) .reel-cell-caption {
+	padding-top: var(--reel-space-1);
+}
+
+.reel-view:not(.is-w700) .reel-cell-title {
+	font-size: var(--reel-text-label);
+	font-weight: 500;
+	line-height: 1.25;
+}
+
+/* `--text-muted`, not `--text-faint`.
+ *
+ * Round 4 of this loop removed a `--text-faint`-as-text pattern from nine
+ * screens at 2.85:1, and the first thing this design pass did was reintroduce
+ * it here — the audit measured exactly 2.85:1 again. Wanting a year to recede
+ * is right; reaching for the faintest colour to do it is how legibility gets
+ * spent on hierarchy. The smaller size already carries the demotion. */
+.reel-view:not(.is-w700) .reel-cell-year {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+}
+
+/* Discover's cards get the same treatment — bigger art, quieter caption. */
+.reel-view:not(.is-w700) .reel-dcard {
+	flex-basis: 148px;
+	width: 148px;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-title {
+	font-size: var(--reel-text-label);
+	font-weight: 500;
+}
+
+/* ---- 3. One shadow, used rarely ---------------------------------- *
+ *
+ * Three elevation levels on a 384px screen is two too many: everything appeared
+ * to float slightly, which reads as noise rather than depth. Depth is reserved
+ * for the two things that genuinely sit above the page — a sheet, and the
+ * artwork, which earns a harder edge because it is a photograph rather than a
+ * panel. */
+.reel-tile,
+.reel-chart,
+.reel-block,
+.reel-quickcard,
+.reel-facts,
+.reel-fact,
+.reel-chip,
+.reel-btn,
+.reel-titles-row,
+.reel-castcard {
+	box-shadow: none;
+}
+
+.reel-cell-poster,
+.reel-dcard-poster,
+.reel-hero-poster {
+	box-shadow: var(--reel-shadow-poster);
+}
+
+.reel-modal {
+	box-shadow: var(--reel-shadow-overlay);
+}
+
+
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */
