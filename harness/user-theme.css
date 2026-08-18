@@ -1,0 +1,13 @@
+/* A stand-in for the user's community theme.
+ *
+ * Loaded AFTER styles.css, because that is the order Obsidian uses: themes
+ * come after plugins. A plugin rule and a theme rule of equal specificity are
+ * therefore won by the theme, which is what silently defeated three attempts
+ * to clear Obsidian's header — `.reel-view { padding-top: … }` lost to
+ * `.view-content { padding: 12px }` and the navigation stayed unreachable.
+ *
+ * Modelled here so that failure can happen locally instead of only on a phone.
+ */
+.view-content {
+	padding: 12px;
+}

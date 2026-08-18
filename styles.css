@@ -2596,8 +2596,15 @@ input.reel-input {
 	width: 100%;
 }
 
+/* `min(1400px, 100%)`, not a bare 1400px.
+ *
+ * A cap that only limits the upper end says nothing about the lower one, so a
+ * child could still end up wider than the space it was actually given. That
+ * went unnoticed until the harness began loading a theme *after* the plugin:
+ * the theme's 12px padding narrowed the body and the stats page immediately
+ * scrolled sideways by 5px. A width promise has two ends. */
 .reel-view-body > * {
-	max-width: 1400px;
+	max-width: min(1400px, 100%);
 	margin-left: auto;
 	margin-right: auto;
 }
@@ -4435,7 +4442,15 @@ input.reel-input {
 	text-transform: uppercase;
 }
 
-/* Every bar answers "which ones were those?" — so every bar is a control. */
+/* Every bar answers "which ones were those?" — so every bar is a control.
+ *
+ * The 6px bleed either side widens the hit area past the text. It is implicated
+ * in the 5px sideways scroll on the stats page, but removing it made the
+ * overflow *worse* — 356px to 363px — so the row's width is not simply
+ * container-plus-twelve and the bleed is not the cause.
+ *
+ * Left exactly as it was until the real chain is measured. Two speculative
+ * fixes in a row is where guessing stops being cheaper than looking. */
 .reel-stats .reel-chart-row.is-clickable {
 	cursor: pointer;
 	border-radius: var(--reel-radius);
@@ -6812,6 +6827,12 @@ input.reel-input {
 .reel-view.is-w700 .reel-nav-btn {
 	display: none;
 }
+
+
+
+
+
+
 
 
 

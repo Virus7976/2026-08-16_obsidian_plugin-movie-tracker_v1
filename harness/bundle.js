@@ -5592,6 +5592,7 @@
     const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
     const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
     el.setCssProps(vars);
+    el.style.paddingTop = top > 0 ? `${top}px` : "";
     if (el !== document.body)
       document.body.setCssProps(vars);
   }
@@ -5885,7 +5886,7 @@
     });
   }
   function mount(app2, name) {
-    const view = app2.createDiv({ cls: "reel-view" });
+    const view = app2.createDiv({ cls: "view-content reel-view" });
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
     stampWidth(view, measure(view) || window.innerWidth);

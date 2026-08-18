@@ -146,6 +146,25 @@ export function stampChromeInsets(el: HTMLElement, root: ParentNode = document):
 
 	const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
 	el.setCssProps(vars);
+
+	/*
+	 * Applied inline, not through a stylesheet rule.
+	 *
+	 * `.reel-view { padding-top: var(--reel-top-inset) }` looked correct and did
+	 * nothing on a real device, through three separate attempts. Obsidian loads
+	 * **themes after plugins**, so a theme's `.view-content { padding: 12px }`
+	 * beats a plugin's `.reel-view { padding: … }` — identical specificity, and
+	 * the theme comes last. The device snapshot showed it plainly: 12px of
+	 * padding on every side, including the top, where the rule sets none.
+	 *
+	 * Raising specificity would work until a theme raised its own. An inline
+	 * style is beaten only by `!important`, and this is not a matter of taste —
+	 * it is the difference between the navigation being reachable and not.
+	 *
+	 * Cleared to "" rather than "0px" when there is nothing to clear, so a theme
+	 * that legitimately wants padding there still gets it.
+	 */
+	el.style.paddingTop = top > 0 ? `${top}px` : "";
 	// Mirrored onto <body> so sheets get them too. A modal is not inside the
 	// view, and its action row is pinned to the bottom — which is exactly where
 	// the floating toolbar is. A "Save" button you cannot reach is worse than a

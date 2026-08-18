@@ -445,7 +445,10 @@ function mountObsidianChrome(app: HTMLElement): void {
 
 /** Render one screen into a fresh, correctly-classed view root. */
 function mount(app: HTMLElement, name: string): HTMLElement {
-	const view = app.createDiv({ cls: "reel-view" });
+	// `view-content` too, because that is what Obsidian calls this element and
+	// what a theme targets. Without it the harness cannot see a theme outranking
+	// the plugin — which is exactly how the header inset failed three times.
+	const view = app.createDiv({ cls: "view-content reel-view" });
 	// The same two classes ReelView sets. Without these the harness would
 	// render the desktop layout at phone width and report a fixed bug.
 	view.toggleClass("is-phone", phone);
