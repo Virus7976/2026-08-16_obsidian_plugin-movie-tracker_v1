@@ -236,27 +236,30 @@ export function sizeBody(view: HTMLElement, body: HTMLElement): void {
 	const top = view.getBoundingClientRect().top;
 
 	/*
-	 * Work around Obsidian mis-sizing the leaf when the keyboard opens.
+	 * Work around Obsidian handing the leaf less height than the screen has.
 	 *
-	 * Measured on a device: with a keyboard up, the visible area is ~510px and
-	 * `.view-content` reports far less. Freeing 110px of Reel's own chrome
-	 * changed the results area not at all, because the constraint was never
-	 * inside Reel — the leaf genuinely ends early and the blank below it is
-	 * Obsidian's own background.
+	 * Do not ask whether a keyboard is open. A device snapshot reported
+	 * `visualViewport: 384x823 offsetTop=0 keyboard≈closed` while the user was
+	 * typing, so on this Android build the keyboard is simply not observable —
+	 * every fix gated on detecting one was dead code.
 	 *
-	 * No arithmetic within that box can recover space the box does not have, so
-	 * the view is given the height the *visible viewport* says it should have.
-	 * Only while a keyboard is actually up: when nothing is covering the screen
-	 * Obsidian's own sizing is correct and should be left alone.
+	 * The observable fact is simpler and does not care why: the leaf is much
+	 * shorter than the space beneath it. Working back from a screenshot,
+	 * `clientHeight` was about 259px where the screen offered roughly 510, which
+	 * is why the body sat at its 120px floor no matter how much of Reel's own
+	 * chrome was removed. Freeing space inside a box cannot help when the box is
+	 * the constraint.
+	 *
+	 * Phone only, and only when the shortfall is large. A pane in a vertical
+	 * split is legitimately shorter than the window, and that must not be
+	 * "corrected".
 	 */
 	const vv = window.visualViewport;
-	const covered = vv ? window.innerHeight - vv.height - vv.offsetTop : 0;
-	if (vv && covered > 120) {
-		const visible = Math.round(vv.offsetTop + vv.height - top);
-		if (visible > 160) view.setCssProps({ height: `${visible}px` });
-	} else {
-		// Hand it back the moment the keyboard goes, so Obsidian resumes
-		// owning a decision that is normally its own.
+	const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+	const available = Math.round(visibleBottom - top);
+	if (view.hasClass("is-phone") && available > 200 && available - view.clientHeight > 40) {
+		view.setCssProps({ height: `${available}px` });
+	} else if (!view.hasClass("is-phone")) {
 		view.style.removeProperty("height");
 	}
 
