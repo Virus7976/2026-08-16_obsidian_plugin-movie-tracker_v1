@@ -184,7 +184,9 @@ export class ReelView extends ItemView {
 		 * Reel's own header row was competing for that space and losing.
 		 */
 		this.addAction("plus", "Log a film or series", () => this.plugin.openSearch());
-		this.addAction("search", "Search your library", () => this.toggleSearch());
+		// No search action here. There is already a search control in Reel's own
+		// row, and two magnifiers a centimetre apart doing different things —
+		// one toggling a field, one being the field — is worse than either.
 
 		this.build();
 		this.registerEvent(this.plugin.library.on("changed", () => this.paint()));

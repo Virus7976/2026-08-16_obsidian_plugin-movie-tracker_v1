@@ -6836,6 +6836,83 @@ input.reel-input {
 
 
 
+
+/* ------------------------------------------------------------------ */
+/* Detail screen: stack it, and align it left                          */
+/*                                                                     */
+/* On a phone the hero was still a two-column row: a 108px poster on   */
+/* the left and everything else crushed into the ~55% beside it. The   */
+/* score chips then overflowed the right edge, the genre chip and the  */
+/* overview sat in a narrow centred ribbon, and a tall empty gutter    */
+/* ran down the left under the poster. That is the alignment problem.  */
+/* ------------------------------------------------------------------ */
+
+.reel-view:not(.is-w620) .reel-hero {
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--reel-space-3);
+}
+
+/* Poster keeps a sensible size rather than stretching to the full width —
+   a 384px-wide poster would push everything else off the first screen. */
+.reel-view:not(.is-w620) .reel-hero-poster {
+	flex: 0 0 auto;
+	width: 132px;
+	align-self: flex-start;
+}
+
+/* Everything reads from the same left edge. Ragged centring is most of what
+   "does not look great with alignment" was pointing at. */
+.reel-view:not(.is-w620) .reel-hero-body,
+.reel-view:not(.is-w620) .reel-detail-page > * {
+	text-align: left;
+	align-items: flex-start;
+	min-width: 0;
+	max-width: 100%;
+}
+
+.reel-view:not(.is-w620) .reel-scores,
+.reel-view:not(.is-w620) .reel-links,
+.reel-view:not(.is-w620) .reel-detail-genres {
+	justify-content: flex-start;
+	min-width: 0;
+	max-width: 100%;
+}
+
+/* The action bar is pinned to the top of the scroller, so it has to cover the
+   full width or it reads as two buttons floating loose over the artwork —
+   which is exactly how it looked, as a white slab across the poster. */
+.reel-view:not(.is-w620) .reel-detail-bar {
+	margin-left: 0;
+	margin-right: 0;
+	padding-left: 0;
+	padding-right: 0;
+	width: 100%;
+	max-width: 100%;
+}
+
+/* The trailer filled its box with grey either side of a 16:9 frame. Sized to
+   the column and given the aspect ratio, there is nothing left to letterbox. */
+.reel-view:not(.is-w620) .reel-trailer {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	background: var(--background-secondary);
+}
+
+.reel-view:not(.is-w620) .reel-trailer-play,
+.reel-view:not(.is-w620) .reel-trailer-frame {
+	width: 100%;
+	height: 100%;
+}
+
+.reel-view:not(.is-w620) .reel-trailer-play img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */
@@ -7098,17 +7175,16 @@ input.reel-input {
  * ancestor's background, which would leave the pill invisible rather than
  * merely underneath the label.
  */
+/* Reverted: `background-clip: content-box` excludes *all* padding, horizontal
+   included, so the background shrank to the text itself. On a device the chips
+   came out as rectangular highlights rather than pills — the row read as
+   marked-up text. A 44px pill is larger than ideal; a broken one is worse, and
+   the earlier complaint was about lozenge *height*, which the row height now
+   handles. */
 .reel-view:not(.is-w700) .reel-chip {
 	min-height: 44px;
-	/* The vertical padding *is* the tap area, and the background does not paint
-	   into it: `background-clip: content-box` leaves a 32px pill inside a 44px
-	   box. The colour stays on the element itself, where the contrast check can
-	   still read it — a pseudo-element pill measured 1.00:1 there, because
-	   moving the paint somewhere the tool cannot see is not the same as being
-	   legible. */
-	padding: 6px 14px;
-	background-clip: content-box;
-	border: none;
+	padding: 0 14px;
+	border-radius: var(--reel-radius-full);
 }
 
 /* The row has to be exactly as tall as the hit area it contains.
@@ -7165,13 +7241,9 @@ input.reel-input {
 	flex: 0 1 auto;
 	width: auto;
 	max-width: 60%;
-	/* Same trick as the chip: a 44px box with the control painted 32px inside
-	   it. A sort dropdown is hit as often as anything else on the screen and
-	   34px was below the line the README promises. */
+	/* 44px, painted normally. The `background-clip` trick that was here shrank
+	   the background to the text and made the control look like a highlight. */
 	min-height: 44px;
-	padding-top: 6px;
-	padding-bottom: 6px;
-	background-clip: content-box;
 	border: 1px solid var(--background-modifier-border);
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
