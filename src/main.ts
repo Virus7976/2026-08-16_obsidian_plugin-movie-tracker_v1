@@ -385,6 +385,43 @@ export default class ReelPlugin extends Plugin {
 			},
 		});
 
+		/*
+		 * The same snapshot, taken later.
+		 *
+		 * The instant command cannot capture a keyboard-open screen: running it
+		 * requires the command palette, and opening the palette dismisses the
+		 * keyboard. So the one state that has defeated four releases — the stats
+		 * page with search focused — is precisely the state the tool cannot see.
+		 *
+		 * Ten seconds is enough to dismiss the palette, tap the field, let the
+		 * keyboard settle and leave it there. The Notice counts down so it is
+		 * obvious the capture has not happened yet.
+		 */
+		this.addCommand({
+			id: "copy-ui-snapshot-delayed",
+			name: "Copy UI snapshot after 10 seconds",
+			callback: () => {
+				const notice = new Notice("Snapshot in 10s — set the screen up now.", 0);
+				let left = 10;
+				const tick = window.setInterval(() => {
+					left -= 1;
+					if (left > 0) {
+						notice.setMessage(`Snapshot in ${left}s — set the screen up now.`);
+						return;
+					}
+					window.clearInterval(tick);
+					notice.hide();
+					void uiSnapshot().then((text) =>
+						navigator.clipboard
+							.writeText(text)
+							.then(() => new Notice(`UI snapshot copied — ${text.length.toLocaleString()} characters.`))
+							.catch(() => void this.writeSnapshotFile(text))
+					);
+				}, 1000);
+				this.register(() => window.clearInterval(tick));
+			},
+		});
+
 		this.addCommand({
 			id: "copy-layout-diagnostics",
 			name: "Copy layout diagnostics",

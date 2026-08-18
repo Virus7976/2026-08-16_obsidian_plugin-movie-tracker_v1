@@ -176,6 +176,23 @@ export async function uiSnapshot(): Promise<string> {
 
 	lines.push("=== Reel UI snapshot ===");
 	lines.push(`viewport: ${window.innerWidth}×${window.innerHeight}  dpr: ${window.devicePixelRatio}`);
+	/*
+	 * The keyboard, which is the whole reason the delayed capture exists.
+	 *
+	 * `visualViewport` is the only thing that knows a keyboard is up — the
+	 * layout viewport does not shrink for it. Reporting the difference makes a
+	 * keyboard-open capture self-evidently a keyboard-open capture, rather than
+	 * a screenshot I have to interpret.
+	 */
+	const vv = window.visualViewport;
+	if (vv) {
+		const covered = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+		lines.push(
+			`visualViewport: ${Math.round(vv.width)}×${Math.round(vv.height)} offsetTop=${Math.round(vv.offsetTop)}` +
+				`  keyboard≈${covered > 0 ? `${covered}px` : "closed"}`
+		);
+	}
+	lines.push(`--reel-keyboard: ${getComputedStyle(document.body).getPropertyValue("--reel-keyboard").trim() || "unset"}`);
 	lines.push(`platform: phone=${Platform.isPhone} mobile=${Platform.isMobile} desktop=${Platform.isDesktop}`);
 	lines.push(`theme: ${document.body.classList.contains("theme-dark") ? "dark" : "light"}`);
 	lines.push(`body classes: ${document.body.className}`);
