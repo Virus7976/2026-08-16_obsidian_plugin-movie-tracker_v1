@@ -304,11 +304,31 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	// return either nothing or the wrong titles, which is worse than a bar
 	// that plainly does not respond. They become clickable when those filters
 	// exist, not before.
+	/**
+	 * Drop empty rows from each end, keeping any gap in the middle.
+	 *
+	 * All twelve months drew whenever any one of them had data, so a library
+	 * watched entirely in August produced eleven rows of zero — around 540px of
+	 * nothing, in a chart grid a device snapshot measured at 8930px.
+	 *
+	 * Interior zeros stay. "Nothing in September, between two busy months" is a
+	 * fact about the year; leading and trailing zeros are just the calendar.
+	 */
+	const trimEmpty = <T extends { n: number }>(rows: T[]): T[] => {
+		let first = 0;
+		let last = rows.length - 1;
+		while (first <= last && rows[first].n === 0) first++;
+		while (last >= first && rows[last].n === 0) last--;
+		return rows.slice(first, last + 1);
+	};
+
 	if (watched.length) {
 		const byMonth = new Array(12).fill(0);
 		for (const v of watched) byMonth[parseInt(v.date.slice(5, 7), 10) - 1]++;
 		const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-		if (byMonth.some((n) => n > 0)) bars(charts, "By month", byMonth.map((n, i) => ({ label: names[i], n })));
+		if (byMonth.some((n) => n > 0)) {
+			bars(charts, "By month", trimEmpty(byMonth.map((n, i) => ({ label: names[i], n }))));
+		}
 
 		const byWeekday = new Array(7).fill(0);
 		for (const v of watched) {

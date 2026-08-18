@@ -98,7 +98,17 @@ export function paintCast(plugin: ReelPlugin, slot: HTMLElement, meta: TmdbFilm 
 	const cast = (credits?.cast ?? []).slice(0, 12);
 	if (!cast.length) return;
 
-	const strip = slot.createDiv({ cls: "reel-caststrip" });
+	/*
+	 * `.reel-caststrip` is the *section*; `.reel-caststrip-track` is the row
+	 * that scrolls. Putting the cards straight into the section left them as
+	 * block elements in a column — twelve faces stacked vertically down a
+	 * 72px gutter with the rest of the width empty, which is what "the people
+	 * leave a ton of blank space" was.
+	 *
+	 * The track already existed with the right rules on it. This was a wrapper
+	 * I failed to create, not a style I failed to write.
+	 */
+	const strip = slot.createDiv({ cls: "reel-caststrip" }).createDiv({ cls: "reel-caststrip-track" });
 	for (const person of cast) {
 		const card = strip.createDiv({ cls: "reel-castcard" });
 		const face = card.createDiv({ cls: "reel-castface" });

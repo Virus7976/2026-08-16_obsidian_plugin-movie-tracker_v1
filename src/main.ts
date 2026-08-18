@@ -362,16 +362,20 @@ export default class ReelPlugin extends Plugin {
 			id: "copy-ui-snapshot",
 			name: "Copy UI snapshot",
 			callback: () => {
-				const text = uiSnapshot();
-				void navigator.clipboard
-					.writeText(text)
-					.then(() => new Notice(`UI snapshot copied — ${text.length.toLocaleString()} characters.`))
-					.catch(() => {
-						// A phone that refuses the clipboard would otherwise
-						// lose the whole point, so fall back to a file the user
-						// can open and copy from by hand.
-						void this.writeSnapshotFile(text);
-					});
+				// Async now: it waits for the command palette to finish closing
+				// before measuring. Measured too early, every control on screen
+				// reads as covered by the palette's own backdrop.
+				void uiSnapshot().then((text) =>
+					navigator.clipboard
+						.writeText(text)
+						.then(() => new Notice(`UI snapshot copied — ${text.length.toLocaleString()} characters.`))
+						.catch(() => {
+							// A phone that refuses the clipboard would otherwise
+							// lose the whole point, so fall back to a file the
+							// user can open and copy from by hand.
+							void this.writeSnapshotFile(text);
+						})
+				);
 			},
 		});
 

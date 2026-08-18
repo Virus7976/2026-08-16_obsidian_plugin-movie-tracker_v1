@@ -1205,13 +1205,23 @@
         plugin2
       );
     }
+    const trimEmpty = (rows2) => {
+      let first = 0;
+      let last = rows2.length - 1;
+      while (first <= last && rows2[first].n === 0)
+        first++;
+      while (last >= first && rows2[last].n === 0)
+        last--;
+      return rows2.slice(first, last + 1);
+    };
     if (watched.length) {
       const byMonth = new Array(12).fill(0);
       for (const v of watched)
         byMonth[parseInt(v.date.slice(5, 7), 10) - 1]++;
       const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      if (byMonth.some((n2) => n2 > 0))
-        bars(charts, "By month", byMonth.map((n2, i) => ({ label: names[i], n: n2 })));
+      if (byMonth.some((n2) => n2 > 0)) {
+        bars(charts, "By month", trimEmpty(byMonth.map((n2, i) => ({ label: names[i], n: n2 }))));
+      }
       const byWeekday = new Array(7).fill(0);
       for (const v of watched) {
         const d = /* @__PURE__ */ new Date(v.date + "T00:00:00");
@@ -2336,7 +2346,7 @@
     const cast = (credits?.cast ?? []).slice(0, 12);
     if (!cast.length)
       return;
-    const strip = slot.createDiv({ cls: "reel-caststrip" });
+    const strip = slot.createDiv({ cls: "reel-caststrip" }).createDiv({ cls: "reel-caststrip-track" });
     for (const person of cast) {
       const card = strip.createDiv({ cls: "reel-castcard" });
       const face = card.createDiv({ cls: "reel-castface" });
@@ -5535,12 +5545,27 @@
   }
   var TOP_CHROME = ".view-header";
   var BOTTOM_CHROME = ".mobile-toolbar, .mobile-navbar, .status-bar";
+  function pickChrome(root, selector) {
+    let best = null;
+    let bestArea = 0;
+    for (const el of Array.from(root.querySelectorAll(selector))) {
+      const r = el.getBoundingClientRect();
+      const area = r.width * r.height;
+      if (area <= 0)
+        continue;
+      if (area > bestArea) {
+        best = el;
+        bestArea = area;
+      }
+    }
+    return best;
+  }
   function stampChromeInsets(el, root = document) {
     const rect = el.getBoundingClientRect();
     const clamp = (n2) => Math.round(Math.min(Math.max(n2, 0), 160));
-    const header = root.querySelector(TOP_CHROME);
+    const header = pickChrome(root, TOP_CHROME);
     const top = header ? clamp(header.getBoundingClientRect().bottom - rect.top) : 0;
-    const bar = root.querySelector(BOTTOM_CHROME);
+    const bar = pickChrome(root, BOTTOM_CHROME);
     const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
     const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
     el.setCssProps(vars);
@@ -5822,6 +5847,7 @@
   function mountObsidianChrome(app2) {
     if (!phone2)
       return;
+    app2.createDiv({ cls: "view-header obsidian-chrome-decoy" });
     const header = app2.createDiv({ cls: "view-header obsidian-chrome" });
     header.createDiv({ cls: "view-header-title", text: "Reel" });
     header.createEl("button", { cls: "clickable-icon", text: "\u2630", attr: { "aria-label": "Menu" } });

@@ -16,7 +16,22 @@
  */
 import { readFile, writeFile } from "node:fs/promises";
 
-const MARK = "/* === generated: pane-measured mirrors of the compact rules === */";
+/*
+ * The generated block sits *before* the hand-written mobile sections.
+ *
+ * It used to be appended at end-of-file, which meant every mirror outranked
+ * every deliberate rule written after it — same specificity, later position.
+ * A device snapshot caught this: the sort dropdown was still full width because
+ * `.reel-view:not(.is-w500) .reel-select { max-width: none }`, mirrored from an
+ * old `@media (max-width: 500px)` block, was silently beating the rule written
+ * to fix it.
+ *
+ * A mirror is a translation of an existing rule, not a new decision. It belongs
+ * where the rule it copies belongs — under anything written afterwards on
+ * purpose.
+ */
+const BEGIN = "/* === generated: pane-measured mirrors of the compact rules === */";
+const END = "/* === end generated === */";
 const FILE = new URL("../styles.css", import.meta.url);
 
 /** Breakpoint classes the view stamps. Pick the smallest that covers N. */
@@ -39,7 +54,23 @@ const NOT_IN_PANE = [".reel-recipe", ".reel-log", ".reel-preview", ".reel-prompt
 const inPane = (sel) => !NOT_IN_PANE.some((p) => sel.trim().startsWith(p));
 
 const raw = await readFile(FILE, "utf8");
-const src = raw.split(MARK)[0].replace(/\s+$/, "") + "\n";
+
+/*
+ * Remove any previous generation, in either shape.
+ *
+ * Older runs appended at end-of-file; this one writes between markers. Both
+ * have to go, or a rewrite leaves the old copy in place — still outranking
+ * every rule written after it, which is the bug this whole change is about.
+ */
+let src = raw;
+const begin = src.indexOf(BEGIN);
+if (begin >= 0) {
+	const finish = src.indexOf(END, begin);
+	src =
+		finish >= 0
+			? src.slice(0, begin) + src.slice(finish + END.length)
+			: src.slice(0, begin).replace(/\s+$/, "") + "\n";
+}
 
 const lines = src.split("\n");
 const blocks = [];
@@ -75,7 +106,7 @@ function reroot(sel, guard) {
 	return `${guard} ${s}`;
 }
 
-const out = [MARK, "", "/* Written by scripts/mirror-compact.mjs — do not edit by hand. */", ""];
+const out = [BEGIN, "", "/* Written by scripts/mirror-compact.mjs — do not edit by hand. */", ""];
 
 for (const { max, body } of blocks) {
 	const guard = `.reel-view:not(.is-w${stepFor(max)})`;
@@ -106,5 +137,25 @@ for (const { max, body } of blocks) {
 	}
 }
 
-await writeFile(FILE, `${src}\n${out.join("\n")}`);
+out.push(END, "");
+
+/*
+ * Written at the anchor, not at the end.
+ *
+ * The anchor marks the start of the hand-written mobile sections, so every
+ * deliberate rule comes after the mirrors and wins on source order. Falling
+ * back to appending would silently restore the defect, so a missing anchor is
+ * an error rather than a default.
+ */
+const ANCHOR = "/* Mobile density pass";
+const at = src.indexOf(ANCHOR);
+if (at < 0) {
+	console.error("mirror-compact: anchor not found — refusing to append, which would outrank the hand-written rules.");
+	process.exit(1);
+}
+// Back up to the comment box that opens the section, so the generated block
+// lands between sections rather than inside one.
+const boxed = src.lastIndexOf("/* ---", at);
+const insertAt = boxed >= 0 && at - boxed < 200 ? boxed : at;
+await writeFile(FILE, `${src.slice(0, insertAt)}${out.join("\n")}\n${src.slice(insertAt)}`);
 console.log(`mirrored ${blocks.length} compact blocks`);

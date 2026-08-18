@@ -136,9 +136,43 @@ const TAPPABLE = 'button, input, select, textarea, a, [role="button"], [contente
  * An indented tree rather than raw JSON: the nesting is the point, and the
  * thing being diagnosed is usually visible at a glance in the indentation.
  */
-export function uiSnapshot(): string {
+/**
+ * Wait for the command palette to get out of the way.
+ *
+ * This command is run *from* the palette, and the palette is still in the DOM
+ * while it closes. The first real snapshot reported twenty-two covered controls
+ * and blamed `div.modal-bg` for every one of them — the search field, the tab
+ * bar, four of Obsidian's own header buttons. All artifacts of the overlay that
+ * was still up, and every one of them noise in a report whose entire job is
+ * telling real occlusion from imagined.
+ *
+ * Polls rather than waiting a fixed delay: the animation length is a theme's
+ * business, and a guess would be wrong on somebody's machine. Gives up after
+ * 800ms and measures anyway, because a late snapshot beats no snapshot.
+ */
+async function waitForOverlays(): Promise<void> {
+	const gone = (): boolean => !document.querySelector(".modal-container, .prompt, .modal-bg, .suggestion-container");
+	for (let waited = 0; waited < 800 && !gone(); waited += 50) {
+		await new Promise((r) => window.setTimeout(r, 50));
+	}
+	// Two frames after that, so a closing transition has finished laying out.
+	await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+}
+
+export async function uiSnapshot(): Promise<string> {
+	await waitForOverlays();
 	const nodes = collect();
 	const lines: string[] = [];
+
+	// Say so if something is still up, rather than reporting its shadow as a
+	// layout bug. A snapshot that quietly lies is worse than one that admits it.
+	const overlay = document.querySelector(".modal-container, .prompt, .modal-bg");
+	if (overlay) {
+		lines.push(
+			`!! An overlay (${overlay.className.split(" ")[0]}) is still open — "covered" entries below may be its doing, not the layout's.`,
+			""
+		);
+	}
 
 	lines.push("=== Reel UI snapshot ===");
 	lines.push(`viewport: ${window.innerWidth}×${window.innerHeight}  dpr: ${window.devicePixelRatio}`);

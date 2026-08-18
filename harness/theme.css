@@ -114,6 +114,15 @@ body.reel-harness-narrow-pane #app {
 	max-width: var(--reel-harness-pane);
 }
 
+/* Zero-sized, exactly as the real hidden leaves are. It must be findable by
+   `querySelector` and must contribute no inset. */
+.obsidian-chrome-decoy {
+	position: fixed;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+}
+
 .svg-icon { width: 18px; height: 18px; }
 
 /* The audit report. Plain on purpose — it is output, not part of the app. */

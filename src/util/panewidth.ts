@@ -53,6 +53,39 @@ const TOP_CHROME = ".view-header";
 const BOTTOM_CHROME = ".mobile-toolbar, .mobile-navbar, .status-bar";
 
 /**
+ * The chrome element that is actually on screen.
+ *
+ * `querySelector` returns the *first* match in document order, and Obsidian
+ * keeps a `.view-header` in every workspace leaf — including the ones that are
+ * closed, collapsed or in a hidden drawer. On a real phone the first match
+ * measured 0×0 while the header genuinely covering the view was 384×45 at
+ * y=33. The inset therefore computed as zero, the compensation never applied,
+ * and the search field stayed buried exactly as before.
+ *
+ * A device snapshot showed both elements side by side, which is the only reason
+ * this was findable at all: the harness has one leaf and one header, so the
+ * first match is always the right one there.
+ *
+ * Picking the tallest visible match is the fix. A zero-height header is not
+ * covering anything, and where several are real the one reaching furthest down
+ * is the one to clear.
+ */
+function pickChrome(root: ParentNode, selector: string): HTMLElement | null {
+	let best: HTMLElement | null = null;
+	let bestArea = 0;
+	for (const el of Array.from(root.querySelectorAll<HTMLElement>(selector))) {
+		const r = el.getBoundingClientRect();
+		const area = r.width * r.height;
+		if (area <= 0) continue;
+		if (area > bestArea) {
+			best = el;
+			bestArea = area;
+		}
+	}
+	return best;
+}
+
+/**
  * How far Obsidian's chrome reaches over the top and bottom of a view.
  *
  * On a phone Obsidian draws its header and its toolbar *over* the content
@@ -72,10 +105,10 @@ export function stampChromeInsets(el: HTMLElement, root: ParentNode = document):
 	const rect = el.getBoundingClientRect();
 	const clamp = (n: number): number => Math.round(Math.min(Math.max(n, 0), 160));
 
-	const header = root.querySelector<HTMLElement>(TOP_CHROME);
+	const header = pickChrome(root, TOP_CHROME);
 	const top = header ? clamp(header.getBoundingClientRect().bottom - rect.top) : 0;
 
-	const bar = root.querySelector<HTMLElement>(BOTTOM_CHROME);
+	const bar = pickChrome(root, BOTTOM_CHROME);
 	const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
 
 	const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };

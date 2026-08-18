@@ -6755,6 +6755,220 @@ input.reel-input {
 }
 
 
+
+
+/* === generated: pane-measured mirrors of the compact rules === */
+
+/* Written by scripts/mirror-compact.mjs — do not edit by hand. */
+
+/*
+ * Tabs go at the TOP on mobile, not the bottom.
+ *
+ * A bottom tab bar is the right pattern for a normal phone app, but this
+ * runs inside Obsidian, which puts its own floating toolbar over the
+ * bottom of every view. That toolbar sat directly on top of the tab row —
+ * Library and Stats were half-visible at the edges and nothing in between
+ * could be tapped at all, so the app had no working navigation.
+ *
+ * Padding the bar upward would mean guessing that toolbar's height, which
+ * changes with the user's settings and their phone's gesture bar. Moving
+ * out of its way entirely is the only version that cannot be covered.
+ */
+.reel-view:not(.is-w700) .reel-tabs {
+	order: 1;
+	border-top: none;
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding-bottom: 0;
+	}
+	
+	.reel-view {
+	flex-direction: column;
+	}
+	
+	.reel-view-body {
+	order: 3;
+	/* Clear the floating toolbar so the last row is reachable. */
+	padding-bottom: calc(var(--reel-bottom-inset, 48px) + 24px + env(safe-area-inset-bottom));
+	}
+	
+	.reel-view-filters {
+	order: 2;
+	}
+	
+	.reel-tab.is-active {
+	border-bottom-color: transparent;
+	border-top: 2px solid var(--interactive-accent);
+	margin-top: -2px;
+}
+
+.reel-view:not(.is-w500) .reel-select {
+	flex: 1 1 auto;
+	max-width: none;
+}
+
+.reel-view:not(.is-w620) .reel-hero {
+	gap: var(--reel-space-3);
+	}
+	
+	.reel-hero-poster {
+	flex: 0 0 108px;
+	width: 108px;
+	}
+	
+	.reel-hero-title {
+	font-size: 1.3em;
+	}
+	
+	.reel-detail-actions .reel-btn {
+	flex: 1 1 100%;
+	}
+	
+	.reel-meta-row {
+	grid-template-columns: 1fr;
+	gap: 2px;
+}
+
+.reel-view:not(.is-w620) .reel-fact {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	}
+	
+	.reel-fact-value {
+	text-align: left;
+	white-space: normal;
+	overflow: visible;
+	text-overflow: clip;
+	line-height: 1.4;
+	}
+	
+	/* A label column of up to 8em on a 375px screen leaves the bar about
+	150px — and the series-progress chart labels are film titles, so they
+	were unreadable. Label on its own line, bar full width beneath. */
+	.reel-chart-row {
+	grid-template-columns: 1fr 3em;
+	grid-template-areas:
+	"label label"
+	"track value";
+	gap: var(--reel-space-1) var(--reel-space-2);
+	min-height: 0;
+	padding-bottom: var(--reel-space-2);
+	}
+	
+	.reel-chart-label {
+	grid-area: label;
+	white-space: normal;
+	overflow: visible;
+	color: var(--text-normal);
+	}
+	
+	.reel-chart-track {
+	grid-area: track;
+	}
+	
+	.reel-chart-value {
+	grid-area: value;
+}
+
+.reel-view:not(.is-w400) .reel-tiles {
+	grid-template-columns: 1fr 1fr;
+	gap: var(--reel-space-2);
+	}
+	
+	.reel-tile {
+	padding: var(--reel-space-3);
+	}
+	
+	.reel-tile-value {
+	font-size: 1.35em;
+}
+
+.reel-view:not(.is-w620) .reel-dcard-btn {
+	min-height: 38px;
+}
+
+/*
+ * Two tiles across, not four. At 375px a four-across grid gave each tile
+ * about 80px, which is narrower than the numbers it had to hold — labels
+ * wrapped to three lines and the value clipped.
+ */
+.reel-view:not(.is-w700) .reel-stats .reel-tiles {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--reel-space-2);
+	}
+	
+	.reel-stats .reel-tile {
+	padding: var(--reel-space-3) var(--reel-space-3);
+	min-height: 76px;
+	}
+	
+	.reel-stats .reel-tile-value {
+	font-size: 1.5em;
+	}
+	
+	.reel-stats .reel-chart {
+	padding: var(--reel-space-3) var(--reel-space-3);
+	}
+	
+	/* Narrower label column: 7.5rem of a 375px screen left almost nothing for
+	the bar itself, so the chart stopped communicating anything. */
+	.reel-stats .reel-facts {
+	padding: 2px 12px;
+	}
+	
+	.reel-stats .reel-fact {
+	/* Label above value rather than a squeezed two-column row, which
+	truncated titles like "You liked far more than most". */
+	flex-direction: column;
+	gap: 1px;
+	}
+	
+	.reel-stats .reel-fact-value {
+	text-align: left;
+}
+
+/* Label above names — 5.5rem of a narrow screen left three stars
+   wrapping one word per line. */
+.reel-view:not(.is-w700) .reel-credit-row {
+	flex-direction: column;
+	gap: 2px;
+	}
+	
+	.reel-credit-label {
+	flex: none;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.reel-view:not(.is-w700) .reel-chart-thumb {
+	width: 22px;
+	height: 33px;
+	flex-basis: 22px;
+}
+
+.reel-view:not(.is-w700) .reel-chart-thumb {
+	width: 34px;
+	height: 51px;
+	flex-basis: 34px;
+}
+
+.reel-view:not(.is-w700) .reel-skel-card {
+	flex-basis: 96px;
+	width: 96px;
+}
+
+.reel-view:not(.is-w700) .reel-hero.has-backdrop {
+	/* Full-bleed on a phone: the padding either side of the page would
+	otherwise frame the image and halve the effect. */
+	margin: 0 calc(-1 * var(--reel-gutter, 12px));
+	border-radius: 0;
+	padding: 16px var(--reel-gutter, 12px);
+}
+
+/* === end generated === */
+
 /* ------------------------------------------------------------------ */
 /* Mobile density pass                                                 */
 /*                                                                     */
@@ -7193,214 +7407,4 @@ input.reel-input {
 
 .reel-view:not(.is-w700) .reel-stats .reel-fact:last-child {
 	border-bottom: none;
-}
-
-/* === generated: pane-measured mirrors of the compact rules === */
-
-/* Written by scripts/mirror-compact.mjs — do not edit by hand. */
-
-/*
- * Tabs go at the TOP on mobile, not the bottom.
- *
- * A bottom tab bar is the right pattern for a normal phone app, but this
- * runs inside Obsidian, which puts its own floating toolbar over the
- * bottom of every view. That toolbar sat directly on top of the tab row —
- * Library and Stats were half-visible at the edges and nothing in between
- * could be tapped at all, so the app had no working navigation.
- *
- * Padding the bar upward would mean guessing that toolbar's height, which
- * changes with the user's settings and their phone's gesture bar. Moving
- * out of its way entirely is the only version that cannot be covered.
- */
-.reel-view:not(.is-w700) .reel-tabs {
-	order: 1;
-	border-top: none;
-	border-bottom: 1px solid var(--background-modifier-border);
-	padding-bottom: 0;
-	}
-	
-	.reel-view {
-	flex-direction: column;
-	}
-	
-	.reel-view-body {
-	order: 3;
-	/* Clear the floating toolbar so the last row is reachable. */
-	padding-bottom: calc(var(--reel-bottom-inset, 48px) + 24px + env(safe-area-inset-bottom));
-	}
-	
-	.reel-view-filters {
-	order: 2;
-	}
-	
-	.reel-tab.is-active {
-	border-bottom-color: transparent;
-	border-top: 2px solid var(--interactive-accent);
-	margin-top: -2px;
-}
-
-.reel-view:not(.is-w500) .reel-select {
-	flex: 1 1 auto;
-	max-width: none;
-}
-
-.reel-view:not(.is-w620) .reel-hero {
-	gap: var(--reel-space-3);
-	}
-	
-	.reel-hero-poster {
-	flex: 0 0 108px;
-	width: 108px;
-	}
-	
-	.reel-hero-title {
-	font-size: 1.3em;
-	}
-	
-	.reel-detail-actions .reel-btn {
-	flex: 1 1 100%;
-	}
-	
-	.reel-meta-row {
-	grid-template-columns: 1fr;
-	gap: 2px;
-}
-
-.reel-view:not(.is-w620) .reel-fact {
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 2px;
-	}
-	
-	.reel-fact-value {
-	text-align: left;
-	white-space: normal;
-	overflow: visible;
-	text-overflow: clip;
-	line-height: 1.4;
-	}
-	
-	/* A label column of up to 8em on a 375px screen leaves the bar about
-	150px — and the series-progress chart labels are film titles, so they
-	were unreadable. Label on its own line, bar full width beneath. */
-	.reel-chart-row {
-	grid-template-columns: 1fr 3em;
-	grid-template-areas:
-	"label label"
-	"track value";
-	gap: var(--reel-space-1) var(--reel-space-2);
-	min-height: 0;
-	padding-bottom: var(--reel-space-2);
-	}
-	
-	.reel-chart-label {
-	grid-area: label;
-	white-space: normal;
-	overflow: visible;
-	color: var(--text-normal);
-	}
-	
-	.reel-chart-track {
-	grid-area: track;
-	}
-	
-	.reel-chart-value {
-	grid-area: value;
-}
-
-.reel-view:not(.is-w400) .reel-tiles {
-	grid-template-columns: 1fr 1fr;
-	gap: var(--reel-space-2);
-	}
-	
-	.reel-tile {
-	padding: var(--reel-space-3);
-	}
-	
-	.reel-tile-value {
-	font-size: 1.35em;
-}
-
-.reel-view:not(.is-w620) .reel-dcard-btn {
-	min-height: 38px;
-}
-
-/*
- * Two tiles across, not four. At 375px a four-across grid gave each tile
- * about 80px, which is narrower than the numbers it had to hold — labels
- * wrapped to three lines and the value clipped.
- */
-.reel-view:not(.is-w700) .reel-stats .reel-tiles {
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: var(--reel-space-2);
-	}
-	
-	.reel-stats .reel-tile {
-	padding: var(--reel-space-3) var(--reel-space-3);
-	min-height: 76px;
-	}
-	
-	.reel-stats .reel-tile-value {
-	font-size: 1.5em;
-	}
-	
-	.reel-stats .reel-chart {
-	padding: var(--reel-space-3) var(--reel-space-3);
-	}
-	
-	/* Narrower label column: 7.5rem of a 375px screen left almost nothing for
-	the bar itself, so the chart stopped communicating anything. */
-	.reel-stats .reel-facts {
-	padding: 2px 12px;
-	}
-	
-	.reel-stats .reel-fact {
-	/* Label above value rather than a squeezed two-column row, which
-	truncated titles like "You liked far more than most". */
-	flex-direction: column;
-	gap: 1px;
-	}
-	
-	.reel-stats .reel-fact-value {
-	text-align: left;
-}
-
-/* Label above names — 5.5rem of a narrow screen left three stars
-   wrapping one word per line. */
-.reel-view:not(.is-w700) .reel-credit-row {
-	flex-direction: column;
-	gap: 2px;
-	}
-	
-	.reel-credit-label {
-	flex: none;
-	font-size: var(--font-ui-smaller);
-	color: var(--text-faint);
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-}
-
-.reel-view:not(.is-w700) .reel-chart-thumb {
-	width: 22px;
-	height: 33px;
-	flex-basis: 22px;
-}
-
-.reel-view:not(.is-w700) .reel-chart-thumb {
-	width: 34px;
-	height: 51px;
-	flex-basis: 34px;
-}
-
-.reel-view:not(.is-w700) .reel-skel-card {
-	flex-basis: 96px;
-	width: 96px;
-}
-
-.reel-view:not(.is-w700) .reel-hero.has-backdrop {
-	/* Full-bleed on a phone: the padding either side of the page would
-	otherwise frame the image and halve the effect. */
-	margin: 0 calc(-1 * var(--reel-gutter, 12px));
-	border-radius: 0;
-	padding: 16px var(--reel-gutter, 12px);
 }

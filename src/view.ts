@@ -414,7 +414,31 @@ export class ReelView extends ItemView {
 		this.bodyEl.addClass(`reel-move-${move}`);
 	}
 
+	/**
+	 * Every screen paints into the same element, so every screen has to let go
+	 * of it.
+	 *
+	 * `paintStats`, `DetailScreen` and `DiscoverScreen` each add their own class
+	 * to the shared body and none of them removed it. After a few tab switches a
+	 * device snapshot showed
+	 * `reel-view-body reel-discover reel-detail reel-move-back reel-stats` — four
+	 * screens' worth of layout rules applied at once.
+	 *
+	 * That is what made the stats page look broken rather than merely plain: the
+	 * facts block came out 171px wide inside a 349px body, and the charts sat in
+	 * a narrow indented column with dead space either side. Nothing was wrong
+	 * with the stats styling. It was competing with Discover's centring and the
+	 * detail screen's column rules.
+	 *
+	 * Cleared before each paint rather than by each screen on the way out: a
+	 * screen that throws never gets to clean up, and this has to hold even then.
+	 */
+	private clearScreenClasses(): void {
+		this.bodyEl.removeClasses(["reel-discover", "reel-detail", "reel-stats", "reel-rate", "reel-upnext", "reel-diary"]);
+	}
+
 	private paintTab(): void {
+		this.clearScreenClasses();
 		if (this.tab === "library") {
 			this.paintFilters();
 			this.paintLibrary();

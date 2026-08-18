@@ -403,6 +403,19 @@ document.body.classList.toggle("theme-light", params.get("dark") !== "1");
  */
 function mountObsidianChrome(app: HTMLElement): void {
 	if (!phone) return;
+	/*
+	 * A decoy header, first in document order and zero-sized.
+	 *
+	 * This is what a real phone actually contains: Obsidian keeps a
+	 * `.view-header` in every workspace leaf, including closed and collapsed
+	 * ones. `querySelector` returned that 0x0 element instead of the 384x45 one
+	 * genuinely covering the view, so the inset computed as zero and the search
+	 * field stayed buried through three separate attempts to fix it.
+	 *
+	 * The harness had one leaf and one header, so the first match was always
+	 * the right one and nothing here could ever fail. It fails now.
+	 */
+	app.createDiv({ cls: "view-header obsidian-chrome-decoy" });
 	const header = app.createDiv({ cls: "view-header obsidian-chrome" });
 	header.createDiv({ cls: "view-header-title", text: "Reel" });
 	header.createEl("button", { cls: "clickable-icon", text: "☰", attr: { "aria-label": "Menu" } });
