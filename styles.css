@@ -6872,8 +6872,13 @@ input.reel-input {
 	flex: 0 1 auto;
 	width: auto;
 	max-width: 60%;
-	min-height: 34px;
-	background: transparent;
+	/* Same trick as the chip: a 44px box with the control painted 32px inside
+	   it. A sort dropdown is hit as often as anything else on the screen and
+	   34px was below the line the README promises. */
+	min-height: 44px;
+	padding-top: 6px;
+	padding-bottom: 6px;
+	background-clip: content-box;
 	border: 1px solid var(--background-modifier-border);
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
@@ -6927,6 +6932,84 @@ input.reel-input {
 .reel-view:not(.is-w700) .reel-discover-filters .reel-chips {
 	row-gap: var(--reel-space-2);
 	align-content: flex-start;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Native controls                                                     */
+/*                                                                     */
+/* Reel hand-rolled its buttons, chips, fields and rows, so every theme */
+/* the user installs styled the app *around* Reel and left Reel looking */
+/* like a web page dropped into it. These borrow Obsidian's own classes */
+/* rather than imitating them, which means the look follows the theme   */
+/* from now on instead of needing to be chased.                         */
+/* ------------------------------------------------------------------ */
+
+/* The search row is a view action on a phone, not a permanent fixture.
+ *
+ * It was the first thing in the view, directly under Obsidian's header, which
+ * is what left it visible and untappable. Now it collapses to nothing until
+ * the header's search action asks for it — one less row of chrome on a screen
+ * that was spending a third of itself on chrome. */
+.reel-view:not(.is-w700) .reel-view-header {
+	display: grid;
+	grid-template-rows: 0fr;
+	padding-top: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+	transition: grid-template-rows 160ms ease;
+}
+
+.reel-view:not(.is-w700) .reel-view-header > * {
+	overflow: hidden;
+	min-height: 0;
+	/* Not merely clipped — gone.
+	 *
+	 * A collapsed row whose contents are only squashed still holds focusable
+	 * elements: tab order runs through a field nobody can see, and a screen
+	 * reader announces it. The audit caught the same fault from the other side,
+	 * as a 19px button overlapping the input above it. `visibility: hidden`
+	 * removes them from focus, hit-testing and the accessibility tree at once. */
+	visibility: hidden;
+}
+
+.reel-view:not(.is-w700) .reel-view-header.is-open > * {
+	visibility: visible;
+}
+
+.reel-view:not(.is-w700) .reel-view-header.is-open {
+	grid-template-rows: 1fr;
+	padding-top: var(--reel-space-2);
+	padding-bottom: var(--reel-space-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-view .reel-view-header {
+		transition: none;
+	}
+}
+
+/* Obsidian styles `.search-input-container` and `select.dropdown` itself. Both
+   now carry those classes, so Reel stops repainting over the top of whatever
+   the user chose. The remaining declarations are layout, not appearance. */
+.reel-search-wrap.search-input-container {
+	width: auto;
+	flex: 1;
+}
+
+.reel-select.dropdown {
+	height: auto;
+}
+
+/* An icon-only button is `clickable-icon` in Obsidian, which supplies the hit
+   area, the hover and the active state — all three of which Reel was
+   reimplementing slightly differently in four places. */
+.reel-search-clear.clickable-icon {
+	position: absolute;
+	right: 4px;
+	background: transparent;
+	border: none;
 }
 
 /* === generated: pane-measured mirrors of the compact rules === */

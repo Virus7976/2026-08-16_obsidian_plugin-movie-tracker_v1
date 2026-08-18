@@ -5179,6 +5179,10 @@
     return getComputedStyle(document.body).backgroundColor;
   }
   var TAPPABLE = 'button, input, select, textarea, a, [role="button"], [contenteditable="true"], .clickable-icon';
+  function shown(el) {
+    const cs = getComputedStyle(el);
+    return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
+  }
   function scrollableOut(el, stopAt) {
     for (let p = el.parentElement; p; p = p.parentElement) {
       const cs = getComputedStyle(p);
@@ -5271,7 +5275,7 @@
     };
     const small = [...view.querySelectorAll('button, [role="button"], select')].filter((el) => {
       const h = el.getBoundingClientRect().height;
-      if (h <= 0 || el.closest(".reel-stars") || el.closest(".reel-episode-stars"))
+      if (h <= 0 || !shown(el) || el.closest(".reel-stars") || el.closest(".reel-episode-stars"))
         return false;
       if (h >= 44)
         return false;
@@ -5286,7 +5290,7 @@
     const blocked = [];
     for (const el of Array.from(view.querySelectorAll(TAPPABLE))) {
       const r = el.getBoundingClientRect();
-      if (r.width < 2 || r.height < 2)
+      if (r.width < 2 || r.height < 2 || !shown(el))
         continue;
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
@@ -5345,6 +5349,8 @@
     }
     check("contrastAA", lowContrast.length === 0, [...new Set(lowContrast)].slice(0, 4).join(", "));
     const targets = [...view.querySelectorAll('button, [role="button"], a, select, input')].filter((el) => {
+      if (!shown(el))
+        return false;
       const b = el.getBoundingClientRect();
       return b.width > 0 && b.height > 0;
     });
@@ -5530,14 +5536,13 @@
   };
   function library(root) {
     const header = root.createDiv({ cls: "reel-view-header" });
-    const wrap = header.createDiv({ cls: "reel-search-wrap" });
+    const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
     wrap.createSpan({ cls: "reel-search-icon", text: "\u2315" });
     wrap.createEl("input", {
       cls: "reel-input reel-search-input",
       attr: { type: "search", placeholder: "Search titles, people, characters, plots\u2026" }
     });
-    wrap.createEl("button", { cls: "reel-search-clear", text: "\xD7" });
-    header.createEl("button", { cls: "reel-btn mod-cta reel-add-btn", text: "+" });
+    wrap.createEl("button", { cls: "reel-search-clear clickable-icon", text: "\xD7" });
     const tabs = root.createDiv({ cls: "reel-tabs" });
     for (const t of ["Library", "Discover", "Rate", "Up next", "Diary", "Stats"]) {
       const b = tabs.createEl("button", { cls: "reel-tab" });
@@ -5564,10 +5569,10 @@
     }
     const sort = filters.createDiv({ cls: "reel-sortbar" });
     sort.createSpan({ cls: "reel-dim", text: "Sort" });
-    const sel = sort.createEl("select");
+    const sel = sort.createEl("select", { cls: "reel-select dropdown" });
     sel.createEl("option", { text: "Recently watched" });
     sort.createSpan({ cls: "reel-dim", text: "then" });
-    const sel2 = sort.createEl("select");
+    const sel2 = sort.createEl("select", { cls: "reel-select dropdown" });
     sel2.createEl("option", { text: "\u2014" });
     const body = root.createDiv({ cls: "reel-view-body" });
     body.createDiv({ cls: "reel-view-count", text: `${all.length} titles` });

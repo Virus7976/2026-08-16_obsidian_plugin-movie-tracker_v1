@@ -151,14 +151,14 @@ const plugin = {
  */
 function library(root: HTMLElement): void {
 	const header = root.createDiv({ cls: "reel-view-header" });
-	const wrap = header.createDiv({ cls: "reel-search-wrap" });
+	const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
 	wrap.createSpan({ cls: "reel-search-icon", text: "⌕" });
 	wrap.createEl("input", {
 		cls: "reel-input reel-search-input",
 		attr: { type: "search", placeholder: "Search titles, people, characters, plots…" },
 	});
-	wrap.createEl("button", { cls: "reel-search-clear", text: "×" });
-	header.createEl("button", { cls: "reel-btn mod-cta reel-add-btn", text: "+" });
+	wrap.createEl("button", { cls: "reel-search-clear clickable-icon", text: "×" });
+	// No add button: it moved to a native view action via addAction().
 
 	const tabs = root.createDiv({ cls: "reel-tabs" });
 	for (const t of ["Library", "Discover", "Rate", "Up next", "Diary", "Stats"]) {
@@ -188,10 +188,10 @@ function library(root: HTMLElement): void {
 
 	const sort = filters.createDiv({ cls: "reel-sortbar" });
 	sort.createSpan({ cls: "reel-dim", text: "Sort" });
-	const sel = sort.createEl("select");
+	const sel = sort.createEl("select", { cls: "reel-select dropdown" });
 	sel.createEl("option", { text: "Recently watched" });
 	sort.createSpan({ cls: "reel-dim", text: "then" });
-	const sel2 = sort.createEl("select");
+	const sel2 = sort.createEl("select", { cls: "reel-select dropdown" });
 	sel2.createEl("option", { text: "—" });
 
 	const body = root.createDiv({ cls: "reel-view-body" });

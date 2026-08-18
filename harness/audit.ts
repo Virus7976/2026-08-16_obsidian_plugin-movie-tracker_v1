@@ -77,6 +77,19 @@ export interface Check {
 const TAPPABLE = 'button, input, select, textarea, a, [role="button"], [contenteditable="true"], .clickable-icon';
 
 /**
+ * Is this element actually presented to the user?
+ *
+ * `visibility: hidden` takes an element out of hit-testing, focus and the
+ * accessibility tree — it is not a target, and counting it as one produced two
+ * false failures the moment the search row learned to collapse. Size and
+ * position are the wrong questions to ask about something nobody can touch.
+ */
+function shown(el: HTMLElement): boolean {
+	const cs = getComputedStyle(el);
+	return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
+}
+
+/**
  * Can the user scroll this element out from under whatever is covering it?
  *
  * An ancestor that scrolls vertically and has somewhere left to go means yes.
@@ -235,7 +248,7 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 
 	const small = [...view.querySelectorAll<HTMLElement>('button, [role="button"], select')].filter((el) => {
 		const h = el.getBoundingClientRect().height;
-		if (h <= 0 || el.closest(".reel-stars") || el.closest(".reel-episode-stars")) return false;
+		if (h <= 0 || !shown(el) || el.closest(".reel-stars") || el.closest(".reel-episode-stars")) return false;
 		if (h >= 44) return false;
 		return !reaches44(el);
 	});
@@ -261,7 +274,7 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 	const blocked: string[] = [];
 	for (const el of Array.from(view.querySelectorAll<HTMLElement>(TAPPABLE))) {
 		const r = el.getBoundingClientRect();
-		if (r.width < 2 || r.height < 2) continue;
+		if (r.width < 2 || r.height < 2 || !shown(el)) continue;
 		const cx = r.left + r.width / 2;
 		const cy = r.top + r.height / 2;
 		// Off-screen is a scrolling question, not a stacking one.
@@ -347,6 +360,8 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 	// Overlap. Two controls sharing pixels means one of them cannot be tapped,
 	// and it is invisible in a static read of the markup.
 	const targets = [...view.querySelectorAll<HTMLElement>('button, [role="button"], a, select, input')].filter((el) => {
+		// A hidden control is not a target; it cannot be tapped or overlap one.
+		if (!shown(el)) return false;
 		const b = el.getBoundingClientRect();
 		return b.width > 0 && b.height > 0;
 	});

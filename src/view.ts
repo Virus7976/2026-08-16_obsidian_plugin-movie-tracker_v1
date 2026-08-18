@@ -154,6 +154,18 @@ export class ReelView extends ItemView {
 		// registerDomEvent, not addEventListener: Obsidian unbinds it when the
 		// view closes, so reopening the tab can't stack duplicate handlers.
 		this.registerDomEvent(this.contentEl, "keydown", this.onKey);
+
+		/*
+		 * View actions, where Obsidian already draws its own.
+		 *
+		 * `addAction` puts these in the header alongside the tab and menu
+		 * buttons, which is both the native place for them and the one place
+		 * guaranteed not to collide with anything — Obsidian owns the layout.
+		 * Reel's own header row was competing for that space and losing.
+		 */
+		this.addAction("plus", "Log a film or series", () => this.plugin.openSearch());
+		this.addAction("search", "Search your library", () => this.toggleSearch());
+
 		this.build();
 		this.registerEvent(this.plugin.library.on("changed", () => this.paint()));
 	}
@@ -161,10 +173,20 @@ export class ReelView extends ItemView {
 	private build(): void {
 		const root = this.contentEl;
 
-		/* ---- header: search + add ------------------------------------ */
+		/* ---- header: search ------------------------------------------- */
+		/*
+		 * `search-input-container` is Obsidian's own class, not a copy of it.
+		 *
+		 * Reel hand-rolled every control, which meant every theme the user
+		 * installs styled the app around Reel and left Reel looking like a web
+		 * page dropped into it. Borrowing the real classes means the search
+		 * field, the dropdowns and the icon buttons inherit whatever the user
+		 * chose, for free and permanently.
+		 */
 		const header = root.createDiv({ cls: "reel-view-header" });
+		this.headerEl = header;
 
-		const searchWrap = header.createDiv({ cls: "reel-search-wrap" });
+		const searchWrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
 		setIcon(searchWrap.createSpan({ cls: "reel-search-icon" }), "search");
 		const search = searchWrap.createEl("input", {
 			cls: "reel-input reel-search-input",
@@ -184,7 +206,7 @@ export class ReelView extends ItemView {
 		});
 		this.searchEl = search;
 		const clear = searchWrap.createEl("button", {
-			cls: "reel-search-clear",
+			cls: "reel-search-clear clickable-icon",
 			text: "×",
 			// A screen reader otherwise announces this as "times".
 			attr: { "aria-label": "Clear search", type: "button" },
@@ -196,11 +218,10 @@ export class ReelView extends ItemView {
 			search.focus();
 		});
 
-		const add = header.createEl("button", { cls: "reel-btn mod-cta reel-add-btn" });
-		setIcon(add.createSpan(), "plus");
-		add.createSpan({ text: Platform.isPhone ? "" : "Log" });
-		add.setAttr("aria-label", "Log a film or series");
-		add.addEventListener("click", () => this.plugin.openSearch());
+		// The "Log" button used to live here, in a row of Reel's own making
+		// that sat directly under Obsidian's header — which is what buried the
+		// search field. It is a view action now: same place Obsidian already
+		// draws its own, and one less row of chrome on a phone.
 
 		/* ---- tabs ----------------------------------------------------- */
 		const tabBar = root.createDiv({ cls: "reel-tabs" });
@@ -230,6 +251,8 @@ export class ReelView extends ItemView {
 	}
 
 	private filterEl!: HTMLElement;
+	/** The search row, collapsed on a phone until the header action asks for it. */
+	private headerEl!: HTMLElement;
 	private searchEl: HTMLInputElement | null = null;
 	/** Where the list was when a detail screen was opened over it. */
 	private listScroll = 0;
@@ -483,6 +506,29 @@ export class ReelView extends ItemView {
 	 * what "I can't see anything on the library page" actually was.
 	 */
 	/**
+	 * Show or hide the search row.
+	 *
+	 * On a phone the field is collapsed until asked for: a persistent search
+	 * box costs a row of a screen that had roughly a third of it spent on
+	 * chrome, and searching is something you do occasionally rather than
+	 * continuously. On a wide pane there is room, so it simply stays.
+	 *
+	 * Clearing on collapse is deliberate. A hidden filter still filtering is
+	 * indistinguishable from missing data, which is the bug this view already
+	 * had once when a Library search silently filtered the Diary.
+	 */
+	private toggleSearch(): void {
+		const open = this.headerEl.hasClass("is-open");
+		this.headerEl.toggleClass("is-open", !open);
+		if (open) {
+			this.clearSearch();
+			this.paint();
+		} else {
+			this.searchEl?.focus();
+		}
+	}
+
+	/**
 	 * Keep `is-scroll-end` in step with a horizontally scrolling row.
 	 *
 	 * The edge fade that advertises "there is more this way" becomes a lie the
@@ -622,7 +668,7 @@ export class ReelView extends ItemView {
 		const sortBar = this.filterEl.createDiv({ cls: "reel-sortbar" });
 
 		sortBar.createSpan({ cls: "reel-dim", text: "Sort" });
-		const select = sortBar.createEl("select", { cls: "reel-select" });
+		const select = sortBar.createEl("select", { cls: "reel-select dropdown" });
 		for (const [value, label] of SORT_OPTIONS) select.createEl("option", { value, text: label });
 		select.value = this.sort;
 		select.addEventListener("change", () => {
@@ -634,7 +680,7 @@ export class ReelView extends ItemView {
 		// among equals the most recent" is a real question the single sort
 		// could not answer.
 		sortBar.createSpan({ cls: "reel-dim", text: "then" });
-		const select2 = sortBar.createEl("select", { cls: "reel-select" });
+		const select2 = sortBar.createEl("select", { cls: "reel-select dropdown" });
 		select2.createEl("option", { value: "", text: "—" });
 		for (const [value, label] of SORT_OPTIONS) {
 			if (value === this.sort || value === "random") continue;
