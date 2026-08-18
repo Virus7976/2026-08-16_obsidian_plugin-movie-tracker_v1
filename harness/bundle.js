@@ -1008,6 +1008,63 @@
     attachOpinion(el, opinionOf(plugin2, personId));
   }
 
+  // src/ui/titlesSheet.ts
+  var TitlesSheet = class extends Modal {
+    constructor(plugin2, heading, entries, note) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.heading = heading;
+      this.entries = entries;
+      this.note = note;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal", "reel-titles-sheet");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-titles");
+      const head = contentEl.createDiv({ cls: "reel-titles-head" });
+      head.createDiv({ cls: "reel-titles-title", text: this.heading });
+      head.createDiv({
+        cls: "reel-titles-count",
+        text: `${this.entries.length} ${this.entries.length === 1 ? "title" : "titles"}`
+      });
+      if (this.note)
+        head.createDiv({ cls: "reel-dim", text: this.note });
+      if (!this.entries.length) {
+        contentEl.createDiv({ cls: "reel-empty", text: "Nothing here yet." });
+        return;
+      }
+      const list = contentEl.createDiv({ cls: "reel-titles-list" });
+      for (const entry of this.entries) {
+        const row = list.createDiv({ cls: "reel-titles-row" });
+        const poster2 = row.createDiv({ cls: "reel-titles-poster" });
+        this.plugin.posters.attach(poster2, entry);
+        const body = row.createDiv({ cls: "reel-titles-body" });
+        body.createDiv({ cls: "reel-titles-name", text: entry.title });
+        const meta = body.createDiv({ cls: "reel-titles-meta" });
+        const year = entry.year ?? entry.firstAirYear;
+        if (year)
+          meta.createSpan({ cls: "reel-dim", text: String(year) });
+        if (entry.rating != null) {
+          renderStarsStatic(meta.createDiv({ cls: "reel-titles-stars" }), entry.rating);
+        }
+        const last = entry.watched?.[entry.watched.length - 1];
+        if (last?.date)
+          meta.createSpan({ cls: "reel-dim", text: prettyDate(last.date) });
+        row.addEventListener("click", () => {
+          this.close();
+          void this.plugin.openDetail(entry);
+        });
+        row.setAttr("role", "button");
+        row.setAttr("tabindex", "0");
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/render/stats.ts
   function paintStats(plugin2, el, opts) {
     el.empty();
@@ -1066,6 +1123,7 @@
       });
     };
     const rated = watched.map((v) => v.rating ?? v.entry.rating).filter((r) => r != null);
+    const show = (heading, entries, note) => () => new TitlesSheet(plugin2, heading, entries, note).open();
     if (films.length) {
       const distinct = new Set(watched.map((v) => v.entry.path)).size;
       const rewatches = watched.filter((v) => v.rewatch).length;
@@ -1073,7 +1131,7 @@
         "Films watched",
         String(watched.length),
         `${distinct} distinct \xB7 ${rewatches} rewatches`,
-        () => void plugin2.openLibraryWithStatus("watched", "stats")
+        show("Films watched", [...new Set(watched.map((v) => v.entry))])
       );
       tile("Hours of film", formatMinutes(filmMinutes));
     }
@@ -1082,14 +1140,23 @@
         "Episodes",
         String(episodesSeen),
         `${shows.length} show${shows.length === 1 ? "" : "s"}`,
-        () => void plugin2.openLibraryWithStatus("watching", "stats")
+        show("Series you're watching", shows)
       );
       if (episodeMinutes)
         tile("Hours of TV", formatMinutes(episodeMinutes));
     }
     if (rated.length) {
       const mean = rated.reduce((a, b) => a + b, 0) / rated.length;
-      tile("Average rating", mean.toFixed(2), `${rated.length} rated`);
+      tile(
+        "Average rating",
+        mean.toFixed(2),
+        `${rated.length} rated`,
+        show(
+          "Everything you've rated",
+          [...new Set(watched.map((v) => v.entry))].filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)),
+          "Highest first"
+        )
+      );
     }
     const paired = films.filter((e) => e.rating != null && e.imdbRating != null).map((e) => ({ entry: e, delta: e.rating - e.imdbRating / 2 }));
     if (paired.length >= 3) {
@@ -1116,7 +1183,7 @@
         "On the watchlist",
         String(watchlist),
         rate > 0 ? `${Math.ceil(watchlist / rate)} months at this pace` : void 0,
-        () => void plugin2.openLibraryWithStatus("watchlist", "stats")
+        show("On the watchlist", all2.filter((e) => e.status === "watchlist"))
       );
     }
     const unrated = films.filter((e) => e.rating == null && e.watched.length).length;
@@ -1362,8 +1429,11 @@
     const max = Math.max(...data.map((d) => d.n), 1);
     const faces = data.some((d) => d.face) ? plugin2?.library.peopleIds() : void 0;
     const box = el.createDiv({ cls: "reel-chart" });
-    box.createDiv({ cls: "reel-chart-title", text: title });
-    const body = box.createDiv({ cls: "reel-chart-body" });
+    const fold = box.createEl("details", { cls: "reel-fold" });
+    const summary = fold.createEl("summary", { cls: "reel-fold-summary" });
+    summary.createDiv({ cls: "reel-chart-title", text: title });
+    summary.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
+    const body = fold.createDiv({ cls: "reel-chart-body" });
     for (const d of data) {
       const row = body.createDiv({ cls: "reel-chart-row" });
       const head = row.createDiv({ cls: "reel-chart-head" });
@@ -5308,7 +5378,9 @@
   var TAPPABLE = 'button, input, select, textarea, a, [role="button"], [contenteditable="true"], .clickable-icon';
   function shown(el) {
     const cs = getComputedStyle(el);
-    return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
+    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0")
+      return false;
+    return !el.closest("details:not([open])");
   }
   function scrollableOut(el, stopAt) {
     for (let p = el.parentElement; p; p = p.parentElement) {

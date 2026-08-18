@@ -1,6 +1,7 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, addIcon } from "obsidian";
 import { DEFAULT_SETTINGS, ReelSettingTab, ReelSettings } from "./settings";
 import { canPersist, mergeForSave } from "./util/settingsguard";
+import { keyboardInset } from "./util/panewidth";
 import { CredentialStore, MissingKeyError } from "./credentials";
 import { TmdbClient } from "./tmdb";
 import { Library } from "./library";
@@ -82,6 +83,11 @@ export default class ReelPlugin extends Plugin {
 		// Steps hold a path, and a path stops meaning anything the moment the
 		// note behind it is renamed or deleted.
 		this.undo.watch();
+
+		// Sheets are pinned to the bottom of the screen, and a phone keyboard is
+		// drawn over that. Without this the passphrase prompt appears behind the
+		// keyboard — focused, invisible, and impossible to complete.
+		this.register(keyboardInset());
 
 		addIcon("reel", REEL_ICON);
 

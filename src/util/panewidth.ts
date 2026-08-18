@@ -176,3 +176,38 @@ export function stampChromeInsets(el: HTMLElement, root: ParentNode = document):
 export function topInset(el: HTMLElement): number {
 	return parseInt(el.style.getPropertyValue("--reel-top-inset") || "0", 10) || 0;
 }
+
+/**
+ * Keep sheets above the software keyboard.
+ *
+ * A sheet is pinned to the bottom of the *layout* viewport. A phone keyboard
+ * does not shrink that viewport — it is drawn over it — so a bottom-anchored
+ * sheet ends up behind the keyboard. The passphrase prompt did exactly that:
+ * the field had focus, the keyboard was up, and the sheet itself was nowhere on
+ * screen. Not being able to type a passphrase means not being able to unlock
+ * the API keys, which means not being able to use the plugin at all.
+ *
+ * `visualViewport` is the one API that knows how much of the screen the
+ * keyboard has taken. Where it is missing, the offset stays 0 and behaviour is
+ * exactly as before.
+ *
+ * Returns a teardown, because a listener on `visualViewport` outlives any view
+ * that forgets to remove it.
+ */
+export function keyboardInset(): () => void {
+	const vv = window.visualViewport;
+	if (!vv) return () => {};
+	const sync = (): void => {
+		// How much of the layout viewport is currently hidden below the fold.
+		const hidden = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+		document.body.setCssProps({ "--reel-keyboard": `${Math.round(hidden)}px` });
+	};
+	vv.addEventListener("resize", sync);
+	vv.addEventListener("scroll", sync);
+	sync();
+	return () => {
+		vv.removeEventListener("resize", sync);
+		vv.removeEventListener("scroll", sync);
+		document.body.setCssProps({ "--reel-keyboard": "0px" });
+	};
+}

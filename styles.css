@@ -6913,6 +6913,170 @@ input.reel-input {
 
 
 
+
+/* ------------------------------------------------------------------ */
+/* Sheets must sit above the keyboard                                  */
+/*                                                                     */
+/* A sheet is `position: fixed; inset: auto 0 0 0` — anchored to the    */
+/* bottom of the *layout* viewport. A software keyboard does not shrink */
+/* that viewport; it is simply drawn over it. So the passphrase sheet   */
+/* was rendering underneath the keyboard: the field had focus, the      */
+/* keyboard was up, and there was nothing on screen at all. Unable to   */
+/* type a passphrase means unable to unlock the API keys, which means   */
+/* unable to use the plugin.                                            */
+/*                                                                      */
+/* `--reel-keyboard` is set from `visualViewport` by `keyboardInset()`. */
+/* ------------------------------------------------------------------ */
+.reel-modal.reel-sheet {
+	bottom: var(--reel-keyboard, 0px);
+	max-height: calc(88dvh - var(--reel-keyboard, 0px));
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Drill-down sheet, and collapsible sections                          */
+/* ------------------------------------------------------------------ */
+
+.reel-titles-head {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-bottom: var(--reel-space-3);
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: var(--reel-space-2);
+}
+
+.reel-titles-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 700;
+}
+
+.reel-titles-count {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-titles-list {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+/* A row is a control, so it gets a control's target and feedback. */
+.reel-titles-row {
+	display: flex;
+	gap: var(--reel-space-3);
+	align-items: flex-start;
+	min-height: 44px;
+	min-width: 0;
+	padding: var(--reel-space-2) 0;
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-titles-row:last-child {
+	border-bottom: none;
+}
+
+.reel-titles-row:active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-titles-poster {
+	flex: 0 0 44px;
+	width: 44px;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius-sm);
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.reel-titles-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-titles-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.reel-titles-name {
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.reel-titles-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--reel-space-2);
+	margin-top: 2px;
+	min-width: 0;
+}
+
+.reel-titles-stars {
+	display: flex;
+	gap: 1px;
+}
+
+/* Collapsed by default: everything present at once is everything unfindable.
+   A closed section states what it holds, so the page reads as a contents page
+   you open one part of. */
+.reel-fold {
+	min-width: 0;
+}
+
+.reel-fold-summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--reel-space-2);
+	min-height: 44px;
+	cursor: pointer;
+	list-style: none;
+	/* Safari still draws its own marker without this. */
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-fold-summary::-webkit-details-marker {
+	display: none;
+}
+
+/* A chevron of our own, so it can point the right way in both states. */
+.reel-fold-summary::after {
+	content: "";
+	flex: 0 0 auto;
+	width: 8px;
+	height: 8px;
+	border-right: 2px solid var(--text-muted);
+	border-bottom: 2px solid var(--text-muted);
+	transform: rotate(45deg) translate(-2px, -2px);
+	transition: transform 140ms ease;
+}
+
+.reel-fold[open] > .reel-fold-summary::after {
+	transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.reel-fold-count {
+	margin-left: auto;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-fold-summary::after {
+		transition: none;
+	}
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */

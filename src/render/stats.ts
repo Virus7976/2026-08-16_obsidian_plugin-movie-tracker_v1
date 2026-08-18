@@ -22,6 +22,7 @@ import { viewings } from "./diary";
 import { renderEmpty } from "../ui/empty";
 import { setSelected } from "../ui/a11y";
 import { attachOpinion, opinionOf } from "../ui/personBadge";
+import { TitlesSheet } from "../ui/titlesSheet";
 
 export interface StatsOptions {
 	year?: number;
@@ -134,23 +135,51 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 
 	const rated = watched.map((v) => v.rating ?? v.entry.rating).filter((r): r is number => r != null);
 
+	/*
+	 * A tile answers in place.
+	 *
+	 * These used to navigate to a filtered Library, which answers the question
+	 * by leaving the page it was asked from — and on a phone, leaving means
+	 * finding your way back. A sheet shows the titles, your rating and when you
+	 * saw them, over the stats page rather than instead of it.
+	 */
+	const show = (heading: string, entries: Entry[], note?: string) => () =>
+		new TitlesSheet(plugin, heading, entries, note).open();
+
 	if (films.length) {
 		const distinct = new Set(watched.map((v) => v.entry.path)).size;
 		const rewatches = watched.filter((v) => v.rewatch).length;
-		tile("Films watched", String(watched.length), `${distinct} distinct · ${rewatches} rewatches`, () =>
-			void plugin.openLibraryWithStatus("watched", "stats")
+		tile(
+			"Films watched",
+			String(watched.length),
+			`${distinct} distinct · ${rewatches} rewatches`,
+			show("Films watched", [...new Set(watched.map((v) => v.entry))])
 		);
 		tile("Hours of film", formatMinutes(filmMinutes));
 	}
 	if (shows.length) {
-		tile("Episodes", String(episodesSeen), `${shows.length} show${shows.length === 1 ? "" : "s"}`, () =>
-			void plugin.openLibraryWithStatus("watching", "stats")
+		tile(
+			"Episodes",
+			String(episodesSeen),
+			`${shows.length} show${shows.length === 1 ? "" : "s"}`,
+			show("Series you're watching", shows)
 		);
 		if (episodeMinutes) tile("Hours of TV", formatMinutes(episodeMinutes));
 	}
 	if (rated.length) {
 		const mean = rated.reduce((a, b) => a + b, 0) / rated.length;
-		tile("Average rating", mean.toFixed(2), `${rated.length} rated`);
+		tile(
+			"Average rating",
+			mean.toFixed(2),
+			`${rated.length} rated`,
+			show(
+				"Everything you've rated",
+				[...new Set(watched.map((v) => v.entry))]
+					.filter((e) => e.rating != null)
+					.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)),
+				"Highest first"
+			)
+		);
 	}
 
 	/* Taste vs the crowd. Comparing your rating to IMDb needs both on the
@@ -187,7 +216,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			"On the watchlist",
 			String(watchlist),
 			rate > 0 ? `${Math.ceil(watchlist / rate)} months at this pace` : undefined,
-			() => void plugin.openLibraryWithStatus("watchlist", "stats")
+			show("On the watchlist", all.filter((e) => e.status === "watchlist"))
 		);
 	}
 
@@ -575,9 +604,24 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 	// memoised on the index, but reaching for it twelve times per chart across
 	// eight charts is still eight times more work than reaching for it once.
 	const faces = data.some((d) => d.face) ? plugin?.library.peopleIds() : undefined;
+	/*
+	 * Collapsed by default, and openable.
+	 *
+	 * Eight charts all expanded made the stats page a single 8930px scroll:
+	 * everything present, nothing findable. A closed section states what it
+	 * holds and how much, so the page becomes a contents page you open the one
+	 * part of that you came for.
+	 *
+	 * `<details>` rather than a hand-rolled toggle — it is keyboard-operable,
+	 * announced correctly by a screen reader and searchable by the browser's own
+	 * find, none of which a div with a click handler gets for free.
+	 */
 	const box = el.createDiv({ cls: "reel-chart" });
-	box.createDiv({ cls: "reel-chart-title", text: title });
-	const body = box.createDiv({ cls: "reel-chart-body" });
+	const fold = box.createEl("details", { cls: "reel-fold" });
+	const summary = fold.createEl("summary", { cls: "reel-fold-summary" });
+	summary.createDiv({ cls: "reel-chart-title", text: title });
+	summary.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
+	const body = fold.createDiv({ cls: "reel-chart-body" });
 	for (const d of data) {
 		const row = body.createDiv({ cls: "reel-chart-row" });
 

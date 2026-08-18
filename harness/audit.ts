@@ -86,7 +86,19 @@ const TAPPABLE = 'button, input, select, textarea, a, [role="button"], [contente
  */
 function shown(el: HTMLElement): boolean {
 	const cs = getComputedStyle(el);
-	return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
+	if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") return false;
+	/*
+	 * Inside a collapsed `<details>` counts as not shown.
+	 *
+	 * Chrome renders closed details with `content-visibility: hidden` rather
+	 * than `display: none`, so the children keep reporting rects — stale ones,
+	 * all stacked at the container's position. The moment the stats charts
+	 * became collapsible that produced a page of phantom overlaps between rows
+	 * nobody could see, which is the same mistake as counting a
+	 * `visibility: hidden` control as a target: measuring something the user
+	 * cannot reach and reporting it as a defect.
+	 */
+	return !el.closest("details:not([open])");
 }
 
 /**
