@@ -64,7 +64,20 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	const all = plugin.visible(plugin.library.all());
 	const films = opts.include === "tv" ? [] : all.filter((e) => e.type === "film");
 	const shows = opts.include === "film" ? [] : all.filter((e) => e.type === "tv");
-	const watched = viewings(films, opts.year);
+	/*
+	 * Only viewings with a usable date.
+	 *
+	 * Nine places below do `v.date.slice(...)` or `new Date(v.date + ...)`, and
+	 * a single entry whose `watched:` frontmatter is malformed — hand-edited,
+	 * imported from another tracker, or half-typed — takes all of them down.
+	 * The page then renders as far as the first tile and stops, which is what a
+	 * device screenshot showed: two tiles and a blank screen.
+	 *
+	 * Filtering once here is both cheaper and more honest than nine guards: a
+	 * viewing without a date cannot appear on a timeline, so it is not data this
+	 * page can use.
+	 */
+	const watched = viewings(films, opts.year).filter((v) => typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(v.date));
 
 	if (!watched.length && !shows.length) {
 		// Stats is the one screen that can say something true and useful about

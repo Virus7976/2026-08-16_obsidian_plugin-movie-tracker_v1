@@ -1072,7 +1072,7 @@
     const all2 = plugin2.visible(plugin2.library.all());
     const films = opts.include === "tv" ? [] : all2.filter((e) => e.type === "film");
     const shows = opts.include === "film" ? [] : all2.filter((e) => e.type === "tv");
-    const watched = viewings(films, opts.year);
+    const watched = viewings(films, opts.year).filter((v) => typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(v.date));
     if (!watched.length && !shows.length) {
       renderEmpty(el, {
         icon: "bar-chart-3",

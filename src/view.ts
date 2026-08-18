@@ -480,7 +480,36 @@ export class ReelView extends ItemView {
 		this.bodyEl.removeClasses(["reel-discover", "reel-detail", "reel-stats", "reel-rate", "reel-upnext", "reel-diary"]);
 	}
 
+	/**
+	 * Draw the current tab, and never leave half a page behind.
+	 *
+	 * A throw partway through a screen used to leave exactly what had been
+	 * drawn so far and no explanation — two stats tiles and then nothing, which
+	 * photographs as a blank white area and reads as a layout bug. It is not a
+	 * layout bug; it is an exception with nobody catching it.
+	 *
+	 * Discover already had this guard and it is the reason its white screen
+	 * became diagnosable. Every other tab was still unprotected, which is the
+	 * kind of gap that only shows up as "the search error still exists" three
+	 * releases running.
+	 */
 	private paintTab(): void {
+		try {
+			this.drawTab();
+		} catch (e) {
+			this.bodyEl.empty();
+			const box = this.bodyEl.createDiv({ cls: "reel-error-state" });
+			box.createDiv({ cls: "reel-empty-title", text: `${this.tab} hit a problem` });
+			// Redacted: an error can carry a request URL, and a URL can carry
+			// the API key.
+			box.createDiv({ cls: "reel-empty-body", text: redact(e) });
+			const again = box.createEl("button", { cls: "reel-btn mod-cta", text: "Try again" });
+			again.addEventListener("click", () => this.paint());
+			console.error(`Reel: ${this.tab} render failed`, e);
+		}
+	}
+
+	private drawTab(): void {
 		this.clearScreenClasses();
 		this.paintNav();
 		if (this.tab === "library") {
