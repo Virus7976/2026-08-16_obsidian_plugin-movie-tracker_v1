@@ -5739,16 +5739,21 @@
   }
   function sizeBody(view, body) {
     const cs = getComputedStyle(view);
-    let inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    const top = view.getBoundingClientRect().top;
+    const vv = window.visualViewport;
+    const covered = vv ? window.innerHeight - vv.height - vv.offsetTop : 0;
+    if (vv && covered > 120) {
+      const visible = Math.round(vv.offsetTop + vv.height - top);
+      if (visible > 160)
+        view.setCssProps({ height: `${visible}px` });
+    } else {
+      view.style.removeProperty("height");
+    }
+    const inner = view.clientHeight - padTop - padBottom;
     if (!(inner > 0))
       return;
-    const vv = window.visualViewport;
-    if (vv) {
-      const visibleBottom = vv.offsetTop + vv.height;
-      const room = visibleBottom - view.getBoundingClientRect().top - (parseFloat(cs.paddingTop) || 0);
-      if (room > 0)
-        inner = Math.min(inner, room);
-    }
     let used = 0;
     for (const child of Array.from(view.children)) {
       if (child === body || !(child instanceof HTMLElement))

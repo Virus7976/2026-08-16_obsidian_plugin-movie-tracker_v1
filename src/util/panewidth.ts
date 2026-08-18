@@ -231,25 +231,37 @@ export function keyboardInset(): () => void {
  */
 export function sizeBody(view: HTMLElement, body: HTMLElement): void {
 	const cs = getComputedStyle(view);
-	let inner = view.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
-	if (!(inner > 0)) return;
+	const padTop = parseFloat(cs.paddingTop) || 0;
+	const padBottom = parseFloat(cs.paddingBottom) || 0;
+	const top = view.getBoundingClientRect().top;
 
 	/*
-	 * Never taller than what the keyboard leaves.
+	 * Work around Obsidian mis-sizing the leaf when the keyboard opens.
 	 *
-	 * The view's own height does not shrink when a keyboard opens — the layout
-	 * viewport is unchanged and the keyboard is simply drawn over it. So the
-	 * arithmetic below would hand the body a height that runs underneath the
-	 * keyboard, and the part you cannot see reads as dead space.
+	 * Measured on a device: with a keyboard up, the visible area is ~510px and
+	 * `.view-content` reports far less. Freeing 110px of Reel's own chrome
+	 * changed the results area not at all, because the constraint was never
+	 * inside Reel — the leaf genuinely ends early and the blank below it is
+	 * Obsidian's own background.
 	 *
-	 * `visualViewport` knows what is actually visible; clamp to it.
+	 * No arithmetic within that box can recover space the box does not have, so
+	 * the view is given the height the *visible viewport* says it should have.
+	 * Only while a keyboard is actually up: when nothing is covering the screen
+	 * Obsidian's own sizing is correct and should be left alone.
 	 */
 	const vv = window.visualViewport;
-	if (vv) {
-		const visibleBottom = vv.offsetTop + vv.height;
-		const room = visibleBottom - view.getBoundingClientRect().top - (parseFloat(cs.paddingTop) || 0);
-		if (room > 0) inner = Math.min(inner, room);
+	const covered = vv ? window.innerHeight - vv.height - vv.offsetTop : 0;
+	if (vv && covered > 120) {
+		const visible = Math.round(vv.offsetTop + vv.height - top);
+		if (visible > 160) view.setCssProps({ height: `${visible}px` });
+	} else {
+		// Hand it back the moment the keyboard goes, so Obsidian resumes
+		// owning a decision that is normally its own.
+		view.style.removeProperty("height");
 	}
+
+	const inner = view.clientHeight - padTop - padBottom;
+	if (!(inner > 0)) return;
 
 	let used = 0;
 	for (const child of Array.from(view.children)) {
