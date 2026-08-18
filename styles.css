@@ -7696,6 +7696,22 @@ input.reel-input {
 
 
 
+
+/* While searching, the filter chips step aside.
+ *
+ * With a keyboard open the view has roughly 288px of usable height on a 384px
+ * phone, and the search row plus two chip rows take 171 of it. Sixty percent of
+ * the screen spent on controls left about one third of one poster visible —
+ * which is what "I can see the head of two titles but not the information" was.
+ *
+ * Searching and filtering narrow the same list, and nobody does both at once.
+ * Only while there is a query: an empty field changes nothing. */
+.reel-view.is-searching:not(.is-w700) .reel-view-filters {
+	display: none;
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */

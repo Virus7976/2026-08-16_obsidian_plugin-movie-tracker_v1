@@ -265,6 +265,7 @@ export class ReelView extends ItemView {
 		// filtering runs in well under a frame even at a few thousand titles.
 		search.addEventListener("input", () => {
 			this.query = search.value;
+			this.syncSearchFocus();
 			this.paint();
 		});
 		this.searchEl = search;
@@ -676,6 +677,26 @@ export class ReelView extends ItemView {
 	 * indistinguishable from missing data, which is the bug this view already
 	 * had once when a Library search silently filtered the Diary.
 	 */
+	/**
+	 * While you are searching, the filters step aside.
+	 *
+	 * With a keyboard up the view has about 288px of usable height, and the
+	 * search row plus two rows of filter chips take 171 of it — sixty percent of
+	 * the screen spent on controls, leaving barely one row of results. A device
+	 * screenshot showed two matching posters clipped to a third of their height
+	 * with the count above them.
+	 *
+	 * Searching and filtering are two ways of narrowing the same list, and
+	 * nobody does both at once. The chips come back the moment the field is
+	 * empty.
+	 */
+	private syncSearchFocus(): void {
+		const searching = this.headerEl.hasClass("is-open") && this.query.length > 0;
+		this.contentEl.toggleClass("is-searching", searching);
+		// The filter row changing height changes what the body has left.
+		this.measureWidth();
+	}
+
 	private toggleSearch(): void {
 		const open = this.headerEl.hasClass("is-open");
 		this.headerEl.toggleClass("is-open", !open);
