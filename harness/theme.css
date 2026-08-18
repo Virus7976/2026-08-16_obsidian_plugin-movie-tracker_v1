@@ -82,12 +82,15 @@ html, body {
 
 .view-header.obsidian-chrome {
 	top: 0;
-	height: 48px;
+	/* 48px is what one Android phone reported. A replayed snapshot overrides
+	   it, so the harness imitates the device rather than the one device its
+	   defaults were taken from. */
+	height: var(--harness-chrome-top, 48px);
 }
 
 .mobile-toolbar.obsidian-chrome {
 	bottom: 0;
-	height: 48px;
+	height: var(--harness-chrome-bottom, 48px);
 	justify-content: flex-end;
 }
 

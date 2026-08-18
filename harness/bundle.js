@@ -5805,6 +5805,14 @@
   var wanted = params2.get("screen") ?? "library";
   var phone2 = params2.get("phone") !== "0";
   var paneWidth = Number(params2.get("pane") ?? "") || 0;
+  var chromeTop = Number(params2.get("chromeTop") ?? "") || 0;
+  var chromeBottom = Number(params2.get("chromeBottom") ?? "") || 0;
+  if (chromeTop || chromeBottom) {
+    document.body.setCssProps({
+      "--harness-chrome-top": `${chromeTop || 48}px`,
+      "--harness-chrome-bottom": `${chromeBottom || 48}px`
+    });
+  }
   if (paneWidth > 0) {
     document.body.setCssProps({ "--reel-harness-pane": `${paneWidth}px` });
     document.body.addClass("reel-harness-narrow-pane");

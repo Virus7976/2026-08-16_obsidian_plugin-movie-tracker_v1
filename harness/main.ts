@@ -363,6 +363,22 @@ const phone = params.get("phone") !== "0";
  * in a narrow window, where the two happen to agree, so it always passed.
  */
 const paneWidth = Number(params.get("pane") ?? "") || 0;
+
+/*
+ * Chrome sizes taken from a device snapshot, when one is supplied.
+ *
+ * The harness's own header and toolbar are 48px because that is what one
+ * Android phone reported. `?chromeTop=&chromeBottom=` lets a real snapshot
+ * override them, so replaying a device is a URL rather than an edit.
+ */
+const chromeTop = Number(params.get("chromeTop") ?? "") || 0;
+const chromeBottom = Number(params.get("chromeBottom") ?? "") || 0;
+if (chromeTop || chromeBottom) {
+	document.body.setCssProps({
+		"--harness-chrome-top": `${chromeTop || 48}px`,
+		"--harness-chrome-bottom": `${chromeBottom || 48}px`,
+	});
+}
 if (paneWidth > 0) {
 	document.body.setCssProps({ "--reel-harness-pane": `${paneWidth}px` });
 	document.body.addClass("reel-harness-narrow-pane");

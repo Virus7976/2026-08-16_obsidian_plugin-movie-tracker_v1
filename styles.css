@@ -7114,6 +7114,87 @@ input.reel-input {
 	display: none;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Stats: why it did not feel native, and what changed                 */
+/*                                                                     */
+/* Four specific choices, not a general vagueness:                     */
+/*                                                                     */
+/* 1. Cards on cards. Both `.reel-tile` and `.reel-chart` painted      */
+/*    `--background-secondary` with a radius and padding, so the page  */
+/*    was a grid of filled boxes on a filled background. Obsidian's    */
+/*    own surfaces — settings, file explorer, outline, backlinks — are */
+/*    almost entirely flat: sections are separated by a heading and    */
+/*    space, not by a box. A wall of cards is a web dashboard idiom    */
+/*    (Grafana, Notion), and it is the single loudest non-native       */
+/*    signal on the screen.                                            */
+/*                                                                     */
+/* 2. Headings inside the boxes. A chart's title was a bold line       */
+/*    within its own card rather than a section heading over content,  */
+/*    so the page had no scannable structure — just twelve equally     */
+/*    weighted rectangles.                                             */
+/*                                                                     */
+/* 3. A fixed label column. `minmax(4.5em, 8em)` is a desktop table    */
+/*    talking; on a phone it left the bar too little room to say       */
+/*    anything, which is why the labels won and the data lost.         */
+/*                                                                     */
+/* 4. Metric tiles. Four big numbers in a grid is a dashboard's        */
+/*    opening move. It is not wrong, but it is not what an Obsidian    */
+/*    view looks like, and it was consuming the top of the screen.     */
+/*                                                                     */
+/* The fix is subtraction: flatten the boxes, promote the titles to    */
+/* headings with a rule, and let the charts use the full width.        */
+/* ------------------------------------------------------------------ */
+
+.reel-view:not(.is-w700) .reel-stats .reel-chart {
+	background: transparent;
+	padding: 0;
+	border-radius: 0;
+	margin-bottom: var(--reel-space-5);
+}
+
+/* A section heading, in Obsidian's own idiom: small, muted, uppercase,
+   separated by a rule rather than by a container. */
+.reel-view:not(.is-w700) .reel-stats .reel-chart-title {
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	padding-bottom: var(--reel-space-1);
+	margin-bottom: var(--reel-space-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* The label gets a line of its own and the bar gets the width. A chart whose
+   bar is 150px wide is a chart that has stopped communicating. */
+.reel-view:not(.is-w700) .reel-stats .reel-chart-row {
+	grid-template-columns: minmax(0, 1fr) 3em;
+}
+
+/* Tiles keep their fill — they *are* the number, so the fill is doing work —
+   but they stop being cards floating on a card. */
+.reel-view:not(.is-w700) .reel-stats .reel-tile {
+	background: var(--background-secondary);
+	border-radius: var(--reel-radius);
+}
+
+.reel-view:not(.is-w700) .reel-stats .reel-facts {
+	background: transparent;
+	padding: 0;
+}
+
+/* A fact row is a label and a value on one line, which is exactly what
+   Obsidian's own settings rows are. Borrow the separator too. */
+.reel-view:not(.is-w700) .reel-stats .reel-fact {
+	padding: var(--reel-space-2) 0;
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.reel-view:not(.is-w700) .reel-stats .reel-fact:last-child {
+	border-bottom: none;
+}
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */

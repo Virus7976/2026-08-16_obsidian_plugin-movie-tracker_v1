@@ -67,6 +67,58 @@ Carried from round 4, where five items were listed and not built.
 
 ## Done
 
+### Round 7 — the 21-item list, and why the stats page looked wrong
+
+Twenty-one items across five iterations, published as 0.7.69–0.7.74.
+
+**Why stats did not feel native**, since "restyle it" was the wrong instruction:
+
+1. *Cards on cards.* Tiles and charts both painted `--background-secondary`
+   with a radius, so the page was a grid of filled boxes on a filled
+   background. Obsidian's own surfaces — settings, file explorer, outline,
+   backlinks — are almost entirely flat: sections separated by a heading and
+   space, not by a box. A wall of cards is a dashboard idiom, and it is the
+   loudest non-native signal on the screen.
+2. *Headings inside the boxes.* A chart title was bold text within its own
+   card rather than a heading over content, so twelve equally weighted
+   rectangles had no scannable structure.
+3. *A fixed label column.* `minmax(4.5em, 8em)` is a desktop table talking. On
+   a phone it left the bar too little room, so the labels won and the data
+   lost.
+4. *Metric tiles.* Four big numbers in a grid is a dashboard's opening move.
+   Not wrong, but not what an Obsidian view looks like.
+
+The fix was subtraction, not restyling: flatten the containers, promote titles
+to headings with a rule, give the bar the width.
+
+**What the new checks caught**, all real and all found by machine:
+
+- `reel-input under view-header` — the untappable search field, reproduced in
+  the harness for the first time after months of failing to.
+- Sheet action buttons under the floating toolbar. Unlike a list, there is
+  nothing to scroll to reach them.
+- A collapsed search row still holding focusable children — tab order running
+  through a field nobody can see.
+- The sort dropdown at 34px against a promised 44.
+
+**Three times the check was wrong rather than the code**, which is worth as
+much as the bugs:
+
+- `touchTargets44` measured the painted box, so enforcing it turned every chip
+  into a lozenge. It measures the tap area now.
+- The target checks counted `visibility: hidden` elements, producing false
+  failures the moment a row learned to collapse.
+- A reported chip collision was two chips 130px apart — an artifact of the
+  harness mounting a fixed-position sheet inside a fake narrow pane. Now
+  skipped *and printed*, because a pass that silently covers less than it looks
+  like is worse than one that fails.
+
+**Unproven, and stated as such.** Snapshot replay parses and is tested against
+a synthetic fixture built from the one set of real numbers available. No
+snapshot from a device exists yet: nine releases have been built and none has
+reached the phone, so everything above is verified against a *model* of it.
+
+
 ### Round 6 — the layout was asking the wrong question
 
 The stylesheet decided its layout from `@media (min-width: …)`, which asks how
