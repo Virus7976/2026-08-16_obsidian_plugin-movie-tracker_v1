@@ -1515,24 +1515,24 @@ input.reel-input {
 	padding-left: max(12px, env(safe-area-inset-left));
 }
 
+/*
+ * `flex: 1 1 auto` with an explicit basis, and no `min-height: 0`.
+ *
+ * A device snapshot measured this element at **32px** inside a 516px view,
+ * holding a 5772px grid — a thirty-two pixel window onto the library, which is
+ * what several screenshots of "a blank page" actually were. The keyboard was
+ * closed the whole time; it was never a keyboard bug.
+ *
+ * I caused it. `min-height: 0` is the standard fix for a flex scroller and it
+ * is wrong here: with `flex-basis: 0` and nothing to grow against, the item is
+ * free to collapse, and on this device it did. Earlier snapshots measured the
+ * same element at 695px and 192px, before that line existed.
+ *
+ * `flex: 1 1 auto` keeps the content as the basis, so the body is at least as
+ * tall as the space it is given, and `overflow-y: auto` still scrolls it.
+ */
 .reel-view-body {
-	flex: 1;
-	/* `min-height: 0`, without which none of the rest of this rule works.
-	 *
-	 * A flex item defaults to `min-height: auto` — "never shrink below my
-	 * content" — so `flex: 1` proposes sharing the space and `auto` refuses, and
-	 * the content wins. The body grew to its full height (measured at 5187px
-	 * inside an 812px view), `.reel-view` clipped it at `overflow: hidden`, and
-	 * `overflow-y: auto` never engaged because nothing had ever constrained the
-	 * element. Everything past the fold was not scrolled-away; it was gone.
-	 *
-	 * Invisible on a tall screen and total on a short one, which is why it only
-	 * became obvious with a keyboard open — and why several screenshots of "a
-	 * blank page" on different tabs were all this one line.
-	 *
-	 * The horizontal twin was fixed weeks ago with `min-width: 0` across a dozen
-	 * containers. Nobody thought to check the other axis. */
-	min-height: 0;
+	flex: 1 1 auto;
 	overflow-y: auto;
 	-webkit-overflow-scrolling: touch;
 	padding: 8px 12px calc(24px + env(safe-area-inset-bottom));
@@ -7590,6 +7590,8 @@ input.reel-input {
 .reel-modal {
 	box-shadow: var(--reel-shadow-overlay);
 }
+
+
 
 
 
