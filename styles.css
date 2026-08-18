@@ -202,6 +202,21 @@ body {
 	-webkit-tap-highlight-color: transparent;
 }
 
+/* A button follows the theme's button radius; a chip stays a pill.
+ *
+ * `--button-radius` is one of exactly two variables Obsidian documents for
+ * buttons, and Reel was overriding it with a hardcoded pill. A theme that
+ * squares its buttons off had every Reel button disagreeing with every other
+ * button in the app.
+ *
+ * The chip is deliberately excluded. A filter chip is a tag, not a button, and
+ * it reads as one because it is rounder than the buttons around it — borrowing
+ * the button radius there would flatten a distinction that is doing work. */
+.reel-btn,
+.reel-log .reel-seg .reel-seg-btn {
+	border-radius: var(--button-radius, var(--reel-radius));
+}
+
 /*
  * Reel's buttons state their own appearance rather than inheriting it.
  *
@@ -7408,6 +7423,29 @@ input.reel-input {
 	border-bottom: none;
 	padding-top: 0;
 	padding-bottom: var(--reel-space-2);
+}
+
+
+
+
+/* Modals take the theme's documented modal variables.
+ *
+ * `--modal-radius`, `--modal-background`, `--modal-border-width` and
+ * `--modal-border-color` are published for exactly this, and Reel was painting
+ * its own. A sheet that does not match the app's other sheets is the clearest
+ * possible signal that it came from somewhere else. */
+.reel-modal {
+	border-radius: var(--modal-radius, var(--reel-radius-lg));
+	background: var(--modal-background, var(--background-primary));
+	border: var(--modal-border-width, 1px) solid var(--modal-border-color, var(--background-modifier-border));
+}
+
+/* A bottom sheet is square along the edge it is attached to, whatever radius
+   the theme uses elsewhere — a rounded bottom on something flush with the
+   bottom of the screen is a gap, not a corner. */
+.reel-modal.reel-sheet {
+	border-radius: var(--modal-radius, var(--reel-radius-lg)) var(--modal-radius, var(--reel-radius-lg)) 0 0;
+	border-bottom: none;
 }
 
 

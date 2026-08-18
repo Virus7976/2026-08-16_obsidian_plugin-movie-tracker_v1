@@ -104,4 +104,10 @@ body {
 	--radius-s: 2px;
 	--radius-m: 12px;
 	--radius-l: 20px;
+	/* Documented component variables. A theme that squares its buttons off and
+	   rounds its modals hard is a real configuration, and Reel should follow it
+	   rather than paint over it. */
+	--button-radius: 3px;
+	--modal-radius: 22px;
+	--modal-border-width: 2px;
 }
