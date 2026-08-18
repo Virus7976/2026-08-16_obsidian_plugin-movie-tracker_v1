@@ -236,33 +236,16 @@ export function sizeBody(view: HTMLElement, body: HTMLElement): void {
 	const top = view.getBoundingClientRect().top;
 
 	/*
-	 * Work around Obsidian handing the leaf less height than the screen has.
+	 * The view's own height is left alone.
 	 *
-	 * Do not ask whether a keyboard is open. A device snapshot reported
-	 * `visualViewport: 384x823 offsetTop=0 keyboard≈closed` while the user was
-	 * typing, so on this Android build the keyboard is simply not observable —
-	 * every fix gated on detecting one was dead code.
+	 * A previous attempt set it from the screen, which resizes the element the
+	 * `ResizeObserver` is watching — a feedback loop browsers abort silently,
+	 * leaving whatever value happened to be set when they gave up. A snapshot
+	 * caught the result: a 516px view with a 120px body and 257px of nothing.
 	 *
-	 * The observable fact is simpler and does not care why: the leaf is much
-	 * shorter than the space beneath it. Working back from a screenshot,
-	 * `clientHeight` was about 259px where the screen offered roughly 510, which
-	 * is why the body sat at its 120px floor no matter how much of Reel's own
-	 * chrome was removed. Freeing space inside a box cannot help when the box is
-	 * the constraint.
-	 *
-	 * Phone only, and only when the shortfall is large. A pane in a vertical
-	 * split is legitimately shorter than the window, and that must not be
-	 * "corrected".
+	 * The view had 377px available the whole time. The body was not starved of
+	 * space; it was measured once, early, and never asked again.
 	 */
-	const vv = window.visualViewport;
-	const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-	const available = Math.round(visibleBottom - top);
-	if (view.hasClass("is-phone") && available > 200 && available - view.clientHeight > 40) {
-		view.setCssProps({ height: `${available}px` });
-	} else if (!view.hasClass("is-phone")) {
-		view.style.removeProperty("height");
-	}
-
 	const inner = view.clientHeight - padTop - padBottom;
 	if (!(inner > 0)) return;
 

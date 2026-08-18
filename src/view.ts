@@ -519,6 +519,17 @@ export class ReelView extends ItemView {
 	private paintTab(): void {
 		try {
 			this.drawTab();
+			/*
+			 * Re-measure after drawing, not only on resize.
+			 *
+			 * The body's height is the view minus its siblings, and the siblings
+			 * change height as a result of painting — opening the search row
+			 * adds 61px, hiding the filters removes 110. `ResizeObserver` does
+			 * not fire for that, because the *view* never changed size, so the
+			 * body kept a height computed for a layout that no longer existed.
+			 * A snapshot caught it at 120px with 377px available.
+			 */
+			if (this.bodyEl) sizeBody(this.contentEl, this.bodyEl);
 		} catch (e) {
 			this.bodyEl.empty();
 			const box = this.bodyEl.createDiv({ cls: "reel-error-state" });

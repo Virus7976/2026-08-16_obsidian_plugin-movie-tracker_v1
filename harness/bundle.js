@@ -5742,14 +5742,6 @@
     const padTop = parseFloat(cs.paddingTop) || 0;
     const padBottom = parseFloat(cs.paddingBottom) || 0;
     const top = view.getBoundingClientRect().top;
-    const vv = window.visualViewport;
-    const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-    const available = Math.round(visibleBottom - top);
-    if (view.hasClass("is-phone") && available > 200 && available - view.clientHeight > 40) {
-      view.setCssProps({ height: `${available}px` });
-    } else if (!view.hasClass("is-phone")) {
-      view.style.removeProperty("height");
-    }
     const inner = view.clientHeight - padTop - padBottom;
     if (!(inner > 0))
       return;
