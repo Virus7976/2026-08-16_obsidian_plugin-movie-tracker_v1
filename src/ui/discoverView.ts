@@ -366,6 +366,16 @@ export class DiscoverScreen {
 		let startX = 0;
 		let startY = 0;
 		let tracking = false;
+		/** Was the content already at the top when the finger went down? */
+		let atTop = false;
+
+		/** The nearest ancestor that actually scrolls this card's content. */
+		const scroller = (): HTMLElement | null => {
+			for (let p: HTMLElement | null = card; p; p = p.parentElement) {
+				if (p.scrollHeight > p.clientHeight + 1) return p;
+			}
+			return null;
+		};
 
 		card.addEventListener(
 			"touchstart",
@@ -375,6 +385,11 @@ export class DiscoverScreen {
 				startX = t.clientX;
 				startY = t.clientY;
 				tracking = true;
+				// Dragging down *is* scrolling up. Unless the content is already
+				// at the top there is nothing to pull against, and treating the
+				// drag as a gesture steals an ordinary scroll.
+				const s = scroller();
+				atTop = !s || s.scrollTop <= 0;
 			},
 			{ passive: true }
 		);
@@ -389,8 +404,22 @@ export class DiscoverScreen {
 				const dx = t.clientX - startX;
 				const dy = t.clientY - startY;
 
-				// Down, and clearly not a horizontal swipe that drifted.
-				if (dy > 80 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+				/*
+				 * Down, and clearly not a horizontal swipe that drifted.
+				 *
+				 * Two extra conditions, both learned the hard way: the content
+				 * has to have been at the top when the finger went down, and
+				 * there has to be something to take back.
+				 *
+				 * Without the first, a drag down is indistinguishable from an
+				 * ordinary scroll up — which is what this gesture was actually
+				 * doing, on every single scroll. Without the second, the reward
+				 * for scrolling was a notice saying there was nothing to undo:
+				 * the app interrupting you to report that it had misread you.
+				 *
+				 * 140px rather than 80: a deliberate pull, not a flick.
+				 */
+				if (atTop && this.lastAction && dy > 140 && Math.abs(dy) > Math.abs(dx) * 1.5) {
 					onUndo();
 					return;
 				}

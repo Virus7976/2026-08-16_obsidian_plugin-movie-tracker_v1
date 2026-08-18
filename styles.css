@@ -1343,11 +1343,15 @@ input.reel-input {
 	overflow: hidden;
 }
 
+/* `--reel-top-inset` is measured by `ReelView.measureTopInset`: how far
+   Obsidian's own header reaches over the top of the view. Zero wherever the
+   header stacks above the content properly, and on a phone where it does not,
+   exactly the amount that was sitting on top of the search field. */
 .reel-view-header {
 	display: flex;
 	gap: var(--reel-space-2);
 	align-items: center;
-	padding: 10px 12px calc(10px) 12px;
+	padding: calc(10px + var(--reel-top-inset, 0px)) 12px 10px 12px;
 	padding-left: max(12px, env(safe-area-inset-left));
 	padding-right: max(12px, env(safe-area-inset-right));
 	border-bottom: 1px solid var(--background-modifier-border);

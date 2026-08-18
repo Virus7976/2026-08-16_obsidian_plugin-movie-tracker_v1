@@ -2541,6 +2541,14 @@
       let startX = 0;
       let startY = 0;
       let tracking = false;
+      let atTop = false;
+      const scroller = () => {
+        for (let p = card; p; p = p.parentElement) {
+          if (p.scrollHeight > p.clientHeight + 1)
+            return p;
+        }
+        return null;
+      };
       card.addEventListener(
         "touchstart",
         (ev) => {
@@ -2550,6 +2558,8 @@
           startX = t.clientX;
           startY = t.clientY;
           tracking = true;
+          const s = scroller();
+          atTop = !s || s.scrollTop <= 0;
         },
         { passive: true }
       );
@@ -2564,7 +2574,7 @@
             return;
           const dx = t.clientX - startX;
           const dy = t.clientY - startY;
-          if (dy > 80 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+          if (atTop && this.lastAction && dy > 140 && Math.abs(dy) > Math.abs(dx) * 1.5) {
             onUndo();
             return;
           }

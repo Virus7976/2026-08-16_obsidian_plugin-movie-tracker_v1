@@ -98,6 +98,8 @@ export class ReelView extends ItemView {
 	private tabScroll = new Map<string, number>();
 	/** Last measured pane width, surfaced by the diagnostics dump. */
 	private lastWidth = 0;
+	/** How far Obsidian's own header reaches over the top of the view. */
+	private lastTopInset = 0;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -479,6 +481,35 @@ export class ReelView extends ItemView {
 	private measureWidth(): void {
 		this.lastWidth = measure(this.contentEl);
 		stampWidth(this.contentEl, this.lastWidth);
+		this.measureTopInset();
+	}
+
+	/**
+	 * How much of the view's top edge Obsidian is already covering.
+	 *
+	 * On a phone Obsidian draws its own header — the sidebar toggle, the view
+	 * title, the tab and menu buttons — and on this device it lands *over* the
+	 * top of the content rather than above it. Reel's search field is the first
+	 * thing in the view, so it ended up underneath: visible, and untappable.
+	 * "I can't search" was literally that.
+	 *
+	 * The bottom toolbar had the same shape of problem and the fix there was to
+	 * move out of its way, because guessing the toolbar's height means guessing
+	 * at the user's settings and their phone's gesture bar. The top is
+	 * different: there is nowhere above it to move to. So measure the overlap
+	 * instead of assuming it — zero when Obsidian stacks the header properly,
+	 * and exactly the covered distance when it does not.
+	 */
+	private measureTopInset(): void {
+		const header = this.containerEl.querySelector<HTMLElement>(".view-header");
+		const top = this.contentEl.getBoundingClientRect().top;
+		const covered = header ? header.getBoundingClientRect().bottom - top : 0;
+		// Clamped: a negative reading means the header sits above us, which is
+		// the correct arrangement and needs no compensation. The ceiling stops
+		// a mid-transition measurement from pushing the whole screen down.
+		const inset = Math.round(Math.min(Math.max(covered, 0), 120));
+		this.lastTopInset = inset;
+		this.contentEl.setCssProps({ "--reel-top-inset": `${inset}px` });
 	}
 
 	/**
@@ -495,6 +526,7 @@ export class ReelView extends ItemView {
 			`tab: ${this.tab}`,
 			`pane width: ${this.lastWidth || "unmeasured"} (clientWidth ${el.clientWidth}, rect ${Math.round(el.getBoundingClientRect().width)})`,
 			`window: ${window.innerWidth}×${window.innerHeight}`,
+			`top inset: ${this.lastTopInset}px (Obsidian header overlap)`,
 			`classes: ${cls.join(" ") || "none"}`,
 			`platform: phone=${Platform.isPhone} mobile=${Platform.isMobile}`,
 			`ResizeObserver: ${typeof ResizeObserver !== "undefined"}`,
