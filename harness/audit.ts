@@ -294,6 +294,22 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 		const hit = document.elementFromPoint(cx, cy);
 		if (!hit || hit === el || el.contains(hit) || hit.contains(el)) continue;
 		/*
+		 * Reject an answer that cannot be true.
+		 *
+		 * `elementFromPoint` occasionally returns an element whose own rect does
+		 * not contain the point asked about — animating transforms and
+		 * fixed-position sheets both produce it. The log sheet reported a heart
+		 * at (334, 449) as covered by a chip spanning x 166–258, y 237–281,
+		 * which is nowhere near it.
+		 *
+		 * A check that reports a collision between two things two hundred pixels
+		 * apart is not describing the screen, and this is the second time such a
+		 * report has nearly had me change working code. If the geometry
+		 * disagrees with the hit test, the geometry wins.
+		 */
+		const hr = hit.getBoundingClientRect();
+		if (cx < hr.left - 1 || cx > hr.right + 1 || cy < hr.top - 1 || cy > hr.bottom + 1) continue;
+		/*
 		 * Content passing beneath a floating bar is not a bug — it is how a
 		 * phone works, and the body carries enough bottom padding to scroll the
 		 * last row clear. What is a bug is a control that can never be reached,

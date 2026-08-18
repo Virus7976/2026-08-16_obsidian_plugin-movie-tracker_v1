@@ -5519,6 +5519,9 @@
       const hit = document.elementFromPoint(cx, cy);
       if (!hit || hit === el || el.contains(hit) || hit.contains(el))
         continue;
+      const hr = hit.getBoundingClientRect();
+      if (cx < hr.left - 1 || cx > hr.right + 1 || cy < hr.top - 1 || cy > hr.bottom + 1)
+        continue;
       if (scrollableOut(el, view))
         continue;
       blocked.push(`${el.className.split(" ")[0] || el.tagName} under ${hit.className.split(" ")[0] || hit.tagName}`);

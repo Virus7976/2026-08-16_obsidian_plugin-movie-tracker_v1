@@ -1,13 +1,89 @@
 /* A stand-in for the user's community theme.
  *
- * Loaded AFTER styles.css, because that is the order Obsidian uses: themes
- * come after plugins. A plugin rule and a theme rule of equal specificity are
- * therefore won by the theme, which is what silently defeated three attempts
- * to clear Obsidian's header — `.reel-view { padding-top: … }` lost to
- * `.view-content { padding: 12px }` and the navigation stayed unreachable.
+ * Loaded AFTER styles.css, because that is the order Obsidian uses: themes come
+ * after plugins, so a plugin rule and a theme rule of equal specificity are won
+ * by the theme.
  *
- * Modelled here so that failure can happen locally instead of only on a phone.
+ * This has now caught two faults that were invisible locally and obvious on a
+ * phone — `.view-content { padding }` defeating the header inset, and a frame
+ * around every `<details>` turning the collapsed stats sections into a stack of
+ * empty form fields. Both times the harness rendered Reel's CSS against a blank
+ * page and saw nothing wrong.
+ *
+ * So it is deliberately opinionated now, in the way real themes are. Every rule
+ * below is something popular Obsidian themes genuinely do. If Reel depends on a
+ * bare element looking bare, that dependency should fail here rather than in a
+ * screenshot.
  */
+
 .view-content {
 	padding: 12px;
+}
+
+/* Foldables get framed, which is what turned the stats page into empty boxes. */
+details {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	padding: 8px 12px;
+	margin: 8px 0;
+	background: var(--background-secondary);
+}
+
+summary {
+	font-weight: 600;
+	cursor: pointer;
+	padding: 4px 0;
+}
+
+/* Headings in a modal are a theme's favourite thing to resize. */
+h3 {
+	font-size: 1.4em;
+	font-weight: 700;
+	margin: 0.8em 0 0.4em;
+	line-height: 1.2;
+}
+
+p {
+	margin: 0.6em 0;
+	line-height: 1.6;
+}
+
+/* Lists get indented and bulleted by essentially every theme. */
+ol,
+ul {
+	padding-left: 1.8em;
+	margin: 0.6em 0;
+}
+
+li {
+	margin: 0.3em 0;
+}
+
+code {
+	font-family: monospace;
+	background: var(--background-secondary-alt);
+	padding: 2px 5px;
+	border-radius: 4px;
+}
+
+a {
+	color: var(--text-accent);
+	text-decoration: underline;
+}
+
+/* Form controls are restyled wholesale by most themes. */
+input,
+select,
+textarea {
+	font-family: inherit;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 6px 10px;
+	background: var(--background-modifier-form-field);
+}
+
+button {
+	font-family: inherit;
+	border-radius: 6px;
+	padding: 6px 12px;
 }
