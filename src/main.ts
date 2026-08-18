@@ -398,6 +398,34 @@ export default class ReelPlugin extends Plugin {
 		 * shrinks when it opens; that fires, the layout is given a moment to
 		 * settle, and the snapshot is taken with no timer and nothing on screen.
 		 */
+		/*
+		 * Ten seconds of silence, then a capture.
+		 *
+		 * The countdown used to tick in a Notice, which Obsidian draws across the
+		 * top of the screen — directly over the header action you have to tap. The
+		 * message describing the task was obstructing the task.
+		 *
+		 * So the notice says one thing, briefly, and gets out of the way. Nothing
+		 * is on screen while the shot is set up, which is the point: a diagnostic
+		 * that alters the screen it is measuring is measuring the wrong screen.
+		 */
+		this.addCommand({
+			id: "copy-ui-snapshot-delayed",
+			name: "Copy UI snapshot after 10 seconds",
+			callback: () => {
+				new Notice("Snapshot in 10s.", 1500);
+				const timer = window.setTimeout(() => {
+					void uiSnapshot().then((text) =>
+						navigator.clipboard
+							.writeText(text)
+							.then(() => new Notice(`Snapshot copied — ${text.length.toLocaleString()} characters.`, 5000))
+							.catch(() => void this.writeSnapshotFile(text))
+					);
+				}, 10000);
+				this.register(() => window.clearTimeout(timer));
+			},
+		});
+
 		this.addCommand({
 			id: "snapshot-on-keyboard",
 			name: "Snapshot the next time the keyboard opens",
