@@ -1101,6 +1101,34 @@
       (n2, s) => n2 + s.seasons.reduce((m, x) => m + rangeCount(x.watched), 0) * (s.episodeRuntime ?? 0),
       0
     );
+    const heroFor = [...watched].sort((a, b) => b.date.localeCompare(a.date))[0]?.entry ?? [...films, ...shows].filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+    if (heroFor) {
+      const hero = el.createDiv({ cls: "reel-stats-hero" });
+      const local = plugin2.posters.displayUrl(heroFor);
+      const remote = heroFor.backdropPath ? plugin2.tmdb.posterUrl(heroFor.backdropPath, "w780") : null;
+      if (local || remote) {
+        hero.addClass("has-backdrop");
+        hero.toggleClass("has-art", !!remote);
+        const wrap = hero.createDiv({ cls: "reel-stats-backdrop" });
+        if (local) {
+          wrap.createDiv({ cls: "reel-stats-backdrop-base" }).setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
+        }
+        if (remote) {
+          wrap.createEl("img", {
+            cls: "reel-stats-backdrop-img",
+            attr: { src: remote, alt: "", loading: "lazy", decoding: "async" }
+          });
+        }
+      }
+      plugin2.swatches.tint(el, plugin2.posters.displayUrl(heroFor), document.body.hasClass("theme-dark"));
+      const line = hero.createDiv({ cls: "reel-stats-hero-body" });
+      line.createDiv({ cls: "reel-stats-hero-label", text: opts.year ? String(opts.year) : "All time" });
+      line.createDiv({
+        cls: "reel-stats-hero-title",
+        text: `${watched.length} ${watched.length === 1 ? "film" : "films"}${shows.length ? ` \xB7 ${shows.length} series` : ""}`
+      });
+      line.createDiv({ cls: "reel-stats-hero-sub", text: `Most recently \u2014 ${heroFor.title}` });
+    }
     const tiles = el.createDiv({ cls: "reel-tiles" });
     const tile = (label, value, sub, go) => {
       const t = tiles.createDiv({ cls: "reel-tile" });
@@ -1610,6 +1638,9 @@
     if (!Number.isFinite(days))
       return 0;
     return Math.max(1, days / 30.4);
+  }
+  function cssUrl(path) {
+    return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
   // src/util/status.ts
@@ -4343,7 +4374,7 @@
       const wrap = hero.createDiv({ cls: "reel-hero-backdrop" });
       if (local) {
         const base = wrap.createDiv({ cls: "reel-hero-backdrop-base" });
-        base.setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
+        base.setCssProps({ "--reel-backdrop": `url("${cssUrl2(local)}")` });
       }
       if (!remote)
         return;
@@ -4815,7 +4846,7 @@
       }
     }
   };
-  function cssUrl(path) {
+  function cssUrl2(path) {
     return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 

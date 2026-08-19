@@ -7712,6 +7712,135 @@ input.reel-input {
 
 
 
+
+/* ================================================================== *
+ * Stats: the same treatment the detail screen has always had          *
+ *                                                                     *
+ * One page took its atmosphere from artwork and the other rendered in *
+ * flat theme grey, from identical material — this page already knows  *
+ * every poster in the library. That difference is most of why one read *
+ * as designed and the other as a spreadsheet.                         *
+ * ================================================================== */
+
+.reel-stats-hero {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	min-height: 132px;
+	margin: 0 calc(-1 * var(--reel-gutter, 12px)) var(--reel-space-4);
+	width: calc(100% + 2 * var(--reel-gutter, 12px));
+	padding: var(--reel-space-5) var(--reel-gutter, 12px) var(--reel-space-4);
+	overflow: hidden;
+	isolation: isolate;
+}
+
+.reel-stats-backdrop {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+}
+
+/* A blurred poster is a *texture*, not a picture. Scaled well past the frame
+   so no edge shows, and heavily blurred, because a legible poster behind text
+   is noise rather than atmosphere. */
+.reel-stats-backdrop-base {
+	position: absolute;
+	inset: -20%;
+	background-image: var(--reel-backdrop);
+	background-size: cover;
+	background-position: center;
+	filter: blur(28px) saturate(150%);
+	opacity: 0.55;
+}
+
+/* A real backdrop is a photograph and earns much less blur. */
+.reel-stats-backdrop-img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	filter: blur(2px) saturate(115%);
+	opacity: 0.5;
+}
+
+/* The scrim is what makes text on artwork legible rather than lucky. Without
+   it the hero reads correctly over a dark poster and not at all over a pale
+   one, and half of this library is pale. */
+.reel-stats-hero.has-backdrop::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: linear-gradient(
+		to bottom,
+		hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 0.1),
+		var(--background-primary) 92%
+	);
+}
+
+.reel-stats-hero-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.reel-stats-hero-label {
+	font-size: var(--reel-text-caption);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--text-muted);
+}
+
+.reel-stats-hero-title {
+	font-size: var(--reel-text-hero);
+	font-weight: 700;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-stats-hero-sub {
+	font-size: var(--reel-text-caption);
+	font-weight: 400;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ---- One alignment grid ------------------------------------------ *
+ *
+ * "Everything aligned" was a fair complaint: the tiles, the facts block and
+ * the chart rows each carried their own padding, so three columns of content
+ * started at three different x positions down a 384px screen. They share an
+ * edge now, and the section rows share a rhythm. */
+.reel-view:not(.is-w700) .reel-stats .reel-tiles,
+.reel-view:not(.is-w700) .reel-stats .reel-facts,
+.reel-view:not(.is-w700) .reel-stats .reel-chart-grid,
+.reel-view:not(.is-w700) .reel-stats .reel-chips {
+	padding-left: 0;
+	padding-right: 0;
+	margin-left: 0;
+	margin-right: 0;
+}
+
+.reel-view:not(.is-w700) .reel-stats .reel-fold-toggle,
+.reel-view:not(.is-w700) .reel-stats .reel-fact {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* The accent, used once and quietly: the bar fill is the only place on the
+   page where colour carries meaning rather than decoration. */
+.reel-stats.has-accent .reel-chart-fill {
+	background: hsl(var(--reel-accent-h) var(--reel-accent-s) var(--reel-accent-l) / 0.85);
+}
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */

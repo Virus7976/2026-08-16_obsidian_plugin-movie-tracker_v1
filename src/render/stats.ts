@@ -118,6 +118,62 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		0
 	);
 
+	/*
+	 * A hero, from a title you actually watched.
+	 *
+	 * The detail screen has taken its atmosphere from artwork since it was
+	 * built; stats rendered in flat theme grey, which is why one page reads as
+	 * designed and the other as a spreadsheet. The material is identical — this
+	 * page already knows every poster in the library.
+	 *
+	 * The subject is the most recent viewing, falling back to the highest
+	 * rated: the page is about what you have been watching, so it should be
+	 * wearing what you have been watching.
+	 */
+	const heroFor =
+		[...watched].sort((a, b) => b.date.localeCompare(a.date))[0]?.entry ??
+		[...films, ...shows].filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+
+	if (heroFor) {
+		const hero = el.createDiv({ cls: "reel-stats-hero" });
+		const local = plugin.posters.displayUrl(heroFor);
+		const remote = heroFor.backdropPath ? plugin.tmdb.posterUrl(heroFor.backdropPath, "w780") : null;
+
+		if (local || remote) {
+			hero.addClass("has-backdrop");
+			// A real backdrop is a photograph and takes a scrim; a blurred
+			// poster is a texture. Blurring a pale poster produces fog, which
+			// reads as something having failed to load — so the two are styled
+			// differently rather than treated as one.
+			hero.toggleClass("has-art", !!remote);
+			const wrap = hero.createDiv({ cls: "reel-stats-backdrop" });
+			if (local) {
+				wrap
+					.createDiv({ cls: "reel-stats-backdrop-base" })
+					.setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
+			}
+			if (remote) {
+				wrap.createEl("img", {
+					cls: "reel-stats-backdrop-img",
+					attr: { src: remote, alt: "", loading: "lazy", decoding: "async" },
+				});
+			}
+		}
+
+		// The same colour the detail screen pulls, so the two pages agree.
+		plugin.swatches.tint(el, plugin.posters.displayUrl(heroFor), document.body.hasClass("theme-dark"));
+
+		const line = hero.createDiv({ cls: "reel-stats-hero-body" });
+		line.createDiv({ cls: "reel-stats-hero-label", text: opts.year ? String(opts.year) : "All time" });
+		line.createDiv({
+			cls: "reel-stats-hero-title",
+			text: `${watched.length} ${watched.length === 1 ? "film" : "films"}${
+				shows.length ? ` · ${shows.length} series` : ""
+			}`,
+		});
+		line.createDiv({ cls: "reel-stats-hero-sub", text: `Most recently — ${heroFor.title}` });
+	}
+
 	const tiles = el.createDiv({ cls: "reel-tiles" });
 
 	/**
@@ -954,4 +1010,9 @@ export function parseOptions(source: string): StatsOptions {
 		if (k === "include") opts.include = v === "film" || v === "films" ? "film" : v === "tv" ? "tv" : "all";
 	}
 	return opts;
+}
+
+/** Escape a vault resource path for use inside a CSS `url("…")`. */
+function cssUrl(path: string): string {
+	return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
