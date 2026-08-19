@@ -7841,6 +7841,108 @@ input.reel-input {
 
 
 
+
+/* ================================================================== *
+ * One content edge, on every tab                                      *
+ *                                                                     *
+ * Measured from a device: tile text began at 37px, fact labels at 16, *
+ * chart titles at 24. Three left edges down a 384px screen, because   *
+ * carded sections inset their text by their own padding and un-carded *
+ * ones did not. Nothing was wrong individually; nothing agreed.       *
+ *                                                                     *
+ * So the page gets a single inset that every text block shares,       *
+ * whatever container it happens to live in. Card *edges* still run to *
+ * the full width — it is the reading edge that has to line up, not the *
+ * boxes.                                                              *
+ * ================================================================== */
+
+.reel-view:not(.is-w700) .reel-view-body > * {
+	/* No auto-centring on a phone. With blocks of differing intrinsic width,
+	   `margin: auto` gives each one a different left edge — which is exactly
+	   how three of them ended up at 16, 24 and 37. */
+	margin-left: 0;
+	margin-right: 0;
+	max-width: 100%;
+}
+
+/* The shared reading edge. Text starts here on every tab, in every section,
+   carded or not. */
+.reel-view:not(.is-w700) .reel-stats .reel-fact,
+.reel-view:not(.is-w700) .reel-stats .reel-fold-toggle,
+.reel-view:not(.is-w700) .reel-stats .reel-chart-row,
+.reel-view:not(.is-w700) .reel-stats .reel-chart-body,
+.reel-view:not(.is-w700) .reel-block-count,
+.reel-view:not(.is-w700) .reel-view-count,
+.reel-view:not(.is-w700) .reel-drow-head,
+.reel-view:not(.is-w700) .reel-discover-head,
+.reel-view:not(.is-w700) .reel-stats-hero-body {
+	padding-left: var(--reel-space-3);
+	padding-right: var(--reel-space-3);
+	margin-left: 0;
+	margin-right: 0;
+}
+
+/* A tile already insets its own text by exactly this much, so the card edge
+   sits outside the reading edge and the two agree. */
+.reel-view:not(.is-w700) .reel-stats .reel-tile {
+	padding-left: var(--reel-space-3);
+	padding-right: var(--reel-space-3);
+}
+
+/* The chart row's negative bleed fought the shared edge — it was there to
+   widen a tap target, and the row is full width now, so it has nothing left to
+   bleed into. */
+.reel-view:not(.is-w700) .reel-stats .reel-chart-row.is-clickable {
+	margin-left: 0;
+	margin-right: 0;
+}
+
+/* Horizontal strips keep their first card on the same edge, so a row of
+   posters starts where the heading above it starts. */
+.reel-view:not(.is-w700) .reel-drow-strip,
+.reel-view:not(.is-w700) .reel-caststrip-track,
+.reel-view:not(.is-w700) .reel-chips,
+.reel-view:not(.is-w700) .reel-suggest {
+	padding-left: var(--reel-space-3);
+	scroll-padding-left: var(--reel-space-3);
+}
+
+/* And the containers themselves run edge to edge, so the inset above is the
+   only thing deciding where text begins. */
+.reel-view:not(.is-w700) .reel-view-body {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* The detail page keeps the inset the body used to provide.
+ *
+ * Its hero bleeds full-width with `margin: 0 -gutter`, which only works if
+ * there is a gutter to bleed into. Removing the body's padding took that away
+ * and the hero ran 12px past both edges — caught as `bodyNoSideScroll 363 vs
+ * 351` before it reached a device, which is the first time that check has paid
+ * for itself on a change of mine rather than a discovery. */
+.reel-view:not(.is-w700) .reel-detail-page,
+.reel-view:not(.is-w700) .reel-discover {
+	padding-left: var(--reel-space-3);
+	padding-right: var(--reel-space-3);
+}
+
+/* The grid keeps a gutter of its own — posters are images, not text, and
+   should not touch the screen edge. */
+.reel-view:not(.is-w700) .reel-grid,
+.reel-view:not(.is-w700) .reel-dgrid,
+.reel-view:not(.is-w700) .reel-tiles,
+.reel-view:not(.is-w700) .reel-list,
+.reel-view:not(.is-w700) .reel-upnext,
+.reel-view:not(.is-w700) .reel-diary {
+	padding-left: var(--reel-space-3);
+	padding-right: var(--reel-space-3);
+}
+
+
+
+
+
 /* === generated: pane-measured mirrors of the compact rules === */
 
 /* Written by scripts/mirror-compact.mjs — do not edit by hand. */
