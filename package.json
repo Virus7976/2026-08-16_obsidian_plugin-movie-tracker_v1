@@ -1,6 +1,6 @@
 {
   "name": "obsidian-reel",
-  "version": "0.7.105",
+  "version": "0.7.106",
   "description": "Track films and series in your Obsidian vault with TMDB metadata. Mobile-first.",
   "main": "main.js",
   "scripts": {
