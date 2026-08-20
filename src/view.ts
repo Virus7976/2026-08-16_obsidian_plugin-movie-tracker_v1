@@ -19,7 +19,7 @@ import { paintUpNext } from "./render/upnext";
 import { paintOnThisDay } from "./render/onthisday";
 import { paintUpcoming } from "./render/calendar";
 import { paintStats } from "./render/stats";
-import { viewings } from "./render/diary";
+import { viewings, paintDiaryRows } from "./render/diary";
 import { sortEntries } from "./render/query";
 import { prettyDate } from "./util/dates";
 import { redact } from "./secrets";
@@ -1317,43 +1317,25 @@ export class ReelView extends ItemView {
 		}
 
 		const list = this.bodyEl.createDiv({ cls: "reel-diary" });
-		const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-		let currentMonth = "";
-
-		for (const v of rows.slice(0, 400)) {
-			const month = v.date.slice(0, 7);
-			if (month !== currentMonth) {
-				currentMonth = month;
-				const [y, m] = month.split("-");
-				list.createDiv({ cls: "reel-diary-month", text: `${months[parseInt(m, 10) - 1]} ${y}` });
-			}
-
-			const row = list.createDiv({ cls: "reel-diary-row" });
-			row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
-
-			const thumb = row.createDiv({ cls: "reel-diary-thumb" });
-			this.plugin.posters.attach(thumb, v.entry);
-
-			const body = row.createDiv({ cls: "reel-diary-body" });
-			body.createDiv({ cls: "reel-diary-title", text: v.entry.title });
-			const meta = body.createDiv({ cls: "reel-diary-meta" });
-			if (v.rating != null) renderStarsStatic(meta, v.rating);
-			if (v.rewatch) meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
-			meta.createSpan({ cls: "reel-dim", text: prettyDate(v.date) });
-
-			/*
-			 * What you wrote that night, under the night you wrote it.
-			 *
-			 * The diary is a list of viewings and a review is a fact about one
-			 * viewing, so this is the one screen where the date match is exact —
-			 * a rewatch shows its own review rather than the most recent one.
-			 * Silent when there is nothing: an empty prompt on four hundred rows
-			 * would be four hundred pieces of furniture.
-			 */
-			paintReviews(this.plugin, body, v.entry, { onlyDate: v.date, heading: "", lazy: true });
-
-			row.addEventListener("click", () => this.openDetail(v.entry));
-		}
+		/*
+		 * The same renderer the ```diary``` block uses.
+		 *
+		 * This loop used to be written out again here, and the two copies had
+		 * drifted: the block's rows announce themselves to a screen reader and
+		 * carry the year, and this one — the screen actually opened every day —
+		 * did neither. Sharing it is what stops that happening a second time.
+		 *
+		 * The review pane is the one real difference. The diary is a list of
+		 * viewings and a review is a fact about one viewing, so this is the only
+		 * screen where the date match is exact: a rewatch shows its own review
+		 * rather than the most recent one. Silent when there is nothing, because
+		 * an empty prompt on four hundred rows would be four hundred pieces of
+		 * furniture.
+		 */
+		paintDiaryRows(this.plugin, list, rows.slice(0, 400), (v) => this.openDetail(v.entry), {
+			extras: (body, v) =>
+				paintReviews(this.plugin, body, v.entry, { onlyDate: v.date, heading: "", lazy: true }),
+		});
 	}
 
 	async onClose(): Promise<void> {

@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.15",
+		date: "2026-08-20",
+		headline: "The Diary tab catches up with the Diary block it had quietly fallen behind.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Diary rows can be reached and activated from a keyboard, and announce the title, date and rating.",
+				note: "The same list is drawn by the diary block and by the Diary tab, and only the block had ever been given those. The tab announced each of four hundred rows as nothing at all.",
+			},
+			{
+				kind: "better",
+				text: "Diary rows show the release year beside the title, and a series shows which episode the entry was for.",
+			},
+		],
+	},
+	{
 		version: "0.8.14",
 		date: "2026-08-20",
 		headline: "A long series name in Up Next ends in an ellipsis instead of stopping mid-word.",

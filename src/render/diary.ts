@@ -136,53 +136,85 @@ class DiaryBlock extends MarkdownRenderChild {
 		});
 
 		const list = el.createDiv({ cls: "reel-diary" });
-		let currentMonth = "";
+		paintDiaryRows(this.plugin, list, rows, async (v) => {
+			const file = this.plugin.app.vault.getAbstractFileByPath(v.entry.path);
+			if (file instanceof TFile) await this.plugin.app.workspace.getLeaf(false).openFile(file);
+		});
+	}
+}
 
-		for (const v of rows) {
-			const month = v.date.slice(0, 7);
-			if (month !== currentMonth) {
-				currentMonth = month;
-				const [y, m] = month.split("-");
-				list.createDiv({
-					cls: "reel-diary-month",
-					text: `${MONTHS[parseInt(m, 10) - 1]} ${y}`,
-				});
-			}
+/**
+ * The diary's rows, in one place, because there were two.
+ *
+ * This list is rendered by the ```diary``` block *and* by the Diary tab, and
+ * the two copies had drifted — which is what duplicated rendering always does,
+ * given time. The block's rows carried `role="button"`, a tabindex and an
+ * aria-label naming the title, the date and the rating; the tab's carried none
+ * of the three, and dropped the year from the title as well. So the version
+ * nobody has to go looking for was the accessible one, and the tab — the screen
+ * actually opened every day — announced each of four hundred rows as nothing at
+ * all.
+ *
+ * Neither copy was wrong on purpose. The tab was written first and the block
+ * was improved later, which is the ordinary way this happens and the reason the
+ * fix is to have one of them rather than to keep them matching.
+ *
+ * `extras` is the one genuine difference: the tab shows what you wrote that
+ * night under the night you wrote it, and the block does not.
+ */
+export function paintDiaryRows(
+	plugin: ReelPlugin,
+	list: HTMLElement,
+	rows: Viewing[],
+	onOpen: (v: Viewing) => void,
+	opts: { extras?: (body: HTMLElement, v: Viewing) => void } = {}
+): void {
+	let currentMonth = "";
 
-			const row = list.createDiv({ cls: "reel-diary-row" });
-			// Was an unnamed button. The day number, the poster and the stars
-			// are all visual, so there was nothing at all to announce.
-			row.setAttr("role", "button");
-			row.setAttr("tabindex", "0");
-			row.setAttr(
-				"aria-label",
-				`${v.entry.title}, watched ${prettyDate(v.date)}${
-					v.rating != null ? `, rated ${v.rating} out of 5` : ""
-				}`
-			);
-
-			row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
-
-			const thumb = row.createDiv({ cls: "reel-diary-thumb" });
-			this.plugin.posters.attach(thumb, v.entry);
-
-			const body = row.createDiv({ cls: "reel-diary-body" });
-			const title = body.createDiv({ cls: "reel-diary-title" });
-			title.createSpan({ text: v.entry.title });
-			if (v.entry.year) title.createSpan({ cls: "reel-dim", text: ` ${v.entry.year}` });
-
-			const meta = body.createDiv({ cls: "reel-diary-meta" });
-			// The episode reads first: for a series, "S1E4" is the entry, and
-			// the title alone would make three weeks of a run look identical.
-			if (v.episode) meta.createSpan({ cls: "reel-badge", text: v.episode });
-			if (v.rating != null) renderStarsStatic(meta, v.rating);
-			if (v.rewatch) meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
-			meta.createSpan({ cls: "reel-dim", text: prettyDate(v.date) });
-
-			row.addEventListener("click", async () => {
-				const file = this.plugin.app.vault.getAbstractFileByPath(v.entry.path);
-				if (file instanceof TFile) await this.plugin.app.workspace.getLeaf(false).openFile(file);
-			});
+	for (const v of rows) {
+		const month = v.date.slice(0, 7);
+		if (month !== currentMonth) {
+			currentMonth = month;
+			const [y, m] = month.split("-");
+			list.createDiv({ cls: "reel-diary-month", text: `${MONTHS[parseInt(m, 10) - 1]} ${y}` });
 		}
+
+		const row = list.createDiv({ cls: "reel-diary-row" });
+		// The day number, the poster and the stars are all visual, so without
+		// this there is nothing for a screen reader to announce.
+		row.setAttr("role", "button");
+		row.setAttr("tabindex", "0");
+		row.setAttr(
+			"aria-label",
+			`${v.entry.title}, watched ${prettyDate(v.date)}${v.rating != null ? `, rated ${v.rating} out of 5` : ""}`
+		);
+
+		row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
+
+		const thumb = row.createDiv({ cls: "reel-diary-thumb" });
+		plugin.posters.attach(thumb, v.entry);
+
+		const body = row.createDiv({ cls: "reel-diary-body" });
+		const title = body.createDiv({ cls: "reel-diary-title" });
+		title.createSpan({ text: v.entry.title });
+		if (v.entry.year) title.createSpan({ cls: "reel-dim", text: ` ${v.entry.year}` });
+
+		const meta = body.createDiv({ cls: "reel-diary-meta" });
+		// The episode reads first: for a series, "S1E4" is the entry, and the
+		// title alone would make three weeks of a run look identical.
+		if (v.episode) meta.createSpan({ cls: "reel-badge", text: v.episode });
+		if (v.rating != null) renderStarsStatic(meta, v.rating);
+		if (v.rewatch) meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
+		meta.createSpan({ cls: "reel-dim", text: prettyDate(v.date) });
+
+		opts.extras?.(body, v);
+
+		row.addEventListener("click", () => onOpen(v));
+		row.addEventListener("keydown", (ev: KeyboardEvent) => {
+			if (ev.key === "Enter" || ev.key === " ") {
+				ev.preventDefault();
+				onOpen(v);
+			}
+		});
 	}
 }
