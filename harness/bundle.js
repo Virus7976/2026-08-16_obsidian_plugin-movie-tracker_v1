@@ -6452,6 +6452,16 @@ ${body}
       }
       check("typingVisible", unreachable.length === 0, unreachable.slice(0, 3).join(", "));
     }
+    const broken = [];
+    for (const el of Array.from(view.querySelectorAll(".reel-error, .reel-error-state, pre"))) {
+      if (!shown(el))
+        continue;
+      const text = (el.textContent ?? "").trim();
+      if (!text)
+        continue;
+      broken.push(text.slice(0, 80));
+    }
+    check("screenRendered", broken.length === 0, broken.slice(0, 2).join(" | "));
     const blocked = [];
     for (const el of Array.from(view.querySelectorAll(TAPPABLE))) {
       const r = el.getBoundingClientRect();
@@ -6887,7 +6897,7 @@ ${body}
     openRecipe: () => {
     }
   };
-  function library(root) {
+  function library(root, rows2 = all) {
     const header = root.createDiv({ cls: "reel-view-header" });
     const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
     navBtn.createSpan({ cls: "reel-nav-icon", text: "\u25A3" });
@@ -6918,12 +6928,15 @@ ${body}
     const body = root.createDiv({ cls: "reel-view-body" });
     heroBand(body, {
       label: "Your library",
-      title: `${all.length} titles`,
-      sub: `Most recently \u2014 ${all[0].title} \xB7 14 to watch \xB7 2 hidden by content filter`,
+      title: `${rows2.length} titles`,
+      sub: `Most recently \u2014 ${rows2[0].title} \xB7 14 to watch \xB7 2 hidden by content filter`,
       art: false,
       compact: true
     });
-    renderPosterGrid(plugin, body, all);
+    renderPosterGrid(plugin, body, rows2);
+  }
+  function libraryYear(root) {
+    withPool(YEAR, () => library(root, YEAR));
   }
   function filterBar(into, active, sort = true) {
     const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
@@ -7343,6 +7356,7 @@ ${body}
   }
   var SCREENS = {
     library,
+    libraryYear,
     dense,
     searching,
     seensheet,
@@ -7408,7 +7422,7 @@ ${body}
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
     stampWidth(view, measure(view) || window.innerWidth);
-    const FULL_VIEW = /* @__PURE__ */ new Set(["library", "searching"]);
+    const FULL_VIEW = /* @__PURE__ */ new Set(["library", "libraryYear", "searching"]);
     const target = FULL_VIEW.has(name) ? view : view.createDiv({ cls: "reel-view-body" });
     try {
       (SCREENS[name] ?? library)(target);

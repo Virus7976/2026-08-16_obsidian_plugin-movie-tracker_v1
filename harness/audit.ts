@@ -380,6 +380,33 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	}
 
 	/*
+	 * Did the screen actually draw, or is it apologising?
+	 *
+	 * Two screens have now been audited green for weeks while showing an error
+	 * message. The detail screen ended with "this.plugin.tmdb.getFilm is not a
+	 * function" where the cast strip, the credit rows and eight tabs should
+	 * have been, and every check passed — because one line of caught error text
+	 * has no overflow, no contrast fault, no undersized target and no collision.
+	 *
+	 * The failure mode is the point: every other check in this file asks
+	 * whether what is on screen is laid out correctly, and none asks whether
+	 * the right thing is on screen at all. A stub that throws does not leave a
+	 * gap for a check to notice, it substitutes something small and tidy.
+	 *
+	 * Cheap to state, and it generalises past the rig — `.reel-error` is what
+	 * the app itself renders when a fetch fails, so a screen that starts
+	 * erroring in the real code fails here too.
+	 */
+	const broken: string[] = [];
+	for (const el of Array.from(view.querySelectorAll<HTMLElement>(".reel-error, .reel-error-state, pre"))) {
+		if (!shown(el)) continue;
+		const text = (el.textContent ?? "").trim();
+		if (!text) continue;
+		broken.push(text.slice(0, 80));
+	}
+	check("screenRendered", broken.length === 0, broken.slice(0, 2).join(" | "));
+
+	/*
 	 * Is anything drawn on top of a control?
 	 *
 	 * The search field was visible, correctly sized, high-contrast and

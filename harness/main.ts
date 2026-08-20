@@ -242,7 +242,7 @@ const plugin = {
  * *chrome* is what buried the library, so the harness has to include all of
  * it or it verifies nothing.
  */
-function library(root: HTMLElement): void {
+function library(root: HTMLElement, rows: Entry[] = all): void {
 	const header = root.createDiv({ cls: "reel-view-header" });
 	// The navigation dropdown that replaces the tab row on a narrow pane. The
 	// harness has to build it or the audit measures a header that no longer
@@ -300,12 +300,27 @@ function library(root: HTMLElement): void {
 	// the part that must ellipsise rather than wrap or widen the pane.
 	heroBand(body, {
 		label: "Your library",
-		title: `${all.length} titles`,
-		sub: `Most recently — ${all[0].title} · 14 to watch · 2 hidden by content filter`,
+		title: `${rows.length} titles`,
+		sub: `Most recently — ${rows[0].title} · 14 to watch · 2 hidden by content filter`,
 		art: false,
 		compact: true,
 	});
-	renderPosterGrid(plugin, body, all);
+	renderPosterGrid(plugin, body, rows);
+}
+
+/**
+ * The library as it exists after a year of use, rather than after a demo.
+ *
+ * `library` keeps its 35 titles: a shortish grid is the case where the filter
+ * chrome has the most room to misbehave relative to the content, and that is
+ * where the "chrome before the first poster" faults have all been found.
+ *
+ * This is the other end. A grid with a hundred-plus posters is where lazy
+ * loading, scroll height and the sheer weight of the first paint show up, and
+ * none of that has ever been rendered here.
+ */
+function libraryYear(root: HTMLElement): void {
+	withPool(YEAR, () => library(root, YEAR));
 }
 
 /**
@@ -920,6 +935,7 @@ function logsheet(root: HTMLElement): void {
 
 const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	library,
+	libraryYear,
 	dense,
 	searching,
 	seensheet,
@@ -1113,7 +1129,7 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	 * dutifully reported 917px in an 812px view. The number was real and it was
 	 * measuring the rig.
 	 */
-	const FULL_VIEW = new Set(["library", "searching"]);
+	const FULL_VIEW = new Set(["library", "libraryYear", "searching"]);
 	const target = FULL_VIEW.has(name) ? view : view.createDiv({ cls: "reel-view-body" });
 	try {
 		(SCREENS[name] ?? library)(target);
