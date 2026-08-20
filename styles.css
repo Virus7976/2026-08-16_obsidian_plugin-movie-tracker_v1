@@ -12859,3 +12859,76 @@ input.reel-input {
 	min-height: 44px;
 	padding-block: var(--reel-space-1);
 }
+
+
+/* ==================================================================== */
+/* Analytics: cards as material, facts as one line                      */
+/* ==================================================================== */
+
+/*
+ * Why the page read as cheap, from the screenshot: four stacked cards, each a
+ * 1px hairline around a fill the same colour as the page behind it.
+ *
+ * That is a wireframe. The border is doing all the work of saying "this is a
+ * thing", and a stroke is the weakest way to say it — an outline has to be
+ * traced, where a raised surface is read before you have looked at it. It is
+ * also what a layout looks like before anyone has decided what the material
+ * is, which is exactly the impression to avoid.
+ *
+ * So the border goes and elevation replaces it.
+ *
+ * The fill is `--background-secondary` and NOT a mix toward some other token.
+ * A first attempt at this mixed toward `--background-primary` on the reasoning
+ * that cards should step away from the page — which is true, and which that
+ * mix gets backwards on a light theme, where primary IS the lighter end. It
+ * lightened cards toward the page and dropped a value to 1.31:1. The palette
+ * passes now catch that in both directions, and the lesson they encode is
+ * simpler than the arithmetic: `--background-secondary` is the surface the
+ * theme nominated for exactly this, in whichever direction that theme happens
+ * to run. Take the theme's answer rather than recomputing it.
+ */
+.reel-view .reel-stats .reel-chart,
+.reel-view .reel-stats .reel-block,
+.reel-view .reel-stats .reel-facts {
+	border: none;
+	background: var(--background-secondary);
+	box-shadow: var(--reel-shadow-raised);
+	border-radius: var(--reel-radius-lg);
+}
+
+/*
+ * A fact is one line, not two.
+ *
+ * "Highest rated / Iron Man — 5★" stacked a label on a value, each running the
+ * full width: roughly 140px of screen for eleven characters of answer. Three of
+ * them ate half the viewport to say three short things, which is most of why
+ * the page felt thin — a premium interface is dense with content, not with
+ * padding.
+ *
+ * Side by side they cost one row each and read better for it. The labels form
+ * a column you scan down and the answers form a column beside it, which is what
+ * a table of facts is and why every spec sheet is built this way: it is how the
+ * eye compares.
+ *
+ * It wraps back to stacked when the value is genuinely long. A film title can
+ * run fifty characters, and squeezing that into half a phone width would trade
+ * this problem for a worse one.
+ */
+.reel-view:not(.is-w700) .reel-stats .reel-fact {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--reel-space-3);
+	flex-wrap: wrap;
+	padding-block: var(--reel-space-3);
+}
+
+.reel-view:not(.is-w700) .reel-stats .reel-fact-label {
+	flex: 0 0 auto;
+}
+
+.reel-view:not(.is-w700) .reel-stats .reel-fact-value {
+	flex: 1 1 auto;
+	min-width: 0;
+	text-align: right;
+}

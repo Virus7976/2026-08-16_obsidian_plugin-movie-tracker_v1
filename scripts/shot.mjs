@@ -105,7 +105,12 @@ if (args.includes("--console")) {
 	page.on("pageerror", (e) => console.log(`[pageerror] ${e.message}`));
 }
 
-await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}`, {
+// Shots can render on the audit's alternate palettes too. Looking at a
+// screen on neutral greys only tells you how it looks on neutral greys, and
+// the whole point of the palette passes is that this differs.
+const palette = args.find((a) => a.startsWith("--palette="))?.slice(10) ?? "";
+const palArg = palette ? `&palette=${palette}` : "";
+await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}${palArg}`, {
 	waitUntil: "networkidle0",
 });
 

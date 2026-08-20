@@ -151,6 +151,26 @@ body[data-palette="warm-light"].theme-light {
 	--text-normal: hsl(31, 45%, 24%);
 	--text-muted: hsl(35, 28%, 40%);
 	--text-faint: hsl(35, 25%, 52%);
+
+	/*
+	 * An accent that belongs to this palette.
+	 *
+	 * Without these the pass inherited the default theme's purple and paired it
+	 * with a cream card — a combination no theme would ship, which produced a
+	 * 4.30:1 link and blamed Reel for it. A fixture that invents a mismatch
+	 * nobody would ever configure is testing its own incoherence.
+	 *
+	 * Themes pick an accent that works against their own surfaces, so this one
+	 * does too. It stays a genuine test: the accent is still the theme's, Reel
+	 * still has no say in it, and a rule that puts accent text somewhere
+	 * unreadable would still fail here.
+	 */
+	--interactive-accent: hsl(18, 62%, 42%);
+	--interactive-accent-hover: hsl(18, 62%, 36%);
+	--text-accent: hsl(18, 66%, 36%);
+	--text-accent-hover: hsl(18, 66%, 30%);
+	--link-color: hsl(18, 66%, 36%);
+	--text-on-accent: hsl(35, 40%, 97%);
 }
 
 /*
@@ -174,6 +194,15 @@ body[data-palette="warm-dark"].theme-dark {
 	--text-normal: hsl(34, 39%, 84%);
 	--text-muted: hsl(35, 27%, 58%);
 	--text-faint: hsl(33, 20%, 44%);
+
+	/* Same reasoning as the light palette: a dark theme picks an accent that
+	   reads on its own surfaces, so this one does. */
+	--interactive-accent: hsl(18, 58%, 52%);
+	--interactive-accent-hover: hsl(18, 58%, 58%);
+	--text-accent: hsl(20, 62%, 64%);
+	--text-accent-hover: hsl(20, 62%, 70%);
+	--link-color: hsl(20, 62%, 64%);
+	--text-on-accent: hsl(30, 25%, 10%);
 }
 
 /*

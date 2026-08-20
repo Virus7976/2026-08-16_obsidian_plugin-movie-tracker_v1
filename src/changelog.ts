@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.27",
+		date: "2026-08-20",
+		headline: "The stats cards are surfaces now, not outlines.",
+		changes: [
+			{
+				kind: "better",
+				text: "Cards on the stats page are raised surfaces rather than hairline boxes drawn on the page.",
+				note: "A stroke has to be traced; a raised surface is read before you have looked at it. Outlined boxes are also what a layout looks like before anyone decided what the material was.",
+			},
+			{
+				kind: "better",
+				text: "Facts like “Highest rated” put the label and the answer on one line.",
+				note: "Stacked, three of them ate half the screen to say three short things. Side by side the labels form a column you scan and the answers form one beside it — and long titles still wrap rather than being squeezed.",
+			},
+		],
+	},
+	{
 		version: "0.8.26",
 		date: "2026-08-20",
 		headline: "Reel holds up under other people's themes.",
