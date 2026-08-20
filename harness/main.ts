@@ -483,8 +483,34 @@ function rows(root: HTMLElement): void {
 	renderRowList(plugin, root, all.slice(0, 8));
 }
 
+/**
+ * The stats page, wearing an accent — which is the case that actually ships.
+ *
+ * Every surface, separator and bar on this page now derives from
+ * `--reel-accent-*`, set at runtime from the dominant colour of your most
+ * recent poster. The harness stubs `swatches.tint` to a no-op, so until now the
+ * audit had only ever measured the *fallback* — a mid blue nobody sees once
+ * there is a poster in the library.
+ *
+ * The value used is the worst case rather than a pretty one. `usableAccent`
+ * clamps lightness to 30–48% on a light theme and 48–78% on a dark one, so the
+ * boundary nearest the page background is where accent-tinted ink has the least
+ * contrast to give. If it passes there it passes everywhere.
+ */
+function tintWorstCase(el: HTMLElement): void {
+	const dark = document.body.classList.contains("theme-dark");
+	el.setCssProps({
+		// Yellow-green, which `usableAccent` singles out as the hue that reads
+		// lightest at a given L and therefore needs the most help.
+		"--reel-accent-h": "84",
+		"--reel-accent-s": "85%",
+		"--reel-accent-l": dark ? "55%" : "42%",
+	});
+}
+
 function stats(root: HTMLElement): void {
 	root.addClass("reel-view-body");
+	tintWorstCase(root);
 	paintStats(plugin, root, { include: "all" });
 }
 

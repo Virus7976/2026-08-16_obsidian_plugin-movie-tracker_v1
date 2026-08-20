@@ -9553,3 +9553,184 @@ input.reel-input {
 .reel-view.is-narrow.is-searching .reel-view-body {
 	padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
+
+
+/* ================================================================== *
+ * Stats, refined                                                      *
+ *                                                                     *
+ * The page reads flat for a reason that is measurable rather than     *
+ * aesthetic: on this theme `--background-secondary` is within a few   *
+ * percent of `--background-primary`, so every tile, card and panel is *
+ * a surface that does not surface. No amount of spacing fixes that —  *
+ * the boxes are genuinely invisible.                                  *
+ *                                                                     *
+ * So the surfaces stop asking the theme and derive from the accent    *
+ * the page already pulled off your most recent poster. That separates *
+ * in any theme, light or dark, and it ties the page to its artwork    *
+ * rather than to a grey that may or may not exist.                    *
+ * ================================================================== */
+
+.reel-view .reel-stats .reel-tile {
+	/* Tinted from the artwork, with a hairline that does not depend on the
+	   theme having a usable border colour either. */
+	background: hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.09);
+	border: 1px solid hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.14);
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	/* Value first and hard against the top, label under it, and the note
+	   pushed to the floor — so a tile with a note and one without still line
+	   their labels up across a row. */
+	justify-content: flex-start;
+	gap: 1px;
+}
+
+/* Three sizes of the same grey is not a hierarchy. The value is the content,
+   the label is a caption, and the note is an aside — each gets a different
+   *kind* of treatment rather than a different point size. */
+.reel-view .reel-stats .reel-tile-value {
+	font-weight: 700;
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum" 1;
+}
+
+.reel-view .reel-stats .reel-tile-label {
+	font-size: var(--reel-text-caption);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.07em;
+	color: var(--text-muted);
+	line-height: 1.2;
+}
+
+.reel-view .reel-stats .reel-tile-sub {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+	margin-top: auto;
+	padding-top: var(--reel-space-1);
+	line-height: 1.25;
+}
+
+/* A tile you can open says so, quietly. A chevron drawn from borders rather
+   than an icon font, so it costs no request and scales with the text. */
+.reel-tile-go {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	width: 6px;
+	height: 6px;
+	border-top: 1.5px solid var(--text-muted);
+	border-right: 1.5px solid var(--text-muted);
+	transform: rotate(45deg);
+	opacity: 0.55;
+	transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.reel-tile.is-clickable:hover .reel-tile-go,
+.reel-tile.is-clickable:focus-visible .reel-tile-go {
+	opacity: 1;
+	transform: rotate(45deg) translate(1px, -1px);
+	border-color: var(--text-accent);
+}
+
+.reel-tile.is-clickable:active {
+	transform: scale(0.985);
+}
+
+/* ---------------- chart rows ---------------- */
+
+/* The position, so the ordering is a fact rather than an impression — the top
+   three are usually 4, 3 and 3, where bar length says nothing. Tabular and
+   fixed-width, so every row has the same left edge. */
+.reel-chart-rank {
+	flex: 0 0 auto;
+	min-width: 1.4em;
+	font-size: var(--reel-text-caption);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+	opacity: 0.7;
+	line-height: 1.4;
+}
+
+/* The count is the answer to the question the row asks, and it was the same
+   weight and colour as the label beside it. */
+.reel-view .reel-stats .reel-chart-value {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-normal);
+}
+
+/* The bar, for rows with no posters to be their own bar. A flat block became
+   a shape with a lit edge — it is the only ink on those rows, so it may as
+   well carry the page's colour. */
+.reel-view .reel-stats .reel-chart-fill {
+	background: linear-gradient(
+		to right,
+		hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.55),
+		var(--interactive-accent)
+	);
+	border-radius: 999px;
+}
+
+.reel-view .reel-stats .reel-chart-track {
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+/* A row that opens something gets the same corner mark as a tile, rather than
+   only announcing itself on press. */
+.reel-view .reel-stats .reel-chart-row.is-clickable .reel-chart-value::after {
+	content: "";
+	display: inline-block;
+	width: 5px;
+	height: 5px;
+	margin-left: 0.45em;
+	vertical-align: 0.12em;
+	border-top: 1.5px solid var(--text-muted);
+	border-right: 1.5px solid var(--text-muted);
+	transform: rotate(45deg);
+	opacity: 0.5;
+}
+
+/* ---------------- rhythm ---------------- */
+
+/* The page was a single column of equally weighted things — twelve sections
+   with the same gap above each, so nothing grouped and nothing led. The
+   heatmap and the charts are different kinds of statement and get a rule
+   between them; the tiles and the hero belong together and do not. */
+.reel-view .reel-stats .reel-heatmap-box {
+	margin-top: var(--reel-space-5);
+	padding-top: var(--reel-space-5);
+	border-top: 1px solid hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.16);
+}
+
+/* Facts are settings rows and keep their separators, but the separator should
+   be tinted like everything else rather than being the one theme-grey line
+   left on the page. */
+.reel-view:not(.is-w700) .reel-stats .reel-fact {
+	border-bottom-color: hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.16);
+}
+
+.reel-view .reel-stats .reel-fact-label {
+	color: var(--text-muted);
+}
+
+.reel-view .reel-stats .reel-fact-value {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-tile-go,
+	.reel-tile.is-clickable:active {
+		transition: none;
+		transform: rotate(45deg);
+	}
+
+	.reel-tile.is-clickable:active {
+		transform: none;
+	}
+}

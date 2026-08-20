@@ -173,6 +173,13 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		t.createDiv({ cls: "reel-tile-label", text: label });
 		if (sub) t.createDiv({ cls: "reel-tile-sub", text: sub });
 		if (!go) return;
+		/*
+		 * Half these tiles open the set they are counting and half cannot, and
+		 * until now the two looked identical — you found out by tapping. A mark in
+		 * the corner is the smallest thing that distinguishes them without turning
+		 * a number into a button.
+		 */
+		t.createDiv({ cls: "reel-tile-go" });
 		t.addClass("is-clickable");
 		t.setAttr("role", "button");
 		t.setAttr("tabindex", "0");
@@ -785,6 +792,17 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 		// row counts turns the chart into the thing it is describing — the
 		// posters are the bar, and their number is the count.
 		const head = row.createDiv({ cls: "reel-chart-head" });
+
+		/*
+		 * The position, stated.
+		 *
+		 * Every chart here is sorted and none of them said so, which leaves the
+		 * reader inferring rank from bar length — fine when the bars differ, and
+		 * useless in the common case where the top three are 4, 3 and 3. A number
+		 * makes the ordering a fact rather than an impression, and it gives the
+		 * rows a left edge to line up on.
+		 */
+		head.createDiv({ cls: "reel-chart-rank", text: String(data.indexOf(d) + 1) });
 
 		// A person's row leads with their face. It used to lead with a film
 		// poster, which is the right *data* — that is the film they were in —

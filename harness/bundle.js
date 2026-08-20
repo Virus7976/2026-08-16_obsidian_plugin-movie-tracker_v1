@@ -1163,6 +1163,7 @@
         t.createDiv({ cls: "reel-tile-sub", text: sub });
       if (!go)
         return;
+      t.createDiv({ cls: "reel-tile-go" });
       t.addClass("is-clickable");
       t.setAttr("role", "button");
       t.setAttr("tabindex", "0");
@@ -1539,6 +1540,7 @@
     for (const d of data) {
       const row = body.createDiv({ cls: "reel-chart-row" });
       const head = row.createDiv({ cls: "reel-chart-head" });
+      head.createDiv({ cls: "reel-chart-rank", text: String(data.indexOf(d) + 1) });
       if (d.face && plugin2) {
         const shot = head.createDiv({ cls: "reel-chart-face" });
         plugin2.people.attach(shot, d.face, faces?.get(d.face));
@@ -6845,8 +6847,19 @@ ${body}
     root.addClass("reel-view-body");
     renderRowList(plugin, root, all.slice(0, 8));
   }
+  function tintWorstCase(el) {
+    const dark = document.body.classList.contains("theme-dark");
+    el.setCssProps({
+      // Yellow-green, which `usableAccent` singles out as the hue that reads
+      // lightest at a given L and therefore needs the most help.
+      "--reel-accent-h": "84",
+      "--reel-accent-s": "85%",
+      "--reel-accent-l": dark ? "55%" : "42%"
+    });
+  }
   function stats(root) {
     root.addClass("reel-view-body");
+    tintWorstCase(root);
     paintStats(plugin, root, { include: "all" });
   }
   function upnext(root) {
