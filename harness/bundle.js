@@ -2735,6 +2735,16 @@
        * short one on a loop.
        */
       this.seen = /* @__PURE__ */ new Set();
+      /**
+       * Cards taken out of the feed by an action, newest last.
+       *
+       * `handled` is a set and says nothing about order, so it cannot answer "which
+       * one did I just do". Undo has to put back the last one specifically, and
+       * pressing undo twice has to put back two.
+       */
+      this.handledOrder = [];
+      /** The container of the most recent render, so an undo can repaint it. */
+      this.lastContainer = null;
     }
     /**
      * The mounted rows, in the shape the rest of the screen already expects.
@@ -2778,6 +2788,7 @@
      * outside it.
      */
     render(container) {
+      this.lastContainer = container;
       try {
         this.draw(container);
       } catch (e) {
@@ -2921,7 +2932,7 @@
             title: (isTvItem ? item.name : item.title) ?? "Untitled"
           }
         }).open();
-        this.handled.add(item.id);
+        this.markHandled(item.id);
         this.render(container);
       });
       const nav = card.createDiv({ cls: "reel-quickcard-nav" });
@@ -2969,7 +2980,7 @@
         await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist });
         haptic("commit");
         this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
-        this.handled.add(item.id);
+        this.markHandled(item.id);
         this.lastAction = { id: item.id, at: this.quickAt };
         this.render(container);
       } catch (e) {
@@ -3058,6 +3069,28 @@
      * the two things only this screen knows about: that the card was marked
      * handled, and where you were when you did it.
      */
+    /** Take a card out of the feed, remembering that it was this one. */
+    markHandled(id) {
+      this.handled.add(id);
+      this.handledOrder = [...this.handledOrder.filter((n2) => n2 !== id), id];
+    }
+    /**
+     * Put back whatever the last action removed.
+     *
+     * Called after an undo lands. Rating a title from the feed used to reverse
+     * the vault write and leave the card gone — the note came back and the poster
+     * did not, so the undo looked like it had half worked. The screen's own state
+     * is not something a vault write can reach, so it has to be told.
+     */
+    restoreLast() {
+      const id = this.handledOrder.pop();
+      if (id == null)
+        return;
+      this.handled.delete(id);
+      this.seen.delete(id);
+      if (this.lastContainer?.isConnected)
+        this.render(this.lastContainer);
+    }
     async undoLast(container) {
       const last = this.lastAction;
       if (!last) {
@@ -3068,6 +3101,8 @@
       this.lastAction = null;
       await this.plugin.undo.undo();
       this.handled.delete(last.id);
+      this.handledOrder = this.handledOrder.filter((n2) => n2 !== last.id);
+      this.seen.delete(last.id);
       this.quickAt = last.at;
       this.render(container);
     }
@@ -3667,7 +3702,7 @@
       if (isTv)
         posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
       const openPreview = () => new PreviewSheet(this.plugin, item, () => {
-        this.handled.add(item.id);
+        this.markHandled(item.id);
         this.render(container);
       }).open();
       posterEl.addEventListener("click", openPreview);
@@ -3693,12 +3728,12 @@
       button("plus", "Add to watchlist", "add", async () => {
         await this.add(item, true);
         this.plugin.undo.offer(`${title} \u2192 watchlist`);
-        this.handled.add(item.id);
+        this.markHandled(item.id);
         this.render(container);
       });
       button("check", "Seen it \u2014 rate now", "seen", () => {
         new SeenSheet(this.plugin, item, () => {
-          this.handled.add(item.id);
+          this.markHandled(item.id);
           this.render(container);
         }).open();
       });
@@ -3713,6 +3748,7 @@
       await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist, rating });
     }
   };
+  var RATING_WORDS = ["Not for me", "Weak", "Fine", "Great", "Favourite"];
   var SeenSheet = class extends Modal {
     constructor(plugin2, item, onDone) {
       super(plugin2.app);
@@ -3726,16 +3762,39 @@
       modalEl.addClass("reel-modal");
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
+      modalEl.addClass("reel-seensheet");
       const isTv = this.item.media_type === "tv";
       const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
-      contentEl.createEl("h3", { cls: "reel-log-title", text: title });
-      contentEl.createDiv({ cls: "reel-log-sub", text: "Adding as watched. Rate it now, or skip." });
+      const year = yearOf(this.item.release_date ?? this.item.first_air_date);
+      const head = contentEl.createDiv({ cls: "reel-seen-head" });
+      const src = this.item.poster_path ? this.plugin.tmdb.posterUrl(this.item.poster_path, "w342") : null;
+      if (src) {
+        const art = head.createDiv({ cls: "reel-seen-poster" });
+        art.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+        this.plugin.swatches.tint(modalEl, src, document.body.hasClass("theme-dark"));
+      }
+      const who = head.createDiv({ cls: "reel-seen-who" });
+      who.createDiv({ cls: "reel-seen-title", text: title });
+      const meta = who.createDiv({ cls: "reel-seen-meta" });
+      if (year)
+        meta.createSpan({ text: String(year) });
+      meta.createSpan({ cls: "reel-badge subtle", text: isTv ? "Series" : "Film" });
+      if (this.item.vote_average)
+        meta.createSpan({ cls: "reel-dim", text: `\u2605 ${this.item.vote_average.toFixed(1)}` });
+      who.createDiv({ cls: "reel-seen-note", text: "Adding as watched." });
       const starRow = contentEl.createDiv({ cls: "reel-rating-row big centred" });
+      const readout = contentEl.createDiv({ cls: "reel-seen-readout", text: "Tap a star to rate it" });
       renderStars(starRow, {
-        onChange: (v) => void this.save(v)
+        onChange: (v) => {
+          if (v == null)
+            return;
+          readout.setText(`${v} \u2014 ${RATING_WORDS[Math.ceil(v) - 1] ?? ""}`);
+          readout.addClass("is-set");
+          void this.save(v);
+        }
       });
       const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const noRating = actions.createEl("button", { cls: "reel-btn", text: "Add without rating" });
+      const noRating = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Add without rating" });
       noRating.addEventListener("click", () => void this.save(void 0));
       const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
       cancel.addEventListener("click", () => this.close());
@@ -6843,6 +6902,38 @@ ${body}
     const body = root.createDiv({ cls: "reel-view-body" });
     renderPosterGrid(plugin, body, all.slice(0, 6));
   }
+  function seensheet(root) {
+    const modal = root.createDiv({ cls: "reel-modal reel-seensheet reel-sheet has-accent" });
+    modal.setCssProps({
+      "--reel-accent-h": "18",
+      "--reel-accent-s": "78%",
+      "--reel-accent-l": document.body.classList.contains("theme-dark") ? "58%" : "40%"
+    });
+    const head = modal.createDiv({ cls: "reel-seen-head" });
+    const art = head.createDiv({ cls: "reel-seen-poster" });
+    art.createEl("img", { attr: { src: poster(all[0].title), alt: "" } });
+    const who = head.createDiv({ cls: "reel-seen-who" });
+    who.createDiv({
+      cls: "reel-seen-title",
+      text: "The Assassination of Jesse James by the Coward Robert Ford"
+    });
+    const meta = who.createDiv({ cls: "reel-seen-meta" });
+    meta.createSpan({ text: "2007" });
+    meta.createSpan({ cls: "reel-badge subtle", text: "Film" });
+    meta.createSpan({ cls: "reel-dim", text: "\u2605 7.5" });
+    who.createDiv({ cls: "reel-seen-note", text: "Adding as watched." });
+    const starRow = modal.createDiv({ cls: "reel-rating-row big centred" });
+    const stars2 = starRow.createDiv({ cls: "reel-stars" });
+    for (let i = 1; i <= 5; i++) {
+      const star = stars2.createDiv({ cls: `reel-star${i <= 4 ? " is-full" : ""}` });
+      star.createSpan({ cls: "reel-star-bg", text: "\u2605" });
+      star.createSpan({ cls: "reel-star-fg", text: "\u2605" });
+    }
+    modal.createDiv({ cls: "reel-seen-readout is-set", text: "4 \u2014 Great" });
+    const actions = modal.createDiv({ cls: "reel-log-actions" });
+    actions.createEl("button", { cls: "reel-btn mod-cta", text: "Add without rating" });
+    actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+  }
   function rows(root) {
     root.addClass("reel-view-body");
     renderRowList(plugin, root, all.slice(0, 8));
@@ -6949,6 +7040,7 @@ ${body}
     library,
     dense,
     searching,
+    seensheet,
     feed,
     filterSheet,
     reviews,
@@ -7021,7 +7113,7 @@ ${e?.stack ?? ""}` });
   if (app)
     mountObsidianChrome(app);
   if (app && params2.get("audit") != null) {
-    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate", "filterSheet"]);
+    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet"]);
     const skipped = [];
     const results = [];
     for (const name of Object.keys(SCREENS)) {

@@ -478,6 +478,51 @@ function searching(root: HTMLElement): void {
 	renderPosterGrid(plugin, body, all.slice(0, 6));
 }
 
+/**
+ * The "seen it" sheet, which is the surface this app is used through.
+ *
+ * Modelled at its worst: a title long enough to need clamping, every meta chip
+ * present, and the readout in its set state. The poster is the part the audit
+ * has to see — it is a fixed 76px beside text that must shrink rather than push
+ * the sheet wider, which is the same min-width defect that has widened four
+ * other rows in this codebase.
+ */
+function seensheet(root: HTMLElement): void {
+	const modal = root.createDiv({ cls: "reel-modal reel-seensheet reel-sheet has-accent" });
+	modal.setCssProps({
+		"--reel-accent-h": "18",
+		"--reel-accent-s": "78%",
+		"--reel-accent-l": document.body.classList.contains("theme-dark") ? "58%" : "40%",
+	});
+
+	const head = modal.createDiv({ cls: "reel-seen-head" });
+	const art = head.createDiv({ cls: "reel-seen-poster" });
+	art.createEl("img", { attr: { src: poster(all[0].title), alt: "" } });
+	const who = head.createDiv({ cls: "reel-seen-who" });
+	who.createDiv({
+		cls: "reel-seen-title",
+		text: "The Assassination of Jesse James by the Coward Robert Ford",
+	});
+	const meta = who.createDiv({ cls: "reel-seen-meta" });
+	meta.createSpan({ text: "2007" });
+	meta.createSpan({ cls: "reel-badge subtle", text: "Film" });
+	meta.createSpan({ cls: "reel-dim", text: "★ 7.5" });
+	who.createDiv({ cls: "reel-seen-note", text: "Adding as watched." });
+
+	const starRow = modal.createDiv({ cls: "reel-rating-row big centred" });
+	const stars = starRow.createDiv({ cls: "reel-stars" });
+	for (let i = 1; i <= 5; i++) {
+		const star = stars.createDiv({ cls: `reel-star${i <= 4 ? " is-full" : ""}` });
+		star.createSpan({ cls: "reel-star-bg", text: "★" });
+		star.createSpan({ cls: "reel-star-fg", text: "★" });
+	}
+	modal.createDiv({ cls: "reel-seen-readout is-set", text: "4 — Great" });
+
+	const actions = modal.createDiv({ cls: "reel-log-actions" });
+	actions.createEl("button", { cls: "reel-btn mod-cta", text: "Add without rating" });
+	actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+}
+
 function rows(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	renderRowList(plugin, root, all.slice(0, 8));
@@ -638,6 +683,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	library,
 	dense,
 	searching,
+	seensheet,
 	feed,
 	filterSheet,
 	reviews,
@@ -839,7 +885,7 @@ if (app && params.get("audit") != null) {
 	 * Logged rather than dropped quietly. A pass that silently covers less than
 	 * it appears to is how a green tick stops meaning anything.
 	 */
-	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet"]);
+	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet"]);
 	const skipped: string[] = [];
 
 	const results: { screen: string; checks: Check[] }[] = [];

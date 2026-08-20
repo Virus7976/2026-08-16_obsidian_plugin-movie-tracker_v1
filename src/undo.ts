@@ -36,6 +36,22 @@ export class UndoService {
 	private stack = new UndoStack(20);
 	/** The notice currently offering an undo, so a second action replaces it. */
 	private offered: Notice | null = null;
+	/**
+	 * Screens that have to put something back when an undo lands.
+	 *
+	 * Undo reverses the *vault*, and for most of the app that is the whole job —
+	 * the library index reparses and every list repaints. Discover is the
+	 * exception: rating a card marks it handled and drops it out of the feed, and
+	 * that is screen state no vault write can reach. So the note came back and the
+	 * poster did not, which reads as the undo half-working.
+	 */
+	private listeners = new Set<() => void>();
+
+	/** Register a callback for after a successful undo. Returns an unsubscribe. */
+	onUndone(fn: () => void): () => void {
+		this.listeners.add(fn);
+		return () => this.listeners.delete(fn);
+	}
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -148,6 +164,15 @@ export class UndoService {
 		try {
 			await step.apply();
 			new Notice(`Reel: undid ${step.label}.`);
+			// After the write, never before: a listener that repaints from a state
+			// the vault has not reached yet shows the thing it is about to undo.
+			for (const fn of this.listeners) {
+				try {
+					fn();
+				} catch {
+					/* a screen failing to repaint must not fail the undo */
+				}
+			}
 			return step.label;
 		} catch (e) {
 			// Put it back. A step that failed because the vault was momentarily

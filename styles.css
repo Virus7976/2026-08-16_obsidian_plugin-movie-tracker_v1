@@ -9734,3 +9734,119 @@ input.reel-input {
 		transform: none;
 	}
 }
+
+
+/* ================================================================== *
+ * The "seen it" sheet, which is the surface you touch most            *
+ *                                                                     *
+ * It showed a title, a sentence and five grey stars — the same screen  *
+ * for every film, told apart only by a line of text. It was also the   *
+ * one place in the app with artwork available and none drawn.          *
+ * ================================================================== */
+
+.reel-seen-head {
+	display: flex;
+	gap: var(--reel-space-3);
+	align-items: flex-start;
+	min-width: 0;
+}
+
+.reel-seen-poster {
+	flex: 0 0 auto;
+	width: 76px;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius);
+	overflow: hidden;
+	background: var(--background-modifier-border);
+	box-shadow: var(--reel-shadow-raised, 0 6px 18px rgb(0 0 0 / 0.22));
+}
+
+.reel-seen-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-seen-who {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-1);
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.reel-seen-title {
+	font-size: var(--reel-text-title);
+	font-weight: 700;
+	line-height: 1.2;
+	/* Two lines, then ellipsis. A long title should not push the stars off a
+	   sheet whose whole job is the stars. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-seen-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+	flex-wrap: wrap;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-seen-note {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-top: auto;
+}
+
+/* The value, in words. Five stars with no readout makes the difference between
+   three and three and a half a few pixels of a glyph your thumb is covering —
+   and here the tap that sets it also closes the sheet, so the confirmation has
+   nowhere else to appear. */
+.reel-seen-readout {
+	text-align: center;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	min-height: 1.4em;
+	transition: color 140ms ease;
+}
+
+.reel-seen-readout.is-set {
+	color: var(--text-normal);
+	font-weight: var(--font-medium);
+}
+
+/* Tinted from the poster, like every other surface that knows which title it
+   is about. */
+.reel-seensheet.has-accent .reel-seen-head {
+	margin: calc(-1 * var(--reel-space-3)) calc(-1 * var(--reel-space-3)) 0;
+	padding: var(--reel-space-3);
+	border-radius: var(--reel-radius);
+	background: linear-gradient(
+		to bottom,
+		hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.16),
+		transparent
+	);
+}
+
+/* "Add without rating" is the action, not an equal partner to Cancel. It was
+   one of two identical outlined buttons, so the sheet asked a question and
+   offered no answer. */
+.reel-seensheet .reel-log-actions {
+	display: flex;
+	gap: var(--reel-space-2);
+}
+
+.reel-seensheet .reel-log-actions .reel-btn {
+	flex: 1 1 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-seen-readout {
+		transition: none;
+	}
+}

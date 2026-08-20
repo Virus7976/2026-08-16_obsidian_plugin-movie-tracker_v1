@@ -131,6 +131,16 @@ export class DiscoverScreen {
 	 * short one on a loop.
 	 */
 	private seen = new Set<number>();
+	/**
+	 * Cards taken out of the feed by an action, newest last.
+	 *
+	 * `handled` is a set and says nothing about order, so it cannot answer "which
+	 * one did I just do". Undo has to put back the last one specifically, and
+	 * pressing undo twice has to put back two.
+	 */
+	private handledOrder: number[] = [];
+	/** The container of the most recent render, so an undo can repaint it. */
+	private lastContainer: HTMLElement | null = null;
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -172,6 +182,7 @@ export class DiscoverScreen {
 	 * outside it.
 	 */
 	render(container: HTMLElement): void {
+		this.lastContainer = container;
 		try {
 			this.draw(container);
 		} catch (e) {
@@ -370,7 +381,7 @@ export class DiscoverScreen {
 					title: (isTvItem ? item.name : item.title) ?? "Untitled",
 				},
 			}).open();
-			this.handled.add(item.id);
+			this.markHandled(item.id);
 			this.render(container);
 		});
 
@@ -441,7 +452,7 @@ export class DiscoverScreen {
 			// Quick mode is a swipe-speed interaction, which makes it the single
 			// easiest place to add the title you were only scrolling past.
 			this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
-			this.handled.add(item.id);
+			this.markHandled(item.id);
 			this.lastAction = { id: item.id, at: this.quickAt };
 			this.render(container);
 		} catch (e) {
@@ -541,6 +552,30 @@ export class DiscoverScreen {
 	 * the two things only this screen knows about: that the card was marked
 	 * handled, and where you were when you did it.
 	 */
+	/** Take a card out of the feed, remembering that it was this one. */
+	markHandled(id: number): void {
+		this.handled.add(id);
+		this.handledOrder = [...this.handledOrder.filter((n) => n !== id), id];
+	}
+
+	/**
+	 * Put back whatever the last action removed.
+	 *
+	 * Called after an undo lands. Rating a title from the feed used to reverse
+	 * the vault write and leave the card gone — the note came back and the poster
+	 * did not, so the undo looked like it had half worked. The screen's own state
+	 * is not something a vault write can reach, so it has to be told.
+	 */
+	restoreLast(): void {
+		const id = this.handledOrder.pop();
+		if (id == null) return;
+		this.handled.delete(id);
+		// Out of `seen` too, or the next fetch that offers it would filter it
+		// straight back out as a duplicate and it would never reappear.
+		this.seen.delete(id);
+		if (this.lastContainer?.isConnected) this.render(this.lastContainer);
+	}
+
 	private async undoLast(container: HTMLElement): Promise<void> {
 		const last = this.lastAction;
 		if (!last) {
@@ -550,7 +585,12 @@ export class DiscoverScreen {
 		haptic("commit");
 		this.lastAction = null;
 		await this.plugin.undo.undo();
+		// `undo()` notifies `restoreLast`, which has already put this one back —
+		// but the swipe path also has a queue position to restore, so it finishes
+		// the job rather than duplicating it.
 		this.handled.delete(last.id);
+		this.handledOrder = this.handledOrder.filter((n) => n !== last.id);
+		this.seen.delete(last.id);
 		// Back to the card you were on, so the screen shows the thing you
 		// just recovered rather than leaving you further down the queue
 		// wondering whether it worked.
@@ -1272,7 +1312,7 @@ export class DiscoverScreen {
 
 		const openPreview = () =>
 			new PreviewSheet(this.plugin, item, () => {
-				this.handled.add(item.id);
+				this.markHandled(item.id);
 				this.render(container);
 			}).open();
 		posterEl.addEventListener("click", openPreview);
@@ -1302,13 +1342,13 @@ export class DiscoverScreen {
 		button("plus", "Add to watchlist", "add", async () => {
 			await this.add(item, true);
 			this.plugin.undo.offer(`${title} → watchlist`);
-			this.handled.add(item.id);
+			this.markHandled(item.id);
 			this.render(container);
 		});
 
 		button("check", "Seen it — rate now", "seen", () => {
 			new SeenSheet(this.plugin, item, () => {
-				this.handled.add(item.id);
+				this.markHandled(item.id);
 				this.render(container);
 			}).open();
 		});
@@ -1329,6 +1369,15 @@ export class DiscoverScreen {
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * A word per star, so a number you set by thumb is confirmed in language.
+ *
+ * Deliberately mild at the bottom: "Bad" for a one-star is a stronger statement
+ * than most one-star ratings mean, and a scale that editorialises makes people
+ * rate more conservatively than they would.
+ */
+const RATING_WORDS = ["Not for me", "Weak", "Fine", "Great", "Favourite"];
+
 /** Marking something seen usually means you have an opinion about it. */
 class SeenSheet extends Modal {
 	private busy = false;
@@ -1346,19 +1395,59 @@ class SeenSheet extends Modal {
 		modalEl.addClass("reel-modal");
 		if (Platform.isPhone) modalEl.addClass("reel-sheet");
 
+		modalEl.addClass("reel-seensheet");
+
 		const isTv = this.item.media_type === "tv";
 		const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
+		const year = yearOf(this.item.release_date ?? this.item.first_air_date);
 
-		contentEl.createEl("h3", { cls: "reel-log-title", text: title });
-		contentEl.createDiv({ cls: "reel-log-sub", text: "Adding as watched. Rate it now, or skip." });
+		/*
+		 * The poster, because this sheet is about *this* film.
+		 *
+		 * It showed a title, a sentence and five grey stars — the same screen for
+		 * every title in the library, distinguished only by a line of text. This is
+		 * the surface you touch most often in the app, and it was the one place
+		 * Reel had artwork available and drew none of it.
+		 */
+		const head = contentEl.createDiv({ cls: "reel-seen-head" });
+		const src = this.item.poster_path ? this.plugin.tmdb.posterUrl(this.item.poster_path, "w342") : null;
+		if (src) {
+			const art = head.createDiv({ cls: "reel-seen-poster" });
+			art.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+			// The same tint every other screen takes off a poster, so the sheet
+			// belongs to the title rather than being a grey box with its name in it.
+			this.plugin.swatches.tint(modalEl, src, document.body.hasClass("theme-dark"));
+		}
 
+		const who = head.createDiv({ cls: "reel-seen-who" });
+		who.createDiv({ cls: "reel-seen-title", text: title });
+		const meta = who.createDiv({ cls: "reel-seen-meta" });
+		if (year) meta.createSpan({ text: String(year) });
+		meta.createSpan({ cls: "reel-badge subtle", text: isTv ? "Series" : "Film" });
+		if (this.item.vote_average) meta.createSpan({ cls: "reel-dim", text: `★ ${this.item.vote_average.toFixed(1)}` });
+		who.createDiv({ cls: "reel-seen-note", text: "Adding as watched." });
+
+		/*
+		 * The stars, and a word for what you just chose.
+		 *
+		 * Five stars with no readout means the difference between three and three
+		 * and a half is a few pixels of a glyph you are already tapping over with
+		 * your thumb. Naming it confirms the value landed — which matters here more
+		 * than anywhere, because the tap that sets it also closes the sheet.
+		 */
 		const starRow = contentEl.createDiv({ cls: "reel-rating-row big centred" });
+		const readout = contentEl.createDiv({ cls: "reel-seen-readout", text: "Tap a star to rate it" });
 		renderStars(starRow, {
-			onChange: (v) => void this.save(v),
+			onChange: (v) => {
+				if (v == null) return;
+				readout.setText(`${v} — ${RATING_WORDS[Math.ceil(v) - 1] ?? ""}`);
+				readout.addClass("is-set");
+				void this.save(v);
+			},
 		});
 
 		const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-		const noRating = actions.createEl("button", { cls: "reel-btn", text: "Add without rating" });
+		const noRating = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Add without rating" });
 		noRating.addEventListener("click", () => void this.save(undefined));
 		const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
 		cancel.addEventListener("click", () => this.close());

@@ -317,6 +317,20 @@ export class ReelView extends ItemView {
 		// has to go once there is not, or the last tab looks half-drawn.
 		this.trackScrollEnd(tabBar);
 
+		/*
+		 * When an undo lands, whatever it took back should come back into view.
+		 *
+		 * Registered on the view rather than inside Discover so it is torn down
+		 * with the leaf. A listener held by a screen that has no unload hook is a
+		 * leak that survives every close and reopen.
+		 */
+		this.register(
+			this.plugin.undo.onUndone(() => {
+				this.discoverScreen?.restoreLast();
+				if (this.tab !== "discover") this.paint();
+			})
+		);
+
 		this.filterEl = root.createDiv({ cls: "reel-view-filters" });
 		this.bodyEl = root.createDiv({ cls: "reel-view-body" });
 		this.paint();
