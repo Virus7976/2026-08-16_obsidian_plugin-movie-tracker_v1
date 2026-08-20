@@ -6410,6 +6410,7 @@ ${body}
       const entry = rows2[this.index];
       container.createDiv({ cls: "reel-rate-count", text: `${this.index + 1} of ${rows2.length}` });
       const card = container.createDiv({ cls: "reel-rate-card" });
+      paintWash(card, this.plugin.posters.displayUrl(entry));
       card.setAttr("tabindex", "0");
       card.addEventListener("keydown", (ev) => void this.handleKey(ev, entry, container, rows2.length));
       if (!Platform.isMobile)

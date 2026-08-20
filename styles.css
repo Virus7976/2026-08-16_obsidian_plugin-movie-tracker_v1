@@ -12187,3 +12187,106 @@ input.reel-input {
 		filter: blur(38px);
 	}
 }
+
+
+/* ==================================================================== */
+/* The wash, beyond the sheets                                          */
+/* ==================================================================== */
+
+/*
+ * The Rate card.
+ *
+ * This screen shows one film at a time and asks one question about it, and it
+ * was a white card with a poster stuck to the left. Of everywhere the wash
+ * could go this is the most obviously right: there is nothing else on screen
+ * to belong to.
+ */
+.reel-rate-card.has-wash {
+	position: relative;
+	isolation: isolate;
+	border-radius: var(--reel-radius-lg);
+	/*
+	 * No `overflow: hidden` here, though the instinct is to put it on the thing
+	 * with rounded corners.
+	 *
+	 * It establishes a block formatting context, which stops the card's
+	 * children collapsing their margins through it — so the card grew by the
+	 * height of the margins that used to collapse away, and on a short screen
+	 * the star strip ended up underneath the action row. The audit caught it in
+	 * the keyboard pass only, because that is the only pass with no room to
+	 * spare.
+	 *
+	 * The wrapper below does the clipping, and it inherits this radius.
+	 */
+}
+
+.reel-rate-card .reel-sheet-wash {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	overflow: hidden;
+	pointer-events: none;
+	border-radius: inherit;
+}
+
+.reel-rate-card .reel-sheet-wash-art {
+	position: absolute;
+	inset: -60px;
+	background-image: var(--reel-wash);
+	background-size: cover;
+	background-position: center 20%;
+	filter: blur(38px) saturate(1.35);
+	opacity: 0.5;
+}
+
+.reel-rate-card .reel-sheet-wash::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to bottom,
+		rgb(from var(--background-primary) r g b / 0.46),
+		rgb(from var(--background-primary) r g b / 0.86)
+	);
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-rate-card .reel-sheet-wash::after {
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.78));
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-rate-card .reel-sheet-wash-art {
+		filter: blur(38px);
+	}
+}
+
+/* ==================================================================== */
+/* Up Next: the row that is about one show                              */
+/* ==================================================================== */
+
+/*
+ * Not a wash here, and the reason is worth stating.
+ *
+ * Up Next is a *list* of rows. Giving each one the colour of its own artwork
+ * would put four or five unrelated tints down the screen, and the effect that
+ * makes a single-title surface feel considered makes a list look like it has
+ * been highlighted at random. The wash works because it is one colour for one
+ * thing you are looking at.
+ *
+ * What a row can take is the same elevation language as everything else, so it
+ * reads as an object you could pick up rather than a stripe of text.
+ */
+.reel-upnext-row {
+	border-radius: var(--reel-radius);
+	background: var(--background-secondary);
+	box-shadow: var(--reel-shadow-raised);
+	padding: var(--reel-space-3);
+}
+
+.theme-dark .reel-upnext-row {
+	background-image: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05));
+	border-top: 1px solid rgba(255, 255, 255, 0.05);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}

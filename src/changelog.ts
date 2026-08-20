@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.23",
+		date: "2026-08-20",
+		headline: "The Rate card takes the colour of the film it is asking about.",
+		changes: [
+			{
+				kind: "new",
+				text: "The Rate screen carries the artwork wash, like the detail screen and the sheets.",
+				note: "The whole screen is one film and one question about it, so there was nothing else for it to belong to.",
+			},
+			{
+				kind: "better",
+				text: "Up Next rows read as cards rather than stripes of text, with the same elevation as everything else.",
+				note: "No wash there on purpose: four rows each tinted by their own poster is a list that looks highlighted at random.",
+			},
+		],
+	},
+	{
 		version: "0.8.22",
 		date: "2026-08-20",
 		headline: "Every sheet about one title now carries that title's colour.",
