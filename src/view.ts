@@ -333,6 +333,39 @@ export class ReelView extends ItemView {
 
 		this.filterEl = root.createDiv({ cls: "reel-view-filters" });
 		this.bodyEl = root.createDiv({ cls: "reel-view-body" });
+
+		/*
+		 * Re-measure when the body's contents change, not only when Reel paints.
+		 *
+		 * `sizeBody` runs at the end of `paintTab`, which is the moment the *view*
+		 * draws. Discover does not finish drawing then: it paints a skeleton,
+		 * fetches, and re-renders itself from a `.finally()` that the view never
+		 * hears about. So the body kept the height it was given while it held six
+		 * placeholder cards, and the real results were clipped inside it — a search
+		 * showing two half-height posters with no titles, and four hundred pixels
+		 * of empty screen underneath.
+		 *
+		 * Every async screen has this shape, so the fix belongs here rather than in
+		 * Discover. `childList` only: setting a height on the body is an attribute
+		 * change on the body itself and cannot re-trigger this, so there is no loop
+		 * to guard against.
+		 */
+		if (typeof MutationObserver !== "undefined") {
+			let queued = false;
+			const mo = new MutationObserver(() => {
+				if (queued) return;
+				queued = true;
+				// One measurement per frame. A screen that appends thirty cards in a
+				// loop would otherwise force thirty layouts.
+				requestAnimationFrame(() => {
+					queued = false;
+					if (this.bodyEl?.isConnected) sizeBody(this.contentEl, this.bodyEl);
+				});
+			});
+			mo.observe(this.bodyEl, { childList: true });
+			this.register(() => mo.disconnect());
+		}
+
 		this.paint();
 	}
 

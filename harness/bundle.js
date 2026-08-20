@@ -6358,9 +6358,17 @@ ${body}
     const worst = /* @__PURE__ */ new Map();
     for (const el of small) {
       const k = el.className.split(" ")[0] || el.tagName;
-      worst.set(k, Math.min(worst.get(k) ?? 99, Math.round(el.getBoundingClientRect().height)));
+      const r = el.getBoundingClientRect();
+      if (worst.has(k))
+        continue;
+      const used = getComputedStyle(el).height;
+      const drawn = `${Math.round(r.height)}px`;
+      worst.set(
+        k,
+        `${drawn}${used !== drawn ? ` (laid out ${used} \u2014 mid-transform?)` : ""} at ${Math.round(r.left)},${Math.round(r.top)} in .${el.parentElement?.className.split(" ")[0] ?? "?"}`
+      );
     }
-    check("touchTargets44", small.length === 0, [...worst].map(([k, h]) => `${k} ${h}px`).join(", "));
+    check("touchTargets44", small.length === 0, [...worst].map(([k, d]) => `${k} ${d}`).join(", "));
     const blocked = [];
     for (const el of Array.from(view.querySelectorAll(TAPPABLE))) {
       const r = el.getBoundingClientRect();
@@ -6884,7 +6892,7 @@ ${body}
   }
   function searching(root) {
     root.addClass("is-searching");
-    const header = root.createDiv({ cls: "reel-view-header" });
+    const header = root.createDiv({ cls: "reel-view-header is-open" });
     const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
     navBtn.createSpan({ cls: "reel-nav-icon", text: "\u25A3" });
     navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });

@@ -456,7 +456,15 @@ function dense(root: HTMLElement): void {
 function searching(root: HTMLElement): void {
 	root.addClass("is-searching");
 
-	const header = root.createDiv({ cls: "reel-view-header" });
+	/*
+	 * `is-open`, because that is the only state this screen exists in.
+	 *
+	 * Without it the header keeps the collapsed grid it uses before you ask for
+	 * the field, the wrap measures 0x0, and every check skips it — `width < 2`
+	 * is the first line of `controlsNotCovered`. Two releases of a docked search
+	 * field were audited as a zero-sized element and reported green.
+	 */
+	const header = root.createDiv({ cls: "reel-view-header is-open" });
 	const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
 	navBtn.createSpan({ cls: "reel-nav-icon", text: "▣" });
 	navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });

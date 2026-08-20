@@ -9503,17 +9503,26 @@ input.reel-input {
 .reel-view.is-phone.is-searching .reel-search-wrap,
 .reel-view.is-narrow.is-searching .reel-search-wrap {
 	position: fixed;
-	left: var(--reel-space-3);
-	right: var(--reel-space-3);
+	/* Insets rather than a width, and a margin rather than an inset pair.
+	   `left`/`right` alone left the pill wider than the viewport once the
+	   container's own padding was added back, so its left cap was cut off by
+	   the edge of the screen. */
+	left: 0;
+	right: 0;
+	margin: 0 var(--reel-space-3);
+	width: auto;
+	max-width: none;
+	box-sizing: border-box;
 	/* No `--reel-keyboard` here on purpose. This device reports no keyboard at
 	   all through visualViewport — two releases were gated on that and neither
 	   ever ran. Android shrinks the layout viewport instead, so the bottom of
-	   the page *is* the top of the keyboard, and the plain answer is the one
-	   that works. */
-	bottom: calc(var(--reel-space-3) + env(safe-area-inset-bottom));
+	   the page *is* the top of the keyboard.
+	
+	   `--reel-bottom-inset` is the height of Obsidian's own floating controls,
+	   measured by shape rather than by class name. Without it the pill sits
+	   under the round + button, which is exactly what it did. */
+	bottom: calc(var(--reel-bottom-inset, 0px) + var(--reel-space-3) + env(safe-area-inset-bottom));
 	z-index: var(--layer-popover, 30);
-	margin: 0;
-	width: auto;
 }
 
 /* The pill. Bigger than the inline field was, because it is now the only
@@ -9532,19 +9541,46 @@ input.reel-input {
 	font-size: var(--font-ui-medium);
 }
 
-/* The clear button becomes the filled circle it is in Obsidian's own search,
-   which is what makes the row read as finished rather than as an input with a
-   cross next to it. */
-.reel-view.is-phone.is-searching .reel-search-clear {
-	width: 30px;
-	height: 30px;
+/* The clear button: a filled circle, like Obsidian's own, at a size a thumb
+   can hit and a colour you can see.
+ *
+ * Both numbers came from the audit the moment it could finally measure this
+ * element rather than a 0x0 placeholder — 26px against a 44px minimum, and
+ * 1.67:1 against 4.5. The contrast was `--text-on-accent` painted on
+ * `--background-modifier-border`, which is white-on-pale-grey: a colour pair
+ * that only makes sense on the accent it is named for.
+ *
+ * The 44px is the *target*, not the circle. A 44px disc in a 52px pill is a
+ * button with a pill drawn round it; the ink stays 28px and the padding does
+ * the reaching, which is the same trade the chip rule settled on. */
+.reel-view.is-phone.is-searching .reel-search-clear,
+.reel-view.is-narrow.is-searching .reel-search-clear {
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 8px;
 	border-radius: 999px;
-	background: var(--background-modifier-border-hover);
-	color: var(--text-on-accent, var(--text-normal));
+	background: transparent;
+	color: var(--text-normal);
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	flex: 0 0 auto;
+}
+
+/* The disc is drawn on the icon inside, so the target can be larger than the
+   thing you see without leaving a 44px grey circle in the pill. */
+.reel-view.is-phone.is-searching .reel-search-clear > *,
+.reel-view.is-narrow.is-searching .reel-search-clear > * {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 999px;
+	background: var(--background-modifier-border-hover);
+	color: var(--text-normal);
 }
 
 /* The last result must clear the docked field, or the thing you searched for
@@ -9849,4 +9885,114 @@ input.reel-input {
 	.reel-seen-readout {
 		transition: none;
 	}
+}
+
+
+/* One pill, not two.
+ *
+ * `.reel-search-wrap` is the pill and `.reel-input` inside it brings its own
+ * border, background and radius — which is fine when the wrap is a bare flex
+ * row in the header, and is a second rounded rectangle drawn inside the first
+ * once the wrap becomes the visible control. */
+.reel-view.is-phone.is-searching .reel-search-wrap .reel-search-input,
+.reel-view.is-narrow.is-searching .reel-search-wrap .reel-search-input {
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+	padding-left: 0;
+	padding-right: 0;
+	min-height: 0;
+	height: auto;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* The magnifier belongs inside the pill, at the pill's own scale. */
+.reel-view.is-phone.is-searching .reel-search-icon {
+	flex: 0 0 auto;
+	margin-right: var(--reel-space-2);
+	opacity: 0.75;
+}
+
+/* The floating + button is Obsidian's, it is round, and it is drawn over
+   everything. The pill clears it vertically via `--reel-bottom-inset`; this
+   keeps the *clear* button from ending up under it horizontally on the narrow
+   phones where the two would still meet. */
+.reel-view.is-phone.is-searching .reel-search-wrap {
+	padding-right: var(--reel-space-3);
+}
+
+
+/* The docked pill owns its own layout, and stops inheriting the collapsed one.
+ *
+ * On a narrow pane `.reel-search-wrap` is a *collapsed grid*: one 0fr column
+ * with its children set to `visibility: hidden`, which is how the field stays
+ * out of the tab order until you ask for it. Docking it only changed its
+ * position, so it was still a grid trying to be a pill — a column that
+ * animates its width, wrapped around an input drawing its own border. That is
+ * the second rounded rectangle, and the reason the cap was clipped.
+ *
+ * It is also why the harness reported this field as 0x0 for two releases, and
+ * `controlsNotCovered` skips anything under 2px — so every check that would
+ * have caught the + button sitting on top of it was silently passing.
+ *
+ * Having a query is reason enough for the field to exist, so this does not
+ * wait for `.is-open` either. */
+.reel-view.is-phone.is-searching .reel-search-wrap,
+.reel-view.is-narrow.is-searching .reel-search-wrap,
+.reel-view.is-phone.is-searching .reel-view-header:not(.is-open) .reel-search-wrap,
+.reel-view.is-narrow.is-searching .reel-view-header:not(.is-open) .reel-search-wrap,
+.reel-view.is-phone.is-searching .reel-view-header.is-open .reel-search-wrap,
+.reel-view.is-narrow.is-searching .reel-view-header.is-open .reel-search-wrap {
+	display: flex;
+	align-items: center;
+	grid-template-columns: none;
+	/*
+	 * `reel-search-in` starts at `scaleY(0.6) translateY(-6px)`, which is right
+	 * for a field growing out of the header and wrong for one docked at the
+	 * bottom of the screen — nothing is above it to grow from.
+	 *
+	 * The `.is-open` selectors exist purely to outrank it. The rule that sets
+	 * the animation carries five classes; the plain
+	 * `.reel-view.is-phone.is-searching .reel-search-wrap` carries four, so
+	 * `animation: none` lost the cascade in the *only* state this pill is ever
+	 * in, and the docked field scaled up from a squash every time it drew.
+	 *
+	 * It also cost three rounds of chasing a phantom: the audit measured the
+	 * clear button synchronously at frame zero and reported 44px of button as
+	 * 26px, because a rect is a transformed rect. `transform: none` is here for
+	 * the same reason — a running animation beats a declaration, so the
+	 * animation has to be gone before the transform matters.
+	 */
+	animation: none;
+	transform: none;
+	transform-origin: initial;
+	transition: none;
+}
+
+.reel-view.is-phone.is-searching .reel-search-wrap > *,
+.reel-view.is-narrow.is-searching .reel-search-wrap > *,
+.reel-view.is-phone.is-searching .reel-view-header.is-open .reel-search-wrap > *,
+.reel-view.is-narrow.is-searching .reel-view-header.is-open .reel-search-wrap > * {
+	visibility: visible;
+	overflow: visible;
+}
+
+/* The clear button is positioned absolutely inside the collapsed grid. In a
+   flex pill it is simply the last item.
+ *
+ * `transform: none` is the whole fix and it took a measurement to find. The
+ * absolute rule centres the button with the `top: 50%` + `translateY(-50%)`
+ * pair; dropping it to `position: static` makes the `top` inert but leaves the
+ * transform, which still moves a static box. So the button laid out correctly
+ * at 44x44 and then painted 22px — half its height — above the pill it lives
+ * in, and `touchTargets44` reported 26px because its upper probe landed
+ * outside the pill and hit the page behind. */
+.reel-view.is-phone.is-searching .reel-search-clear,
+.reel-view.is-narrow.is-searching .reel-search-clear {
+	position: static;
+	inset: auto;
+	transform: none;
+	align-self: center;
 }

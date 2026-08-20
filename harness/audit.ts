@@ -285,12 +285,39 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 		if (h >= 44) return false;
 		return !reaches44(el);
 	});
-	const worst = new Map<string, number>();
+	/*
+	 * The height *and* where the thing is.
+	 *
+	 * "reel-search-clear 26px" was the entire failure message for three rounds
+	 * of fixing, while the element measured 44px everywhere I could reach it by
+	 * hand. A height with no position cannot distinguish "this control is too
+	 * small" from "you are looking at a different control than I am" — and it
+	 * was the second one.
+	 */
+	const worst = new Map<string, string>();
 	for (const el of small) {
 		const k = el.className.split(" ")[0] || el.tagName;
-		worst.set(k, Math.min(worst.get(k) ?? 99, Math.round(el.getBoundingClientRect().height)));
+		const r = el.getBoundingClientRect();
+		if (worst.has(k)) continue;
+		/*
+		 * The used height alongside the painted one, because they disagree when
+		 * something is mid-transform and that disagreement is the answer.
+		 *
+		 * A rect is a *transformed* rect. This screen reported a 44px button as
+		 * 26px because the audit measures synchronously, at frame zero of an
+		 * entry animation whose first keyframe is `scaleY(0.6)`. Printing both
+		 * numbers turns "this control is too small" into "this control is
+		 * animating", which is a different bug with a different fix.
+		 */
+		const used = getComputedStyle(el).height;
+		const drawn = `${Math.round(r.height)}px`;
+		worst.set(
+			k,
+			`${drawn}${used !== drawn ? ` (laid out ${used} — mid-transform?)` : ""}` +
+				` at ${Math.round(r.left)},${Math.round(r.top)} in .${el.parentElement?.className.split(" ")[0] ?? "?"}`,
+		);
 	}
-	check("touchTargets44", small.length === 0, [...worst].map(([k, h]) => `${k} ${h}px`).join(", "));
+	check("touchTargets44", small.length === 0, [...worst].map(([k, d]) => `${k} ${d}`).join(", "));
 
 	/*
 	 * Is anything drawn on top of a control?
