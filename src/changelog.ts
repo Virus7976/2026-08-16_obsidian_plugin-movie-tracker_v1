@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.14",
+		date: "2026-08-20",
+		headline: "A long series name in Up Next ends in an ellipsis instead of stopping mid-word.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Series titles that do not fit now end in “…” on the Up Next screen.",
+				note: "The title was cut mid-word with no ellipsis, which reads as a name stored wrong rather than as text that did not fit.",
+			},
+		],
+	},
+	{
 		version: "0.8.13",
 		date: "2026-08-20",
 		headline: "The cast strip lines up, and Remove stops looking like Refresh.",

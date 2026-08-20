@@ -166,7 +166,10 @@ class UpNextPainter {
 
 		const body = row.createDiv({ cls: "reel-upnext-body" });
 		const title = body.createDiv({ cls: "reel-upnext-title" });
-		title.createSpan({ text: entry.title });
+		// Classed so it can be the thing that truncates. `text-overflow` applies
+		// to a block container's inline content, and the row above is a flex
+		// container — so the ellipsis declared on it has never done anything.
+		title.createSpan({ cls: "reel-upnext-name", text: entry.title });
 		if (this.plugin.upNext.airingToday(entry)) {
 			title.createSpan({ cls: "reel-badge new", text: "New" });
 		}

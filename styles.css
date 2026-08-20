@@ -10830,3 +10830,64 @@ input.reel-input {
 	border-color: transparent;
 	font-weight: 700;
 }
+
+
+/* ==================================================================== */
+/* Up Next: the title truncates with an ellipsis, like everywhere else   */
+/* ==================================================================== */
+
+/*
+ * "A Very Long Runn" — cut mid-word, no ellipsis, on the screen you open
+ * every night.
+ *
+ * `.reel-upnext-title` carries `white-space: nowrap`, `overflow: hidden` and
+ * `text-overflow: ellipsis`, and it is also `display: flex`, because it holds
+ * the title *and* a "New" badge. `text-overflow` applies to the inline content
+ * of a block container; a flex container has no inline content to elide, so
+ * two of those three declarations worked and the one that signals truncation
+ * did nothing. The result reads as a data error — a series whose name is
+ * genuinely stored wrong — rather than as text that did not fit.
+ *
+ * The fix is to truncate the text and not the box: the name shrinks and
+ * elides, the badge keeps its size, and `min-width: 0` lets the name actually
+ * give ground rather than defending its content width, which is the same flex
+ * default that has now caused this in four places.
+ */
+.reel-upnext-title {
+	/* No longer needed here, and misleading to leave: they describe a
+	   truncation this element cannot perform. */
+	text-overflow: clip;
+}
+
+.reel-upnext-name {
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* A badge is a fixed thing beside a flexible one, so it must not be the part
+   that shrinks. */
+.reel-upnext-title .reel-badge {
+	flex: 0 0 auto;
+}
+
+
+/*
+ * The meta row keeps its wrap, and this is a note about why not to "fix" it.
+ *
+ * Two Up Next rows come out at different heights when one series has longer
+ * episode counts than the other — "9/186 · 5%" fits beside the label and
+ * "440/750 · 59%" does not — and a list of identical items at two heights
+ * reads as breakage rather than adaptation. So I made the row `nowrap` with an
+ * ellipsis, on the reasoning that the progress bar underneath states the same
+ * fact graphically and a truncated number costs nothing.
+ *
+ * That was wrong, and one screenshot said so. The date lives in this row too,
+ * and the wrap is what had been giving it a line of its own. Forcing one line
+ * put label, counts and date into a single strip and elided all three into
+ * "S2E4  9/1…  15 …" — three facts, none of them readable, on the screen this
+ * app is opened for every night.
+ *
+ * The ragged height is the better failure. It is the wrap doing its job.
+ */

@@ -2066,7 +2066,7 @@
       thumb.addEventListener("click", () => void this.plugin.openDetail(entry));
       const body = row.createDiv({ cls: "reel-upnext-body" });
       const title = body.createDiv({ cls: "reel-upnext-title" });
-      title.createSpan({ text: entry.title });
+      title.createSpan({ cls: "reel-upnext-name", text: entry.title });
       if (this.plugin.upNext.airingToday(entry)) {
         title.createSpan({ cls: "reel-badge new", text: "New" });
       }
