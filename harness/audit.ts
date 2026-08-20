@@ -35,8 +35,26 @@ function luminance(colour: string): number | null {
 	if (!parts || parts.length < 3) return null;
 	// A fully transparent colour is not text anybody reads.
 	if (parts.length > 3 && Number(parts[3]) === 0) return null;
+
+	/*
+	 * `color(srgb r g b)` states its channels 0–1; `rgb()` states them 0–255.
+	 *
+	 * Chrome computes `color-mix()` to the former, so the moment any rule in
+	 * the stylesheet mixed a colour this function started reading light greys
+	 * as near-black. It reported a perfectly legible #a5a5a5 label as 1.31:1
+	 * and did it across 29 checks at once — a wall of failures with nothing
+	 * wrong behind them.
+	 *
+	 * Worth being precise about which way that cuts. A checker that invents
+	 * failures is more dangerous than one that misses them: it costs a real fix
+	 * being reverted as a regression, which is exactly what happened here
+	 * before the cause was found. Anything claiming to measure the interface
+	 * has to understand what the browser actually computes, and `color()` is
+	 * now what browsers compute for a large and growing class of declaration.
+	 */
+	const scale = colour.startsWith("color(") ? 1 : 255;
 	const [r, g, b] = parts.slice(0, 3).map((v) => {
-		const c = Number(v) / 255;
+		const c = Number(v) / scale;
 		return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 	});
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b;

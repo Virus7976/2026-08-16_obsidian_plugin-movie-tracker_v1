@@ -131,7 +131,7 @@ try {
 	// vault and vice versa, and Reel has no theme rules of its own — which is
 	// correct, and exactly why nobody has ever checked that the variables
 	// carry it.
-	for (const { phone, dark, pane, keyboard } of [
+	for (const { phone, dark, pane, keyboard, palette } of [
 		{ phone: 1, dark: 0 },
 		{ phone: 1, dark: 1 },
 		{ phone: 0, dark: 0 },
@@ -160,6 +160,26 @@ try {
 		 * the keyboard measured from a device photo.
 		 */
 		{ phone: 1, dark: 0, keyboard: 380 },
+		/*
+		 * The same phone, on other people's colours.
+		 *
+		 * Every pass above renders on Obsidian's neutral greys, so every colour
+		 * rule in the plugin has only ever been checked at one point on the
+		 * relationship it claims. That is not a test of the relationship. It
+		 * let three faults through to a screenshot on a real phone, and all
+		 * three were rules that happened to hold on grey and nowhere else.
+		 *
+		 * These two palettes are synthetic and deliberately awkward — see the
+		 * note in user-theme.css. `warm-light` is saturated with its surfaces
+		 * bunched six points apart, which breaks any card that separates from
+		 * the page by tone alone. `warm-dark` puts the secondary surface
+		 * *below* the primary, so a rule that raises a card by mixing toward
+		 * one particular token is right on one palette and inverted on the
+		 * other. Getting that backwards is a mistake you cannot see by eye and
+		 * can see instantly here.
+		 */
+		{ phone: 1, dark: 0, palette: "warm-light" },
+		{ phone: 1, dark: 1, palette: "warm-dark" },
 	]) {
 		const page = await browser.newPage();
 		// A real phone viewport, and a desktop one — the compact layout is a
@@ -170,7 +190,8 @@ try {
 		// The screen cannot tell a short window from a keyboard, and the two
 		// ask different questions of the same layout.
 		const kbArg = keyboard ? "&keyboard=1" : "";
-		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}${paneArg}${kbArg}`, {
+		const palArg = palette ? `&palette=${palette}` : "";
+		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}${paneArg}${kbArg}${palArg}`, {
 			waitUntil: "networkidle0",
 		});
 
@@ -180,11 +201,13 @@ try {
 		// reports zero checks as a pass.
 		await page.waitForFunction(() => window.REEL_AUDIT, { timeout: 60_000 });
 		const result = await page.evaluate(() => window.REEL_AUDIT);
-		const label = pane
-			? `docked pane ${pane}px in 1280x900 ${dark ? "dark" : "light"}`
-			: keyboard
-				? `phone 375x${812 - keyboard} — keyboard up`
-				: `${phone ? "phone 375x812" : "desktop 1280x900"} ${dark ? "dark" : "light"}`;
+		const label = palette
+			? `phone 375x812 — ${palette} palette`
+			: pane
+				? `docked pane ${pane}px in 1280x900 ${dark ? "dark" : "light"}`
+				: keyboard
+					? `phone 375x${812 - keyboard} — keyboard up`
+					: `${phone ? "phone 375x812" : "desktop 1280x900"} ${dark ? "dark" : "light"}`;
 
 		if (!result) {
 			console.log(`✗ ${label}: the audit did not run — the harness failed to load.`);

@@ -52,6 +52,32 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.26",
+		date: "2026-08-20",
+		headline: "Reel holds up under other people's themes.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The “mark watched” tick on Up Next was invisible under themes that style buttons.",
+				note: "It lost its accent fill to the theme's own button rule but kept its white checkmark — a white tick on a pale grey disc. The control worked the whole time and showed nothing.",
+			},
+			{
+				kind: "fixed",
+				text: "Discover's card buttons no longer overlap each other when a theme adds button padding.",
+				note: "Two 44px targets were sharing a 16px strip, so a tap in it went to whichever the browser decided.",
+			},
+			{
+				kind: "better",
+				text: "Labels, years and timestamps stay legible on themes with soft muted text.",
+				note: "Reel now derives those tones from the theme's own body and page colours instead of trusting a token that some themes set below the readability floor. It keeps the theme's hue — nothing is repainted, only guaranteed.",
+			},
+			{
+				kind: "better",
+				text: "Cast and crew names are a full-size tap target.",
+			},
+		],
+	},
+	{
 		version: "0.8.25",
 		date: "2026-08-20",
 		headline: "Searching in Stats names the films it found.",

@@ -1226,6 +1226,29 @@ document.body.classList.toggle("theme-dark", params.get("dark") === "1");
 document.body.classList.toggle("theme-light", params.get("dark") !== "1");
 
 /*
+ * Which palette to render on.
+ *
+ * The rig had exactly one set of colours — Obsidian's own neutral greys — and
+ * every colour rule in the plugin was therefore checked against a single
+ * sample. That is not a test of a colour relationship, it is a test of one
+ * point on it, and it let a whole class of fault through: three separate
+ * problems reached a screenshot on the user's phone before anyone saw them,
+ * and all three were rules that happened to work on grey.
+ *
+ * The point is emphatically NOT to render on the one theme this app is used
+ * with — a plugin tuned to a single theme is a plugin broken on every other.
+ * It is that a rule which only survives on neutral greys should fail here.
+ * Three palettes spread across the space is enough to catch that: two of them
+ * saturated, one of them with its surfaces bunched close together, which is
+ * the specific condition under which "use a slightly different background"
+ * stops being a way to make a card.
+ *
+ * The values below are not any real theme's. They are deliberately synthetic
+ * points chosen to bracket what themes do.
+ */
+document.body.setAttribute("data-palette", params.get("palette") ?? "neutral");
+
+/*
  * Obsidian's own mobile chrome, at the sizes it really uses.
  *
  * The harness rendered `.reel-view` into a bare page. The app wraps it in a

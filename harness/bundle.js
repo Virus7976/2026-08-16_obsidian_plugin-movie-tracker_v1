@@ -6825,8 +6825,9 @@ ${body}
       return null;
     if (parts.length > 3 && Number(parts[3]) === 0)
       return null;
+    const scale = colour.startsWith("color(") ? 1 : 255;
     const [r, g, b] = parts.slice(0, 3).map((v) => {
-      const c = Number(v) / 255;
+      const c = Number(v) / scale;
       return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
     });
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -8056,6 +8057,7 @@ ${body}
   }
   document.body.classList.toggle("theme-dark", params2.get("dark") === "1");
   document.body.classList.toggle("theme-light", params2.get("dark") !== "1");
+  document.body.setAttribute("data-palette", params2.get("palette") ?? "neutral");
   function mountObsidianChrome(app2) {
     if (!phone2)
       return;

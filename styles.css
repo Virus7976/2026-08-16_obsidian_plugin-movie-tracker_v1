@@ -12699,3 +12699,163 @@ input.reel-input {
 	outline-offset: 2px;
 	border-radius: var(--reel-radius);
 }
+
+
+/* ==================================================================== */
+/* Muted text, guaranteed legible on whatever the page turns out to be  */
+/* ==================================================================== */
+
+/*
+ * `--text-muted` is a theme's choice and some themes set it soft. On a light
+ * palette with a mid-tone muted it lands around 4.1:1 against the page — under
+ * the 4.5:1 floor, and a near miss is the worst kind, because nothing looks
+ * broken. It stays readable indoors and is the first thing to vanish on a
+ * phone outdoors, which is where this app is used.
+ *
+ * Reel leans on the token for labels on more than a dozen screens, so this is
+ * stated once as a relationship rather than patched per screen.
+ *
+ * Derived from the theme's own two ends: the body colour, pulled a fixed
+ * distance toward the page. That is what "muted" means, and expressing it as a
+ * ratio makes it self-correcting — the mix lightens on a light theme and
+ * darkens on a dark one, and keeps the theme's hue either way, because both
+ * endpoints belong to the theme. No palette is assumed and none is preferred.
+ *
+ * It cannot read `--text-muted` itself: a custom property whose value
+ * references the property being declared is a cycle, and a cycle makes the
+ * declaration invalid — which silently restores the exact value being
+ * corrected. That failure is invisible, so it is worth naming here.
+ *
+ * Scoped to Reel's own surfaces. The plugin does not get to restyle the user's
+ * notes; it only guarantees its own screens.
+ */
+.reel-view,
+.reel-modal {
+	--text-muted: color-mix(in srgb, var(--text-normal) 82%, var(--background-primary));
+	/*
+	 * `--text-faint` gets the same treatment, a step further out.
+	 *
+	 * It is the token themes make faintest, and it is the one Reel reaches for
+	 * on years, timestamps and secondary notes — small text, which needs *more*
+	 * contrast than body copy, not less. Left alone it lands around 4.3:1 on a
+	 * card, which is a near miss on the exact text least able to afford one.
+	 *
+	 * Still one step lighter than muted, so the three-level hierarchy the
+	 * design depends on survives; it is the floor that moves, not the order.
+	 */
+	--text-faint: color-mix(in srgb, var(--text-normal) 72%, var(--background-primary));
+}
+
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+	.reel-view,
+	.reel-modal {
+		/* No mixing available, so fall back to the body colour outright. Too
+		   strong rather than too weak: losing the muted/normal distinction
+		   costs a little hierarchy, losing the contrast costs the text. */
+		--text-muted: var(--text-normal);
+		--text-faint: var(--text-normal);
+	}
+}
+
+
+/* ==================================================================== */
+/* Reel's own controls set their own geometry                           */
+/* ==================================================================== */
+
+/*
+ * Themes style `button`. Most of them do it at a specificity a plugin's single
+ * class cannot beat — `button:not(button.clickable-icon)` is (0,2,0) — and they
+ * set padding, a background and a radius on every button in the app.
+ *
+ * Reel builds a lot of its interface out of `<button>` because that is the
+ * correct element for something you press. The consequence, once a theme like
+ * that is loaded, is that Reel's controls silently inherit a geometry nobody
+ * designed for them:
+ *
+ *   - Discover's card buttons grew past their slot and overlapped each other
+ *     by 14–16px, so two adjacent controls shared a strip of screen and a tap
+ *     in it was a coin toss.
+ *   - Tab labels acquired a filled backdrop, which changed what their text had
+ *     to be legible against and dropped several to 4.30:1.
+ *
+ * Neither is visible on the default theme, and neither is a mistake in the
+ * markup. They are the cost of leaving geometry unstated and inheriting
+ * whatever arrives.
+ *
+ * So Reel states it. These are the properties a theme has no business setting
+ * on a plugin's internal controls — where they sit and how big they are —
+ * declared on Reel's own classes. Colour is deliberately NOT reset here: a
+ * theme changing what Reel's buttons look like is the theme working, and
+ * fighting that would be the actual overreach.
+ */
+.reel-view .reel-dcard-btn,
+.reel-view .reel-tab,
+.reel-view .reel-chip,
+.reel-view .reel-filter-tag-label,
+.reel-view .reel-filter-tag-x {
+	padding: 0;
+	border-radius: inherit;
+	min-width: 0;
+	font-weight: inherit;
+}
+
+/*
+ * The card buttons then re-state the padding they actually want, inside a slot
+ * they are not allowed to outgrow. `min-width: 0` is the load-bearing half:
+ * without it a flex item refuses to shrink below its content and pushes into
+ * its neighbour, which is precisely how two 44px targets ended up sharing
+ * 16px of screen.
+ */
+.reel-view .reel-dcard-btn {
+	padding: var(--reel-space-2);
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* Tabs keep their own backdrop rather than borrowing the theme's button fill,
+   so the text underneath is measured against a surface Reel chose. */
+.reel-view .reel-tab {
+	background: none;
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border-radius: var(--reel-radius-full);
+}
+
+
+/*
+ * The tick keeps its accent fill.
+ *
+ * `.reel-tick` is one class, (0,1,0). A theme's `button:not(...)` is (0,2,0)
+ * and wins outright, so the tick lost its accent background and took the
+ * theme's neutral button fill — while keeping `color: var(--text-on-accent)`,
+ * which is white. A white check on a pale grey disc: 1.11:1, which is to say
+ * invisible. The control still worked, still occupied its 44px, and showed
+ * nothing at all.
+ *
+ * That is the worst shape a theme-compatibility bug can take. It is not a
+ * layout shift anyone would notice in a screenshot of their own app, because
+ * the eye supplies the missing tick from memory once you know where it is.
+ *
+ * `button.reel-tick` is (0,2,1) and settles it. Attaching the element name is
+ * the cheapest way past a themed `button` rule, and it is honest about what it
+ * is doing — this is Reel's button, and Reel says what colour it is.
+ */
+.reel-view button.reel-tick {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: transparent;
+}
+
+/*
+ * Credit names reach 44px.
+ *
+ * They were 37px — under the target on a screen whose whole job is names you
+ * tap to go somewhere. Padding rather than height, so the text keeps its own
+ * line spacing and only the target grows.
+ */
+.reel-view .reel-credit-name {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding-block: var(--reel-space-1);
+}

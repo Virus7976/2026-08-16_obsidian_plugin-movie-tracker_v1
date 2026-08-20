@@ -111,3 +111,85 @@ body {
 	--modal-radius: 22px;
 	--modal-border-width: 2px;
 }
+
+
+/* ==================================================================== *
+ * Palettes                                                             *
+ * ==================================================================== *
+ *
+ * Synthetic, not copied from any theme. Each one is a point chosen to stress a
+ * different assumption Reel's colour rules make. `neutral` is the default and
+ * changes nothing, so every existing check keeps its meaning.
+ *
+ * These only redefine Obsidian's documented tokens. A plugin may assume those
+ * exist; it may not assume what they contain, and that is precisely the
+ * assumption being tested.
+ */
+
+/*
+ * Warm, light, and close together.
+ *
+ * Two stresses at once. The surfaces are saturated, so a fill that reads as a
+ * faint tint in grey reads as a solid colour here at the same lightness. And
+ * `--background-secondary` sits only six points of lightness below
+ * `--background-primary`, so any card relying on tone alone to look raised
+ * does not — it needs elevation, and if it has none this palette shows it.
+ *
+ * `--text-muted` is a soft mid-tone. Plenty of themes ship one; it is the
+ * common case, not a pathological one, and it is where Reel's label colour
+ * stops clearing 4.5:1.
+ */
+body[data-palette="warm-light"].theme-light {
+	--background-primary: hsl(35, 36%, 96%);
+	--background-primary-alt: hsl(35, 37%, 92%);
+	--background-secondary: hsl(34, 34%, 90%);
+	--background-secondary-alt: hsl(36, 35%, 88%);
+	--background-modifier-border: hsl(37, 38%, 83%);
+	--background-modifier-border-hover: hsl(37, 38%, 78%);
+	--interactive-normal: hsl(35, 37%, 92%);
+	--interactive-hover: hsl(34, 34%, 90%);
+	--text-normal: hsl(31, 45%, 24%);
+	--text-muted: hsl(35, 28%, 40%);
+	--text-faint: hsl(35, 25%, 52%);
+}
+
+/*
+ * Warm and dark, with the card DARKER than the page.
+ *
+ * The inverse of the assumption above, and one that catches real bugs: plenty
+ * of dark themes make their secondary surface recede rather than lift. A rule
+ * that says "mix toward `--background-primary` to raise a card" is correct on
+ * one of these palettes and backwards on the other, which is exactly the error
+ * worth catching mechanically instead of by eye.
+ */
+body[data-palette="warm-dark"].theme-dark {
+	--background-primary: hsl(30, 19%, 15%);
+	--background-primary-alt: hsl(29, 16%, 13%);
+	--background-secondary: hsl(29, 16%, 12%);
+	--background-secondary-alt: hsl(29, 16%, 11%);
+	--background-modifier-border: hsl(28, 22%, 24%);
+	--background-modifier-border-hover: hsl(28, 22%, 30%);
+	--interactive-normal: hsl(29, 16%, 20%);
+	--interactive-hover: hsl(28, 22%, 26%);
+	--text-normal: hsl(34, 39%, 84%);
+	--text-muted: hsl(35, 27%, 58%);
+	--text-faint: hsl(33, 20%, 44%);
+}
+
+/*
+ * And the button rule.
+ *
+ * Not a palette, but the same category of thing: something themes do that Reel
+ * has to survive. Many style every button that is not a `clickable-icon`, at
+ * specificity (0,2,0), which beats a plugin's single-class rule outright. That
+ * is what gave the dismiss half of a filter chip a background of its own and
+ * made the chip look like two controls welded together.
+ *
+ * Kept out of the palettes so it applies on every pass.
+ */
+button:not(button.clickable-icon) {
+	background: var(--interactive-normal);
+	padding: var(--size-4-2, 8px) var(--size-4-4, 16px);
+	border-radius: 8px;
+	font-weight: 500;
+}
