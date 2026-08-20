@@ -1073,6 +1073,42 @@
     }
   };
 
+  // src/ui/hero.ts
+  function cssUrl(path) {
+    return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+  function paintHero(plugin2, el, opts) {
+    const band = el.createDiv({ cls: opts.compact ? "reel-hero-band is-compact" : "reel-hero-band" });
+    const subject = opts.subject;
+    if (subject) {
+      const local = plugin2.posters.displayUrl(subject);
+      const remote = subject.backdropPath ? plugin2.tmdb.posterUrl(subject.backdropPath, "w780") : null;
+      if (local || remote) {
+        band.addClass("has-backdrop");
+        band.toggleClass("has-art", !!remote);
+        const wrap = band.createDiv({ cls: "reel-hero-art" });
+        if (local) {
+          wrap.createDiv({ cls: "reel-hero-art-base" }).setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
+        }
+        if (remote) {
+          wrap.createEl("img", {
+            cls: "reel-hero-art-img",
+            attr: { src: remote, alt: "", loading: "lazy", decoding: "async" }
+          });
+        }
+      }
+      if (opts.tint !== false) {
+        plugin2.swatches.tint(el, plugin2.posters.displayUrl(subject), document.body.hasClass("theme-dark"));
+      }
+    }
+    const line = band.createDiv({ cls: "reel-hero-band-body" });
+    line.createDiv({ cls: "reel-hero-band-label", text: opts.label });
+    line.createDiv({ cls: "reel-hero-band-title", text: opts.title });
+    if (opts.sub)
+      line.createDiv({ cls: "reel-hero-band-sub", text: opts.sub });
+    return band;
+  }
+
   // src/render/stats.ts
   function paintStats(plugin2, el, opts) {
     el.empty();
@@ -1111,31 +1147,12 @@
     );
     const heroFor = [...watched].sort((a, b) => b.date.localeCompare(a.date))[0]?.entry ?? [...films, ...shows].filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
     if (heroFor) {
-      const hero = el.createDiv({ cls: "reel-stats-hero" });
-      const local = plugin2.posters.displayUrl(heroFor);
-      const remote = heroFor.backdropPath ? plugin2.tmdb.posterUrl(heroFor.backdropPath, "w780") : null;
-      if (local || remote) {
-        hero.addClass("has-backdrop");
-        hero.toggleClass("has-art", !!remote);
-        const wrap = hero.createDiv({ cls: "reel-stats-backdrop" });
-        if (local) {
-          wrap.createDiv({ cls: "reel-stats-backdrop-base" }).setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
-        }
-        if (remote) {
-          wrap.createEl("img", {
-            cls: "reel-stats-backdrop-img",
-            attr: { src: remote, alt: "", loading: "lazy", decoding: "async" }
-          });
-        }
-      }
-      plugin2.swatches.tint(el, plugin2.posters.displayUrl(heroFor), document.body.hasClass("theme-dark"));
-      const line = hero.createDiv({ cls: "reel-stats-hero-body" });
-      line.createDiv({ cls: "reel-stats-hero-label", text: opts.year ? String(opts.year) : "All time" });
-      line.createDiv({
-        cls: "reel-stats-hero-title",
-        text: `${watched.length} ${watched.length === 1 ? "film" : "films"}${shows.length ? ` \xB7 ${shows.length} series` : ""}`
+      paintHero(plugin2, el, {
+        label: opts.year ? String(opts.year) : "All time",
+        title: `${watched.length} ${watched.length === 1 ? "film" : "films"}${shows.length ? ` \xB7 ${shows.length} series` : ""}`,
+        sub: `Most recently \u2014 ${heroFor.title}`,
+        subject: heroFor
       });
-      line.createDiv({ cls: "reel-stats-hero-sub", text: `Most recently \u2014 ${heroFor.title}` });
     }
     const tiles = el.createDiv({ cls: "reel-tiles" });
     const tile = (label, value, sub, go) => {
@@ -1646,9 +1663,6 @@
     if (!Number.isFinite(days))
       return 0;
     return Math.max(1, days / 30.4);
-  }
-  function cssUrl(path) {
-    return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
   // src/util/status.ts
@@ -4206,12 +4220,28 @@ ${body}
   }
   function paintReviews(plugin2, container, entry, opts = {}) {
     const pane = container.createDiv({ cls: "reel-yours is-loading" });
-    void readReviews(plugin2, entry).then((all2) => {
-      if (!pane.isConnected)
-        return;
-      pane.removeClass("is-loading");
-      draw(plugin2, pane, entry, all2, opts);
-    });
+    const fill = () => {
+      void readReviews(plugin2, entry).then((all2) => {
+        if (!pane.isConnected)
+          return;
+        pane.removeClass("is-loading");
+        draw(plugin2, pane, entry, all2, opts);
+      });
+    };
+    if (!opts.lazy || typeof IntersectionObserver === "undefined") {
+      fill();
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting))
+          return;
+        io.disconnect();
+        fill();
+      },
+      { rootMargin: "800px 0px" }
+    );
+    io.observe(pane);
   }
   function draw(plugin2, pane, entry, all2, opts) {
     pane.empty();
@@ -6523,7 +6553,13 @@ ${body}
     sel.createEl("option", { text: "Recently watched" });
     sort.createSpan({ cls: "reel-dim reel-sort-then", text: "then my rating" });
     const body = root.createDiv({ cls: "reel-view-body" });
-    body.createDiv({ cls: "reel-view-count", text: `${all.length} titles` });
+    heroBand(body, {
+      label: "Your library",
+      title: `${all.length} titles`,
+      sub: `Most recently \u2014 ${all[0].title} \xB7 14 to watch \xB7 2 hidden by content filter`,
+      art: false,
+      compact: true
+    });
     renderPosterGrid(plugin, body, all);
   }
   function filterBar(into, active) {
@@ -6671,6 +6707,24 @@ ${body}
       });
     }
   }
+  function heroBand(into, opts) {
+    const band = into.createDiv({ cls: "reel-hero-band has-backdrop" });
+    if (opts.compact)
+      band.addClass("is-compact");
+    if (opts.art)
+      band.addClass("has-art");
+    const wrap = band.createDiv({ cls: "reel-hero-art" });
+    wrap.createDiv({ cls: "reel-hero-art-base" }).setCssProps({ "--reel-backdrop": `url("${poster(all[0].title)}")` });
+    if (opts.art) {
+      wrap.createEl("img", { cls: "reel-hero-art-img", attr: { src: poster(all[0].title), alt: "" } });
+    }
+    const body = band.createDiv({ cls: "reel-hero-band-body" });
+    body.createDiv({ cls: "reel-hero-band-label", text: opts.label });
+    body.createDiv({ cls: "reel-hero-band-title", text: opts.title });
+    if (opts.sub)
+      body.createDiv({ cls: "reel-hero-band-sub", text: opts.sub });
+    return band;
+  }
   function rows(root) {
     root.addClass("reel-view-body");
     renderRowList(plugin, root, all.slice(0, 8));
@@ -6681,6 +6735,7 @@ ${body}
   }
   function upnext(root) {
     root.addClass("reel-view-body");
+    heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance \u2014 up to S2E4", art: true, compact: true });
     paintUpNext(plugin, root, void 0, true);
   }
   function empties(root) {

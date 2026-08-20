@@ -23,6 +23,7 @@ import { renderEmpty } from "../ui/empty";
 import { setSelected } from "../ui/a11y";
 import { attachOpinion, opinionOf } from "../ui/personBadge";
 import { TitlesSheet } from "../ui/titlesSheet";
+import { paintHero } from "../ui/hero";
 
 export interface StatsOptions {
 	year?: number;
@@ -144,43 +145,17 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		[...films, ...shows].filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
 
 	if (heroFor) {
-		const hero = el.createDiv({ cls: "reel-stats-hero" });
-		const local = plugin.posters.displayUrl(heroFor);
-		const remote = heroFor.backdropPath ? plugin.tmdb.posterUrl(heroFor.backdropPath, "w780") : null;
-
-		if (local || remote) {
-			hero.addClass("has-backdrop");
-			// A real backdrop is a photograph and takes a scrim; a blurred
-			// poster is a texture. Blurring a pale poster produces fog, which
-			// reads as something having failed to load — so the two are styled
-			// differently rather than treated as one.
-			hero.toggleClass("has-art", !!remote);
-			const wrap = hero.createDiv({ cls: "reel-stats-backdrop" });
-			if (local) {
-				wrap
-					.createDiv({ cls: "reel-stats-backdrop-base" })
-					.setCssProps({ "--reel-backdrop": `url("${cssUrl(local)}")` });
-			}
-			if (remote) {
-				wrap.createEl("img", {
-					cls: "reel-stats-backdrop-img",
-					attr: { src: remote, alt: "", loading: "lazy", decoding: "async" },
-				});
-			}
-		}
-
-		// The same colour the detail screen pulls, so the two pages agree.
-		plugin.swatches.tint(el, plugin.posters.displayUrl(heroFor), document.body.hasClass("theme-dark"));
-
-		const line = hero.createDiv({ cls: "reel-stats-hero-body" });
-		line.createDiv({ cls: "reel-stats-hero-label", text: opts.year ? String(opts.year) : "All time" });
-		line.createDiv({
-			cls: "reel-stats-hero-title",
-			text: `${watched.length} ${watched.length === 1 ? "film" : "films"}${
+		// The band itself lives in ui/hero.ts now. It was written here first and
+		// then needed on four more screens, and four copies of a hero drift into
+		// four slightly different heroes — which is the opposite of the point.
+		paintHero(plugin, el, {
+			label: opts.year ? String(opts.year) : "All time",
+			title: `${watched.length} ${watched.length === 1 ? "film" : "films"}${
 				shows.length ? ` · ${shows.length} series` : ""
 			}`,
+			sub: `Most recently — ${heroFor.title}`,
+			subject: heroFor,
 		});
-		line.createDiv({ cls: "reel-stats-hero-sub", text: `Most recently — ${heroFor.title}` });
 	}
 
 	const tiles = el.createDiv({ cls: "reel-tiles" });
@@ -1021,7 +996,4 @@ export function parseOptions(source: string): StatsOptions {
 	return opts;
 }
 
-/** Escape a vault resource path for use inside a CSS `url("…")`. */
-function cssUrl(path: string): string {
-	return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-}
+

@@ -26,6 +26,7 @@ import { redact } from "./secrets";
 import { renderStarsStatic } from "./ui/stars";
 import { renderEmpty } from "./ui/empty";
 import { paintReviews } from "./ui/reviewPane";
+import { paintHero, heroSubject } from "./ui/hero";
 import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
 import {
@@ -563,6 +564,7 @@ export class ReelView extends ItemView {
 			this.rateScreen.render(this.bodyEl);
 		} else if (this.tab === "upnext") {
 			this.paintFilters({ showSort: false });
+			this.paintUpNextHero();
 			// Above Up Next, not below: it is a grace note on the way to the
 			// thing you opened the screen for, and it renders nothing at all on
 			// the days it has nothing to say.
@@ -967,15 +969,36 @@ export class ReelView extends ItemView {
 		rows = sortEntries(rows, this.filters.sort, ascending(this.filters.sort));
 
 		const hiddenCount = this.plugin.hiddenCount(this.plugin.library.all());
-		const count = this.bodyEl.createDiv({ cls: "reel-block-count" });
-		count.setText(`${rows.length} title${rows.length === 1 ? "" : "s"}`);
-		if (hiddenCount) {
-			// Say so explicitly — a filtered-down library that doesn't explain
-			// itself just looks like missing data.
-			count.createSpan({
-				cls: "reel-dim",
-				text: ` · ${hiddenCount} hidden by content filter`,
+
+		/*
+		 * The library wears what you last watched.
+		 *
+		 * This replaces the bare "39 titles" line rather than sitting above it —
+		 * the count is the band's headline, and two of them would be one more row
+		 * of chrome on the screen that has fought hardest for its vertical space.
+		 *
+		 * The subtitle is where the count used to say what it could not: how many
+		 * of these are on a watchlist rather than watched, and how many the content
+		 * filter is holding back. A filtered library that does not explain itself
+		 * reads as missing data.
+		 */
+		if (rows.length) {
+			const watchlist = rows.filter((e) => e.status === "watchlist").length;
+			const parts: string[] = [];
+			if (watchlist) parts.push(`${watchlist} to watch`);
+			if (hiddenCount) parts.push(`${hiddenCount} hidden by content filter`);
+			const newest = heroSubject(rows);
+			if (newest && !parts.length) parts.push(`Most recently — ${newest.title}`);
+			paintHero(this.plugin, this.bodyEl, {
+				label: this.narrowed() ? "Filtered" : "Your library",
+				title: `${rows.length} title${rows.length === 1 ? "" : "s"}`,
+				sub: parts.join(" · ") || undefined,
+				subject: newest,
+				compact: true,
 			});
+		} else if (hiddenCount) {
+			const count = this.bodyEl.createDiv({ cls: "reel-block-count" });
+			count.createSpan({ cls: "reel-dim", text: `${hiddenCount} hidden by content filter` });
 		}
 
 		if (!rows.length) {
@@ -1044,6 +1067,30 @@ export class ReelView extends ItemView {
 		add.addEventListener("click", () => this.plugin.openSearch());
 	}
 
+	/**
+	 * What Up Next is wearing tonight.
+	 *
+	 * The show you are furthest into, which is very nearly always the one you are
+	 * about to put on. Silent when nothing is part-watched: a band announcing
+	 * "0 series" over a blurred poster would be a decorated way of saying there
+	 * is nothing here, and the empty state below already says it better.
+	 */
+	private paintUpNextHero(): void {
+		const all = this.plugin.visible(this.plugin.library.inProgress());
+		const rows = this.narrowed() ? all.filter((e) => this.scoped().some((s) => s.path === e.path)) : all;
+		if (!rows.length) return;
+
+		const lead = rows[0];
+		const at = lead.lastWatched;
+		paintHero(this.plugin, this.bodyEl, {
+			label: "Tonight",
+			title: `${rows.length} on the go`,
+			sub: at ? `${lead.title} — up to S${at.season}E${at.episode}` : lead.title,
+			subject: lead,
+			compact: true,
+		});
+	}
+
 	private paintDiary(): void {
 		// The ```diary``` block took a year and the tab didn't, so the tab
 		// could only ever show everything.
@@ -1065,6 +1112,24 @@ export class ReelView extends ItemView {
 		}
 
 		const rows = this.diaryYear ? all.filter((v) => v.date.startsWith(String(this.diaryYear))) : all;
+
+		/*
+		 * The diary wears the most recent thing in it — which, unlike the other
+		 * tabs, changes when you change the year filter. That is the point: the
+		 * band is a statement about the set you are looking at, not about the
+		 * library in general.
+		 */
+		if (rows.length) {
+			const newest = rows[0];
+			paintHero(this.plugin, this.bodyEl, {
+				label: this.diaryYear ? String(this.diaryYear) : "Diary",
+				title: `${rows.length} viewing${rows.length === 1 ? "" : "s"}`,
+				sub: `Most recently — ${newest.entry.title}`,
+				subject: newest.entry,
+				compact: true,
+			});
+		}
+
 		if (!rows.length) {
 			const none = this.bodyEl.createDiv({ cls: "reel-empty" });
 			none.createDiv({ text: "No viewings logged yet." });
@@ -1107,7 +1172,7 @@ export class ReelView extends ItemView {
 			 * Silent when there is nothing: an empty prompt on four hundred rows
 			 * would be four hundred pieces of furniture.
 			 */
-			paintReviews(this.plugin, body, v.entry, { onlyDate: v.date, heading: "" });
+			paintReviews(this.plugin, body, v.entry, { onlyDate: v.date, heading: "", lazy: true });
 
 			row.addEventListener("click", () => this.openDetail(v.entry));
 		}

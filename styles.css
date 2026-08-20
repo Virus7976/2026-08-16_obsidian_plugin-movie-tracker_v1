@@ -7717,7 +7717,7 @@ input.reel-input {
 
 
 /* ================================================================== *
- * Stats: the same treatment the detail screen has always had          *
+ * The artwork band, on every screen that has a title to wear         *
  *                                                                     *
  * One page took its atmosphere from artwork and the other rendered in *
  * flat theme grey, from identical material — this page already knows  *
@@ -7725,7 +7725,7 @@ input.reel-input {
  * as designed and the other as a spreadsheet.                         *
  * ================================================================== */
 
-.reel-stats-hero {
+.reel-hero-band {
 	position: relative;
 	display: flex;
 	flex-direction: column;
@@ -7738,7 +7738,7 @@ input.reel-input {
 	isolation: isolate;
 }
 
-.reel-stats-backdrop {
+.reel-hero-art {
 	position: absolute;
 	inset: 0;
 	z-index: -1;
@@ -7747,7 +7747,7 @@ input.reel-input {
 /* A blurred poster is a *texture*, not a picture. Scaled well past the frame
    so no edge shows, and heavily blurred, because a legible poster behind text
    is noise rather than atmosphere. */
-.reel-stats-backdrop-base {
+.reel-hero-art-base {
 	position: absolute;
 	inset: -20%;
 	background-image: var(--reel-backdrop);
@@ -7758,7 +7758,7 @@ input.reel-input {
 }
 
 /* A real backdrop is a photograph and earns much less blur. */
-.reel-stats-backdrop-img {
+.reel-hero-art-img {
 	position: absolute;
 	inset: 0;
 	width: 100%;
@@ -7771,7 +7771,7 @@ input.reel-input {
 /* The scrim is what makes text on artwork legible rather than lucky. Without
    it the hero reads correctly over a dark poster and not at all over a pale
    one, and half of this library is pale. */
-.reel-stats-hero.has-backdrop::after {
+.reel-hero-band.has-backdrop::after {
 	content: "";
 	position: absolute;
 	inset: 0;
@@ -7783,14 +7783,14 @@ input.reel-input {
 	);
 }
 
-.reel-stats-hero-body {
+.reel-hero-band-body {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 	min-width: 0;
 }
 
-.reel-stats-hero-label {
+.reel-hero-band-label {
 	font-size: var(--reel-text-caption);
 	font-weight: 600;
 	text-transform: uppercase;
@@ -7798,14 +7798,14 @@ input.reel-input {
 	color: var(--text-muted);
 }
 
-.reel-stats-hero-title {
+.reel-hero-band-title {
 	font-size: var(--reel-text-hero);
 	font-weight: 700;
 	line-height: 1.15;
 	font-variant-numeric: tabular-nums;
 }
 
-.reel-stats-hero-sub {
+.reel-hero-band-sub {
 	font-size: var(--reel-text-caption);
 	font-weight: 400;
 	color: var(--text-muted);
@@ -7878,7 +7878,7 @@ input.reel-input {
 .reel-view:not(.is-w700) .reel-view-count,
 .reel-view:not(.is-w700) .reel-drow-head,
 .reel-view:not(.is-w700) .reel-discover-head,
-.reel-view:not(.is-w700) .reel-stats-hero-body {
+.reel-view:not(.is-w700) .reel-hero-band-body {
 	padding-left: var(--reel-space-3);
 	padding-right: var(--reel-space-3);
 	margin-left: 0;
@@ -8951,4 +8951,100 @@ input.reel-input {
 .reel-filter-sheet .reel-select {
 	min-height: 44px;
 	width: 100%;
+}
+
+
+/* The band bleeds into the page's gutter — where there is one.
+ *
+ * 0.7.107 moved the inset off the narrow body and onto the content inside it,
+ * so that every reading edge lines up. That leaves a phone body with zero
+ * horizontal padding, and a band with `margin: 0 -12px` on a zero-padded
+ * container is not a full-bleed image: it is 24px of horizontal overflow. That
+ * exact regression is what `bodyNoSideScroll` caught last release, and it would
+ * now be on four screens instead of one. */
+.reel-view:not(.is-w700) .reel-view-body > .reel-hero-band,
+.reel-view:not(.is-w700) .reel-stats > .reel-hero-band {
+	margin-left: 0;
+	margin-right: 0;
+	width: 100%;
+}
+
+/* Up Next and the Diary put the band above content that is already a list of
+   rows, so it needs less height than the Stats headline does. */
+.reel-view:not(.is-w700) .reel-upnext-section .reel-hero-band {
+	min-height: 108px;
+}
+
+
+/* The compact band: the same atmosphere, a third of the height.
+ *
+ * A band above a poster grid is a label, not a headline. The tall version costs
+ * 132px plus padding, and on the Library that took the chrome above the first
+ * poster to 48% of a phone screen — past the 45% ceiling that exists because
+ * this argument was already had once, and lost, in 0.7.x.
+ *
+ * The label and the title share a line here rather than stacking: they are a
+ * caption, and a caption on three lines is a headline pretending otherwise. */
+.reel-hero-band.is-compact {
+	min-height: 0;
+	padding-top: var(--reel-space-3);
+	padding-bottom: var(--reel-space-3);
+	margin-bottom: var(--reel-space-3);
+}
+
+.reel-hero-band.is-compact .reel-hero-band-title {
+	font-size: var(--reel-text-title, 1.15rem);
+	line-height: 1.2;
+}
+
+.reel-hero-band.is-compact .reel-hero-band-label {
+	font-size: var(--reel-text-caption);
+}
+
+/* Less blur and less opacity too. At 132px the texture has room to read as
+   atmosphere; at 70px a heavy blur is just a smudge behind two lines of type. */
+.reel-hero-band.is-compact .reel-hero-art-base {
+	filter: blur(20px) saturate(140%);
+	opacity: 0.45;
+}
+
+.reel-hero-band.is-compact .reel-hero-art-img {
+	opacity: 0.38;
+}
+
+
+/* On a wide pane the compact band is one line, not three.
+ *
+ * Stacking a label over a title over a subtitle is a phone idiom: it exists
+ * because 375px cannot hold all three side by side. At 1280px it can, and
+ * stacking there spends 75px of vertical space to avoid using width that is
+ * sitting empty — which took the chrome above the first poster to 46% of a
+ * 900px window, over the 45% ceiling.
+ *
+ * Only the compact variant. The tall band on Stats is a headline and a headline
+ * on one line with its own caption is just a sentence. */
+.reel-view.is-w700 .reel-hero-band.is-compact .reel-hero-band-body {
+	flex-direction: row;
+	align-items: baseline;
+	gap: var(--reel-space-3);
+	flex-wrap: nowrap;
+}
+
+/* The subtitle takes the leftover width and ellipsises into it, so a long
+   "Most recently — …" cannot be what pushes the row to two lines. */
+.reel-view.is-w700 .reel-hero-band.is-compact .reel-hero-band-sub {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin-left: auto;
+	text-align: right;
+}
+
+.reel-view.is-w700 .reel-hero-band.is-compact .reel-hero-band-label,
+.reel-view.is-w700 .reel-hero-band.is-compact .reel-hero-band-title {
+	flex: 0 0 auto;
+}
+
+.reel-view.is-w700 .reel-hero-band.is-compact {
+	padding-top: var(--reel-space-2);
+	padding-bottom: var(--reel-space-2);
 }

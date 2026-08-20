@@ -195,7 +195,17 @@ function library(root: HTMLElement): void {
 	sort.createSpan({ cls: "reel-dim reel-sort-then", text: "then my rating" });
 
 	const body = root.createDiv({ cls: "reel-view-body" });
-	body.createDiv({ cls: "reel-view-count", text: `${all.length} titles` });
+	// The band replaced the bare "39 titles" line: the count is its headline, and
+	// two of them would be one more row of chrome on the screen that has fought
+	// hardest for its vertical space. A deliberately long subtitle, because it is
+	// the part that must ellipsise rather than wrap or widen the pane.
+	heroBand(body, {
+		label: "Your library",
+		title: `${all.length} titles`,
+		sub: `Most recently — ${all[0].title} · 14 to watch · 2 hidden by content filter`,
+		art: false,
+		compact: true,
+	});
 	renderPosterGrid(plugin, body, all);
 }
 
@@ -377,6 +387,35 @@ function reviews(root: HTMLElement): void {
 	}
 }
 
+/**
+ * The artwork band, as every tab now wears it.
+ *
+ * Two shapes, both audited: a real backdrop, which is a photograph under a
+ * scrim, and a blurred poster, which is a texture. The pale case is the one
+ * that matters — a hero reads correctly over a dark poster whether or not the
+ * scrim is doing its job, and half of any library is pale.
+ */
+function heroBand(
+	into: HTMLElement,
+	opts: { label: string; title: string; sub?: string; art: boolean; compact?: boolean }
+): HTMLElement {
+	const band = into.createDiv({ cls: "reel-hero-band has-backdrop" });
+	if (opts.compact) band.addClass("is-compact");
+	if (opts.art) band.addClass("has-art");
+	const wrap = band.createDiv({ cls: "reel-hero-art" });
+	wrap
+		.createDiv({ cls: "reel-hero-art-base" })
+		.setCssProps({ "--reel-backdrop": `url("${poster(all[0].title)}")` });
+	if (opts.art) {
+		wrap.createEl("img", { cls: "reel-hero-art-img", attr: { src: poster(all[0].title), alt: "" } });
+	}
+	const body = band.createDiv({ cls: "reel-hero-band-body" });
+	body.createDiv({ cls: "reel-hero-band-label", text: opts.label });
+	body.createDiv({ cls: "reel-hero-band-title", text: opts.title });
+	if (opts.sub) body.createDiv({ cls: "reel-hero-band-sub", text: opts.sub });
+	return band;
+}
+
 function rows(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	renderRowList(plugin, root, all.slice(0, 8));
@@ -389,6 +428,7 @@ function stats(root: HTMLElement): void {
 
 function upnext(root: HTMLElement): void {
 	root.addClass("reel-view-body");
+	heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance — up to S2E4", art: true, compact: true });
 	paintUpNext(plugin, root, undefined, true);
 }
 

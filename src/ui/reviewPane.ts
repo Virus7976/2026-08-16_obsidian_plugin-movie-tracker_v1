@@ -81,6 +81,17 @@ interface PaneOptions {
 	/** Only this date's review — what a diary row wants. */
 	onlyDate?: string;
 	heading?: string;
+	/**
+	 * Wait until the pane is near the viewport before reading the note.
+	 *
+	 * The diary paints up to four hundred rows, and each one asking its note for
+	 * reviews is four hundred file reads on a screen that shows about six. The
+	 * cache is keyed on mtime so repaints are free, but the *first* paint is not,
+	 * and on a phone that is the paint that matters.
+	 *
+	 * Off by default. The detail screen shows exactly one and wants it now.
+	 */
+	lazy?: boolean;
 }
 
 /**
@@ -91,11 +102,41 @@ interface PaneOptions {
  */
 export function paintReviews(plugin: ReelPlugin, container: HTMLElement, entry: Entry, opts: PaneOptions = {}): void {
 	const pane = container.createDiv({ cls: "reel-yours is-loading" });
-	void readReviews(plugin, entry).then((all) => {
-		if (!pane.isConnected) return;
-		pane.removeClass("is-loading");
-		draw(plugin, pane, entry, all, opts);
-	});
+
+	const fill = (): void => {
+		void readReviews(plugin, entry).then((all) => {
+			if (!pane.isConnected) return;
+			pane.removeClass("is-loading");
+			draw(plugin, pane, entry, all, opts);
+		});
+	};
+
+	if (!opts.lazy || typeof IntersectionObserver === "undefined") {
+		fill();
+		return;
+	}
+
+	/*
+	 * Read when it comes into view, and once only.
+	 *
+	 * `rootMargin` is generous on purpose: a row that starts reading its note the
+	 * instant it becomes visible has the text arrive after you have already
+	 * looked at it, and a line appearing under your eye is worse than one that
+	 * was never there. A screen's warning is enough to land before it matters.
+	 *
+	 * `root: null` — the viewport — rather than the scroller, because this is
+	 * used from screens that scroll in different containers and getting it wrong
+	 * fails silently by never firing at all.
+	 */
+	const io = new IntersectionObserver(
+		(entries) => {
+			if (!entries.some((e) => e.isIntersecting)) return;
+			io.disconnect();
+			fill();
+		},
+		{ rootMargin: "800px 0px" }
+	);
+	io.observe(pane);
 }
 
 function draw(
