@@ -12914,12 +12914,27 @@ input.reel-input {
  * run fifty characters, and squeezing that into half a phone width would trade
  * this problem for a worse one.
  */
+/*
+ * `flex-direction: row`, which is the whole fix.
+ *
+ * The row was already `display: flex` — and a narrow-viewport rule further up
+ * sets `flex-direction: column` on it, so every property added here to lay the
+ * label and value side by side was being applied to a column. `justify-content:
+ * space-between` pushed them apart *vertically*; `flex: 1 1 0` on the value
+ * gave it a share of the *height*; `flex-wrap: nowrap` prevented wrapping along
+ * an axis nothing was wrapping on.
+ *
+ * Three rounds of plausible fixes, each measured, each returning exactly the
+ * same 104px, because all three answered the wrong question. The layout was
+ * never wrapping and never failing to shrink — it was vertical, and nothing
+ * said otherwise.
+ */
 .reel-view:not(.is-w700) .reel-stats .reel-fact {
 	display: flex;
+	flex-direction: row;
 	align-items: baseline;
 	justify-content: space-between;
 	gap: var(--reel-space-3);
-	flex-wrap: wrap;
 	padding-block: var(--reel-space-3);
 }
 
@@ -12927,10 +12942,29 @@ input.reel-input {
 	flex: 0 0 auto;
 }
 
+/*
+ * `flex-basis: 0`, and this is the second time in this stylesheet.
+ *
+ * With `auto` the value asks for its content width — "The Equalizer 3 — 0.5★"
+ * is wider than the space beside its label — and a wrapping flex line breaks
+ * before it shrinks. So the row went to two lines anyway and the change did
+ * nothing but add a `display: flex` that was never visible. Measured at 81 to
+ * 104px per row when the intent was 56.
+ *
+ * With `0` the item asks for nothing, takes what is left after the label, and
+ * wraps its text *inside* that box instead of pushing itself onto a new line —
+ * which is what shrink-to-fit means and what was wanted both times.
+ */
 .reel-view:not(.is-w700) .reel-stats .reel-fact-value {
-	flex: 1 1 auto;
+	flex: 1 1 0;
 	min-width: 0;
 	text-align: right;
+}
+
+/* Nothing left to wrap now that the value shrinks, and leaving it on invites
+   the same fault back the next time a label grows. */
+.reel-view:not(.is-w700) .reel-stats .reel-fact {
+	flex-wrap: nowrap;
 }
 
 

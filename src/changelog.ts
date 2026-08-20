@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.30",
+		date: "2026-08-20",
+		headline: "The stats facts really do fit on one line now.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "“Highest rated” and its answer sit side by side instead of stacked.",
+				note: "This was claimed as fixed in 0.8.27 and was not. The row was already a flex container, but a narrow-screen rule set it to lay out vertically — so every property added to put the two side by side was quietly being applied to a column. Short rows drop from 81px to 51px; long titles still wrap, but inside their own column rather than onto a new line.",
+			},
+		],
+	},
+	{
 		version: "0.8.29",
 		date: "2026-08-20",
 		headline: "Washes use a frame from the film, not its poster.",
