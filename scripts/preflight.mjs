@@ -102,6 +102,32 @@ if (existsSync("data.json")) {
 	warn("data.json exists in the repo folder. It holds your API keys — confirm it is gitignored.");
 }
 
+/* ---- the changelog describes the thing being published --------------- */
+/*
+ * A release with no notes is how a changelog stops being true.
+ *
+ * Reel now shows its update notes on first run after an upgrade, which means
+ * the notes are a shipped feature and not a courtesy file. If the newest entry
+ * does not name the version in the manifest, the dialog either says nothing or
+ * describes the previous release as if it were this one — and the second is
+ * worse than having no dialog at all.
+ *
+ * Read as text rather than imported: this script runs before any build, so the
+ * TypeScript is not loadable here.
+ */
+if (existsSync("src/changelog.ts")) {
+	const src = readFileSync("src/changelog.ts", "utf8");
+	const first = src.match(/version:\s*"([^"]+)"/);
+	if (!first) {
+		fail("src/changelog.ts has no release entries.");
+	} else if (first[1] !== manifest.version) {
+		fail(
+			`The newest changelog entry is ${first[1]} but the manifest says ${manifest.version}. ` +
+				`Add an entry for ${manifest.version} before publishing.`
+		);
+	}
+}
+
 /* ---- report --------------------------------------------------------- */
 for (const w of warnings) console.log(`  warn   ${w}`);
 for (const p of problems) console.log(`  ERROR  ${p}`);

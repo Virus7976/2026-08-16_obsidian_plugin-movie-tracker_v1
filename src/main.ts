@@ -32,6 +32,7 @@ import { policyBreach, ContentPolicy } from "./content";
 import { redact } from "./secrets";
 import { uiSnapshot } from "./ui/snapshot";
 import { confirm } from "./ui/confirm";
+import { showChangelog, showWhatsNewIfUpdated } from "./ui/whatsNew";
 import { todayISO } from "./util/dates";
 import type { Entry } from "./types";
 
@@ -101,6 +102,17 @@ export default class ReelPlugin extends Plugin {
 			// a cache file is never worth a notice.
 			void this.tmdb.pruneLegacyCache();
 			if (this.settings.checkNewEpisodes) void this.checkNewEpisodes();
+
+			/*
+			 * After the layout is ready, not during `onload`.
+			 *
+			 * A modal opened while Obsidian is still assembling its workspace
+			 * lands behind it on a phone, and the plugin would appear to have
+			 * hung on a screen the user cannot dismiss. This also puts the
+			 * dialog after the library load, so nothing races it for the
+			 * screen.
+			 */
+			void showWhatsNewIfUpdated(this);
 		});
 
 		registerHeaderProcessor(this);
@@ -301,6 +313,15 @@ export default class ReelPlugin extends Plugin {
 
 	private registerCommands(): void {
 		this.addCommand({ id: "open-view", name: "Open library", icon: "reel", callback: () => void this.openView() });
+
+		// Reopenable on purpose. The dialog shows once per update, and "what was
+		// that thing it said?" is a question with an answer.
+		this.addCommand({
+			id: "whats-new",
+			name: "What's new in Reel",
+			icon: "reel",
+			callback: () => showChangelog(this),
+		});
 
 		// One command per tab: the palette is how a keyboard user navigates,
 		// and "open, then click a tab" is two steps where one will do.

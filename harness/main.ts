@@ -543,6 +543,83 @@ function seensheet(root: HTMLElement): void {
 	actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
 }
 
+/**
+ * The update notes, modelled at their worst case.
+ *
+ * Three releases at once — what someone who skipped a couple of updates
+ * actually gets — with the longest headline and a "before" line on the items
+ * that have one. The rig builds the real DOM rather than instantiating the
+ * modal, because the modal wants an `App` and the screen is worth checking on
+ * its geometry alone: a sticky action row over a scrolling list is the same
+ * shape that put a Save button under the keyboard once already.
+ */
+function whatsnew(root: HTMLElement): void {
+	const modal = root.createDiv({ cls: "reel-modal reel-whatsnew reel-sheet" });
+
+	const head = modal.createDiv({ cls: "reel-wn-head" });
+	head.createDiv({ cls: "reel-wn-eyebrow", text: "Reel" });
+	head.createDiv({ cls: "reel-wn-title", text: "What's new" });
+	head.createDiv({
+		cls: "reel-wn-headline",
+		text: "Reel tells you what it changed, and Stats reads like a page rather than a pile of numbers.",
+	});
+
+	const body = modal.createDiv({ cls: "reel-wn-body" });
+	const releases: [string, string, string, [string, string, string?][]][] = [
+		[
+			"0.8.8",
+			"20 August 2026",
+			"",
+			[
+				[
+					"new",
+					"This screen. After an update, Reel shows what changed since the version you were on.",
+					"Reel updates through BRAT, which swaps the file out silently. Everything fixed here was something you reported, and there was no way to tell it had landed.",
+				],
+				["better", "Stats headline numbers sit on their own cards with the unit beside them."],
+			],
+		],
+		[
+			"0.8.7",
+			"20 August 2026",
+			"The search box stops fighting Obsidian's floating + button.",
+			[
+				[
+					"fixed",
+					"The + button no longer sits on top of the search field.",
+					"Reel was looking for a full-width toolbar and a round corner button never matched.",
+				],
+				["fixed", "The magnifier no longer prints over the first characters you type."],
+			],
+		],
+		[
+			"0.8.6",
+			"20 August 2026",
+			"The search field docks above the keyboard and stays there.",
+			[["better", "While searching, the field sits just above the keyboard."]],
+		],
+	];
+
+	for (const [version, date, summary, changes] of releases) {
+		const sec = body.createDiv({ cls: "reel-wn-release" });
+		const bar = sec.createDiv({ cls: "reel-wn-relhead" });
+		bar.createSpan({ cls: "reel-wn-version", text: version });
+		bar.createSpan({ cls: "reel-wn-date", text: date });
+		if (summary) sec.createDiv({ cls: "reel-wn-relsummary", text: summary });
+		const list = sec.createDiv({ cls: "reel-wn-list" });
+		for (const [kind, what, note] of changes) {
+			const row = list.createDiv({ cls: `reel-wn-item is-${kind}` });
+			row.createSpan({ cls: "reel-wn-kind", text: kind === "new" ? "New" : kind === "better" ? "Better" : "Fixed" });
+			const text = row.createDiv({ cls: "reel-wn-text" });
+			text.createDiv({ cls: "reel-wn-what", text: what });
+			if (note) text.createDiv({ cls: "reel-wn-note", text: note });
+		}
+	}
+
+	const actions = modal.createDiv({ cls: "reel-log-actions reel-wn-actions" });
+	actions.createEl("button", { cls: "reel-btn mod-cta", text: "Got it" });
+}
+
 function rows(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	renderRowList(plugin, root, all.slice(0, 8));
@@ -704,6 +781,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	dense,
 	searching,
 	seensheet,
+	whatsnew,
 	feed,
 	filterSheet,
 	reviews,
@@ -925,7 +1003,7 @@ if (app && params.get("audit") != null) {
 	 * Logged rather than dropped quietly. A pass that silently covers less than
 	 * it appears to is how a green tick stops meaning anything.
 	 */
-	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet"]);
+	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet", "whatsnew"]);
 	const skipped: string[] = [];
 
 	const results: { screen: string; checks: Check[] }[] = [];

@@ -10015,3 +10015,348 @@ input.reel-input {
 	transform: none;
 	align-self: center;
 }
+
+
+/* ==================================================================== */
+/* What's new                                                           */
+/* ==================================================================== */
+
+/*
+ * The update notes.
+ *
+ * Reel arrives through BRAT, which replaces the file and says nothing, so every
+ * fix in the last eight releases landed silently on a person who had reported
+ * it. This screen is the receipt.
+ *
+ * Colour is used to separate *kinds* of change, never to carry the meaning: the
+ * word "Fixed" is written out, and the dot beside it is decoration. A reader
+ * who cannot tell the dots apart loses nothing, which is the only way colour
+ * coding is allowed to work.
+ */
+.reel-whatsnew .reel-wn-head {
+	padding: var(--reel-space-4) var(--reel-space-4) var(--reel-space-3);
+	border-bottom: 1px solid var(--background-modifier-border);
+	/* A wash rather than a fill. The header should read as the top of the page
+	   it is on, not as a coloured banner stuck to it. */
+	background: linear-gradient(
+		180deg,
+		var(--background-modifier-hover) 0%,
+		transparent 100%
+	);
+}
+
+.reel-wn-eyebrow {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.reel-wn-title {
+	font-size: 1.6em;
+	font-weight: 700;
+	line-height: 1.15;
+	margin-top: 2px;
+	color: var(--text-normal);
+}
+
+/* One sentence saying what the update is about, before any list. If the reader
+   stops here they should still know whether the thing they reported arrived. */
+.reel-wn-headline {
+	margin-top: var(--reel-space-2);
+	font-size: 1.02em;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.reel-wn-body {
+	overflow-y: auto;
+	padding: var(--reel-space-3) var(--reel-space-4) 0;
+	/* The actions row is sticky at the bottom of the modal, so the last item
+	   needs room to clear it rather than ending underneath it. */
+	padding-bottom: var(--reel-space-3);
+}
+
+.reel-wn-release + .reel-wn-release {
+	margin-top: var(--reel-space-4);
+	padding-top: var(--reel-space-4);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.reel-wn-relhead {
+	display: flex;
+	align-items: baseline;
+	gap: var(--reel-space-2);
+	margin-bottom: var(--reel-space-2);
+}
+
+/* The version is the anchor for "is the thing I reported in this one", so it is
+   the strongest thing in the row rather than a grey suffix. */
+.reel-wn-version {
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+.reel-wn-date {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.reel-wn-relsummary {
+	margin: 0 0 var(--reel-space-2);
+	font-size: 0.95em;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.reel-wn-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-3);
+}
+
+.reel-wn-item {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: var(--reel-space-3);
+	align-items: start;
+	min-width: 0;
+}
+
+/*
+ * The kind label, written out.
+ *
+ * A fixed width so the three labels line up down the left and the sentences
+ * start at one margin — a ragged left edge here reads as three unrelated lists
+ * rather than one.
+ */
+.reel-wn-kind {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 0 auto;
+	width: 62px;
+	padding-top: 1px;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.reel-wn-kind::before {
+	content: "";
+	width: 8px;
+	height: 8px;
+	border-radius: 999px;
+	flex: 0 0 auto;
+	background: var(--text-faint);
+}
+
+.reel-wn-item.is-new .reel-wn-kind::before {
+	background: var(--color-green, var(--interactive-accent));
+}
+
+.reel-wn-item.is-better .reel-wn-kind::before {
+	background: var(--color-blue, var(--interactive-accent));
+}
+
+.reel-wn-item.is-fixed .reel-wn-kind::before {
+	background: var(--color-orange, var(--text-muted));
+}
+
+.reel-wn-text {
+	min-width: 0;
+}
+
+.reel-wn-what {
+	font-size: 0.98em;
+	line-height: 1.45;
+	color: var(--text-normal);
+}
+
+/* What it was doing before. This is what makes an item checkable rather than a
+   claim — it names the thing you actually saw. */
+.reel-wn-note {
+	margin-top: 4px;
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+/* The one button, always reachable, without scrolling the list to find it. */
+.reel-whatsnew .reel-wn-actions {
+	position: sticky;
+	bottom: 0;
+	margin: 0;
+	padding: var(--reel-space-3) var(--reel-space-4);
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+}
+
+/* The modal's own padding would double the padding written above, and on a
+   phone the head and the actions are meant to reach the edges. */
+.reel-whatsnew .reel-modal-content,
+.reel-whatsnew > .reel-modal-content {
+	padding: 0;
+}
+
+.reel-view.is-w700 .reel-whatsnew,
+.reel-whatsnew {
+	max-width: 560px;
+}
+
+/* On a phone the sheet is height-limited, so the list scrolls inside it rather
+   than the sheet growing past the top of the screen. */
+.reel-whatsnew.reel-sheet .reel-wn-body {
+	max-height: 52vh;
+}
+
+
+/* ==================================================================== */
+/* Stats: the bar becomes the row                                       */
+/* ==================================================================== */
+
+/*
+ * A chart row was a label on one line and a bar on the next.
+ *
+ * That is two lines per number, so a ten-row distribution ran to twenty lines
+ * of a phone screen, and it put the thing being compared — the bar — a line
+ * away from the thing it belongs to. Worse, it read as decoration: every
+ * non-zero row in a set where the maximum is one draws a full-width bar, so
+ * eleven identical stripes said nothing at all.
+ *
+ * The bar is now the row's own fill, behind the text. One line per number,
+ * half the height, and the comparison is the shape of the page rather than a
+ * separate graphic to look at. This is a table with a proportional wash, and
+ * it is the only honest way to draw a bar that is usually either full or
+ * empty.
+ *
+ * Four classes deep because the mobile rule it replaces carries
+ * `:not(.is-w700)`, and that counts.
+ */
+.reel-view .reel-stats .reel-chart .reel-chart-row {
+	position: relative;
+	display: block;
+	grid-template-columns: none;
+	grid-template-areas: none;
+	padding: 7px var(--reel-space-2);
+	margin: 0 calc(var(--reel-space-2) * -1);
+	border-radius: var(--reel-radius-sm);
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* The wash. Absolutely positioned so it is the row's background rather than an
+   element in its flow, which is what lets the text sit on top of it. */
+.reel-view .reel-stats .reel-chart .reel-chart-track {
+	position: absolute;
+	inset: 0;
+	height: auto;
+	width: auto;
+	border-radius: inherit;
+	/* No track colour. An empty track drew a visible groove on every zero row,
+	   so a distribution of ten zeroes looked like ten measurements rather than
+	   like nothing having happened. */
+	background: transparent;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+/*
+ * One colour, at one opacity.
+ *
+ * The fill used to be a left-to-right gradient from a desaturated accent to
+ * the full one. Across a column of bars that all reach the same width, the
+ * gradient is the only thing that varies within a row — so the eye reads the
+ * colour ramp, which means nothing, instead of the length, which means
+ * everything. Faint enough to keep the text on top at full contrast.
+ */
+.reel-view .reel-stats .reel-chart .reel-chart-fill {
+	height: 100%;
+	width: calc(var(--reel-fill, 0) * 100%);
+	background: hsl(var(--reel-accent-h, 220) var(--reel-accent-s, 12%) var(--reel-accent-l, 40%) / 0.18);
+	border-radius: 0;
+	/* A zero is nothing, not a sliver. Rounded corners on a zero-width box
+	   still paint a couple of pixels. */
+	min-width: 0;
+}
+
+/* The text rides on the wash. */
+.reel-view .reel-stats .reel-chart .reel-chart-head {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	grid-template-columns: 1.6em 1fr auto;
+	align-items: center;
+	gap: var(--reel-space-2);
+	min-width: 0;
+}
+
+/* The label can breathe now that it has the row to itself, and it is the thing
+   being read — not a caption on a bar. */
+.reel-view .reel-stats .reel-chart .reel-chart-label {
+	grid-area: auto;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--text-normal);
+}
+
+/* The count sits at the right margin, in line down the column, so the numbers
+   can be compared to each other and not only to their own bars. */
+.reel-view .reel-stats .reel-chart .reel-chart-value {
+	grid-area: auto;
+	justify-self: end;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+.reel-view .reel-stats .reel-chart .reel-chart-rank {
+	grid-area: auto;
+	font-variant-numeric: tabular-nums;
+}
+
+/* A row that opens something still says so, and now the whole row is the
+   target rather than a bar with a label above it. */
+.reel-view .reel-stats .reel-chart .reel-chart-row.is-clickable:hover,
+.reel-view .reel-stats .reel-chart .reel-chart-row.is-clickable:focus-visible {
+	background: var(--background-modifier-hover);
+}
+
+/* Poster strips keep their own line — a row of artwork is the content, not a
+   measurement, so it cannot become a background. */
+.reel-view .reel-stats .reel-chart .reel-chart-row:has(.reel-chart-strip) .reel-chart-head {
+	margin-bottom: var(--reel-space-2);
+}
+
+/* ---- the number tiles ------------------------------------------------ */
+
+/*
+ * The label stops competing with the number.
+ *
+ * At the same size and weight as the figure it describes, "FILMS WATCHED" read
+ * as a second headline — ten tiles of two headlines each, which is why the grid
+ * scanned as a wall rather than as a set of answers. The number is the answer;
+ * the label is how you know what question it answered.
+ */
+.reel-view .reel-stats .reel-tile-label {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	line-height: 1.3;
+}
+
+.reel-view .reel-stats .reel-tile-sub {
+	font-size: 12px;
+	color: var(--text-muted);
+}

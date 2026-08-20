@@ -60,6 +60,14 @@ export interface ReelSettings {
 	/** The Reel view reopens where you left it. */
 	lastTab: string;
 	/**
+	 * The version whose update notes have been read.
+	 *
+	 * Empty on an install that predates the notes screen, which is treated as
+	 * "nothing to catch up on" rather than as version zero — replaying eight
+	 * releases at someone who has been running them all is not news.
+	 */
+	lastSeenVersion: string;
+	/**
 	 * How the library is laid out, and by what.
 	 *
 	 * Persisted because they are statements about how you like to look at your
@@ -116,6 +124,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dismissedIds: [],
 	people: {},
 	lastTab: "library",
+	lastSeenVersion: "",
 	libraryLayout: "grid",
 	librarySort: "watched",
 	recentSearches: [],
