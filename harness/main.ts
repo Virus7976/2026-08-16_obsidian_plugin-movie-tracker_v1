@@ -461,6 +461,7 @@ function libraryYear(root: HTMLElement): void {
 	withPool(YEAR, () => library(root, YEAR));
 }
 
+
 /**
  * The filter bar, as the view draws it.
  *
@@ -488,10 +489,24 @@ function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElemen
 		bar.createSpan({ cls: "reel-chip-sep", text: "·" });
 	}
 
+	/*
+	 * The two-part tag the view now builds: a label that opens the sheet and an
+	 * x that removes just this one.
+	 *
+	 * This had drifted. The harness was still drawing the old single button
+	 * with a decorative x inside it, so the row it measured was one the app had
+	 * stopped producing — and the chip that came out 200px wide and 56px tall
+	 * on the phone measured fine here, because here it was still a plain chip.
+	 */
 	for (const label of active) {
-		const tag = bar.createEl("button", { cls: "reel-chip is-active reel-filter-tag" });
-		tag.createSpan({ text: label });
-		tag.createSpan({ cls: "reel-filter-x", text: "×" });
+		const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
+		tag.setAttr("role", "group");
+		tag.createEl("button", { cls: "reel-filter-tag-label", text: label });
+		const x = tag.createEl("button", {
+			cls: "reel-filter-tag-x",
+			attr: { "aria-label": `Remove the ${label} filter` },
+		});
+		x.createSpan({ cls: "reel-filter-x svg-icon", text: "×" });
 	}
 	return bar;
 }

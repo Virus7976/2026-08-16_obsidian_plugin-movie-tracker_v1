@@ -7549,9 +7549,14 @@ ${body}
       bar.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
     }
     for (const label of active) {
-      const tag = bar.createEl("button", { cls: "reel-chip is-active reel-filter-tag" });
-      tag.createSpan({ text: label });
-      tag.createSpan({ cls: "reel-filter-x", text: "\xD7" });
+      const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
+      tag.setAttr("role", "group");
+      tag.createEl("button", { cls: "reel-filter-tag-label", text: label });
+      const x = tag.createEl("button", {
+        cls: "reel-filter-tag-x",
+        attr: { "aria-label": `Remove the ${label} filter` }
+      });
+      x.createSpan({ cls: "reel-filter-x svg-icon", text: "\xD7" });
     }
     return bar;
   }

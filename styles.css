@@ -11566,3 +11566,153 @@ input.reel-input {
 .reel-filter-tag-x:active {
 	background: color-mix(in srgb, currentColor 12%, transparent);
 }
+
+
+/* ==================================================================== */
+/* Undo the sheet-foot padding, which is no longer holding anything up   */
+/* ==================================================================== */
+
+/*
+ * 0.8.18 pushed the sticky bar down into the sheet's bottom padding and gave
+ * it that space back as its own padding, so its background covered the strip
+ * where content was scrolling past underneath.
+ *
+ * The reason content was down there at all is that the bar was not the last
+ * thing in the sheet — the preview sheet appends its links asynchronously,
+ * after the bar had been built. 0.8.19 fixed that at the source: the foot
+ * re-anchors itself last once the fill is done.
+ *
+ * With the cause gone the compensation is just height. It was adding its own
+ * copy of the clearance on top of the sheet's, which is the band of empty
+ * cream below the buttons — about 130px of nothing at the end of every sheet.
+ *
+ * A fix that outlives the bug it was for is indistinguishable from a bug.
+ */
+.reel-modal.reel-sheet .reel-prompt-actions,
+.reel-modal.reel-sheet .reel-log-actions {
+	--reel-sheet-foot: 0px;
+	bottom: 0;
+	padding-bottom: var(--reel-space-2);
+}
+
+/*
+ * And the sheet itself does not need to clear Obsidian's + button.
+ *
+ * That padding was written for the *view*, where the button floats over the
+ * list. A sheet is a modal: it is drawn above the button, which is why the +
+ * is nowhere to be seen in any screenshot of one. Reserving a thumb's worth of
+ * space to avoid a control that cannot be reached is just a gap.
+ *
+ * The safe-area inset stays. That one is about the phone, not the app.
+ */
+.reel-modal.reel-sheet {
+	padding-bottom: calc(var(--reel-space-3) + env(safe-area-inset-bottom));
+}
+
+/* ==================================================================== */
+/* The filter bar: the way in stays reachable                           */
+/* ==================================================================== */
+
+/*
+ * "I still can't tap the filters until I remove all the other filters."
+ *
+ * The bar is one horizontal scroller holding the Filters button, the sort and
+ * layout controls, and then one tag per active filter. Set two filters and the
+ * tags are wider than the screen, so the button that opens the sheet has
+ * scrolled off the left — and the only way back to it was to delete filters
+ * until the row fitted again. The control that changes the filters was the
+ * first thing pushed out by having any.
+ *
+ * It pins to the left edge instead. It is the way in to this row, so it stays
+ * on screen however much is in it, and the tags scroll behind it.
+ */
+.reel-filterbar .reel-filter-btn {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	/* Its own background, or the tags would scroll visibly underneath it. */
+	background: var(--background-primary);
+	box-shadow: 6px 0 6px -6px rgb(0 0 0 / 0.18);
+}
+
+/* ==================================================================== */
+/* An active filter chip, at the size a chip is                         */
+/* ==================================================================== */
+
+/*
+ * Two 44px halves made a pill 200px wide and 56px tall — two of them filled
+ * the screen. That is not what a filter chip looks like anywhere on a phone.
+ *
+ * The width was the fault, not the height. Two halves each padded to a full
+ * 44px target made a pill 200px wide before the label had said anything, so
+ * two of them were wider than the screen.
+ *
+ * The pill keeps the 44px height every other control here has — fighting the
+ * app's own target size for one chip would buy a few pixels and cost the
+ * consistency that makes the rest of it feel deliberate. What changes is that
+ * the x stops padding itself out to 44px *wide* as well, and the label stops
+ * being allowed to run to any length.
+ */
+.reel-filter-tag {
+	display: inline-flex;
+	align-items: center;
+	padding: 0;
+	overflow: visible;
+	border-radius: var(--reel-radius-full);
+}
+
+.reel-filter-tag-label,
+.reel-filter-tag-x {
+	background: none;
+	border: none;
+	box-shadow: none;
+	border-radius: inherit;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-filter-tag-label {
+	padding: 0 2px 0 var(--reel-space-3);
+	white-space: nowrap;
+	/* A list name can be a sentence. It gets a share of the row, not all of
+	   it — the point of the row is that you can see more than one thing set. */
+	max-width: 38vw;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: block;
+	line-height: 44px;
+}
+
+/*
+ * The x: 16px of ink, 44px of target.
+ *
+ * The vertical padding overflows the 34px pill on both sides. Nothing is drawn
+ * there — the background is on the pill, not the button — so the chip stays
+ * 34px tall while the thumb gets the full height. `overflow: visible` on the
+ * pill above is what lets the target escape; clipping it was what forced the
+ * chip to be 56px tall in the first place.
+ */
+.reel-filter-tag-x {
+	padding: 0 var(--reel-space-3) 0 2px;
+	min-width: 34px;
+	border-left: none;
+	opacity: 0.75;
+}
+
+.reel-filter-tag-x .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.reel-filter-tag-label:active {
+	opacity: 0.6;
+}
+
+.reel-filter-tag-x:active {
+	opacity: 1;
+}

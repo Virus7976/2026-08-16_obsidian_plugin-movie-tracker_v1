@@ -52,6 +52,32 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.20",
+		date: "2026-08-20",
+		headline: "The Filters button stays put, and sheets stop ending in a band of nothing.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The Filters button no longer scrolls off the row once you have filters set.",
+				note: "It sat at the start of a scrolling row, so two or three tags pushed it off the left edge — and the only way back was to delete filters until the row fitted again. It pins to the left now and the tags scroll behind it.",
+			},
+			{
+				kind: "better",
+				text: "Filter chips are about half the width they were.",
+				note: "Both halves padded themselves out to a full touch target, so a chip was 200px wide before its label had said anything and two of them filled the screen.",
+			},
+			{
+				kind: "fixed",
+				text: "Sheets no longer end with a deep band of empty space below the buttons.",
+				note: "Clearance added in 0.8.18 to stop content showing under the sticky bar was still being applied after 0.8.19 fixed the cause, so every sheet carried two copies of it.",
+			},
+			{
+				kind: "better",
+				text: "A long list name in a filter chip is truncated instead of taking the whole row.",
+			},
+		],
+	},
+	{
 		version: "0.8.19",
 		date: "2026-08-20",
 		headline: "Films you marked watched without a date were missing from their own filter.",
