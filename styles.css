@@ -10736,3 +10736,97 @@ input.reel-input {
 .reel-view .reel-stats .reel-chart-more {
 	color: var(--text-muted);
 }
+
+
+/* ==================================================================== */
+/* The cast strip, and a destructive button that says so                */
+/* ==================================================================== */
+
+/*
+ * A cast tile is a fixed size, so the strip is a row and not a skyline.
+ *
+ * Nothing in the tile was clamped. A long character name — "A Character With A
+ * Considerably Longer Name", which is an ordinary length for a TMDB role —
+ * wrapped to four lines inside a 76px column, so every tile was a different
+ * height and the strip below the poster read as ragged debris rather than as a
+ * row of people.
+ *
+ * Invisible until this iteration for a dull reason: `getFilm` was missing from
+ * the harness stub, so `renderFacets` threw and this whole half of the detail
+ * screen rendered as one line of caught error text. Every check passed, because
+ * one line of text has no layout faults.
+ *
+ * The name gets one line: a name is still recognisable truncated, and the
+ * photo above it is doing most of the identifying. The role gets two, because
+ * "Frodo" and "A Character With A Considerably Longer Name" both need to be
+ * readable and only one of them fits on a line.
+ */
+.reel-caststrip-name {
+	display: -webkit-box;
+	-webkit-line-clamp: 1;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	word-break: break-word;
+}
+
+.reel-caststrip-role {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	word-break: break-word;
+	/* Two lines' worth, reserved whether or not this one needs it, so a cast
+	   with one long role in it does not step the whole row down. */
+	min-height: 2.5em;
+}
+
+.reel-caststrip-cell {
+	/* Photo, one line of name, two of role. Stated so the tiles align even
+	   when a role is missing entirely. */
+	align-self: start;
+}
+
+/*
+ * Remove is destructive, and looked exactly like Refresh.
+ *
+ * `.reel-btn-danger` sets the error colour, and a later blanket `.reel-btn`
+ * rule from the design pass sets `color` again and wins on order — so the one
+ * button on the screen that deletes a note was rendering identically to the one
+ * that reloads it, in a stack of four full-width buttons. This is the same
+ * cascade trap as the search field's animation: the specific rule was written
+ * first and the general one last.
+ *
+ * The weight is deliberately *lower* than its neighbours, not higher. A
+ * destructive action should be findable and never the thing your thumb lands on
+ * by momentum — it already asks for confirmation on the second tap, and that
+ * confirmation is where the emphasis belongs.
+ */
+.reel-view .reel-btn.reel-btn-danger,
+.reel-modal .reel-btn.reel-btn-danger {
+	/*
+	 * `--text-muted`, not the error red — and this is the second time in two
+	 * iterations I have had to make exactly this trade.
+	 *
+	 * Taking the button's fill away to demote it left the red sitting directly
+	 * on the panel: 4.35:1 in light, 3.17:1 in dark, both under AA. A saturated
+	 * red is a poor text colour on a light surface, which is why it works on
+	 * *filled* destructive buttons and not on quiet ones.
+	 *
+	 * So the resting state is quiet and legible, and the red goes where the
+	 * decision is: the second tap fills the button and turns it white-on-red,
+	 * which passes comfortably and is the moment the warning is actually for.
+	 * Colour-coding never gets to cost legibility.
+	 */
+	color: var(--text-muted);
+	background: transparent;
+	border-color: transparent;
+	font-weight: 500;
+}
+
+.reel-view .reel-btn.reel-btn-danger[data-confirming="true"],
+.reel-modal .reel-btn.reel-btn-danger[data-confirming="true"] {
+	background: var(--text-error, #dc2626);
+	color: var(--text-on-accent, #fff);
+	border-color: transparent;
+	font-weight: 700;
+}

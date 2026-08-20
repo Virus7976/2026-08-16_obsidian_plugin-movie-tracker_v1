@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.13",
+		date: "2026-08-20",
+		headline: "The cast strip lines up, and Remove stops looking like Refresh.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Cast tiles are all the same height.",
+				note: "Nothing in a tile was clamped, so an ordinary-length character name wrapped to four lines inside a 76px column and the strip read as debris rather than a row of people.",
+			},
+			{
+				kind: "better",
+				text: "Remove is quieter than the buttons above it, and only turns red when it asks you to confirm.",
+				note: "The one button on the screen that deletes a note looked exactly like the one that reloads it.",
+			},
+		],
+	},
+	{
 		version: "0.8.12",
 		date: "2026-08-20",
 		headline: "The year heatmap reads as one scale, and its labels are legible.",

@@ -6736,6 +6736,51 @@ ${body}
       pool = all;
     }
   }
+  var FILM_META = {
+    id: 120,
+    genres: [
+      { id: 12, name: "Adventure" },
+      { id: 14, name: "Fantasy" },
+      { id: 28, name: "Action" }
+    ],
+    tagline: "One ring to rule them all.",
+    status: "Released",
+    original_language: "en",
+    budget: 93e6,
+    revenue: 8715e5,
+    production_companies: [{ id: 12, name: "New Line Cinema" }],
+    credits: {
+      cast: Array.from({ length: 14 }, (_, i) => ({
+        id: 1e3 + i,
+        name: ["Elijah Wood", "Ian McKellen", "Viggo Mortensen", "Sean Astin", "Orlando Bloom"][i % 5],
+        character: i % 4 === 0 ? "A Character With A Considerably Longer Name" : "Frodo",
+        profile_path: null
+      })),
+      crew: [
+        { id: 108, name: "Peter Jackson", job: "Director", profile_path: null },
+        { id: 109, name: "Fran Walsh", job: "Screenplay", profile_path: null },
+        { id: 110, name: "Philippa Boyens", job: "Screenplay", profile_path: null },
+        { id: 111, name: "Howard Shore", job: "Original Music Composer", profile_path: null }
+      ]
+    },
+    recommendations: {
+      results: Array.from({ length: 8 }, (_, i) => ({
+        id: 2e3 + i,
+        title: i === 0 ? "A Recommended Title That Will Not Fit On One Line" : `Related ${i}`,
+        poster_path: "/rel.jpg",
+        vote_average: 7 + i % 3,
+        release_date: `20${10 + i}-05-01`,
+        media_type: "movie"
+      }))
+    },
+    release_dates: {
+      results: [
+        { iso_3166_1: "US", release_dates: [{ certification: "PG-13", release_date: "2001-12-19T00:00:00.000Z", type: 3 }] },
+        { iso_3166_1: "GB", release_dates: [{ certification: "PG", release_date: "2001-12-19T00:00:00.000Z", type: 3 }] }
+      ]
+    },
+    videos: { results: [] }
+  };
   var plugin = {
     settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
     app: { vault: { getAbstractFileByPath: () => null }, workspace: { getLeaf: () => null } },
@@ -6810,7 +6855,24 @@ ${body}
         { id: 28, name: "Action" },
         { id: 35, name: "Comedy" },
         { id: 27, name: "Horror" }
-      ]
+      ],
+      /*
+       * The half of the detail screen nobody had ever seen.
+       *
+       * `getFilm` was missing from this stub, so `renderFacets` threw and the
+       * screen ended with "this.plugin.tmdb.getFilm is not a function" printed
+       * where the cast strip, the credit rows and eight tabs should be. Every
+       * check passed, because a caught error renders as one line of text and
+       * one line of text has no layout faults.
+       *
+       * Two screens have now been audited green for weeks while showing an
+       * error message. A stub that throws is not a neutral omission — it
+       * silently removes whatever it was standing in for from the test.
+       */
+      getFilm: async () => FILM_META,
+      getShow: async () => FILM_META,
+      getImages: async () => ({ backdrops: [], posters: [] }),
+      getSeason: async () => ({ episodes: [] })
     },
     openSearch: () => {
     },
