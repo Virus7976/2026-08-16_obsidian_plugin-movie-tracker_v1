@@ -276,6 +276,11 @@ const plugin = {
 			parent.removeClass("reel-poster-loading");
 		},
 		displayUrl: (e: { title: string }) => poster(e.title),
+		// The wash prefers a backdrop and falls back to the poster. The rig has
+		// no backdrops, so this exercises the fallback path — which is the one
+		// most entries will actually take, since backdrop_path is the field
+		// most often missing.
+		washUrl: (e: { title: string }) => poster(e.title),
 	},
 	people: {
 		attach(parent: HTMLElement, name: string) {

@@ -13180,3 +13180,75 @@ input.reel-input {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
+
+
+/* ==================================================================== */
+/* Tiles carry the artwork of the title their number is about           */
+/* ==================================================================== */
+
+.reel-view .reel-stats .reel-tile.has-wash {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+}
+
+.reel-tile-wash {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.reel-tile-wash::before {
+	content: "";
+	position: absolute;
+	inset: -30px;
+	background-image: var(--reel-wash);
+	background-size: cover;
+	background-position: center 40%;
+	filter: blur(26px) saturate(1.3);
+	opacity: 0.5;
+}
+
+/*
+ * The scrim, heavier than on a sheet and heavier still where the text is.
+ *
+ * A tile is small and its number is the largest thing on it, so there is
+ * nowhere to move the text to. The gradient runs from a lighter top-left,
+ * where the artwork can show, to nearly opaque at the bottom, where the label
+ * and detail line sit — the figure gets the colour, the small text gets a
+ * clean surface. That asymmetry is the only reason a wash can go behind a
+ * label this size at all.
+ */
+.reel-tile-wash::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		160deg,
+		rgb(from var(--background-secondary) r g b / 0.62) 0%,
+		rgb(from var(--background-secondary) r g b / 0.86) 55%,
+		rgb(from var(--background-secondary) r g b / 0.95) 100%
+	);
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-tile-wash::after {
+		background: var(--background-secondary);
+		opacity: 0.88;
+	}
+}
+
+/* The lead tile is the biggest surface on the page and the one most worth
+   looking at, so it lets a little more of the film through. */
+.reel-view .reel-stats .reel-tile.is-lead .reel-tile-wash::before {
+	opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-tile-wash::before {
+		filter: blur(26px);
+	}
+}

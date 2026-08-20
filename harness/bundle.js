@@ -1209,7 +1209,7 @@
       const artFor = (year) => {
         const pool2 = year == null ? allViewings : allViewings.filter((v) => v.date.startsWith(String(year)));
         const pick = pool2.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
-        return pick ? plugin2.posters.displayUrl(pick.entry) : null;
+        return pick ? plugin2.posters.washUrl(pick.entry) : null;
       };
       const chip = (label, active, year) => {
         const b = bar.createEl("button", { cls: "reel-chip" });
@@ -1280,11 +1280,17 @@
     }
     const tiles = el.createDiv({ cls: "reel-tiles" });
     let first = true;
-    const tile = (label, value, sub, go) => {
+    const tile = (label, value, sub, go, art) => {
       const t = tiles.createDiv({ cls: "reel-tile" });
       if (first) {
         t.addClass("is-lead");
         first = false;
+      }
+      const wash = art ? plugin2.posters.washUrl(art) : null;
+      if (wash) {
+        t.addClass("has-wash");
+        t.createDiv({ cls: "reel-tile-wash" }).setCssProps({ "--reel-wash": `url("${wash}")` });
+        t.setAttr("title", `${label} \u2014 ${art?.title ?? ""}`.trim());
       }
       t.createDiv({ cls: "reel-tile-value", text: value });
       t.createDiv({ cls: "reel-tile-label", text: label });
@@ -1314,16 +1320,28 @@
         "Films watched",
         String(watched.length),
         `${distinct} distinct \xB7 ${rewatches} rewatches`,
-        show("Films watched", [...new Set(watched.map((v) => v.entry))])
+        show("Films watched", [...new Set(watched.map((v) => v.entry))]),
+        // The most recent one: this count is a record of watching, and the
+        // last thing you watched is what it most recently recorded.
+        [...watched].sort((a, b) => b.date.localeCompare(a.date))[0]?.entry
       );
-      tile("Hours of film", formatMinutes(filmMinutes));
+      tile(
+        "Hours of film",
+        formatMinutes(filmMinutes),
+        void 0,
+        void 0,
+        // The longest, which is the single biggest contributor to the total.
+        [...new Set(watched.map((v) => v.entry))].sort((a, b) => (b.runtime ?? 0) - (a.runtime ?? 0))[0]
+      );
     }
     if (shows.length) {
       tile(
         "Episodes",
         String(episodesSeen),
         `${shows.length} show${shows.length === 1 ? "" : "s"}`,
-        show("Series you're watching", shows)
+        show("Series you're watching", shows),
+        // The first show, which is the one the episode count leads with.
+        shows[0]
       );
       if (episodeMinutes)
         tile("Hours of TV", formatMinutes(episodeMinutes));
@@ -1694,7 +1712,7 @@
         const track = row.createDiv({ cls: "reel-chart-track" });
         const fill = track.createDiv({ cls: "reel-chart-fill" });
         fill.setCssProps({ "--reel-fill": String(d.n / max) });
-        const art = plugin2 && d.entries?.length ? plugin2.posters.displayUrl(d.entries[0]) : null;
+        const art = plugin2 && d.entries?.length ? plugin2.posters.washUrl(d.entries[0]) : null;
         if (art) {
           fill.addClass("has-wash");
           fill.setCssProps({ "--reel-wash": `url("${art}")` });
@@ -7459,7 +7477,12 @@ ${body}
         img.addClass("is-loaded");
         parent.removeClass("reel-poster-loading");
       },
-      displayUrl: (e) => poster(e.title)
+      displayUrl: (e) => poster(e.title),
+      // The wash prefers a backdrop and falls back to the poster. The rig has
+      // no backdrops, so this exercises the fallback path — which is the one
+      // most entries will actually take, since backdrop_path is the field
+      // most often missing.
+      washUrl: (e) => poster(e.title)
     },
     people: {
       attach(parent, name) {

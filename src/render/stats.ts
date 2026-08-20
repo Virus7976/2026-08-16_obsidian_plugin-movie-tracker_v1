@@ -145,7 +145,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			// Newest first: the most recent thing watched is the one the year is
 			// most likely to be remembered by.
 			const pick = pool.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
-			return pick ? plugin.posters.displayUrl(pick.entry) : null;
+			return pick ? plugin.posters.washUrl(pick.entry) : null;
 		};
 
 		const chip = (label: string, active: boolean, year?: number) => {
@@ -284,11 +284,34 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	 * would demote a TV-only library's headline to a footnote.
 	 */
 	let first = true;
-	const tile = (label: string, value: string, sub?: string, go?: () => void) => {
+	const tile = (label: string, value: string, sub?: string, go?: () => void, art?: Entry) => {
 		const t = tiles.createDiv({ cls: "reel-tile" });
 		if (first) {
 			t.addClass("is-lead");
 			first = false;
+		}
+
+		/*
+		 * A number about films should look like it is about films.
+		 *
+		 * Ten tiles of pure text is a spreadsheet, and the complaint — "each of
+		 * these should have something illustrating what they are" — is the same
+		 * one the year chips got, for the same reason. Every figure here is
+		 * computed from specific titles, so there is always a real one standing
+		 * behind it: the film that took the longest, the one you rated highest,
+		 * the next thing on the watchlist.
+		 *
+		 * That is what makes this honest rather than decorative. The image is
+		 * not a stock texture chosen to fill space; it is the title the number
+		 * is actually about, which means the tile is illustrated by its own
+		 * data. A tile with no such title stays plain, because inventing one
+		 * would be exactly the dishonesty this avoids.
+		 */
+		const wash = art ? plugin.posters.washUrl(art) : null;
+		if (wash) {
+			t.addClass("has-wash");
+			t.createDiv({ cls: "reel-tile-wash" }).setCssProps({ "--reel-wash": `url("${wash}")` });
+			t.setAttr("title", `${label} — ${art?.title ?? ""}`.trim());
 		}
 		t.createDiv({ cls: "reel-tile-value", text: value });
 		t.createDiv({ cls: "reel-tile-label", text: label });
@@ -334,16 +357,28 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			"Films watched",
 			String(watched.length),
 			`${distinct} distinct · ${rewatches} rewatches`,
-			show("Films watched", [...new Set(watched.map((v) => v.entry))])
+			show("Films watched", [...new Set(watched.map((v) => v.entry))]),
+			// The most recent one: this count is a record of watching, and the
+			// last thing you watched is what it most recently recorded.
+			[...watched].sort((a, b) => b.date.localeCompare(a.date))[0]?.entry
 		);
-		tile("Hours of film", formatMinutes(filmMinutes));
+		tile(
+			"Hours of film",
+			formatMinutes(filmMinutes),
+			undefined,
+			undefined,
+			// The longest, which is the single biggest contributor to the total.
+			[...new Set(watched.map((v) => v.entry))].sort((a, b) => (b.runtime ?? 0) - (a.runtime ?? 0))[0]
+		);
 	}
 	if (shows.length) {
 		tile(
 			"Episodes",
 			String(episodesSeen),
 			`${shows.length} show${shows.length === 1 ? "" : "s"}`,
-			show("Series you're watching", shows)
+			show("Series you're watching", shows),
+			// The first show, which is the one the episode count leads with.
+			shows[0]
 		);
 		if (episodeMinutes) tile("Hours of TV", formatMinutes(episodeMinutes));
 	}
@@ -989,7 +1024,7 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 			 * or a date bucket keeps the plain fill, because there is no single
 			 * artwork that belongs to "3½ stars".
 			 */
-			const art = plugin && d.entries?.length ? plugin.posters.displayUrl(d.entries[0]) : null;
+			const art = plugin && d.entries?.length ? plugin.posters.washUrl(d.entries[0]) : null;
 			if (art) {
 				fill.addClass("has-wash");
 				fill.setCssProps({ "--reel-wash": `url("${art}")` });

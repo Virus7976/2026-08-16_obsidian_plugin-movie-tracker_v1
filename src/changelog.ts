@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.29",
+		date: "2026-08-20",
+		headline: "Washes use a frame from the film, not its poster.",
+		changes: [
+			{
+				kind: "better",
+				text: "Blurred backdrops now come from a still of the film rather than its poster.",
+				note: "A poster is marketing art — mostly a title treatment and a credit block, composed around the words printed on it, so blurring one mostly leaves the dark band where the text was. A backdrop is a frame from the film: no type, landscape, lit for the scene. It gives the colour of the film instead of the colour of its advertising. Falls back to the poster where no backdrop exists.",
+			},
+			{
+				kind: "new",
+				text: "Stats tiles carry the artwork of the title their number is about.",
+				note: "The most recent film behind “Films watched”, the longest behind “Hours of film”. A tile with no single title behind it stays plain rather than borrowing an unrelated image — the point is that the tile is illustrated by its own data.",
+			},
+		],
+	},
+	{
 		version: "0.8.28",
 		date: "2026-08-20",
 		headline: "Less text, more film.",

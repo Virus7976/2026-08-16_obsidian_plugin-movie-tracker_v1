@@ -88,6 +88,39 @@ export class PosterStore {
 	}
 
 	/**
+	 * The image to blur behind something, as opposed to the one to show.
+	 *
+	 * Asked for as "action shots of the movie, not this boring text", and the
+	 * distinction is real. A poster is marketing art: it is mostly a title
+	 * treatment, a credit block and a face arranged for a billboard, and its
+	 * composition is built around the words printed on it. Blur one and the
+	 * strongest thing left is usually the dark band where the text used to be.
+	 *
+	 * A backdrop is a frame from the film — landscape, no type, lit for the
+	 * scene. Blurred it gives the colour of the film itself rather than the
+	 * colour of its advertising, which is the whole point of a wash. It is also
+	 * the right aspect: these surfaces are wide, and a 2:3 poster stretched
+	 * across one is mostly a crop of somebody's chin.
+	 *
+	 * Falls back to the poster, because backdrops are the field most often
+	 * missing — older titles, obscure ones, and anything imported from a
+	 * tracker that never stored it.
+	 *
+	 * Note the cost, since it is not free: posters are cached locally and
+	 * backdrops are not, so a wash may not paint offline. That is an acceptable
+	 * trade for decoration and would not be for anything load-bearing — which
+	 * is why this is a separate method and `displayUrl` still means "the image
+	 * this title *is*".
+	 */
+	washUrl(entry: { poster?: string; posterUrl?: string; backdropPath?: string }): string | null {
+		if (entry.backdropPath) {
+			const wide = this.plugin.tmdb.posterUrl(entry.backdropPath, "w780");
+			if (wide) return wide;
+		}
+		return this.displayUrl(entry);
+	}
+
+	/**
 	 * Draw a poster into a container, with the fallback built in.
 	 *
 	 * Six places were each doing this by hand and five of them forgot the
