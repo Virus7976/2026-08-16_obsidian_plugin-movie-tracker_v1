@@ -6526,6 +6526,33 @@ ${body}
     }
     return highest;
   }
+  function findFloatingCorner(view) {
+    const floor = window.innerHeight * 0.6;
+    let best = null;
+    for (const el of Array.from(document.body.querySelectorAll("*"))) {
+      if (el.closest(".reel-view, .reel-modal, .modal-container"))
+        continue;
+      const cs = getComputedStyle(el);
+      if (cs.position !== "fixed" && cs.position !== "sticky")
+        continue;
+      if (cs.visibility === "hidden" || cs.display === "none")
+        continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 28 || r.height < 28)
+        continue;
+      if (r.width > 120 || r.width > view.width * 0.4)
+        continue;
+      if (r.bottom < floor)
+        continue;
+      const nearRight = view.right - r.right < 40;
+      const nearLeft = r.left - view.left < 40;
+      if (!nearRight && !nearLeft)
+        continue;
+      if (!best || r.width > best.getBoundingClientRect().width)
+        best = el;
+    }
+    return best;
+  }
   function pickChrome(root, selector) {
     let best = null;
     let bestArea = 0;
@@ -6548,7 +6575,13 @@ ${body}
     const top = header ? clamp(header.getBoundingClientRect().bottom - rect.top) : 0;
     const bar = pickChrome(root, BOTTOM_CHROME) ?? findFloatingBottomBar(rect);
     const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
-    const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
+    const fab = findFloatingCorner(rect);
+    const right = fab ? clamp(rect.right - fab.getBoundingClientRect().left + 8) : 0;
+    const vars = {
+      "--reel-top-inset": `${top}px`,
+      "--reel-bottom-inset": `${bottom}px`,
+      "--reel-bottom-right-inset": `${right}px`
+    };
     el.setCssProps(vars);
     el.style.paddingTop = top > 0 ? `${top}px` : "";
     if (el !== document.body)
@@ -6570,8 +6603,15 @@ ${body}
         continue;
       used += child.getBoundingClientRect().height;
     }
-    body.setCssProps({ height: `${Math.max(120, Math.round(inner - used))}px` });
+    const want = Math.round(inner - used);
+    if (want >= 120) {
+      lastGoodHeight.set(body, want);
+      body.setCssProps({ height: `${want}px` });
+      return;
+    }
+    body.setCssProps({ height: `${lastGoodHeight.get(body) ?? 120}px` });
   }
+  var lastGoodHeight = /* @__PURE__ */ new WeakMap();
 
   // harness/main.ts
   function poster(title) {
@@ -6682,7 +6722,7 @@ ${body}
     navBtn.createSpan({ cls: "reel-nav-icon", text: "\u25A3" });
     navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
     navBtn.createSpan({ cls: "reel-nav-chevron", text: "\u25BE" });
-    const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
+    const wrap = header.createDiv({ cls: "reel-search-wrap" });
     wrap.createSpan({ cls: "reel-search-icon", text: "\u2315" });
     wrap.createEl("input", {
       cls: "reel-input reel-search-input",
@@ -7095,6 +7135,11 @@ ${body}
       cls: "clickable-icon",
       text: "\uFF0B",
       attr: { "aria-label": "New" }
+    });
+    app2.createDiv({ cls: "harness-unnamed-fab obsidian-chrome" }).createEl("button", {
+      cls: "clickable-icon",
+      text: "\uFF0B",
+      attr: { "aria-label": "New note" }
     });
   }
   function mount(app2, name) {

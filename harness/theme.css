@@ -71,7 +71,21 @@ html, body {
 	position: fixed;
 	left: 0;
 	right: 0;
-	z-index: 20;
+	/*
+	 * Above anything Reel can draw inside its own view, because that is the
+	 * truth on a device.
+	 *
+	 * At 20 this sat *below* the docked search pill, which uses the popover
+	 * layer at 30 — so `elementFromPoint` reported the pill as the topmost
+	 * element at a point where a device photo plainly showed Obsidian's + on
+	 * top of it, and `controlsNotCovered` could not see chrome collisions at
+	 * all. Reel's view lives inside a workspace leaf; no z-index it chooses
+	 * lifts it above chrome painted over that leaf, and the rig has to model
+	 * that or the one check written for this class of bug is decorative.
+	 *
+	 * Modals stay above, below — a real modal is above the mobile chrome too.
+	 */
+	z-index: 50;
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -92,6 +106,22 @@ html, body {
 	bottom: 0;
 	height: var(--harness-chrome-bottom, 48px);
 	justify-content: flex-end;
+}
+
+/* The floating +, modelled at the size and place a device photo showed it:
+   a round button hard against the right edge, sitting above the bottom bar.
+   Small enough that the app's bar detection (40% of the view's width) cannot
+   see it — which is the whole point of having it here. */
+.harness-unnamed-fab.obsidian-chrome {
+	right: var(--harness-fab-right, 8px);
+	left: auto;
+	bottom: var(--harness-fab-bottom, 56px);
+	width: 56px;
+	height: 56px;
+	border-radius: 16px;
+	justify-content: center;
+	background: var(--background-secondary);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .obsidian-chrome .clickable-icon {
@@ -155,4 +185,13 @@ body.theme-dark {
 	--text-on-accent: #fff;
 	--interactive-accent: #7b6cd9;
 	--interactive-accent-hover: #8a7ce0;
+}
+
+
+/* A sheet is above the chrome, as it is in Obsidian: the modal container is
+   mounted at app level, not inside the leaf the chrome covers. Without this
+   the raised chrome above would report every sheet's action row as blocked. */
+.reel-modal-shell,
+.reel-modal {
+	z-index: 200;
 }

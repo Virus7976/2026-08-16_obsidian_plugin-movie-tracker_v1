@@ -9908,18 +9908,37 @@ input.reel-input {
 	min-width: 0;
 }
 
-/* The magnifier belongs inside the pill, at the pill's own scale. */
-.reel-view.is-phone.is-searching .reel-search-icon {
+/* The magnifier belongs inside the pill, at the pill's own scale.
+ *
+ * `position: static` is the load-bearing line. The base rule pins the icon
+ * absolutely at `left: 10px`, which is right when the input reserves 34px of
+ * left padding for it and wrong the moment the pill lays its children out in a
+ * row — the docked field zeroes that padding, so the magnifier was drawn on
+ * top of the first two characters you typed. `flex: 0 0 auto` says nothing to
+ * an absolutely positioned box. */
+.reel-view.is-phone.is-searching .reel-search-icon,
+.reel-view.is-narrow.is-searching .reel-search-icon {
+	position: static;
+	left: auto;
 	flex: 0 0 auto;
 	margin-right: var(--reel-space-2);
 	opacity: 0.75;
 }
 
-/* The floating + button is Obsidian's, it is round, and it is drawn over
-   everything. The pill clears it vertically via `--reel-bottom-inset`; this
-   keeps the *clear* button from ending up under it horizontally on the narrow
-   phones where the two would still meet. */
-.reel-view.is-phone.is-searching .reel-search-wrap {
+/* Give Obsidian's floating + its corner back.
+ *
+ * The + is a button, not a bar, and the two want opposite compensations. The
+ * previous attempt reached for `--reel-bottom-inset` — the *vertical* clearance
+ * meant for a full-width toolbar — which would have cost a whole row of a
+ * screen that already has a keyboard on it, and in any case measured zero,
+ * because the detection behind that variable requires 40% of the view's width
+ * and the + is 56px. The pill sat straight underneath it.
+ *
+ * `--reel-bottom-right-inset` is measured from the button itself. The pill
+ * simply ends before it starts. */
+.reel-view.is-phone.is-searching .reel-search-wrap,
+.reel-view.is-narrow.is-searching .reel-search-wrap {
+	margin-right: calc(var(--reel-space-3) + var(--reel-bottom-right-inset, 0px));
 	padding-right: var(--reel-space-3);
 }
 

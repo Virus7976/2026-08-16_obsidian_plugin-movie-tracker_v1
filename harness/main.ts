@@ -158,7 +158,19 @@ function library(root: HTMLElement): void {
 	navBtn.createSpan({ cls: "reel-nav-icon", text: "▣" });
 	navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
 	navBtn.createSpan({ cls: "reel-nav-chevron", text: "▾" });
-	const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
+	/*
+	 * No `search-input-container` here, matching what the app does once the
+	 * field docks.
+	 *
+	 * That class is Obsidian's, and having it is right in the header — it is
+	 * what makes the field inherit the user's theme. Docked at the bottom the
+	 * wrap is a pill Reel draws itself, and both Obsidian and the theme still
+	 * style the class: a border and background on the container, another border
+	 * on the input inside, and the magnifier pinned absolutely to the left. A
+	 * device photo showed exactly that — two rounded rectangles, and the
+	 * magnifier printed over the word being typed.
+	 */
+	const wrap = header.createDiv({ cls: "reel-search-wrap" });
 	wrap.createSpan({ cls: "reel-search-icon", text: "⌕" });
 	wrap.createEl("input", {
 		cls: "reel-input reel-search-input",
@@ -798,6 +810,26 @@ function mountObsidianChrome(app: HTMLElement): void {
 		cls: "clickable-icon",
 		text: "＋",
 		attr: { "aria-label": "New" },
+	});
+
+	/*
+	 * The floating **+**, which is a button in a corner and not a bar.
+	 *
+	 * A device photo showed it sitting squarely on top of the docked search
+	 * field. The rig could not have caught that: the only floating chrome it
+	 * modelled was a full-width bar, and the app's own detection requires 40%
+	 * of the view's width — so a 56px corner button was invisible to both, and
+	 * `controlsNotCovered` reported the screen green while the + covered the
+	 * field's right end.
+	 *
+	 * Deliberately unnamed, for the same reason the bar above is: naming it
+	 * something Obsidian might call it would test a selector rather than the
+	 * shape-matching that has to work when the next release renames things.
+	 */
+	app.createDiv({ cls: "harness-unnamed-fab obsidian-chrome" }).createEl("button", {
+		cls: "clickable-icon",
+		text: "＋",
+		attr: { "aria-label": "New note" },
 	});
 }
 

@@ -103,6 +103,46 @@ function findFloatingBottomBar(view: DOMRect): HTMLElement | null {
 	return highest;
 }
 
+/**
+ * Obsidian's floating **+**, and anything else shaped like it.
+ *
+ * `findFloatingBottomBar` was written for a toolbar and requires 40% of the
+ * view's width, so it has never once seen the round + button that Obsidian
+ * parks in the bottom corner — a 56px control is nowhere near that threshold.
+ * `--reel-bottom-inset` therefore computed as 0 on the phone and the docked
+ * search field was placed directly underneath it.
+ *
+ * A corner button is not a bar and must not be treated as one. Clearing a bar
+ * means giving up a whole row of the screen; clearing a button means giving up
+ * the corner it sits in. So this reports a *horizontal* inset, and the pill
+ * shortens rather than moving up.
+ *
+ * Same reasoning as the bar: describe the shape, do not guess the class name.
+ * Small, fixed, low, and hard against one side.
+ */
+function findFloatingCorner(view: DOMRect): HTMLElement | null {
+	const floor = window.innerHeight * 0.6;
+	let best: HTMLElement | null = null;
+	for (const el of Array.from(document.body.querySelectorAll<HTMLElement>("*"))) {
+		if (el.closest(".reel-view, .reel-modal, .modal-container")) continue;
+		const cs = getComputedStyle(el);
+		if (cs.position !== "fixed" && cs.position !== "sticky") continue;
+		if (cs.visibility === "hidden" || cs.display === "none") continue;
+		const r = el.getBoundingClientRect();
+		// Button-shaped: big enough to tap, small enough not to be a bar.
+		if (r.width < 28 || r.height < 28) continue;
+		if (r.width > 120 || r.width > view.width * 0.4) continue;
+		// Low on the screen, and hard against the left or right edge.
+		if (r.bottom < floor) continue;
+		const nearRight = view.right - r.right < 40;
+		const nearLeft = r.left - view.left < 40;
+		if (!nearRight && !nearLeft) continue;
+		// The one reaching furthest into the view is the one to clear.
+		if (!best || r.width > best.getBoundingClientRect().width) best = el;
+	}
+	return best;
+}
+
 function pickChrome(root: ParentNode, selector: string): HTMLElement | null {
 	let best: HTMLElement | null = null;
 	let bestArea = 0;
@@ -144,7 +184,23 @@ export function stampChromeInsets(el: HTMLElement, root: ParentNode = document):
 	const bar = pickChrome(root, BOTTOM_CHROME) ?? findFloatingBottomBar(rect);
 	const bottom = bar ? clamp(rect.bottom - bar.getBoundingClientRect().top) : 0;
 
-	const vars = { "--reel-top-inset": `${top}px`, "--reel-bottom-inset": `${bottom}px` };
+	/*
+	 * How far a corner button eats into the bottom of the view, sideways.
+	 *
+	 * Reported separately from `--reel-bottom-inset` because the answer is a
+	 * different one. A bar spans the width and has to be cleared vertically; a
+	 * button occupies a corner and only needs that corner left alone. Treating
+	 * the + as a bar would cost a whole row of a screen that already has a
+	 * keyboard on it.
+	 */
+	const fab = findFloatingCorner(rect);
+	const right = fab ? clamp(rect.right - fab.getBoundingClientRect().left + 8) : 0;
+
+	const vars = {
+		"--reel-top-inset": `${top}px`,
+		"--reel-bottom-inset": `${bottom}px`,
+		"--reel-bottom-right-inset": `${right}px`,
+	};
 	el.setCssProps(vars);
 
 	/*
@@ -255,7 +311,30 @@ export function sizeBody(view: HTMLElement, body: HTMLElement): void {
 		if (getComputedStyle(child).display === "none") continue;
 		used += child.getBoundingClientRect().height;
 	}
-	// A floor rather than a layout: a nonsense mid-transition measurement should
-	// give a short body, never a blank screen.
-	body.setCssProps({ height: `${Math.max(120, Math.round(inner - used))}px` });
+	/*
+	 * The floor is a last resort, not a value to settle on.
+	 *
+	 * `Math.max(120, …)` was meant to keep a nonsense mid-transition reading
+	 * from blanking the screen. Instead it *became* the screen: opening the
+	 * keyboard shrinks the layout viewport while a render is in flight, the
+	 * measurement lands during the collapse, 120px gets written, and nothing
+	 * measures again — a search showing one clipped row of posters above four
+	 * hundred pixels of nothing. That is the exact shape of the bug this floor
+	 * exists to prevent, caused by the floor.
+	 *
+	 * So a real measurement is remembered, and a below-floor one falls back to
+	 * the last real answer rather than overwriting it. The first measurement of
+	 * a brand-new body still gets the floor, because there is nothing better to
+	 * say yet.
+	 */
+	const want = Math.round(inner - used);
+	if (want >= 120) {
+		lastGoodHeight.set(body, want);
+		body.setCssProps({ height: `${want}px` });
+		return;
+	}
+	body.setCssProps({ height: `${lastGoodHeight.get(body) ?? 120}px` });
 }
+
+/** The last height that was not a mid-transition artefact, per body. */
+const lastGoodHeight = new WeakMap<HTMLElement, number>();

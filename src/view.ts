@@ -366,6 +366,47 @@ export class ReelView extends ItemView {
 			this.register(() => mo.disconnect());
 		}
 
+		/*
+		 * Re-measure when the *viewport* changes, which is what a keyboard is.
+		 *
+		 * Watching the body's contents is not enough. Opening the keyboard
+		 * shrinks the layout viewport on Android while a render is already in
+		 * flight, so `sizeBody` measures during the collapse, writes its 120px
+		 * floor, and is never asked again — the body has stopped changing, so
+		 * the MutationObserver above has nothing to fire on. That is the
+		 * clipped row of posters over four hundred pixels of nothing.
+		 *
+		 * A `ResizeObserver` on the view sees it directly. Nothing here resizes
+		 * the view — only the body inside it, which has a fixed height and
+		 * cannot push its parent — so there is no feedback loop of the kind
+		 * `sizeBody` warns about.
+		 *
+		 * `visualViewport` is listened to as well, and expected to stay silent
+		 * on this device: it reports no keyboard here, which is why two earlier
+		 * releases gated on it and never ran. It costs nothing and covers the
+		 * platforms where it does work.
+		 */
+		const remeasure = (): void => {
+			if (!this.bodyEl?.isConnected) return;
+			stampChromeInsets(this.contentEl);
+			sizeBody(this.contentEl, this.bodyEl);
+		};
+		if (typeof ResizeObserver !== "undefined") {
+			const ro = new ResizeObserver(() => requestAnimationFrame(remeasure));
+			// The border box, not the content box. `remeasure` stamps the top
+			// inset as padding on this very element, which changes its content
+			// box and would wake the observer that just ran it.
+			ro.observe(this.contentEl, { box: "border-box" });
+			this.register(() => ro.disconnect());
+		}
+		this.registerDomEvent(window, "resize", remeasure);
+		const vv = window.visualViewport;
+		if (vv) {
+			const onVv = (): void => remeasure();
+			vv.addEventListener("resize", onVv);
+			this.register(() => vv.removeEventListener("resize", onVv));
+		}
+
 		this.paint();
 	}
 
@@ -760,6 +801,23 @@ export class ReelView extends ItemView {
 	private syncSearchFocus(): void {
 		const searching = this.headerEl.hasClass("is-open") && this.query.length > 0;
 		this.contentEl.toggleClass("is-searching", searching);
+		/*
+		 * Borrow Obsidian's class where Obsidian draws the box; drop it where
+		 * Reel does.
+		 *
+		 * `search-input-container` is what makes the field inherit the user's
+		 * theme in the header, and that is worth having. Docked at the bottom
+		 * it is the opposite: the wrap is a pill Reel draws itself, and both
+		 * Obsidian and the theme still style that class — a border and a
+		 * background on the container, another border on the input inside it,
+		 * and the magnifier positioned absolutely at the left edge. That is the
+		 * two rounded rectangles and the icon sitting on top of the text.
+		 *
+		 * Themes load after plugins, so this cannot be won in the cascade at
+		 * equal specificity. Removing the hook is the version that keeps
+		 * working when the theme changes.
+		 */
+		this.searchEl?.parentElement?.toggleClass("search-input-container", !searching);
 		// The filter row changing height changes what the body has left.
 		this.measureWidth();
 	}
