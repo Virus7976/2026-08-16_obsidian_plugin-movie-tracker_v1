@@ -748,7 +748,22 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 			toggle.click();
 		}
 	});
-	toggle.createDiv({ cls: "reel-chart-title", text: title });
+	const heading = toggle.createDiv({ cls: "reel-fold-heading" });
+	heading.createDiv({ cls: "reel-chart-title", text: title });
+	/*
+	 * What is in there, not just how much.
+	 *
+	 * A closed fold said "7", and a page of those is twelve outlined boxes with
+	 * a different digit in each — nothing to read and nothing to choose between.
+	 * The closed state is the one you spend most of your time looking at, so it
+	 * should be the summary: naming the top three makes the page scannable
+	 * without opening anything.
+	 */
+	const preview = data
+		.slice(0, 3)
+		.map((d) => d.label)
+		.join(" · ");
+	if (preview) heading.createDiv({ cls: "reel-fold-preview", text: preview });
 	toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
 	const body = box.createDiv({ cls: "reel-chart-body" });
 

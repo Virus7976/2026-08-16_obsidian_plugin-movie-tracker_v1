@@ -1521,7 +1521,11 @@
         toggle.click();
       }
     });
-    toggle.createDiv({ cls: "reel-chart-title", text: title });
+    const heading = toggle.createDiv({ cls: "reel-fold-heading" });
+    heading.createDiv({ cls: "reel-chart-title", text: title });
+    const preview = data.slice(0, 3).map((d) => d.label).join(" \xB7 ");
+    if (preview)
+      heading.createDiv({ cls: "reel-fold-preview", text: preview });
     toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
     const body = box.createDiv({ cls: "reel-chart-body" });
     const setOpen = (open) => {
@@ -4621,10 +4625,6 @@ ${body}
       if (cast.length)
         this.renderCastStrip(wrap, cast);
       this.renderCreditRows(wrap, cast, crew, isTv);
-      paintReviews(this.plugin, wrap, this.entry, {
-        editable: true,
-        onChange: () => this.rerender()
-      });
       const tabs = [];
       if (cast.length)
         tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
@@ -5212,6 +5212,13 @@ ${body}
           flash(pill);
         });
       }
+      const reviewBox = box.createDiv({ cls: "reel-control" });
+      reviewBox.createDiv({ cls: "reel-field-label", text: "Review" });
+      paintReviews(this.plugin, reviewBox, this.entry, {
+        editable: true,
+        heading: "",
+        onChange: () => this.rerender()
+      });
     }
     renderActions(side) {
       const e = this.entry;
@@ -6054,6 +6061,8 @@ ${body}
     dismissedIds: [],
     people: {},
     lastTab: "library",
+    libraryLayout: "grid",
+    librarySort: "watched",
     recentSearches: [],
     recipes: [],
     hideFlags: [],
@@ -6547,11 +6556,6 @@ ${body}
       suggest.createEl("button", { cls: "reel-chip reel-suggest-chip", text: s });
     }
     filterBar(filters, ["Films", "Science Fiction", "\u2630 Christmas with the family"]);
-    const sort = filters.createDiv({ cls: "reel-sortbar" });
-    sort.createSpan({ cls: "reel-dim", text: "Sort" });
-    const sel = sort.createEl("select", { cls: "reel-select dropdown" });
-    sel.createEl("option", { text: "Recently watched" });
-    sort.createSpan({ cls: "reel-dim reel-sort-then", text: "then my rating" });
     const body = root.createDiv({ cls: "reel-view-body" });
     heroBand(body, {
       label: "Your library",
@@ -6562,13 +6566,21 @@ ${body}
     });
     renderPosterGrid(plugin, body, all);
   }
-  function filterBar(into, active) {
+  function filterBar(into, active, sort = true) {
     const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
     const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
     open.createSpan({ cls: "reel-filter-btn-icon", text: "\u2699" });
     open.createSpan({ text: "Filters" });
     if (active.length)
       open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
+    if (sort) {
+      const sel = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
+      sel.createEl("option", { text: "Recently watched" });
+      const layout = bar.createEl("button", { cls: "reel-chip reel-layout-btn" });
+      layout.createSpan({ cls: "reel-layout-icon", text: "\u25A6" });
+      layout.createSpan({ cls: "reel-layout-label", text: "Posters" });
+      bar.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
+    }
     for (const label of active) {
       const tag = bar.createEl("button", { cls: "reel-chip is-active reel-filter-tag" });
       tag.createSpan({ text: label });
@@ -6725,6 +6737,11 @@ ${body}
       body.createDiv({ cls: "reel-hero-band-sub", text: opts.sub });
     return band;
   }
+  function dense(root) {
+    root.addClass("reel-view-body");
+    const wrap = root.createDiv({ cls: "reel-gridwrap is-dense" });
+    renderPosterGrid(plugin, wrap, [...all, ...all, ...all]);
+  }
   function rows(root) {
     root.addClass("reel-view-body");
     renderRowList(plugin, root, all.slice(0, 8));
@@ -6818,6 +6835,7 @@ ${body}
   }
   var SCREENS = {
     library,
+    dense,
     feed,
     filterSheet,
     reviews,

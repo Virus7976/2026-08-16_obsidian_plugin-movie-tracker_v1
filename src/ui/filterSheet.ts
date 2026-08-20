@@ -34,10 +34,27 @@ export interface FilterState {
 	sort: string;
 	/** Applied where the primary ties. Empty means no tiebreaker. */
 	sort2: string;
+	/**
+	 * How much of the library fits on one screen.
+	 *
+	 * Two posters per row with a caption under each is a good way to look at six
+	 * films and a bad way to look at sixty-six — you scroll past your own library
+	 * without ever seeing it. Dense drops the captions and the padding and fits
+	 * five to a row; list trades the art for a scannable column.
+	 */
+	layout: LibraryLayout;
 }
 
+export type LibraryLayout = "grid" | "dense" | "list";
+
+export const LAYOUTS: { id: LibraryLayout; label: string; icon: string }[] = [
+	{ id: "grid", label: "Posters", icon: "layout-grid" },
+	{ id: "dense", label: "Dense", icon: "grip" },
+	{ id: "list", label: "List", icon: "list" },
+];
+
 export function emptyFilters(): FilterState {
-	return { type: "all", status: null, genre: null, list: null, sort: "watched", sort2: "" };
+	return { type: "all", status: null, genre: null, list: null, sort: "watched", sort2: "", layout: "grid" };
 }
 
 /** Everything set by hand, ignoring sort — sort is always *something*. */

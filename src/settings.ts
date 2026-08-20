@@ -59,6 +59,16 @@ export interface ReelSettings {
 	people: Record<string, PersonOpinion>;
 	/** The Reel view reopens where you left it. */
 	lastTab: string;
+	/**
+	 * How the library is laid out, and by what.
+	 *
+	 * Persisted because they are statements about how you like to look at your
+	 * own collection, not about the session. Choosing the dense grid and finding
+	 * two big posters again next time you open Reel would read as the setting
+	 * having failed rather than as it having been temporary.
+	 */
+	libraryLayout: "grid" | "dense" | "list";
+	librarySort: string;
 	/** Newest-first, capped. Offered under an empty search box. */
 	recentSearches: string[];
 	/** Named discovery recipes, newest first. A mood you built once. */
@@ -106,6 +116,8 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dismissedIds: [],
 	people: {},
 	lastTab: "library",
+	libraryLayout: "grid",
+	librarySort: "watched",
 	recentSearches: [],
 	recipes: [],
 

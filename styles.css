@@ -9048,3 +9048,238 @@ input.reel-input {
 	padding-top: var(--reel-space-2);
 	padding-bottom: var(--reel-space-2);
 }
+
+
+/* ================================================================== *
+ * One row of controls, and three ways to look at a library            *
+ * ================================================================== */
+
+/* Filters, sort and layout were three stacked rows above two posters —
+   a control panel with a preview pane attached. One row, which scrolls
+   on a phone, with the controls you cannot switch off at the start so
+   they are reachable without scrolling. */
+.reel-sort-select {
+	flex: 0 0 auto;
+	max-width: 11em;
+	/* Matches the chips beside it rather than sitting a few pixels proud —
+	   a select and a chip on the same line that disagree about their height
+	   is the cheapest possible way to look unfinished. */
+	height: 32px;
+	min-height: 32px;
+	padding-top: 0;
+	padding-bottom: 0;
+}
+
+.reel-layout-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35em;
+	flex: 0 0 auto;
+}
+
+.reel-layout-icon {
+	display: inline-flex;
+	align-items: center;
+}
+
+.reel-layout-icon .svg-icon {
+	width: 0.95em;
+	height: 0.95em;
+}
+
+/* ---------------- dense ---------------- */
+
+/* As many posters as the width will take, and nothing else.
+ *
+ * The captions are what force the comfortable grid to two columns on a phone:
+ * a title needs about 110px to avoid truncating to "The Equaliz…", and that
+ * sets the column. Take the caption away and the poster can be as small as it
+ * is still recognisable — which for cover art is *very* small, because you
+ * recognise a poster by its colour and shape long before you can read it. */
+.reel-gridwrap.is-dense .reel-grid {
+	grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+	gap: var(--reel-space-1);
+}
+
+.reel-view.is-w700 .reel-gridwrap.is-dense .reel-grid {
+	grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+}
+
+.reel-gridwrap.is-dense .reel-cell-caption {
+	display: none;
+}
+
+/* The badges do not shrink with the poster, so at 68px a "Watchlist" flag and
+   a certification chip cover most of the art. The rating stays — it is the one
+   thing you are scanning a dense grid *for* — as a bare corner mark. */
+.reel-gridwrap.is-dense .reel-cell-flag,
+.reel-gridwrap.is-dense .reel-cell-cert {
+	display: none;
+}
+
+.reel-gridwrap.is-dense .reel-cell-rating {
+	padding: 1px 3px;
+	font-size: 9px;
+	border-radius: var(--radius-s);
+}
+
+/* Not shrunk below 12px.
+ *
+ * The audit flagged this at 10px and it was right to: the check cannot tell a
+ * heart glyph from a word, and widening its exemption to cover "characters I
+ * consider icons" would weaken a rule that has caught real unreadable text
+ * three times. Twelve pixels on a 68px poster is still a small mark, and the
+ * badge that genuinely had to go — the certification chip — is the one that
+ * scaled with its text rather than with the art. */
+.reel-gridwrap.is-dense .reel-cell-heart {
+	font-size: 12px;
+	line-height: 1;
+	top: 2px;
+	right: 3px;
+	text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+}
+
+/* A dense grid is a wall of images, and a wall of images with nothing between
+   them reads as one texture. A hairline radius and a hover lift give each
+   poster an edge without adding a gap that would cost a column. */
+.reel-gridwrap.is-dense .reel-cell-poster {
+	border-radius: var(--radius-s);
+}
+
+.reel-view:not(.is-w400) .reel-gridwrap.is-dense .reel-grid {
+	/* Overrides the two-column floor, which exists for captions this mode
+	   does not draw. */
+	grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+}
+
+
+/* ================================================================== *
+ * The folds, which were twelve outlined boxes with a digit in each    *
+ *                                                                     *
+ * Bland is a fair description and a diagnosable one. Three things     *
+ * were missing: the closed state said nothing (a count is not a       *
+ * summary), the count carried no weight (muted grey, the same as      *
+ * everything else), and the whole row had no surface — a border and   *
+ * a chevron floating in the page background.                          *
+ * ================================================================== */
+
+.reel-fold-heading {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+/* The top three, named. The row is now worth reading closed, which is what
+   makes twelve of them a page rather than a menu. */
+.reel-fold-preview {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+	/* Hidden once open: the same names are the rows underneath, and repeating
+	   them two lines above is noise pretending to be a subtitle. */
+	transition: opacity 160ms ease;
+}
+
+.reel-fold.is-open .reel-fold-preview {
+	opacity: 0;
+	height: 0;
+	overflow: hidden;
+}
+
+/* The count, given the accent it was always describing. A number in the same
+   grey as the label it sits beside is the most ignorable element on a page
+   whose entire job is numbers. */
+.reel-fold-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.6em;
+	height: 1.6em;
+	padding: 0 0.45em;
+	border-radius: 999px;
+	background: hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 0.14);
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-medium);
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	transition: background 160ms ease;
+}
+
+.reel-fold.is-open .reel-fold-count {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+/* A surface, so the row is a thing rather than a gap between two lines.
+ *
+ * Subtle on purpose: this page has twelve of them, and twelve cards is the
+ * "equally weighted rectangles" problem the stats rebuild removed. What it
+ * needs is enough of an edge to be tappable-looking, not a card. */
+.reel-fold-toggle {
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border-radius: var(--reel-radius);
+	transition: background 140ms ease;
+}
+
+.reel-fold-toggle:hover {
+	background: var(--background-modifier-hover);
+}
+
+/* Open, the section is the thing you are looking at, and it says so with a
+   colour rather than by growing a border. */
+.reel-fold.is-open > .reel-fold-toggle {
+	background: hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 0.07);
+}
+
+/* The chevron was `--text-faint`, which is the colour this codebase keeps
+   having to remove — 2.85:1, and here it is the only affordance saying the row
+   opens at all. */
+.reel-fold-toggle::after {
+	border-right-color: var(--text-muted);
+	border-bottom-color: var(--text-muted);
+}
+
+.reel-fold.is-open > .reel-fold-toggle::after {
+	border-right-color: var(--text-accent);
+	border-bottom-color: var(--text-accent);
+}
+
+/* The body grows out of the header rather than appearing under it. */
+.reel-fold.is-open > .reel-chart-body {
+	animation: reel-fold-in 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes reel-fold-in {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-fold.is-open > .reel-chart-body {
+		animation: none;
+	}
+
+	.reel-fold-preview,
+	.reel-fold-count,
+	.reel-fold-toggle {
+		transition: none;
+	}
+}
+
+/* The 0.7.107 alignment rule gave the toggle the page's reading inset. It now
+   carries its own horizontal padding, so the two would compound into a double
+   indent — the exact misalignment that rule exists to prevent. */
+.reel-view:not(.is-w700) .reel-stats .reel-fold-toggle {
+	padding-left: var(--reel-space-3);
+	padding-right: var(--reel-space-3);
+	margin-left: 0;
+	margin-right: 0;
+}

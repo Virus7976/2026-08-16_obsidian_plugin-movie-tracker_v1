@@ -31,12 +31,14 @@ import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
 import {
 	FilterSheet,
+	LAYOUTS,
 	activeFilters,
 	clearFilter,
 	emptyFilters,
 	narrow,
 	SORT_OPTIONS,
 	type FilterState,
+	type LibraryLayout,
 } from "./ui/filterSheet";
 import { unlink } from "./library";
 import { measure, stampWidth, stampChromeInsets, topInset, sizeBody } from "./util/panewidth";
@@ -123,6 +125,12 @@ export class ReelView extends ItemView {
 		// annoyance.
 		const saved = this.plugin.settings.lastTab as Tab;
 		if (TABS.some((t) => t.id === saved)) this.tab = saved;
+		// The layout and sort you chose last time. Not restored, and the dense
+		// grid would be a toggle that forgets — which reads as broken rather than
+		// as temporary.
+		const layout = this.plugin.settings.libraryLayout;
+		if (layout === "grid" || layout === "dense" || layout === "list") this.filters.layout = layout;
+		if (this.plugin.settings.librarySort) this.filters.sort = this.plugin.settings.librarySort;
 
 		this.contentEl.empty();
 		this.contentEl.addClass("reel-view");
@@ -808,7 +816,7 @@ export class ReelView extends ItemView {
 	 * lives in a sheet one tap away. Same function, one row, and it survives the
 	 * keyboard being open.
 	 */
-	private paintFilters(opts: { showSort?: boolean } = {}): void {
+	private paintFilters(opts: { showSort?: boolean } = {}): HTMLElement {
 		const showSort = opts.showSort !== false;
 		this.filterEl.removeClass("is-empty");
 
@@ -847,6 +855,12 @@ export class ReelView extends ItemView {
 			}).open();
 		});
 
+		if (showSort) {
+			this.paintSortControls(bar);
+			this.paintLayoutControl(bar);
+			bar.createSpan({ cls: "reel-chip-sep", text: "·" });
+		}
+
 		/*
 		 * The search reads as a filter, because it is one.
 		 *
@@ -881,25 +895,69 @@ export class ReelView extends ItemView {
 			});
 		}
 
-		if (!showSort) return;
+		return bar;
+	}
 
-		// Sort stays in the bar rather than the sheet: it is the control changed
-		// most often, and it is never *off*, so it costs a chip either way.
-		const sortBar = this.filterEl.createDiv({ cls: "reel-sortbar" });
-		sortBar.createSpan({ cls: "reel-dim", text: "Sort" });
-		const select = sortBar.createEl("select", { cls: "reel-select dropdown" });
+	/**
+	 * Sort and layout, in the same row as the filters.
+	 *
+	 * They were three stacked rows — filters, then a "Sort" label with a
+	 * dropdown, then the grid. Three rows of controls above two posters is a
+	 * control panel with a preview pane attached, which is what the screenshot
+	 * showed. They are all one row now; on a phone it scrolls, and the two
+	 * controls you cannot switch off sit at the start where they are always
+	 * reachable without scrolling.
+	 */
+	private paintSortControls(bar: HTMLElement): void {
+		const select = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
 		for (const [value, label] of SORT_OPTIONS) select.createEl("option", { value, text: label });
 		select.value = this.filters.sort;
+		select.setAttr("aria-label", "Sort by");
 		select.addEventListener("change", () => {
 			this.filters.sort = select.value;
+			void this.persistLayout();
 			this.paint();
 		});
-		// The tiebreaker lives in the sheet now. It is a real feature and a rare
-		// one, and it was costing a phone a permanent row.
+
+		// The tiebreaker lives in the sheet. It is a real feature and a rare one,
+		// and it was costing a phone a permanent dropdown.
 		if (this.filters.sort2) {
 			const label = SORT_OPTIONS.find(([v]) => v === this.filters.sort2)?.[1] ?? this.filters.sort2;
-			sortBar.createSpan({ cls: "reel-dim reel-sort-then", text: `then ${label.toLowerCase()}` });
+			bar.createSpan({ cls: "reel-dim reel-sort-then", text: `then ${label.toLowerCase()}` });
 		}
+	}
+
+	/**
+	 * How much of the library you can see at once.
+	 *
+	 * Cycles rather than opening a menu: there are three states, they are
+	 * instantly legible from the result, and a menu to choose between three
+	 * things you can see is a tap spent on nothing. The icon shows the mode you
+	 * are in, and the label says what the next tap gives you.
+	 */
+	private paintLayoutControl(bar: HTMLElement): void {
+		const current = LAYOUTS.find((l) => l.id === this.filters.layout) ?? LAYOUTS[0];
+		const next = LAYOUTS[(LAYOUTS.indexOf(current) + 1) % LAYOUTS.length];
+		const b = bar.createEl("button", {
+			cls: "reel-chip reel-layout-btn",
+			attr: { type: "button", "aria-label": `View: ${current.label}. Switch to ${next.label}.` },
+		});
+		setIcon(b.createSpan({ cls: "reel-layout-icon" }), current.icon);
+		b.createSpan({ cls: "reel-layout-label", text: current.label });
+		b.addEventListener("click", () => {
+			this.filters.layout = next.id;
+			void this.persistLayout();
+			this.paint();
+		});
+	}
+
+	/** Remember the view you chose, so opening Reel does not undo it. */
+	private async persistLayout(): Promise<void> {
+		const s = this.plugin.settings;
+		if (s.libraryLayout === this.filters.layout && s.librarySort === this.filters.sort) return;
+		s.libraryLayout = this.filters.layout;
+		s.librarySort = this.filters.sort;
+		await this.plugin.saveSettings();
 	}
 
 	/** Is anything narrowing the list at all? */
@@ -1022,7 +1080,22 @@ export class ReelView extends ItemView {
 			return;
 		}
 
-		renderPosterGrid(this.plugin, this.bodyEl, rows, (entry) => this.openDetail(entry));
+		/*
+		 * Three ways to look at the same list.
+		 *
+		 * Two captioned posters per row is right for six films and wrong for
+		 * sixty-six — you scroll past your own library without ever seeing it, which
+		 * is what "an easy way to view all of these at once" is asking about. Dense
+		 * drops the captions and fits five to a row; list trades the art for a
+		 * column you can read down.
+		 */
+		if (this.filters.layout === "list") {
+			renderRowList(this.plugin, this.bodyEl, rows, false, (entry) => this.openDetail(entry));
+		} else {
+			const grid = this.bodyEl.createDiv({ cls: "reel-gridwrap" });
+			grid.toggleClass("is-dense", this.filters.layout === "dense");
+			renderPosterGrid(this.plugin, grid, rows, (entry) => this.openDetail(entry));
+		}
 	}
 
 	/**

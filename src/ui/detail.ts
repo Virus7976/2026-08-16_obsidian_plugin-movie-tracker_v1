@@ -342,20 +342,6 @@ export class DetailScreen {
 		// unless you opened the Crew tab and scrolled.
 		this.renderCreditRows(wrap, cast, crew, isTv);
 
-		/*
-		 * Your own review, above the tabs rather than behind one.
-		 *
-		 * It is the only thing on this screen you wrote, and until now the only
-		 * thing on this screen that could not be seen at all — `appendReview` put
-		 * it in the note body and nothing ever read it back. Putting it behind a
-		 * tap alongside "Releases" and "Photos" would be a strange ranking of
-		 * whose opinion matters on a page about a film you have watched.
-		 */
-		paintReviews(this.plugin, wrap, this.entry, {
-			editable: true,
-			onChange: () => this.rerender(),
-		});
-
 		const tabs: { id: string; label: string; render: (el: HTMLElement) => void }[] = [];
 
 		if (cast.length) tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
@@ -1006,6 +992,23 @@ export class DetailScreen {
 				flash(pill);
 			});
 		}
+
+		/*
+		 * Your review, in the panel that is already about you.
+		 *
+		 * It went in below the cast strip first, which is where the *code* for the
+		 * facets happened to be — and the answer to "where do I write a review" was
+		 * then two screens of scrolling past other people's work. "Your entry"
+		 * holds the rating, the heart and the status. The review is the same kind of
+		 * fact and it belongs in the same box.
+		 */
+		const reviewBox = box.createDiv({ cls: "reel-control" });
+		reviewBox.createDiv({ cls: "reel-field-label", text: "Review" });
+		paintReviews(this.plugin, reviewBox, this.entry, {
+			editable: true,
+			heading: "",
+			onChange: () => this.rerender(),
+		});
 	}
 
 	private renderActions(side: HTMLElement): void {

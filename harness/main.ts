@@ -188,12 +188,6 @@ function library(root: HTMLElement): void {
 	// unreasonable are the cases that used to widen the whole pane.
 	filterBar(filters, ["Films", "Science Fiction", "☰ Christmas with the family"]);
 
-	const sort = filters.createDiv({ cls: "reel-sortbar" });
-	sort.createSpan({ cls: "reel-dim", text: "Sort" });
-	const sel = sort.createEl("select", { cls: "reel-select dropdown" });
-	sel.createEl("option", { text: "Recently watched" });
-	sort.createSpan({ cls: "reel-dim reel-sort-then", text: "then my rating" });
-
 	const body = root.createDiv({ cls: "reel-view-body" });
 	// The band replaced the bare "39 titles" line: the count is its headline, and
 	// two of them would be one more row of chrome on the screen that has fought
@@ -217,12 +211,25 @@ function library(root: HTMLElement): void {
  * whose width is the pane's — the six-row stack it replaced is what made the
  * first poster start below the fold.
  */
-function filterBar(into: HTMLElement, active: string[]): HTMLElement {
+function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElement {
 	const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
 	const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
 	open.createSpan({ cls: "reel-filter-btn-icon", text: "⚙" });
 	open.createSpan({ text: "Filters" });
 	if (active.length) open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
+
+	// Sort and layout share the row rather than owning one each. Three stacked
+	// rows of controls above two posters is a control panel with a preview pane
+	// attached, which is what the device screenshot showed.
+	if (sort) {
+		const sel = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
+		sel.createEl("option", { text: "Recently watched" });
+		const layout = bar.createEl("button", { cls: "reel-chip reel-layout-btn" });
+		layout.createSpan({ cls: "reel-layout-icon", text: "▦" });
+		layout.createSpan({ cls: "reel-layout-label", text: "Posters" });
+		bar.createSpan({ cls: "reel-chip-sep", text: "·" });
+	}
+
 	for (const label of active) {
 		const tag = bar.createEl("button", { cls: "reel-chip is-active reel-filter-tag" });
 		tag.createSpan({ text: label });
@@ -416,6 +423,23 @@ function heroBand(
 	return band;
 }
 
+/**
+ * The dense grid — "an easy way to view all of these at once".
+ *
+ * The captioned grid is two columns on a phone because a title needs about
+ * 110px before it truncates to "The Equaliz…". Take the caption away and the
+ * poster can be small enough to fit five across, which is the difference
+ * between looking at your library and scrolling past it.
+ *
+ * The audit's job here is the badges: they do not shrink with the poster, so
+ * at 68px a certification chip and a watchlist flag cover most of the art.
+ */
+function dense(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const wrap = root.createDiv({ cls: "reel-gridwrap is-dense" });
+	renderPosterGrid(plugin, wrap, [...all, ...all, ...all]);
+}
+
 function rows(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	renderRowList(plugin, root, all.slice(0, 8));
@@ -548,6 +572,7 @@ function logsheet(root: HTMLElement): void {
 
 const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	library,
+	dense,
 	feed,
 	filterSheet,
 	reviews,
