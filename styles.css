@@ -10360,3 +10360,63 @@ input.reel-input {
 	font-size: 12px;
 	color: var(--text-muted);
 }
+
+
+/* ==================================================================== */
+/* A sheet fits the screen it is on, and its actions stay reachable      */
+/* ==================================================================== */
+
+/*
+ * The cap is measured, not expressed.
+ *
+ * `88dvh` is only the visible screen when the WebView shrinks its viewport for
+ * the keyboard, and whether it does depends on the platform, the Obsidian build
+ * and the Android release. Where it does not, a sheet anchored at the bottom is
+ * allowed to be 88% of the *whole* screen while barely half of it is showing —
+ * so it overflows off the top, and the field you were asked to type into is
+ * above the first pixel. That is the passphrase prompt, reported twice as
+ * "there is nothing on screen".
+ *
+ * `--reel-sheet-max` is `window.innerHeight * 0.88`, restamped on every resize
+ * by sheetFit(). Same proportion; a real number to take it of. The `dvh` stays
+ * as the fallback for the first frame before the stamp lands.
+ */
+.reel-modal.reel-sheet {
+	max-height: var(--reel-sheet-max, 88dvh);
+}
+
+/*
+ * The actions stay on the sheet, not at the end of it.
+ *
+ * The audit's keyboard pass found the log sheet's primary button at y 672 in a
+ * 432px screen — 240px below the fold, on a sheet that is pinned to the bottom
+ * of the screen and so cannot be scrolled out from under anything. Sticky
+ * rather than fixed: it rides the bottom of the sheet while the content above
+ * it scrolls, which is what a bottom sheet does everywhere else on a phone.
+ */
+.reel-modal.reel-sheet .reel-prompt-actions,
+.reel-modal.reel-sheet .reel-log-actions {
+	position: sticky;
+	bottom: 0;
+	z-index: 2;
+	margin-bottom: 0;
+	padding-top: var(--reel-space-3);
+	padding-bottom: var(--reel-space-2);
+	background: var(--background-primary);
+	/* Content scrolling underneath should look like it goes under something,
+	   not like it stops. */
+	box-shadow: 0 -8px 12px -8px rgb(0 0 0 / 0.18);
+}
+
+/*
+ * The field is the point of the sheet, so it is what has to be on screen.
+ *
+ * A prompt opens with the title and the explanation above the box. On a full
+ * screen that is the right order to read in; with a keyboard up it spends the
+ * visible half of the screen on prose and puts the input below it. The
+ * explanation is still there — it just stops outranking the thing it explains.
+ */
+.reel-modal.reel-sheet .reel-prompt-body {
+	max-height: 4.6em;
+	overflow-y: auto;
+}

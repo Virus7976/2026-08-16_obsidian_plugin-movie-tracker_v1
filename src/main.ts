@@ -1,7 +1,7 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, addIcon } from "obsidian";
 import { DEFAULT_SETTINGS, ReelSettingTab, ReelSettings } from "./settings";
 import { canPersist, mergeForSave } from "./util/settingsguard";
-import { keyboardInset } from "./util/panewidth";
+import { keyboardInset, sheetFit } from "./util/panewidth";
 import { CredentialStore, MissingKeyError } from "./credentials";
 import { TmdbClient } from "./tmdb";
 import { Library } from "./library";
@@ -89,6 +89,10 @@ export default class ReelPlugin extends Plugin {
 		// drawn over that. Without this the passphrase prompt appears behind the
 		// keyboard — focused, invisible, and impossible to complete.
 		this.register(keyboardInset());
+		// And how tall a sheet may be, measured from the layout viewport rather
+		// than asked of a viewport unit that may or may not know about the
+		// keyboard. See sheetFit().
+		this.register(sheetFit());
 
 		addIcon("reel", REEL_ICON);
 

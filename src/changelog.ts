@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.9",
+		date: "2026-08-20",
+		headline: "Sheets fit the screen they are on, so the passphrase box is where you can see it.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The passphrase prompt stays on screen with the keyboard up.",
+				note: "A sheet was allowed to be 88% of the whole screen while half of it was showing, so it overflowed off the top and took the field with it.",
+			},
+			{
+				kind: "better",
+				text: "A sheet's buttons ride its bottom edge while the rest scrolls, instead of sitting at the end of the content.",
+				note: "With the keyboard up, the log sheet's Save button was 240 pixels below the fold on a sheet that cannot be scrolled clear.",
+			},
+			{
+				kind: "better",
+				text: "Reel is now checked with the keyboard open, not only at rest.",
+				note: "Four separate “I can't see it, the keyboard is over it” faults had shipped, and none of them could fail a test.",
+			},
+		],
+	},
+	{
 		version: "0.8.8",
 		date: "2026-08-20",
 		headline: "Reel tells you what it changed, and Stats reads like a page rather than a pile of numbers.",

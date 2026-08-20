@@ -29,7 +29,7 @@ import { QuickRate } from "../src/ui/quickRate";
 import { LogSheet } from "../src/ui/logSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { auditScreen, type Check } from "./audit";
-import { measure, stampWidth, stampChromeInsets, sizeBody } from "../src/util/panewidth";
+import { measure, stampWidth, stampChromeInsets, sizeBody, sheetFit } from "../src/util/panewidth";
 
 /* ------------------------------------------------------------------ */
 /* A poster that always loads                                          */
@@ -620,6 +620,36 @@ function whatsnew(root: HTMLElement): void {
 	actions.createEl("button", { cls: "reel-btn mod-cta", text: "Got it" });
 }
 
+/**
+ * The passphrase prompt, which is the screen that decides whether the plugin
+ * works at all.
+ *
+ * Reported twice as "there is nothing on screen": the field had focus, the
+ * keyboard was up, and the sheet was behind it. Being unable to type a
+ * passphrase means being unable to unlock the API keys, and there is no way
+ * around it from inside the app.
+ *
+ * Modelled with the confirm field present, which is the taller of its two
+ * shapes and therefore the one that runs out of screen first.
+ */
+function passphrase(root: HTMLElement): void {
+	const modal = root.createDiv({ cls: "reel-modal reel-sheet reel-prompt" });
+	modal.createEl("h3", { cls: "reel-prompt-title", text: "Unlock your API keys" });
+	modal.createEl("p", {
+		cls: "reel-prompt-body",
+		text: "Reel encrypts your TMDB and OMDb keys. Enter the passphrase you set to use them this session.",
+	});
+	for (const ph of ["Passphrase", "Confirm passphrase"]) {
+		modal.createEl("input", {
+			cls: "reel-input",
+			attr: { type: "password", placeholder: ph, autocomplete: "off" },
+		});
+	}
+	const actions = modal.createDiv({ cls: "reel-prompt-actions" });
+	actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+	actions.createEl("button", { cls: "reel-btn mod-cta", text: "Unlock" });
+}
+
 function rows(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	renderRowList(plugin, root, all.slice(0, 8));
@@ -782,6 +812,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	searching,
 	seensheet,
 	whatsnew,
+	passphrase,
 	feed,
 	filterSheet,
 	reviews,
@@ -807,6 +838,15 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 const params = new URLSearchParams(location.search);
 const wanted = params.get("screen") ?? "library";
 const phone = params.get("phone") !== "0";
+/*
+ * Whether this run models a phone with the keyboard open.
+ *
+ * Not inferred from the window height: a short window and a keyboard look
+ * identical to the layout and ask different questions of it. "Is the browsing
+ * chrome eating the screen" is a question about a screen at rest; "can you see
+ * the box you are typing into" is a question about this one.
+ */
+const keyboard = params.get("keyboard") === "1";
 
 /**
  * Constrain the pane without touching the window.
@@ -979,6 +1019,15 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	return view;
 }
 
+/*
+ * The same measured sheet cap the plugin installs.
+ *
+ * Without it the rig exercises the `88dvh` fallback rather than the code that
+ * ships, and the check written for a sheet overflowing its screen would be
+ * measuring a value the app never uses.
+ */
+sheetFit();
+
 const app = document.getElementById("app");
 
 if (app) mountObsidianChrome(app);
@@ -1003,7 +1052,7 @@ if (app && params.get("audit") != null) {
 	 * Logged rather than dropped quietly. A pass that silently covers less than
 	 * it appears to is how a green tick stops meaning anything.
 	 */
-	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet", "whatsnew"]);
+	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet", "whatsnew", "passphrase"]);
 	const skipped: string[] = [];
 
 	const results: { screen: string; checks: Check[] }[] = [];
@@ -1013,7 +1062,7 @@ if (app && params.get("audit") != null) {
 			continue;
 		}
 		const view = mount(app, name);
-		results.push({ screen: name, checks: auditScreen(view, { phone }) });
+		results.push({ screen: name, checks: auditScreen(view, { phone, keyboard }) });
 		view.remove();
 	}
 

@@ -269,6 +269,44 @@ export function keyboardInset(): () => void {
 }
 
 /**
+ * How tall a bottom sheet is allowed to be, measured rather than expressed.
+ *
+ * The sheets were capped at `88dvh`, and whether that unit accounts for a
+ * software keyboard depends on the WebView's `interactive-widget` behaviour —
+ * which is to say, on the platform, the Obsidian version and the Android
+ * release. When it does not, the cap is 88% of the *full* screen while the
+ * visible area is barely half of it: the sheet is anchored at the bottom, so it
+ * overflows off the top, and the field you were asked to type into is above the
+ * first pixel of the screen. That is the passphrase prompt reported twice as
+ * "there is nothing there".
+ *
+ * `window.innerHeight` is the layout viewport, which is the thing the sheet is
+ * actually being drawn into, whatever the units claim. Stamped on `<body>`
+ * because a sheet is not inside the view.
+ *
+ * Returns a teardown; a resize listener outlives the plugin otherwise.
+ */
+export function sheetFit(): () => void {
+	const sync = (): void => {
+		// 88% is the same proportion as before — this changes what it is 88% of,
+		// not how much of the screen a sheet may take.
+		const h = Math.round(window.innerHeight * 0.88);
+		document.body.setCssProps({ "--reel-sheet-max": `${h}px` });
+	};
+	window.addEventListener("resize", sync);
+	window.addEventListener("orientationchange", sync);
+	const vv = window.visualViewport;
+	vv?.addEventListener("resize", sync);
+	sync();
+	return () => {
+		window.removeEventListener("resize", sync);
+		window.removeEventListener("orientationchange", sync);
+		vv?.removeEventListener("resize", sync);
+		document.body.style.removeProperty("--reel-sheet-max");
+	};
+}
+
+/**
  * Give a view's scrolling body an explicit height.
  *
  * `.reel-view-body` has `overflow-y: auto`, which makes it a scroll container,

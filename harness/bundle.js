@@ -6331,7 +6331,7 @@ ${body}
     });
     check("gridTracksEqual", uneven.length === 0, uneven.map((g) => getComputedStyle(g).gridTemplateColumns).join(" | "));
     const first = view.querySelector(".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed");
-    if (first) {
+    if (first && !opts.keyboard) {
       const top = first.getBoundingClientRect().top;
       check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round(top / vh * 100)}%`);
     }
@@ -6370,6 +6370,26 @@ ${body}
       );
     }
     check("touchTargets44", small.length === 0, [...worst].map(([k, d]) => `${k} ${d}`).join(", "));
+    if (opts.keyboard) {
+      const unreachable = [];
+      for (const modal of Array.from(view.querySelectorAll(".reel-modal"))) {
+        const field = modal.querySelector("input, textarea");
+        const action = modal.querySelector(".mod-cta");
+        for (const el of [field, action]) {
+          if (!el || !shown(el))
+            continue;
+          const r = el.getBoundingClientRect();
+          if (r.height < 2)
+            continue;
+          if (r.top >= 0 && r.bottom <= window.innerHeight)
+            continue;
+          unreachable.push(
+            `${el.className.split(" ")[0] || el.tagName} at y ${Math.round(r.top)}..${Math.round(r.bottom)} of ${window.innerHeight}`
+          );
+        }
+      }
+      check("typingVisible", unreachable.length === 0, unreachable.slice(0, 3).join(", "));
+    }
     const blocked = [];
     for (const el of Array.from(view.querySelectorAll(TAPPABLE))) {
       const r = el.getBoundingClientRect();
@@ -6587,6 +6607,23 @@ ${body}
     el.style.paddingTop = top > 0 ? `${top}px` : "";
     if (el !== document.body)
       document.body.setCssProps(vars);
+  }
+  function sheetFit() {
+    const sync = () => {
+      const h = Math.round(window.innerHeight * 0.88);
+      document.body.setCssProps({ "--reel-sheet-max": `${h}px` });
+    };
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", sync);
+    sync();
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+      vv?.removeEventListener("resize", sync);
+      document.body.style.removeProperty("--reel-sheet-max");
+    };
   }
   function sizeBody(view, body) {
     const cs = getComputedStyle(view);
@@ -7047,6 +7084,23 @@ ${body}
     const actions = modal.createDiv({ cls: "reel-log-actions reel-wn-actions" });
     actions.createEl("button", { cls: "reel-btn mod-cta", text: "Got it" });
   }
+  function passphrase(root) {
+    const modal = root.createDiv({ cls: "reel-modal reel-sheet reel-prompt" });
+    modal.createEl("h3", { cls: "reel-prompt-title", text: "Unlock your API keys" });
+    modal.createEl("p", {
+      cls: "reel-prompt-body",
+      text: "Reel encrypts your TMDB and OMDb keys. Enter the passphrase you set to use them this session."
+    });
+    for (const ph of ["Passphrase", "Confirm passphrase"]) {
+      modal.createEl("input", {
+        cls: "reel-input",
+        attr: { type: "password", placeholder: ph, autocomplete: "off" }
+      });
+    }
+    const actions = modal.createDiv({ cls: "reel-prompt-actions" });
+    actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+    actions.createEl("button", { cls: "reel-btn mod-cta", text: "Unlock" });
+  }
   function rows(root) {
     root.addClass("reel-view-body");
     renderRowList(plugin, root, all.slice(0, 8));
@@ -7155,6 +7209,7 @@ ${body}
     searching,
     seensheet,
     whatsnew,
+    passphrase,
     feed,
     filterSheet,
     reviews,
@@ -7175,6 +7230,7 @@ ${body}
   var params2 = new URLSearchParams(location.search);
   var wanted = params2.get("screen") ?? "library";
   var phone2 = params2.get("phone") !== "0";
+  var keyboard = params2.get("keyboard") === "1";
   var paneWidth = Number(params2.get("pane") ?? "") || 0;
   var chromeTop = Number(params2.get("chromeTop") ?? "") || 0;
   var chromeBottom = Number(params2.get("chromeBottom") ?? "") || 0;
@@ -7228,11 +7284,12 @@ ${e?.stack ?? ""}` });
       sizeBody(view, realBody);
     return view;
   }
+  sheetFit();
   var app = document.getElementById("app");
   if (app)
     mountObsidianChrome(app);
   if (app && params2.get("audit") != null) {
-    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet", "whatsnew"]);
+    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet", "whatsnew", "passphrase"]);
     const skipped = [];
     const results = [];
     for (const name of Object.keys(SCREENS)) {
@@ -7241,7 +7298,7 @@ ${e?.stack ?? ""}` });
         continue;
       }
       const view = mount(app, name);
-      results.push({ screen: name, checks: auditScreen(view, { phone: phone2 }) });
+      results.push({ screen: name, checks: auditScreen(view, { phone: phone2, keyboard }) });
       view.remove();
     }
     const failures = results.flatMap((r) => r.checks.filter((c) => !c.ok).map((c) => ({ ...c, screen: r.screen })));

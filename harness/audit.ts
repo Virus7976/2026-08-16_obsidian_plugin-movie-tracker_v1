@@ -131,7 +131,7 @@ const SCROLLERS = [
 	"reel-preview-links",
 ];
 
-export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[] {
+export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?: boolean }): Check[] {
 	/*
 	 * Width is measured from the *pane*, not the window.
 	 *
@@ -246,7 +246,16 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 
 	// How much of the screen is chrome before the first piece of content.
 	const first = view.querySelector(".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed");
-	if (first) {
+	/*
+	 * Not while the keyboard is up.
+	 *
+	 * This is a question about a screen at rest — how much of it is spent on
+	 * navigation before the first poster. With 380px of the screen taken by a
+	 * keyboard the fraction is arithmetic rather than a judgement, and the
+	 * three failures it produced there were all "the screen is short", which
+	 * is the premise of that pass and not a finding.
+	 */
+	if (first && !opts.keyboard) {
 		const top = first.getBoundingClientRect().top;
 		check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round((top / vh) * 100)}%`);
 	}
@@ -318,6 +327,41 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean }): Check[
 		);
 	}
 	check("touchTargets44", small.length === 0, [...worst].map(([k, d]) => `${k} ${d}`).join(", "));
+
+	/*
+	 * Can you see the box you are typing into?
+	 *
+	 * Four bugs of this exact shape have shipped — the passphrase prompt twice,
+	 * the review box, the search field — and every one was reported as "it's
+	 * not there" rather than as a layout fault, because a field behind the
+	 * keyboard is not visibly wrong, it is visibly absent. Being unable to type
+	 * a passphrase means being unable to unlock the API keys, which means the
+	 * plugin does not work at all.
+	 *
+	 * Only inside a modal, and only the first field and the primary action. A
+	 * long form scrolling below the fold is ordinary; a sheet is pinned to the
+	 * bottom of the screen and cannot be scrolled out from under anything, so
+	 * whatever it opens with has to be on screen when it opens.
+	 */
+	if (opts.keyboard) {
+		const unreachable: string[] = [];
+		for (const modal of Array.from(view.querySelectorAll<HTMLElement>(".reel-modal"))) {
+			const field = modal.querySelector<HTMLElement>("input, textarea");
+			const action = modal.querySelector<HTMLElement>(".mod-cta");
+			for (const el of [field, action]) {
+				if (!el || !shown(el)) continue;
+				const r = el.getBoundingClientRect();
+				if (r.height < 2) continue;
+				// Fully on screen, not merely overlapping it. Half a button is
+				// not a button you can be sure you pressed.
+				if (r.top >= 0 && r.bottom <= window.innerHeight) continue;
+				unreachable.push(
+					`${el.className.split(" ")[0] || el.tagName} at y ${Math.round(r.top)}..${Math.round(r.bottom)} of ${window.innerHeight}`
+				);
+			}
+		}
+		check("typingVisible", unreachable.length === 0, unreachable.slice(0, 3).join(", "));
+	}
 
 	/*
 	 * Is anything drawn on top of a control?

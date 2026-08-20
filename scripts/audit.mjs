@@ -131,7 +131,7 @@ try {
 	// vault and vice versa, and Reel has no theme rules of its own — which is
 	// correct, and exactly why nobody has ever checked that the variables
 	// carry it.
-	for (const { phone, dark, pane } of [
+	for (const { phone, dark, pane, keyboard } of [
 		{ phone: 1, dark: 0 },
 		{ phone: 1, dark: 1 },
 		{ phone: 0, dark: 0 },
@@ -143,20 +143,43 @@ try {
 		// layout asking the wrong one of the two. This pass is the case where
 		// they disagree, which is the bug the `is-wNNN` classes exist to fix.
 		{ phone: 0, dark: 0, pane: 375 },
+		/*
+		 * A phone with the keyboard up.
+		 *
+		 * Four separate "I can't see it, the keyboard is over it" bugs have
+		 * shipped — the passphrase prompt twice, the review box, the search
+		 * field — and not one of them could fail a check, because every pass
+		 * ran on an 812px screen with nothing typing into it. A screen that is
+		 * only ever measured at rest is not measured at all: the state where
+		 * text entry happens is the state where text entry breaks.
+		 *
+		 * Modelled as a short viewport rather than as an element, because that
+		 * is what this device does. Android shrinks the *layout* viewport for
+		 * the keyboard, which is why `position: fixed; bottom: 0` lands above
+		 * it and why `visualViewport` reports nothing here. 432px is 812 less
+		 * the keyboard measured from a device photo.
+		 */
+		{ phone: 1, dark: 0, keyboard: 380 },
 	]) {
 		const page = await browser.newPage();
 		// A real phone viewport, and a desktop one — the compact layout is a
 		// separate code path and a regression in either is a regression.
-		await page.setViewport(phone ? { width: 375, height: 812 } : { width: 1280, height: 900 });
+		const base = phone ? { width: 375, height: 812 } : { width: 1280, height: 900 };
+		await page.setViewport(keyboard ? { ...base, height: base.height - keyboard } : base);
 		const paneArg = pane ? `&pane=${pane}` : "";
-		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}${paneArg}`, {
+		// The screen cannot tell a short window from a keyboard, and the two
+		// ask different questions of the same layout.
+		const kbArg = keyboard ? "&keyboard=1" : "";
+		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}${paneArg}${kbArg}`, {
 			waitUntil: "networkidle0",
 		});
 
 		const result = await page.evaluate(() => window.REEL_AUDIT);
 		const label = pane
 			? `docked pane ${pane}px in 1280x900 ${dark ? "dark" : "light"}`
-			: `${phone ? "phone 375x812" : "desktop 1280x900"} ${dark ? "dark" : "light"}`;
+			: keyboard
+				? `phone 375x${812 - keyboard} — keyboard up`
+				: `${phone ? "phone 375x812" : "desktop 1280x900"} ${dark ? "dark" : "light"}`;
 
 		if (!result) {
 			console.log(`✗ ${label}: the audit did not run — the harness failed to load.`);
