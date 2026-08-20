@@ -12932,3 +12932,251 @@ input.reel-input {
 	min-width: 0;
 	text-align: right;
 }
+
+
+/* ==================================================================== */
+/* The lead tile                                                        */
+/* ==================================================================== */
+
+/*
+ * See the note in stats.ts: a grid of ten equal tiles has no way in.
+ *
+ * The lead spans the full width and sets its number larger. Two changes, and
+ * between them they turn a uniform grid into a page with a first line — you
+ * land on the headline figure, then read the supporting ones. That is the
+ * whole difference, and it costs no extra height: the tile the lead replaces
+ * was occupying half a row anyway, and the row it now owns is the row it would
+ * have shared.
+ */
+.reel-view .reel-stats .reel-tile.is-lead {
+	grid-column: 1 / -1;
+}
+
+.reel-view .reel-stats .reel-tile.is-lead .reel-tile-value {
+	font-size: clamp(2.75rem, 13vw, 3.75rem);
+	line-height: 1.02;
+	/* Display type is spaced for reading at body size; at this scale the
+	   tracking that made 13px legible reads as loose. */
+	letter-spacing: -0.03em;
+}
+
+.reel-view .reel-stats .reel-tile.is-lead .reel-tile-label {
+	font-size: var(--font-ui-small);
+}
+
+/*
+ * The supporting tiles step down rather than staying where they were.
+ *
+ * Promoting one number does nothing if the other nine still shout — hierarchy
+ * is a ratio, not a single large thing. Shrinking the rest slightly is what
+ * makes the lead read as the lead, and it buys back the height the larger
+ * figure costs.
+ */
+.reel-view:not(.is-w700) .reel-stats .reel-tile:not(.is-lead) .reel-tile-value {
+	font-size: clamp(1.5rem, 7vw, 1.9rem);
+}
+
+
+/*
+ * The lead tile reads across, not down.
+ *
+ * Stacked, a full-width tile holding a short number left about 500px of empty
+ * card to the right of a single glyph — the promotion worked and the layout
+ * did not follow it. A big number alone in a wide box does not read as
+ * emphasis, it reads as something that failed to load.
+ *
+ * Laying it out horizontally is what the extra width was for: the figure on
+ * the left at display size, its label and detail stacked beside it. That is
+ * the standard shape of a headline statistic everywhere it appears, and it is
+ * standard because it uses the width a headline is given.
+ *
+ * Baseline alignment, not centre. The label sits on the number's baseline so
+ * the two read as one object rather than as a number with a caption floating
+ * near it — and the detail line hangs below the label, where a subordinate
+ * clause belongs.
+ */
+.reel-view .reel-stats .reel-tile.is-lead {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: baseline;
+	column-gap: var(--reel-space-4);
+}
+
+.reel-view .reel-stats .reel-tile.is-lead .reel-tile-value {
+	grid-row: 1 / span 2;
+	/* Baseline alignment needs the value's own box to end at its baseline, or
+	   the descender space pushes the label down and the effect is lost. */
+	align-self: baseline;
+}
+
+.reel-view .reel-stats .reel-tile.is-lead .reel-tile-label {
+	grid-column: 2;
+	align-self: baseline;
+}
+
+.reel-view .reel-stats .reel-tile.is-lead .reel-tile-sub {
+	grid-column: 2;
+	align-self: start;
+}
+
+/* Small screens run out of width before the number runs out of digits — a
+   four-figure episode count beside a long label has nowhere to go — so it
+   falls back to the stacked form rather than shrinking the headline. */
+@media (max-width: 340px) {
+	.reel-view .reel-stats .reel-tile.is-lead {
+		display: block;
+	}
+}
+
+
+/* ==================================================================== */
+/* Year chips carry their year's artwork                                */
+/* ==================================================================== */
+
+.reel-year-chips .reel-chip.has-wash {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+}
+
+.reel-chip-wash {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	pointer-events: none;
+	overflow: hidden;
+}
+
+/*
+ * Inset past the edges, because a blur this wide samples beyond its own box
+ * and would otherwise leave a pale halo on all four sides of the pill.
+ */
+.reel-chip-wash::before {
+	content: "";
+	position: absolute;
+	inset: -24px;
+	background-image: var(--reel-wash);
+	background-size: cover;
+	background-position: center 35%;
+	filter: blur(14px) saturate(1.3);
+	opacity: 0.55;
+}
+
+/*
+ * The scrim, in the theme's own background colour.
+ *
+ * This is the part that makes the label legible. The chip is small and its
+ * text sits directly on the artwork, so the scrim is heavier here than on a
+ * sheet — there is no room to move the text somewhere calmer.
+ */
+.reel-chip-wash::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: rgb(from var(--background-primary) r g b / 0.62);
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-chip-wash::after {
+		background: var(--background-primary);
+		opacity: 0.62;
+	}
+}
+
+/* The selected year keeps its accent fill and lets more of the artwork show —
+   it is the one you are looking at, so it can afford to be the most vivid. */
+.reel-year-chips .reel-chip.has-wash[aria-selected="true"] .reel-chip-wash::after,
+.reel-year-chips .reel-chip.has-wash.is-active .reel-chip-wash::after {
+	background: rgb(from var(--interactive-accent) r g b / 0.72);
+}
+
+.reel-chip-text {
+	position: relative;
+	z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-chip-wash::before {
+		filter: blur(14px);
+	}
+}
+
+/* ==================================================================== */
+/* The hero band stops being a square-cornered slab                     */
+/* ==================================================================== */
+
+/*
+ * Reported as "the harsh cutoff at the top of that blur should be rounded".
+ *
+ * The band was full-bleed — negative margins out to the screen edge — with
+ * `overflow: hidden` clipping the blur, so its top edge was a hard horizontal
+ * line straight across the screen. A blur that fades softly at the bottom and
+ * is guillotined at the top does not read as a soft thing at all; the one hard
+ * edge is what the eye goes to.
+ *
+ * Pulling it into the gutter and giving it the card radius fixes the edge and
+ * settles a second inconsistency at the same time: everything below it is now
+ * an inset rounded card, and the hero was the one element still running to the
+ * screen edge. It is the most important thing on the page, so it should look
+ * deliberate rather than like the only piece that escaped the layout.
+ */
+.reel-view:not(.is-w700) .reel-stats .reel-hero-band {
+	margin-inline: 0;
+	width: 100%;
+	border-radius: var(--reel-radius-lg);
+}
+
+
+/* ==================================================================== */
+/* The sheet foot sits above the list, and the close button loses its slab */
+/* ==================================================================== */
+
+/*
+ * "Show 104 titles" was rendering behind the genre chips.
+ *
+ * The foot is sticky, so it stays put while the list scrolls — but sticky only
+ * decides where an element sits, not what it sits in front of. Without a
+ * stacking order of its own it lost to the chips, which establish contexts of
+ * their own through transforms and shadows. The result was the reported
+ * glitch exactly: the label appeared to float loose over the content, and the
+ * button "arrived" only once you scrolled far enough that nothing overlapped
+ * it any more.
+ *
+ * Two declarations. `z-index` puts it in front, and `position: sticky` is what
+ * makes `z-index` apply at all — an auto-positioned element ignores it.
+ * The background then has to be genuinely opaque, or being in front simply
+ * means the chips show through instead of over.
+ */
+.reel-modal .reel-log-actions,
+.reel-modal .reel-prompt-actions,
+.reel-modal .reel-filter-actions {
+	z-index: 3;
+	background: var(--background-primary);
+}
+
+/*
+ * The close button stops being a white tile.
+ *
+ * On a cream sheet it was a hard-edged square of pure white — lighter than
+ * anything else on screen, so the first thing the eye landed on was the way
+ * out rather than the content. Obsidian's default gives it a filled background
+ * that assumes a white surface underneath; on any tinted theme that assumption
+ * shows.
+ *
+ * It becomes the glyph alone, which is what a close control is nearly
+ * everywhere, with the fill kept for the pressed state so the press still
+ * registers. The 44px target is unchanged — only the paint goes.
+ */
+.reel-modal .modal-close-button {
+	background: none;
+	box-shadow: none;
+	border: none;
+	border-radius: var(--reel-radius-full);
+	color: var(--text-muted);
+}
+
+.reel-modal .modal-close-button:active {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}

@@ -52,6 +52,36 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.28",
+		date: "2026-08-20",
+		headline: "Less text, more film.",
+		changes: [
+			{
+				kind: "new",
+				text: "The year buttons on Stats carry the artwork of what you watched that year.",
+				note: "They were outlined pills with a number in them — the same control you would use for a sort menu — on a page that is otherwise entirely about pictures. Blurred far enough that it is colour rather than image, so the label stays readable and 2024 stops looking identical to 2025.",
+			},
+			{
+				kind: "better",
+				text: "One headline number leads the stats grid instead of ten tiles of equal weight.",
+				note: "Ten equal tiles give the eye no way in. The lead is picked by position, not by name, so a mostly-television library leads with episodes rather than films.",
+			},
+			{
+				kind: "fixed",
+				text: "The blurred header no longer ends in a hard straight line across the screen.",
+			},
+			{
+				kind: "fixed",
+				text: "The “Show N titles” button no longer renders behind the filter chips.",
+				note: "Sticky decides where something sits, not what it sits in front of — so the label looked detached and the button only appeared once you had scrolled past everything overlapping it.",
+			},
+			{
+				kind: "fixed",
+				text: "The close button on sheets is no longer a hard white tile on a tinted theme.",
+			},
+		],
+	},
+	{
 		version: "0.8.27",
 		date: "2026-08-20",
 		headline: "The stats cards are surfaces now, not outlines.",

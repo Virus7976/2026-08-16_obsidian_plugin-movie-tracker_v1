@@ -1205,9 +1205,20 @@
     const allViewings = opts.year ? viewings(films) : watched;
     const years = [...new Set(allViewings.map((v) => v.date.slice(0, 4)))].sort().reverse();
     if (years.length > 1) {
-      const bar = el.createDiv({ cls: "reel-chips" });
+      const bar = el.createDiv({ cls: "reel-chips reel-year-chips" });
+      const artFor = (year) => {
+        const pool2 = year == null ? allViewings : allViewings.filter((v) => v.date.startsWith(String(year)));
+        const pick = pool2.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+        return pick ? plugin2.posters.displayUrl(pick.entry) : null;
+      };
       const chip = (label, active, year) => {
-        const b = bar.createEl("button", { cls: "reel-chip", text: label });
+        const b = bar.createEl("button", { cls: "reel-chip" });
+        const art = artFor(year);
+        if (art) {
+          b.addClass("has-wash");
+          b.createDiv({ cls: "reel-chip-wash" }).setCssProps({ "--reel-wash": `url("${art}")` });
+        }
+        b.createSpan({ cls: "reel-chip-text", text: label });
         setSelected(b, active);
         b.addEventListener("click", () => paintStats(plugin2, el, { ...opts, year }));
       };
@@ -1268,8 +1279,13 @@
       }
     }
     const tiles = el.createDiv({ cls: "reel-tiles" });
+    let first = true;
     const tile = (label, value, sub, go) => {
       const t = tiles.createDiv({ cls: "reel-tile" });
+      if (first) {
+        t.addClass("is-lead");
+        first = false;
+      }
       t.createDiv({ cls: "reel-tile-value", text: value });
       t.createDiv({ cls: "reel-tile-label", text: label });
       if (sub)
@@ -1442,13 +1458,13 @@
       );
     }
     const trimEmpty = (rows2) => {
-      let first = 0;
+      let first2 = 0;
       let last = rows2.length - 1;
-      while (first <= last && rows2[first].n === 0)
-        first++;
-      while (last >= first && rows2[last].n === 0)
+      while (first2 <= last && rows2[first2].n === 0)
+        first2++;
+      while (last >= first2 && rows2[last].n === 0)
         last--;
-      return rows2.slice(first, last + 1);
+      return rows2.slice(first2, last + 1);
     };
     if (watched.length) {
       const byMonth = new Array(12).fill(0);

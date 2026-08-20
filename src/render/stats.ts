@@ -120,9 +120,44 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	const allViewings = opts.year ? viewings(films) : watched;
 	const years = [...new Set(allViewings.map((v) => v.date.slice(0, 4)))].sort().reverse();
 	if (years.length > 1) {
-		const bar = el.createDiv({ cls: "reel-chips" });
+		const bar = el.createDiv({ cls: "reel-chips reel-year-chips" });
+
+		/*
+		 * A year is a set of films, so it should look like one.
+		 *
+		 * These were outlined pills with a number in them — the same control
+		 * you would use for "Sort by" — sitting above a page that is entirely
+		 * about pictures. Reported as "the tabs at the top with the tiny
+		 * outline look terrible" and "this is too text based", and both are
+		 * fair: a stroke around a numeral is the most abstract thing this
+		 * screen could have used to represent a year of watching.
+		 *
+		 * Each chip now carries the artwork of something watched in that year,
+		 * blurred to the point where it is colour rather than image. That is
+		 * the same treatment the detail hero uses, and the reason it works here
+		 * is the reason it works there: at this radius there is nothing to
+		 * read, so it cannot compete with the label sitting on it — it only
+		 * gives the chip the year's own colour. 2019 and 2024 stop being two
+		 * identical outlines and become two different years.
+		 */
+		const artFor = (year?: number): string | null => {
+			const pool = year == null ? allViewings : allViewings.filter((v) => v.date.startsWith(String(year)));
+			// Newest first: the most recent thing watched is the one the year is
+			// most likely to be remembered by.
+			const pick = pool.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+			return pick ? plugin.posters.displayUrl(pick.entry) : null;
+		};
+
 		const chip = (label: string, active: boolean, year?: number) => {
-			const b = bar.createEl("button", { cls: "reel-chip", text: label });
+			const b = bar.createEl("button", { cls: "reel-chip" });
+			const art = artFor(year);
+			if (art) {
+				b.addClass("has-wash");
+				b.createDiv({ cls: "reel-chip-wash" }).setCssProps({ "--reel-wash": `url("${art}")` });
+			}
+			// After the wash, so the label is a sibling painted over it rather
+			// than a text node the wash would displace.
+			b.createSpan({ cls: "reel-chip-text", text: label });
 			setSelected(b, active);
 			b.addEventListener("click", () => paintStats(plugin, el, { ...opts, year }));
 		};
@@ -232,8 +267,29 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	 * looked identical and did nothing was the odd one out — and half the
 	 * counts here name a set you would obviously want to see.
 	 */
+	/*
+	 * The first number leads.
+	 *
+	 * Ten tiles at identical weight is a grid with nothing to enter it by —
+	 * "5 unique actors" was given exactly the prominence of "164 hours of TV",
+	 * so the eye has no route through and every figure competes with every
+	 * other. Analytics that feel considered always lead: one headline figure at
+	 * a larger scale, the rest supporting it.
+	 *
+	 * Positional rather than named, because the emitting order is already the
+	 * order of relevance — films first for a film library, episodes first for
+	 * one that is mostly television, and the section that has no data emits no
+	 * tile at all. Whatever comes out first is the thing this library is
+	 * mostly about, so that is the one to promote. Hard-coding "Films watched"
+	 * would demote a TV-only library's headline to a footnote.
+	 */
+	let first = true;
 	const tile = (label: string, value: string, sub?: string, go?: () => void) => {
 		const t = tiles.createDiv({ cls: "reel-tile" });
+		if (first) {
+			t.addClass("is-lead");
+			first = false;
+		}
 		t.createDiv({ cls: "reel-tile-value", text: value });
 		t.createDiv({ cls: "reel-tile-label", text: label });
 		if (sub) t.createDiv({ cls: "reel-tile-sub", text: sub });
