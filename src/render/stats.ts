@@ -37,6 +37,16 @@ export interface StatsOptions {
 	 * is what a block in a note means.
 	 */
 	entries?: Entry[];
+	/**
+	 * The search behind `entries`, when there was one.
+	 *
+	 * Only used to decide whether the page should show *which* titles it is
+	 * counting. Searching "dog" and being told "1 film, 1h 39m" is arithmetic
+	 * about something the page will not name — and the one thing you wanted was
+	 * the name. The count is not wrong, it is just the least useful true thing
+	 * that could have been said.
+	 */
+	query?: string;
 }
 
 export function registerStatsBlock(plugin: ReelPlugin): void {
@@ -156,6 +166,61 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			sub: `Most recently — ${heroFor.title}`,
 			subject: heroFor,
 		});
+	}
+
+	/*
+	 * When you searched for something, show what it found.
+	 *
+	 * Searching "dog" produced "1 film · 1h 39m · 1 distinct, 0 rewatches" —
+	 * four true statements about a film the page would not name. Every one of
+	 * those numbers is derivable from the one fact that was missing, which is
+	 * *which film*. The aggregates are the right answer for a whole library and
+	 * the wrong one for a handful of titles.
+	 *
+	 * Only under a search. A filter narrowing the library to 47 titles is still
+	 * a question about a population, and 47 posters at the top of the stats page
+	 * would bury the page that was asked for. A typed query is different: it is
+	 * a question about specific titles, and it is nearly always short.
+	 *
+	 * Capped, and the cap is stated rather than silent — a strip that quietly
+	 * stops at twelve reads as "that is all of them".
+	 */
+	const query = opts.query?.trim();
+	if (query && all.length) {
+		const found = el.createDiv({ cls: "reel-chart reel-found" });
+		const foundHead = found.createDiv({ cls: "reel-found-head" });
+		foundHead.createDiv({ cls: "reel-chart-title", text: `Matching “${query}”` });
+		foundHead.createDiv({
+			cls: "reel-found-count",
+			text: `${all.length} ${all.length === 1 ? "title" : "titles"}`,
+		});
+
+		const strip = found.createDiv({ cls: "reel-found-strip" });
+		const CAP = 12;
+		for (const e of all.slice(0, CAP)) {
+			const cell = strip.createDiv({ cls: "reel-found-cell" });
+			const art = cell.createDiv({ cls: "reel-found-art" });
+			plugin.posters.attach(art, e);
+			cell.createDiv({ cls: "reel-found-title", text: e.title });
+			if (e.year) cell.createDiv({ cls: "reel-found-year", text: String(e.year) });
+
+			cell.setAttr("role", "button");
+			cell.setAttr("tabindex", "0");
+			cell.setAttr("aria-label", e.title);
+			const open = (): void => void plugin.openDetail(e);
+			cell.addEventListener("click", open);
+			cell.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key !== "Enter" && ev.key !== " ") return;
+				ev.preventDefault();
+				open();
+			});
+		}
+		if (all.length > CAP) {
+			found.createDiv({
+				cls: "reel-found-more",
+				text: `and ${all.length - CAP} more — the numbers below count all ${all.length}.`,
+			});
+		}
 	}
 
 	const tiles = el.createDiv({ cls: "reel-tiles" });

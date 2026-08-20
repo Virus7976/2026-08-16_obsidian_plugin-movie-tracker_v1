@@ -52,6 +52,27 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.25",
+		date: "2026-08-20",
+		headline: "Searching in Stats names the films it found.",
+		changes: [
+			{
+				kind: "new",
+				text: "A search on the Stats tab now shows the matching titles as posters, above the numbers.",
+				note: "Searching “dog” used to answer “1 film · 1h 39m” — all true, and all derivable from the one thing it would not tell you, which is which film.",
+			},
+			{
+				kind: "better",
+				text: "The heatmap reads as marks on a quiet field instead of a wall of beige.",
+				note: "Empty days were drawn in the theme's border colour, which on a cream theme is darker than the card it sits on — so 363 empty squares were more visible than the four days that had something on them. Cells are a little larger and rounder too, which also makes them tappable.",
+			},
+			{
+				kind: "fixed",
+				text: "The heatmap no longer slices through the first month label at the left edge.",
+			},
+		],
+	},
+	{
 		version: "0.8.24",
 		date: "2026-08-20",
 		headline: "Cached artwork stays out of your phone's photo gallery.",

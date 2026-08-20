@@ -683,6 +683,7 @@ export class ReelView extends ItemView {
 			paintStats(this.plugin, this.bodyEl, {
 				include: this.filters.type,
 				entries: this.scoped(),
+				query: this.query,
 			});
 		}
 	}

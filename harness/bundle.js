@@ -1230,6 +1230,43 @@
         subject: heroFor
       });
     }
+    const query = opts.query?.trim();
+    if (query && all2.length) {
+      const found = el.createDiv({ cls: "reel-chart reel-found" });
+      const foundHead = found.createDiv({ cls: "reel-found-head" });
+      foundHead.createDiv({ cls: "reel-chart-title", text: `Matching \u201C${query}\u201D` });
+      foundHead.createDiv({
+        cls: "reel-found-count",
+        text: `${all2.length} ${all2.length === 1 ? "title" : "titles"}`
+      });
+      const strip = found.createDiv({ cls: "reel-found-strip" });
+      const CAP = 12;
+      for (const e of all2.slice(0, CAP)) {
+        const cell = strip.createDiv({ cls: "reel-found-cell" });
+        const art = cell.createDiv({ cls: "reel-found-art" });
+        plugin2.posters.attach(art, e);
+        cell.createDiv({ cls: "reel-found-title", text: e.title });
+        if (e.year)
+          cell.createDiv({ cls: "reel-found-year", text: String(e.year) });
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-label", e.title);
+        const open = () => void plugin2.openDetail(e);
+        cell.addEventListener("click", open);
+        cell.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ")
+            return;
+          ev.preventDefault();
+          open();
+        });
+      }
+      if (all2.length > CAP) {
+        found.createDiv({
+          cls: "reel-found-more",
+          text: `and ${all2.length - CAP} more \u2014 the numbers below count all ${all2.length}.`
+        });
+      }
+    }
     const tiles = el.createDiv({ cls: "reel-tiles" });
     const tile = (label, value, sub, go) => {
       const t = tiles.createDiv({ cls: "reel-tile" });
