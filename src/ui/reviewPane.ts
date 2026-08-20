@@ -30,9 +30,8 @@ import {
 	type NoteReview,
 } from "../reviews";
 import { prettyDate, todayISO } from "../util/dates";
-import { renderStarsStatic } from "./stars";
+import { renderStars, renderStarsStatic } from "./stars";
 import { redact } from "../secrets";
-import { MAX_STARS, STEP } from "../util/ratings";
 
 /** How much of a review a summary shows before it is worth opening. */
 const EXCERPT = 220;
@@ -272,46 +271,50 @@ export class ReviewEditor extends Modal {
 		modalEl.addClass("reel-modal");
 		if (Platform.isPhone) modalEl.addClass("reel-sheet");
 
+		modalEl.addClass("reel-review-sheet");
+
 		contentEl.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
 		contentEl.createDiv({ cls: "reel-log-sub", text: this.entry.title });
 
-		const dateRow = contentEl.createDiv({ cls: "reel-field" });
-		dateRow.createDiv({ cls: "reel-field-label", text: "Date" });
-		const dateEl = dateRow.createEl("input", { cls: "reel-input", attr: { type: "date" } });
+		/*
+		 * The box, first.
+		 *
+		 * It used to come after a title, a subtitle, a date field and ten rating
+		 * chips, which on a phone put it under the keyboard — you could not see a
+		 * word you were typing. Everything else here is metadata about the writing,
+		 * and metadata goes under the thing it describes.
+		 */
+		const box = contentEl.createEl("textarea", {
+			cls: "reel-input reel-review-box",
+			attr: { rows: "6", placeholder: "What did you think?" },
+		});
+		box.value = this.text;
+		box.addEventListener("input", () => (this.text = box.value));
+
+		const meta = contentEl.createDiv({ cls: "reel-review-meta" });
+
+		/*
+		 * The app's own star control, not ten chips.
+		 *
+		 * Half-star values need ten buttons if each is a number, and one widget if
+		 * it is stars — which is the control every other rating in Reel uses, so
+		 * this was also the only screen where scoring something looked different.
+		 */
+		meta.createDiv({ cls: "reel-field-label", text: "Rating" });
+		renderStars(meta, {
+			value: this.rating,
+			onChange: (v) => {
+				this.rating = v;
+			},
+		});
+
+		meta.createDiv({ cls: "reel-field-label", text: "Date" });
+		const dateEl = meta.createEl("input", { cls: "reel-input reel-review-date", attr: { type: "date" } });
 		dateEl.value = this.date;
 		// An existing review's date is what ties it to a viewing, and moving it
 		// would orphan the pair. Only a new one is free to choose.
 		dateEl.disabled = this.review != null;
 		dateEl.addEventListener("change", () => (this.date = dateEl.value));
-
-		const rateRow = contentEl.createDiv({ cls: "reel-field" });
-		rateRow.createDiv({ cls: "reel-field-label", text: "Rating" });
-		const stars = rateRow.createDiv({ cls: "reel-chips" });
-		const paintStars = (): void => {
-			stars.empty();
-			const none = stars.createEl("button", { cls: "reel-chip", text: "—", attr: { type: "button" } });
-			none.toggleClass("is-active", this.rating == null);
-			none.addEventListener("click", () => {
-				this.rating = undefined;
-				paintStars();
-			});
-			for (let r = STEP; r <= MAX_STARS; r += STEP) {
-				const b = stars.createEl("button", { cls: "reel-chip", text: String(r), attr: { type: "button" } });
-				b.toggleClass("is-active", this.rating === r);
-				b.addEventListener("click", () => {
-					this.rating = r;
-					paintStars();
-				});
-			}
-		};
-		paintStars();
-
-		const box = contentEl.createEl("textarea", {
-			cls: "reel-input reel-review-box",
-			attr: { rows: "8", placeholder: "What did you think?" },
-		});
-		box.value = this.text;
-		box.addEventListener("input", () => (this.text = box.value));
 
 		const actions = contentEl.createDiv({ cls: "reel-actions" });
 		const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel", attr: { type: "button" } });
@@ -319,9 +322,10 @@ export class ReviewEditor extends Modal {
 		const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Save", attr: { type: "button" } });
 		save.addEventListener("click", () => void this.save(save));
 
-		// The box is the point of the screen, so it starts focused — except on
-		// a phone, where that opens the keyboard over the controls above it.
-		if (!Platform.isPhone) window.setTimeout(() => box.focus(), 0);
+		// Focused everywhere now, phones included. Opening the keyboard used to
+		// bury the box; it is the first thing in the sheet, so the keyboard now
+		// opens *under* it.
+		window.setTimeout(() => box.focus(), 0);
 	}
 
 	private async save(button: HTMLButtonElement): Promise<void> {

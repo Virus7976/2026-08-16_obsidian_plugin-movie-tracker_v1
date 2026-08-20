@@ -647,12 +647,12 @@
     const m = String(dateish).match(/^(\d{4})/);
     return m ? parseInt(m[1], 10) : void 0;
   }
-  function prettyDate(iso) {
-    if (!iso)
+  function prettyDate(iso2) {
+    if (!iso2)
       return "";
-    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const m = iso2.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!m)
-      return iso;
+      return iso2;
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     return `${parseInt(m[3], 10)} ${months[parseInt(m[2], 10) - 1]} ${m[1]}`;
   }
@@ -1257,6 +1257,8 @@
       if (best && best[1] > 1)
         tile("Busiest day", `${best[1]} films`, prettyDate(best[0]));
     }
+    if (watched.length > 4)
+      paintHeatmap(plugin2, el, watched, opts, show);
     const seen = [...new Map(watched.map((v) => [v.entry.path, v.entry])).values()];
     const longest = seen.filter((e) => e.runtime).sort((a, b) => (b.runtime ?? 0) - (a.runtime ?? 0))[0];
     const topRated = seen.filter((e) => e.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
@@ -1651,8 +1653,8 @@
     }
     return streak;
   }
-  function shiftDay(iso, delta) {
-    const d = /* @__PURE__ */ new Date(iso + "T00:00:00");
+  function shiftDay(iso2, delta) {
+    const d = /* @__PURE__ */ new Date(iso2 + "T00:00:00");
     d.setDate(d.getDate() + delta);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -1667,6 +1669,97 @@
     if (!Number.isFinite(days))
       return 0;
     return Math.max(1, days / 30.4);
+  }
+  function paintHeatmap(plugin2, el, watched, opts, show) {
+    const perDay = /* @__PURE__ */ new Map();
+    for (const v of watched) {
+      const list = perDay.get(v.date);
+      if (list)
+        list.push(v.entry);
+      else
+        perDay.set(v.date, [v.entry]);
+    }
+    const dates = [...perDay.keys()].sort();
+    const lastISO = dates[dates.length - 1];
+    if (!lastISO)
+      return;
+    const end = opts.year ? new Date(Date.UTC(opts.year, 11, 31)) : parseISO(lastISO);
+    const start = opts.year ? new Date(Date.UTC(opts.year, 0, 1)) : addDays(end, -363);
+    const gridStart = addDays(start, -((start.getUTCDay() + 6) % 7));
+    const weeks = Math.ceil((diffDays(gridStart, end) + 1) / 7);
+    const box = el.createDiv({ cls: "reel-chart reel-heatmap-box" });
+    const head = box.createDiv({ cls: "reel-heatmap-head" });
+    head.createDiv({ cls: "reel-chart-title", text: opts.year ? `${opts.year}, day by day` : "The last year" });
+    const busiest = [...perDay.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+    const peak = Math.max(1, busiest ? busiest[1].length : 1);
+    const active = [...perDay.keys()].filter((d) => d >= iso(start) && d <= iso(end)).length;
+    head.createDiv({
+      cls: "reel-heatmap-sub",
+      text: `${active} ${active === 1 ? "day" : "days"} with something on`
+    });
+    const scroll = box.createDiv({ cls: "reel-heatmap-scroll" });
+    const grid = scroll.createDiv({ cls: "reel-heatmap-grid" });
+    grid.setCssProps({ "--reel-heat-weeks": String(weeks) });
+    const months = grid.createDiv({ cls: "reel-heatmap-months" });
+    let lastMonth = -1;
+    for (let w = 0; w < weeks; w++) {
+      const day = addDays(gridStart, w * 7);
+      const label = months.createDiv({ cls: "reel-heatmap-month" });
+      if (day.getUTCMonth() !== lastMonth && day.getUTCDate() <= 7) {
+        lastMonth = day.getUTCMonth();
+        label.setText(MONTH_SHORT[lastMonth]);
+      }
+    }
+    const cells = grid.createDiv({ cls: "reel-heatmap-cells" });
+    for (let w = 0; w < weeks; w++) {
+      const col = cells.createDiv({ cls: "reel-heatmap-week" });
+      for (let d = 0; d < 7; d++) {
+        const day = addDays(gridStart, w * 7 + d);
+        const key = iso(day);
+        const cell = col.createDiv({ cls: "reel-heatmap-cell" });
+        if (day < start || day > end) {
+          cell.addClass("is-outside");
+          continue;
+        }
+        const hits = perDay.get(key) ?? [];
+        if (!hits.length)
+          continue;
+        const level = Math.min(4, Math.ceil(hits.length / peak * 4));
+        cell.addClass(`is-l${level}`);
+        cell.setAttr("title", `${prettyDate(key)} \u2014 ${hits.length} ${hits.length === 1 ? "film" : "films"}`);
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-label", `${prettyDate(key)}, ${hits.length} watched`);
+        const open = show(prettyDate(key), hits, `${hits.length} watched that day`);
+        cell.addEventListener("click", open);
+        cell.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ")
+            return;
+          ev.preventDefault();
+          open();
+        });
+      }
+    }
+    const legend = box.createDiv({ cls: "reel-heatmap-legend" });
+    legend.createSpan({ cls: "reel-dim", text: "Less" });
+    for (let l = 0; l <= 4; l++) {
+      legend.createDiv({ cls: `reel-heatmap-cell${l ? ` is-l${l}` : ""}` });
+    }
+    legend.createSpan({ cls: "reel-dim", text: "More" });
+  }
+  var MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function parseISO(s) {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  }
+  function iso(d) {
+    return d.toISOString().slice(0, 10);
+  }
+  function addDays(d, n2) {
+    return new Date(d.getTime() + n2 * 864e5);
+  }
+  function diffDays(a, b) {
+    return Math.round((b.getTime() - a.getTime()) / 864e5);
   }
 
   // src/util/status.ts
@@ -2047,14 +2140,14 @@
         const shortcut = (label, offsetDays) => {
           const d = /* @__PURE__ */ new Date();
           d.setDate(d.getDate() - offsetDays);
-          const iso = toLocalISO(d);
+          const iso2 = toLocalISO(d);
           const b = quick2.createEl("button", { cls: "reel-chip", text: label });
           b.addEventListener("click", () => {
-            this.date = iso;
-            dateInput.value = iso;
+            this.date = iso2;
+            dateInput.value = iso2;
             paintChips();
           });
-          chips.push({ el: b, iso });
+          chips.push({ el: b, iso: iso2 });
         };
         const paintChips = () => chips.forEach((c) => c.el.toggleClass("is-active", c.iso === this.date));
         shortcut("Today", 0);
@@ -4123,9 +4216,9 @@
   // src/reviews.ts
   var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
   function dateFromHeading(heading) {
-    const iso = /(\d{4})-(\d{2})-(\d{2})/.exec(heading);
-    if (iso)
-      return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const iso2 = /(\d{4})-(\d{2})-(\d{2})/.exec(heading);
+    if (iso2)
+      return `${iso2[1]}-${iso2[2]}-${iso2[3]}`;
     const pretty = /\b(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})\b/.exec(heading);
     if (pretty) {
       const month = MONTHS.indexOf(pretty[2].slice(0, 3).toLowerCase());
@@ -4344,48 +4437,34 @@ ${body}
       modalEl.addClass("reel-modal");
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
+      modalEl.addClass("reel-review-sheet");
       contentEl.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
       contentEl.createDiv({ cls: "reel-log-sub", text: this.entry.title });
-      const dateRow = contentEl.createDiv({ cls: "reel-field" });
-      dateRow.createDiv({ cls: "reel-field-label", text: "Date" });
-      const dateEl = dateRow.createEl("input", { cls: "reel-input", attr: { type: "date" } });
-      dateEl.value = this.date;
-      dateEl.disabled = this.review != null;
-      dateEl.addEventListener("change", () => this.date = dateEl.value);
-      const rateRow = contentEl.createDiv({ cls: "reel-field" });
-      rateRow.createDiv({ cls: "reel-field-label", text: "Rating" });
-      const stars2 = rateRow.createDiv({ cls: "reel-chips" });
-      const paintStars = () => {
-        stars2.empty();
-        const none = stars2.createEl("button", { cls: "reel-chip", text: "\u2014", attr: { type: "button" } });
-        none.toggleClass("is-active", this.rating == null);
-        none.addEventListener("click", () => {
-          this.rating = void 0;
-          paintStars();
-        });
-        for (let r = STEP; r <= MAX_STARS; r += STEP) {
-          const b = stars2.createEl("button", { cls: "reel-chip", text: String(r), attr: { type: "button" } });
-          b.toggleClass("is-active", this.rating === r);
-          b.addEventListener("click", () => {
-            this.rating = r;
-            paintStars();
-          });
-        }
-      };
-      paintStars();
       const box = contentEl.createEl("textarea", {
         cls: "reel-input reel-review-box",
-        attr: { rows: "8", placeholder: "What did you think?" }
+        attr: { rows: "6", placeholder: "What did you think?" }
       });
       box.value = this.text;
       box.addEventListener("input", () => this.text = box.value);
+      const meta = contentEl.createDiv({ cls: "reel-review-meta" });
+      meta.createDiv({ cls: "reel-field-label", text: "Rating" });
+      renderStars(meta, {
+        value: this.rating,
+        onChange: (v) => {
+          this.rating = v;
+        }
+      });
+      meta.createDiv({ cls: "reel-field-label", text: "Date" });
+      const dateEl = meta.createEl("input", { cls: "reel-input reel-review-date", attr: { type: "date" } });
+      dateEl.value = this.date;
+      dateEl.disabled = this.review != null;
+      dateEl.addEventListener("change", () => this.date = dateEl.value);
       const actions = contentEl.createDiv({ cls: "reel-actions" });
       const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel", attr: { type: "button" } });
       cancel.addEventListener("click", () => this.close());
       const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Save", attr: { type: "button" } });
       save.addEventListener("click", () => void this.save(save));
-      if (!Platform.isPhone)
-        window.setTimeout(() => box.focus(), 0);
+      window.setTimeout(() => box.focus(), 0);
     }
     async save(button) {
       if (this.saving)
@@ -4424,8 +4503,8 @@ ${body}
   };
 
   // src/ui/detail.ts
-  function flagEmoji(iso) {
-    const code = iso.trim().toUpperCase();
+  function flagEmoji(iso2) {
+    const code = iso2.trim().toUpperCase();
     if (!/^[A-Z]{2}$/.test(code))
       return "";
     return String.fromCodePoint(...[...code].map((c) => 127462 + c.charCodeAt(0) - 65));
@@ -6742,6 +6821,26 @@ ${body}
     const wrap = root.createDiv({ cls: "reel-gridwrap is-dense" });
     renderPosterGrid(plugin, wrap, [...all, ...all, ...all]);
   }
+  function searching(root) {
+    root.addClass("is-searching");
+    const header = root.createDiv({ cls: "reel-view-header" });
+    const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
+    navBtn.createSpan({ cls: "reel-nav-icon", text: "\u25A3" });
+    navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
+    navBtn.createSpan({ cls: "reel-nav-chevron", text: "\u25BE" });
+    const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
+    wrap.createSpan({ cls: "reel-search-icon", text: "\u2315" });
+    const input = wrap.createEl("input", {
+      cls: "reel-input reel-search-input",
+      attr: { type: "search", placeholder: "Search titles, people, characters, plots\u2026" }
+    });
+    input.value = "the dog";
+    wrap.createEl("button", { cls: "reel-search-clear clickable-icon", text: "\xD7" });
+    const filters = root.createDiv({ cls: "reel-view-filters" });
+    filterBar(filters, ["\u201Cthe dog\u201D"]);
+    const body = root.createDiv({ cls: "reel-view-body" });
+    renderPosterGrid(plugin, body, all.slice(0, 6));
+  }
   function rows(root) {
     root.addClass("reel-view-body");
     renderRowList(plugin, root, all.slice(0, 8));
@@ -6836,6 +6935,7 @@ ${body}
   var SCREENS = {
     library,
     dense,
+    searching,
     feed,
     filterSheet,
     reviews,
@@ -6889,7 +6989,8 @@ ${body}
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
     stampWidth(view, measure(view) || window.innerWidth);
-    const target = name === "library" ? view : view.createDiv({ cls: "reel-view-body" });
+    const FULL_VIEW = /* @__PURE__ */ new Set(["library", "searching"]);
+    const target = FULL_VIEW.has(name) ? view : view.createDiv({ cls: "reel-view-body" });
     try {
       (SCREENS[name] ?? library)(target);
     } catch (e) {

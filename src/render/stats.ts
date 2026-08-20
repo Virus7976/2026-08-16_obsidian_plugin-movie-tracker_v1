@@ -292,6 +292,8 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		if (best && best[1] > 1) tile("Busiest day", `${best[1]} films`, prettyDate(best[0]));
 	}
 
+	if (watched.length > 4) paintHeatmap(plugin, el, watched, opts, show);
+
 	/* ---- superlatives -------------------------------------------------- */
 	// These describe what you have *seen*, so they run over the watched set
 	// rather than the whole library. Using every film put a watchlist title
@@ -1012,3 +1014,162 @@ export function parseOptions(source: string): StatsOptions {
 }
 
 
+
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * A year of viewing, as a shape.
+ *
+ * Every other chart on this page is a ranking — your top genres, your top
+ * actors, the months with the most films in them. Rankings answer "what" and
+ * none of them answers "when": whether you watch in bursts or steadily, which
+ * months you lost, how long the current run is. That is a different question
+ * and it wants a different picture.
+ *
+ * Days as rows and weeks as columns, which is the arrangement everyone already
+ * knows how to read — a year fits in one glance and the gaps are as legible as
+ * the runs. Colour comes from the accent the page already pulled off your most
+ * recent poster, so it belongs to this page rather than being a chart library's
+ * idea of green.
+ */
+function paintHeatmap(
+	plugin: ReelPlugin,
+	el: HTMLElement,
+	watched: { date: string; entry: Entry }[],
+	opts: StatsOptions,
+	show: (heading: string, entries: Entry[], note?: string) => () => void
+): void {
+	const perDay = new Map<string, Entry[]>();
+	for (const v of watched) {
+		const list = perDay.get(v.date);
+		if (list) list.push(v.entry);
+		else perDay.set(v.date, [v.entry]);
+	}
+
+	const dates = [...perDay.keys()].sort();
+	const lastISO = dates[dates.length - 1];
+	if (!lastISO) return;
+
+	/*
+	 * The window ends at the last thing you watched, not at today.
+	 *
+	 * A library that has not been logged in since March should show March's
+	 * activity, not four blank months followed by a chart that looks broken.
+	 * When a year is selected the window is that year exactly, because that is
+	 * what the filter means.
+	 */
+	const end = opts.year ? new Date(Date.UTC(opts.year, 11, 31)) : parseISO(lastISO);
+	const start = opts.year ? new Date(Date.UTC(opts.year, 0, 1)) : addDays(end, -363);
+	// Weeks run Monday to Sunday, so the grid starts on the Monday on or before
+	// the window opens or the first column is a ragged half-week.
+	const gridStart = addDays(start, -((start.getUTCDay() + 6) % 7));
+	const weeks = Math.ceil((diffDays(gridStart, end) + 1) / 7);
+
+	const box = el.createDiv({ cls: "reel-chart reel-heatmap-box" });
+	const head = box.createDiv({ cls: "reel-heatmap-head" });
+	head.createDiv({ cls: "reel-chart-title", text: opts.year ? `${opts.year}, day by day` : "The last year" });
+
+	const busiest = [...perDay.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+	const peak = Math.max(1, busiest ? busiest[1].length : 1);
+	const active = [...perDay.keys()].filter((d) => d >= iso(start) && d <= iso(end)).length;
+	head.createDiv({
+		cls: "reel-heatmap-sub",
+		text: `${active} ${active === 1 ? "day" : "days"} with something on`,
+	});
+
+	const scroll = box.createDiv({ cls: "reel-heatmap-scroll" });
+	const grid = scroll.createDiv({ cls: "reel-heatmap-grid" });
+	grid.setCssProps({ "--reel-heat-weeks": String(weeks) });
+
+	/*
+	 * Month labels, placed on the week each month opens in.
+	 *
+	 * Without them the grid is a texture with no scale — you can see that
+	 * something happened but not when. Written only when the month changes, or
+	 * fifty-two labels overlap into a smear.
+	 */
+	const months = grid.createDiv({ cls: "reel-heatmap-months" });
+	let lastMonth = -1;
+	for (let w = 0; w < weeks; w++) {
+		const day = addDays(gridStart, w * 7);
+		const label = months.createDiv({ cls: "reel-heatmap-month" });
+		if (day.getUTCMonth() !== lastMonth && day.getUTCDate() <= 7) {
+			lastMonth = day.getUTCMonth();
+			label.setText(MONTH_SHORT[lastMonth]);
+		}
+	}
+
+	const cells = grid.createDiv({ cls: "reel-heatmap-cells" });
+	for (let w = 0; w < weeks; w++) {
+		const col = cells.createDiv({ cls: "reel-heatmap-week" });
+		for (let d = 0; d < 7; d++) {
+			const day = addDays(gridStart, w * 7 + d);
+			const key = iso(day);
+			const cell = col.createDiv({ cls: "reel-heatmap-cell" });
+
+			// Outside the window is not the same as "nothing that day", and a
+			// grid that renders them identically is lying about its edges.
+			if (day < start || day > end) {
+				cell.addClass("is-outside");
+				continue;
+			}
+
+			const hits = perDay.get(key) ?? [];
+			if (!hits.length) continue;
+
+			// Four steps, not a continuous ramp: the eye cannot rank thirty
+			// shades, and every one of these is a small square.
+			const level = Math.min(4, Math.ceil((hits.length / peak) * 4));
+			cell.addClass(`is-l${level}`);
+			cell.setAttr("title", `${prettyDate(key)} — ${hits.length} ${hits.length === 1 ? "film" : "films"}`);
+			cell.setAttr("role", "button");
+			cell.setAttr("tabindex", "0");
+			cell.setAttr("aria-label", `${prettyDate(key)}, ${hits.length} watched`);
+			const open = show(prettyDate(key), hits, `${hits.length} watched that day`);
+			cell.addEventListener("click", open);
+			cell.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key !== "Enter" && ev.key !== " ") return;
+				ev.preventDefault();
+				open();
+			});
+		}
+	}
+
+	// A key, because four unlabelled shades of the same colour is a decoration
+	// rather than a scale.
+	const legend = box.createDiv({ cls: "reel-heatmap-legend" });
+	legend.createSpan({ cls: "reel-dim", text: "Less" });
+	for (let l = 0; l <= 4; l++) {
+		legend.createDiv({ cls: `reel-heatmap-cell${l ? ` is-l${l}` : ""}` });
+	}
+	legend.createSpan({ cls: "reel-dim", text: "More" });
+}
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/*
+ * UTC throughout.
+ *
+ * A date-only string parsed as local time lands on the previous day west of
+ * Greenwich, which would put every viewing in the wrong cell for half the
+ * world — and, worse, only for half the year in places that observe daylight
+ * saving. The dates in frontmatter are calendar days with no timezone, so they
+ * are read and written as such.
+ */
+function parseISO(s: string): Date {
+	const [y, m, d] = s.split("-").map(Number);
+	return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+}
+
+function iso(d: Date): string {
+	return d.toISOString().slice(0, 10);
+}
+
+function addDays(d: Date, n: number): Date {
+	return new Date(d.getTime() + n * 86_400_000);
+}
+
+function diffDays(a: Date, b: Date): number {
+	return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}

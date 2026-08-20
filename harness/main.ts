@@ -440,6 +440,44 @@ function dense(root: HTMLElement): void {
 	renderPosterGrid(plugin, wrap, [...all, ...all, ...all]);
 }
 
+/**
+ * The library mid-search, with the field docked against the keyboard.
+ *
+ * Obsidian's own mobile search puts the input at the bottom and lets results
+ * fill upward, and that is the shape being copied: the thumb is already down
+ * there, and a field at the top spends its life in a fight with the thing
+ * covering half the screen.
+ *
+ * The audit's job here is the one that matters — `controlsNotCovered`. A fixed
+ * element over a scrolling list is exactly how the search field ended up
+ * underneath Obsidian's header in the first place, and this is the same trick
+ * pointed the other way.
+ */
+function searching(root: HTMLElement): void {
+	root.addClass("is-searching");
+
+	const header = root.createDiv({ cls: "reel-view-header" });
+	const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
+	navBtn.createSpan({ cls: "reel-nav-icon", text: "▣" });
+	navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
+	navBtn.createSpan({ cls: "reel-nav-chevron", text: "▾" });
+
+	const wrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
+	wrap.createSpan({ cls: "reel-search-icon", text: "⌕" });
+	const input = wrap.createEl("input", {
+		cls: "reel-input reel-search-input",
+		attr: { type: "search", placeholder: "Search titles, people, characters, plots…" },
+	});
+	input.value = "the dog";
+	wrap.createEl("button", { cls: "reel-search-clear clickable-icon", text: "×" });
+
+	const filters = root.createDiv({ cls: "reel-view-filters" });
+	filterBar(filters, ["“the dog”"]);
+
+	const body = root.createDiv({ cls: "reel-view-body" });
+	renderPosterGrid(plugin, body, all.slice(0, 6));
+}
+
 function rows(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	renderRowList(plugin, root, all.slice(0, 8));
@@ -573,6 +611,7 @@ function logsheet(root: HTMLElement): void {
 const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	library,
 	dense,
+	searching,
 	feed,
 	filterSheet,
 	reviews,
@@ -721,7 +760,18 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	 * child of `.reel-view`, so it cannot take the sizing that governs the real
 	 * one — and a check written about the real body was reporting on a fake.
 	 */
-	const target = name === "library" ? view : view.createDiv({ cls: "reel-view-body" });
+	/*
+	 * Screens that build a whole view — header, filters and body — take the view
+	 * root. Everything else gets a body to draw into.
+	 *
+	 * A list rather than one name, because adding `searching` reproduced the
+	 * exact defect the paragraph above describes: it built its own
+	 * `.reel-view-body` inside the one handed to it, and `bodyScrollsNotClips`
+	 * dutifully reported 917px in an 812px view. The number was real and it was
+	 * measuring the rig.
+	 */
+	const FULL_VIEW = new Set(["library", "searching"]);
+	const target = FULL_VIEW.has(name) ? view : view.createDiv({ cls: "reel-view-body" });
 	try {
 		(SCREENS[name] ?? library)(target);
 	} catch (e) {

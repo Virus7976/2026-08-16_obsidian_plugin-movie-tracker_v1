@@ -616,24 +616,31 @@ body {
 	color: var(--background-modifier-border);
 }
 
+/* The yellow star sits exactly on top of the grey one. It did not.
+ *
+ * A star is two stacked glyphs — a grey one and a yellow one clipped to the
+ * fraction filled. The grey layer centred its glyph in the box; the yellow
+ * layer left-aligned its own and was then nudged right by 4px. So the two were
+ * offset by a few pixels at every size, and what you saw was a grey star with a
+ * yellow star slightly beside it: "two stars on each star". At 12px in the
+ * poster grid the offset is a third of the glyph.
+ *
+ * The cause was resizing the *box* to clip. `width: 50%` narrows the flex
+ * container, which moves where its centred content lands — so the clip and the
+ * alignment fought each other. `clip-path` cuts the painted result and leaves
+ * the box alone, so both layers keep identical geometry and only the visible
+ * fraction changes. */
 .reel-star-fg {
 	color: var(--color-yellow, var(--interactive-accent));
-	width: 0;
-	overflow: hidden;
-	justify-content: flex-start;
-	padding-left: 0;
-}
-
-.reel-stars:not(.is-readonly) .reel-star-fg {
-	padding-left: var(--reel-space-1);
+	clip-path: inset(0 100% 0 0);
 }
 
 .reel-star.is-half .reel-star-fg {
-	width: 50%;
+	clip-path: inset(0 50% 0 0);
 }
 
 .reel-star.is-full .reel-star-fg {
-	width: 100%;
+	clip-path: none;
 }
 
 .reel-rating-row {
@@ -9282,4 +9289,267 @@ input.reel-input {
 	padding-right: var(--reel-space-3);
 	margin-left: 0;
 	margin-right: 0;
+}
+
+
+/* The review box is the point of the sheet, so it gets the room.
+ *
+ * With a keyboard open on a 384px phone the sheet has roughly 250px above the
+ * keys, and the box was below a title, a subtitle, a date field and ten rating
+ * chips — so it was entirely off screen and you could not see a word you were
+ * typing. The box is first now, the metadata is one row under it, and the
+ * actions are pinned. */
+.reel-review-sheet .reel-review-box {
+	flex: 1 1 auto;
+	min-height: 7em;
+	width: 100%;
+	resize: none;
+}
+
+.reel-review-sheet {
+	display: flex;
+	flex-direction: column;
+}
+
+.reel-review-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-3);
+	flex-wrap: wrap;
+	padding-top: var(--reel-space-2);
+}
+
+.reel-review-meta .reel-field-label {
+	margin: 0;
+}
+
+.reel-review-date {
+	flex: 0 0 auto;
+	max-width: 11em;
+}
+
+/* Pinned, so "Save" never scrolls away behind the keyboard. */
+.reel-review-sheet .reel-actions {
+	position: sticky;
+	bottom: 0;
+	background: var(--background-primary);
+	padding-top: var(--reel-space-2);
+	margin-top: auto;
+}
+
+
+/* ================================================================== *
+ * A year of viewing, as a shape                                       *
+ *                                                                     *
+ * Every other chart here is a ranking, and no ranking answers "when". *
+ * Days down, weeks across — the arrangement everyone can already read.*
+ * ================================================================== */
+
+.reel-heatmap-box {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2);
+	min-width: 0;
+}
+
+.reel-heatmap-head {
+	display: flex;
+	align-items: baseline;
+	gap: var(--reel-space-2);
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.reel-heatmap-sub {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-left: auto;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Fifty-two weeks will not fit across a phone at a tappable size, so it
+   scrolls — and it starts scrolled to the right, because the interesting end
+   of a year of viewing is the recent one. */
+.reel-heatmap-scroll {
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+	min-width: 0;
+	max-width: 100%;
+	direction: rtl;
+}
+
+.reel-heatmap-scroll::-webkit-scrollbar {
+	display: none;
+}
+
+.reel-heatmap-grid {
+	direction: ltr;
+	display: inline-flex;
+	flex-direction: column;
+	gap: 3px;
+	/* Sized from the cell so the two rows cannot drift apart. */
+	--reel-heat-cell: 11px;
+	--reel-heat-gap: 2px;
+}
+
+.reel-heatmap-months,
+.reel-heatmap-cells {
+	display: grid;
+	grid-template-columns: repeat(var(--reel-heat-weeks), var(--reel-heat-cell));
+	gap: var(--reel-heat-gap);
+}
+
+.reel-heatmap-month {
+	font-size: 10px;
+	color: var(--text-muted);
+	line-height: 1;
+	white-space: nowrap;
+	/* A label is wider than its column and must be allowed to spill, or every
+	   month reads as "J". It overflows to the right, into weeks that have no
+	   label of their own. */
+	overflow: visible;
+}
+
+.reel-heatmap-week {
+	display: grid;
+	grid-template-rows: repeat(7, var(--reel-heat-cell));
+	gap: var(--reel-heat-gap);
+}
+
+.reel-heatmap-cell {
+	width: var(--reel-heat-cell);
+	height: var(--reel-heat-cell);
+	border-radius: 2px;
+	background: var(--background-modifier-border);
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* Outside the window is not "nothing happened", and a grid that draws them
+   the same way is lying about its own edges. */
+.reel-heatmap-cell.is-outside {
+	background: transparent;
+}
+
+/* Four steps rather than a continuous ramp: nobody can rank thirty shades,
+   and every one of these is an 11px square. The colour is the accent this
+   page already pulled off your most recent poster, so the chart belongs to
+   the page instead of to a chart library. */
+.reel-heatmap-cell.is-l1 {
+	background: hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 0.3);
+}
+
+.reel-heatmap-cell.is-l2 {
+	background: hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 0.52);
+}
+
+.reel-heatmap-cell.is-l3 {
+	background: hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 0.76);
+}
+
+.reel-heatmap-cell.is-l4 {
+	background: var(--interactive-accent);
+}
+
+.reel-heatmap-cell[role="button"] {
+	cursor: pointer;
+}
+
+.reel-heatmap-cell[role="button"]:active {
+	transform: scale(0.86);
+}
+
+.reel-heatmap-cell:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+.reel-heatmap-legend {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-heatmap-legend .reel-dim {
+	font-size: 10px;
+}
+
+.reel-heatmap-legend .reel-dim:first-child {
+	margin-right: var(--reel-space-1);
+}
+
+.reel-heatmap-legend .reel-dim:last-child {
+	margin-left: var(--reel-space-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-heatmap-cell[role="button"]:active {
+		transform: none;
+	}
+}
+
+/* ================================================================== *
+ * Typing happens at the bottom of the screen                          *
+ *                                                                     *
+ * Obsidian's own mobile search puts the field against the keyboard    *
+ * and lets results fill upward, and it is the right shape: the thumb  *
+ * is already down there, and a field at the top is permanently in a   *
+ * fight with the thing covering half the screen. Reel's search sat at *
+ * the top, which is the whole history of "there's a white box over    *
+ * where I need to look".                                              *
+ * ================================================================== */
+
+.reel-view.is-phone.is-searching .reel-search-wrap,
+.reel-view.is-narrow.is-searching .reel-search-wrap {
+	position: fixed;
+	left: var(--reel-space-3);
+	right: var(--reel-space-3);
+	/* No `--reel-keyboard` here on purpose. This device reports no keyboard at
+	   all through visualViewport — two releases were gated on that and neither
+	   ever ran. Android shrinks the layout viewport instead, so the bottom of
+	   the page *is* the top of the keyboard, and the plain answer is the one
+	   that works. */
+	bottom: calc(var(--reel-space-3) + env(safe-area-inset-bottom));
+	z-index: var(--layer-popover, 30);
+	margin: 0;
+	width: auto;
+}
+
+/* The pill. Bigger than the inline field was, because it is now the only
+   control on its row and the one thing you are looking at. */
+.reel-view.is-phone.is-searching .reel-search-wrap {
+	min-height: 52px;
+	border-radius: var(--reel-radius-full);
+	border: 1px solid var(--background-modifier-border-hover);
+	background: var(--background-primary);
+	box-shadow: var(--reel-shadow-raised, 0 6px 24px rgb(0 0 0 / 0.18));
+	padding-left: var(--reel-space-4);
+	padding-right: var(--reel-space-2);
+}
+
+.reel-view.is-phone.is-searching .reel-search-input {
+	font-size: var(--font-ui-medium);
+}
+
+/* The clear button becomes the filled circle it is in Obsidian's own search,
+   which is what makes the row read as finished rather than as an input with a
+   cross next to it. */
+.reel-view.is-phone.is-searching .reel-search-clear {
+	width: 30px;
+	height: 30px;
+	border-radius: 999px;
+	background: var(--background-modifier-border-hover);
+	color: var(--text-on-accent, var(--text-normal));
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+}
+
+/* The last result must clear the docked field, or the thing you searched for
+   is the thing hidden behind the search box. */
+.reel-view.is-phone.is-searching .reel-view-body,
+.reel-view.is-narrow.is-searching .reel-view-body {
+	padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
