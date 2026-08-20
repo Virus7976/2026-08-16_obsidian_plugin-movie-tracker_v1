@@ -64,6 +64,45 @@ export function paintTrailer(slot: HTMLElement, url: string): void {
  * different and much worse thing than a direct link, so when the id is missing
  * the links are simply absent.
  */
+/**
+ * The artwork, behind the sheet.
+ *
+ * The detail hero and the person sheet each grew their own version of this and
+ * it is the thing that makes both of them feel like they are about something
+ * rather than being a form with a title at the top. Every other sheet in the
+ * app is about exactly one title too, and each was a flat panel.
+ *
+ * Two layers, and the second is the one that matters. A blurred, saturated
+ * copy of the poster gives the sheet the film's own colour; a scrim in the
+ * *theme's* background colour then sits on top of it, and all the text sits on
+ * the scrim. So the sheet is tinted by the artwork without any text ever being
+ * asked to be legible against a photograph nobody chose for contrast — which
+ * is the difference between this and the translucent filter bar that had to be
+ * taken out again.
+ *
+ * Absent artwork means no wash at all, rather than a grey smear.
+ */
+export function paintWash(host: HTMLElement, url: string | null | undefined): void {
+	if (!url) return;
+	host.addClass("has-wash");
+	/*
+	 * Two elements, because the blurred layer has to overhang and the overhang
+	 * has to be clipped.
+	 *
+	 * A wide blur samples past its own edges, so the art is inset by a negative
+	 * amount to keep a pale halo off all four sides. Left as a direct child
+	 * that overhang is real overflow: on a desktop pane, where the sheet is not
+	 * the full width of the window, it made the page 46px wider than the
+	 * viewport and three screens started scrolling sideways.
+	 *
+	 * The wrapper sits exactly on the host and clips. It cannot be the host
+	 * itself, which has a sticky foot inside it — giving that `overflow:
+	 * hidden` would make it the scroll container and unstick the buttons.
+	 */
+	const wash = host.createDiv({ cls: "reel-sheet-wash" });
+	wash.createDiv({ cls: "reel-sheet-wash-art" }).setCssProps({ "--reel-wash": `url("${url}")` });
+}
+
 export function paintLinks(slot: HTMLElement, meta: TmdbFilm | TmdbShow, isTv: boolean): void {
 	const row = slot.createDiv({ cls: "reel-preview-links" });
 	const link = (text: string, href: string): void => {

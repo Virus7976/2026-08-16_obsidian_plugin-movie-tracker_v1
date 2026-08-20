@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.22",
+		date: "2026-08-20",
+		headline: "Every sheet about one title now carries that title's colour.",
+		changes: [
+			{
+				kind: "new",
+				text: "The blurred artwork behind the detail screen now sits behind the preview, log and season sheets too.",
+				note: "Each of those was a flat panel about a specific film. The poster is blurred and desaturated behind the sheet, with a scrim in your theme's own colour on top, so the sheet takes the film's colour and no text is ever asked to be legible against a photograph.",
+			},
+			{
+				kind: "better",
+				text: "The wash is absent rather than grey when a title has no artwork.",
+			},
+		],
+	},
+	{
 		version: "0.8.21",
 		date: "2026-08-20",
 		headline: "A typography and materials pass: numbers that line up, surfaces that read as surfaces.",

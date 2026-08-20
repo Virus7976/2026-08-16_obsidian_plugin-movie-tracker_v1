@@ -17,6 +17,7 @@ import { redact } from "../secrets";
 import { formatRange, parseRange } from "../util/ranges";
 import { prettyDate } from "../util/dates";
 import { renderStars } from "./stars";
+import { paintWash } from "./titleExtras";
 
 export class SeasonSheet extends Modal {
 	private watched: Set<number>;
@@ -43,6 +44,7 @@ export class SeasonSheet extends Modal {
 		modalEl.addClass("reel-modal");
 		if (Platform.isPhone) modalEl.addClass("reel-sheet");
 		contentEl.addClass("reel-season");
+		paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
 
 		const head = contentEl.createDiv({ cls: "reel-season-head" });
 		head.createEl("h3", { text: `${this.entry.title} — Season ${this.season}` });

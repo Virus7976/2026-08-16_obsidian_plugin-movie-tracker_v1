@@ -29,7 +29,7 @@ import { haptic } from "../util/haptics";
 import { setSelected } from "./a11y";
 import { diagnoseError } from "./failure";
 import { gestureIntent } from "../util/gesture";
-import { paintExtras, paintLinks as paintLinksShared, paintTrailer as paintTrailerShared, paintCast } from "./titleExtras";
+import { paintExtras, paintLinks as paintLinksShared, paintTrailer as paintTrailerShared, paintCast, paintWash } from "./titleExtras";
 
 interface Filters {
 	genreId: number | null;
@@ -1497,6 +1497,7 @@ export class PreviewSheet extends Modal {
 		modalEl.addClass("reel-modal");
 		if (Platform.isPhone) modalEl.addClass("reel-sheet");
 		contentEl.addClass("reel-preview");
+		paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
 
 		const isTv = this.item.media_type === "tv";
 		const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";

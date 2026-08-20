@@ -12115,3 +12115,75 @@ input.reel-input {
 .reel-modal.reel-sheet .reel-recipe-steps {
 	margin-bottom: var(--reel-space-1);
 }
+
+
+/* ==================================================================== */
+/* The artwork wash, on every sheet that is about one title             */
+/* ==================================================================== */
+
+/*
+ * Same two layers as the detail hero and the person sheet, stated once.
+ *
+ * The blur is large and the scale slightly over 1 so the sample never runs
+ * out at the edges — a blur this wide reads the pixels beyond its own box and
+ * leaves a pale halo on all four sides without the overhang.
+ */
+.reel-modal .reel-sheet-wash {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	overflow: hidden;
+	pointer-events: none;
+	border-radius: inherit;
+}
+
+.reel-modal .reel-sheet-wash-art {
+	position: absolute;
+	inset: -60px;
+	background-image: var(--reel-wash);
+	background-size: cover;
+	background-position: center 20%;
+	filter: blur(38px) saturate(1.35);
+	opacity: 0.5;
+}
+
+/*
+ * The scrim, in the theme's own background colour.
+ *
+ * This is what everything above it is legible against. Slightly lighter at the
+ * top, where the poster and the title are, and close to opaque by the bottom,
+ * where the controls live and there is nothing to gain from colour.
+ */
+.reel-modal .reel-sheet-wash::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to bottom,
+		rgb(from var(--background-primary) r g b / 0.50),
+		rgb(from var(--background-primary) r g b / 0.88)
+	);
+}
+
+/* Relative colour syntax is recent, and without it the whole declaration is
+   dropped and the sheet's text would sit on a raw blurred photograph. */
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-modal .reel-sheet-wash::after {
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.78));
+	}
+}
+
+/* The host has to establish a stacking context, or a `z-index: -1` child is
+   painted behind the sheet itself and disappears. */
+.reel-modal .reel-preview.has-wash,
+.reel-modal .reel-season.has-wash,
+.reel-modal .reel-log.has-wash {
+	position: relative;
+	isolation: isolate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-modal .reel-sheet-wash-art {
+		filter: blur(38px);
+	}
+}

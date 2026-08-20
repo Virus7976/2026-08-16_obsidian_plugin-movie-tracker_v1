@@ -19,6 +19,7 @@ import type { Entry } from "../types";
 import { redact } from "../secrets";
 import { prettyDate, todayISO } from "../util/dates";
 import { renderStars } from "./stars";
+import { paintWash } from "./titleExtras";
 
 interface PendingAdd {
 	id: number;
@@ -57,6 +58,7 @@ export class LogSheet extends Modal {
 		modalEl.addClass("reel-modal");
 		if (Platform.isPhone) modalEl.addClass("reel-sheet");
 		contentEl.addClass("reel-log");
+		if (this.opts.entry) paintWash(contentEl, this.plugin.posters.displayUrl(this.opts.entry));
 
 		const isTv = (this.opts.entry?.type ?? this.opts.pending?.type) === "tv";
 		const title = this.opts.entry?.title ?? this.opts.pending?.title ?? "";

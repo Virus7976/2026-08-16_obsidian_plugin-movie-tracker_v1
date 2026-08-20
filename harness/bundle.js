@@ -1840,6 +1840,138 @@
     return Math.round((b.getTime() - a.getTime()) / 864e5);
   }
 
+  // src/extract.ts
+  function trailerUrl(videos) {
+    if (!videos?.length)
+      return void 0;
+    const youtube = videos.filter((v) => v.site === "YouTube" && v.key);
+    const pick = youtube.find((v) => v.type === "Trailer" && v.official) ?? youtube.find((v) => v.type === "Trailer") ?? youtube.find((v) => v.type === "Teaser") ?? youtube[0];
+    return pick?.key ? `https://www.youtube.com/watch?v=${pick.key}` : void 0;
+  }
+  function providerNames(block, region) {
+    const results = block?.results;
+    const row = results?.[region];
+    if (!row)
+      return [];
+    const names = [...row.flatrate ?? [], ...row.free ?? []].map((p) => p.provider_name);
+    return [...new Set(names)];
+  }
+  function keywordNames(film2) {
+    const asFilm = film2.keywords?.keywords;
+    const asShow = film2.keywords?.results;
+    return (asFilm ?? asShow ?? []).map((k) => k.name).filter(Boolean);
+  }
+  function imdbUrl(imdbId) {
+    return imdbId ? `https://www.imdb.com/title/${imdbId}/` : void 0;
+  }
+  function tmdbUrl(tmdbId, type) {
+    return `https://www.themoviedb.org/${type === "tv" ? "tv" : "movie"}/${tmdbId}`;
+  }
+
+  // src/ui/titleExtras.ts
+  function paintTrailer(slot, url) {
+    const id = /[?&]v=([\w-]{6,})/.exec(url)?.[1] ?? /youtu\.be\/([\w-]{6,})/.exec(url)?.[1];
+    if (!id) {
+      const link = slot.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", text: "\u25B6  Watch trailer", href: url });
+      link.setAttr("target", "_blank");
+      link.setAttr("rel", "noopener");
+      return;
+    }
+    const box = slot.createDiv({ cls: "reel-trailer" });
+    const play = box.createEl("button", { cls: "reel-trailer-play", attr: { type: "button" } });
+    play.createEl("img", { attr: { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "", loading: "lazy" } });
+    play.createDiv({ cls: "reel-trailer-icon", text: "\u25B6" });
+    play.setAttr("aria-label", "Play the trailer");
+    play.addEventListener("click", () => {
+      const frame = box.createEl("iframe", {
+        cls: "reel-trailer-frame",
+        attr: {
+          src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`,
+          title: "Trailer",
+          allow: "accelerometer; autoplay; encrypted-media; picture-in-picture",
+          allowfullscreen: "true",
+          frameborder: "0"
+        }
+      });
+      play.remove();
+      frame.focus();
+    });
+  }
+  function paintWash(host, url) {
+    if (!url)
+      return;
+    host.addClass("has-wash");
+    const wash = host.createDiv({ cls: "reel-sheet-wash" });
+    wash.createDiv({ cls: "reel-sheet-wash-art" }).setCssProps({ "--reel-wash": `url("${url}")` });
+  }
+  function paintLinks(slot, meta, isTv) {
+    const row = slot.createDiv({ cls: "reel-preview-links" });
+    const link = (text, href) => {
+      const a = row.createEl("a", { cls: "reel-chip", text, href });
+      a.setAttr("target", "_blank");
+      a.setAttr("rel", "noopener");
+    };
+    const raw = meta.external_ids?.imdb_id ?? meta.imdb_id ?? void 0;
+    const imdb = imdbUrl(raw ?? void 0);
+    if (imdb) {
+      link("IMDb", imdb);
+      link("Parents guide", `${imdb}parentalguide`);
+    }
+    link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
+  }
+  function paintCast(plugin2, slot, meta, isTv) {
+    const credits = isTv ? meta.aggregate_credits : meta.credits;
+    const cast = (credits?.cast ?? []).slice(0, 12);
+    if (!cast.length)
+      return;
+    const strip = slot.createDiv({ cls: "reel-caststrip" }).createDiv({ cls: "reel-caststrip-track" });
+    for (const person of cast) {
+      const card = strip.createDiv({ cls: "reel-castcard" });
+      const face = card.createDiv({ cls: "reel-castface" });
+      const src = person.profile_path ? plugin2.tmdb.posterUrl(person.profile_path, "w185") : null;
+      if (src)
+        face.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
+      else
+        plugin2.people.attach(face, person.name);
+      const held = opinionOf(plugin2, person.id);
+      if (held) {
+        const mark = face.createDiv({ cls: "reel-castmark" });
+        if (held.rating != null)
+          mark.createSpan({ text: `\u2605 ${held.rating}` });
+        else if (held.liked)
+          mark.createSpan({ cls: "reel-castmark-heart", text: "\u2665" });
+      }
+      card.createDiv({ cls: "reel-castname", text: person.name });
+      const role = Array.isArray(person.roles) ? (person.roles ?? []).map((r) => r.character).join(", ") : person.character;
+      if (role)
+        card.createDiv({ cls: "reel-castrole", text: role });
+    }
+  }
+  async function paintExtras(plugin2, slot, id, isTv) {
+    try {
+      const meta = isTv ? await plugin2.tmdb.getShow(id) : await plugin2.tmdb.getFilm(id);
+      const url = trailerUrl(meta.videos?.results);
+      if (url)
+        paintTrailer(slot, url);
+      paintCast(plugin2, slot, meta, isTv);
+      paintLinks(slot, meta, isTv);
+    } catch {
+    }
+  }
+  async function paintTrailerFor(plugin2, slot, id, isTv, known) {
+    if (known) {
+      paintTrailer(slot, known);
+      return;
+    }
+    try {
+      const meta = isTv ? await plugin2.tmdb.getShow(id) : await plugin2.tmdb.getFilm(id);
+      const url = trailerUrl(meta.videos?.results);
+      if (url)
+        paintTrailer(slot, url);
+    } catch {
+    }
+  }
+
   // src/util/status.ts
   var FROZEN_STATUSES = /* @__PURE__ */ new Set(["dropped", "paused", "watchlist"]);
   function nextShowStatus(current, watchedCount, total) {
@@ -1870,6 +2002,7 @@
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
       contentEl.addClass("reel-season");
+      paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
       const head = contentEl.createDiv({ cls: "reel-season-head" });
       head.createEl("h3", { text: `${this.entry.title} \u2014 Season ${this.season}` });
       const counter = head.createDiv({ cls: "reel-season-count" });
@@ -2232,6 +2365,8 @@
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
       contentEl.addClass("reel-log");
+      if (this.opts.entry)
+        paintWash(contentEl, this.plugin.posters.displayUrl(this.opts.entry));
       const isTv = (this.opts.entry?.type ?? this.opts.pending?.type) === "tv";
       const title = this.opts.entry?.title ?? this.opts.pending?.title ?? "";
       const isNew = !!this.opts.pending;
@@ -2547,34 +2682,6 @@
     }
   };
 
-  // src/extract.ts
-  function trailerUrl(videos) {
-    if (!videos?.length)
-      return void 0;
-    const youtube = videos.filter((v) => v.site === "YouTube" && v.key);
-    const pick = youtube.find((v) => v.type === "Trailer" && v.official) ?? youtube.find((v) => v.type === "Trailer") ?? youtube.find((v) => v.type === "Teaser") ?? youtube[0];
-    return pick?.key ? `https://www.youtube.com/watch?v=${pick.key}` : void 0;
-  }
-  function providerNames(block, region) {
-    const results = block?.results;
-    const row = results?.[region];
-    if (!row)
-      return [];
-    const names = [...row.flatrate ?? [], ...row.free ?? []].map((p) => p.provider_name);
-    return [...new Set(names)];
-  }
-  function keywordNames(film2) {
-    const asFilm = film2.keywords?.keywords;
-    const asShow = film2.keywords?.results;
-    return (asFilm ?? asShow ?? []).map((k) => k.name).filter(Boolean);
-  }
-  function imdbUrl(imdbId) {
-    return imdbId ? `https://www.imdb.com/title/${imdbId}/` : void 0;
-  }
-  function tmdbUrl(tmdbId, type) {
-    return `https://www.themoviedb.org/${type === "tv" ? "tv" : "movie"}/${tmdbId}`;
-  }
-
   // src/util/failure.ts
   function diagnose(status, online) {
     if (!online) {
@@ -2701,103 +2808,6 @@
     if (Math.abs(dx) < HORIZONTAL_MIN || Math.abs(dx) < Math.abs(dy) * STRAIGHTNESS)
       return "none";
     return dx < 0 ? "next" : "previous";
-  }
-
-  // src/ui/titleExtras.ts
-  function paintTrailer(slot, url) {
-    const id = /[?&]v=([\w-]{6,})/.exec(url)?.[1] ?? /youtu\.be\/([\w-]{6,})/.exec(url)?.[1];
-    if (!id) {
-      const link = slot.createEl("a", { cls: "reel-btn mod-cta reel-trailer-btn", text: "\u25B6  Watch trailer", href: url });
-      link.setAttr("target", "_blank");
-      link.setAttr("rel", "noopener");
-      return;
-    }
-    const box = slot.createDiv({ cls: "reel-trailer" });
-    const play = box.createEl("button", { cls: "reel-trailer-play", attr: { type: "button" } });
-    play.createEl("img", { attr: { src: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, alt: "", loading: "lazy" } });
-    play.createDiv({ cls: "reel-trailer-icon", text: "\u25B6" });
-    play.setAttr("aria-label", "Play the trailer");
-    play.addEventListener("click", () => {
-      const frame = box.createEl("iframe", {
-        cls: "reel-trailer-frame",
-        attr: {
-          src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`,
-          title: "Trailer",
-          allow: "accelerometer; autoplay; encrypted-media; picture-in-picture",
-          allowfullscreen: "true",
-          frameborder: "0"
-        }
-      });
-      play.remove();
-      frame.focus();
-    });
-  }
-  function paintLinks(slot, meta, isTv) {
-    const row = slot.createDiv({ cls: "reel-preview-links" });
-    const link = (text, href) => {
-      const a = row.createEl("a", { cls: "reel-chip", text, href });
-      a.setAttr("target", "_blank");
-      a.setAttr("rel", "noopener");
-    };
-    const raw = meta.external_ids?.imdb_id ?? meta.imdb_id ?? void 0;
-    const imdb = imdbUrl(raw ?? void 0);
-    if (imdb) {
-      link("IMDb", imdb);
-      link("Parents guide", `${imdb}parentalguide`);
-    }
-    link("TMDB", tmdbUrl(meta.id, isTv ? "tv" : "film"));
-  }
-  function paintCast(plugin2, slot, meta, isTv) {
-    const credits = isTv ? meta.aggregate_credits : meta.credits;
-    const cast = (credits?.cast ?? []).slice(0, 12);
-    if (!cast.length)
-      return;
-    const strip = slot.createDiv({ cls: "reel-caststrip" }).createDiv({ cls: "reel-caststrip-track" });
-    for (const person of cast) {
-      const card = strip.createDiv({ cls: "reel-castcard" });
-      const face = card.createDiv({ cls: "reel-castface" });
-      const src = person.profile_path ? plugin2.tmdb.posterUrl(person.profile_path, "w185") : null;
-      if (src)
-        face.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-      else
-        plugin2.people.attach(face, person.name);
-      const held = opinionOf(plugin2, person.id);
-      if (held) {
-        const mark = face.createDiv({ cls: "reel-castmark" });
-        if (held.rating != null)
-          mark.createSpan({ text: `\u2605 ${held.rating}` });
-        else if (held.liked)
-          mark.createSpan({ cls: "reel-castmark-heart", text: "\u2665" });
-      }
-      card.createDiv({ cls: "reel-castname", text: person.name });
-      const role = Array.isArray(person.roles) ? (person.roles ?? []).map((r) => r.character).join(", ") : person.character;
-      if (role)
-        card.createDiv({ cls: "reel-castrole", text: role });
-    }
-  }
-  async function paintExtras(plugin2, slot, id, isTv) {
-    try {
-      const meta = isTv ? await plugin2.tmdb.getShow(id) : await plugin2.tmdb.getFilm(id);
-      const url = trailerUrl(meta.videos?.results);
-      if (url)
-        paintTrailer(slot, url);
-      paintCast(plugin2, slot, meta, isTv);
-      paintLinks(slot, meta, isTv);
-    } catch {
-    }
-  }
-  async function paintTrailerFor(plugin2, slot, id, isTv, known) {
-    if (known) {
-      paintTrailer(slot, known);
-      return;
-    }
-    try {
-      const meta = isTv ? await plugin2.tmdb.getShow(id) : await plugin2.tmdb.getFilm(id);
-      const url = trailerUrl(meta.videos?.results);
-      if (url)
-        paintTrailer(slot, url);
-    } catch {
-    }
   }
 
   // src/ui/discoverView.ts
@@ -3967,6 +3977,7 @@
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
       contentEl.addClass("reel-preview");
+      paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
       const isTv = this.item.media_type === "tv";
       const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
       const year = yearOf(isTv ? this.item.first_air_date : this.item.release_date);
