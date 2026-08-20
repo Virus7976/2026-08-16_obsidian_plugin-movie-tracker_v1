@@ -1475,6 +1475,8 @@ class SeenSheet extends Modal {
 /** Preview before committing — for when you want the overview first. */
 export class PreviewSheet extends Modal {
 	private busy = false;
+	/** The sticky foot, kept so it can be put back at the end. */
+	private actionsEl: HTMLElement | null = null;
 
 	constructor(
 		private plugin: ReelPlugin,
@@ -1532,7 +1534,8 @@ export class PreviewSheet extends Modal {
 		// have needed this fetch regardless.
 		void this.loadTrailer(contentEl.createDiv({ cls: "reel-preview-trailer" }), isTv);
 
-		const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+		const actions = contentEl.createDiv({ cls: "reel-log-actions reel-preview-actions" });
+		this.actionsEl = actions;
 		const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
 		later.addEventListener("click", () => void this.add(true, later));
 		const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it" });
@@ -1596,6 +1599,25 @@ export class PreviewSheet extends Modal {
 			this.paintLinks(slot, meta, isTv);
 		} catch {
 			/* neither a trailer nor a provider list is worth interrupting for */
+		} finally {
+			/*
+			 * The sticky foot goes back to being the last thing in the sheet.
+			 *
+			 * It is `position: sticky`, which pins it to the bottom of the
+			 * scroller only for as long as there is content *above* it. Anything
+			 * appended afterwards lands underneath — so the links row ended up
+			 * below the buttons, at the very bottom edge of the screen, half
+			 * cut off, while the cast strip above scrolled under the bar and
+			 * had its names sliced through the middle.
+			 *
+			 * This fill is asynchronous and adds several blocks, and which of
+			 * them land where depends on which slot each one was handed. Rather
+			 * than depend on that ordering holding, the foot re-anchors itself
+			 * once the fill is done. A sticky bottom bar that is not the last
+			 * child is a bug however it got that way.
+			 */
+			const actions = this.actionsEl;
+			if (actions?.parentElement) actions.parentElement.appendChild(actions);
 		}
 	}
 

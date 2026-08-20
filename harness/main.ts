@@ -24,7 +24,7 @@ import { renderEmpty } from "../src/ui/empty";
 import { skeletonCards, skeletonGrid } from "../src/ui/skeleton";
 import { renderStars } from "../src/ui/stars";
 import { DetailScreen } from "../src/ui/detail";
-import { DiscoverScreen } from "../src/ui/discoverView";
+import { DiscoverScreen, PreviewSheet } from "../src/ui/discoverView";
 import { RecipeSheet } from "../src/ui/recipeSheet";
 import { QuickRate } from "../src/ui/quickRate";
 import { RateScreen } from "../src/ui/rate";
@@ -128,6 +128,11 @@ const FILM_META = {
 		{ id: 14, name: "Fantasy" },
 		{ id: 28, name: "Action" },
 	],
+	// Without an IMDb id the links row renders a single chip, and a one-chip
+	// row cannot show what a three-chip row does — which is the row in the
+	// photo, wrapping and then being clipped.
+	imdb_id: "tt0120737",
+	external_ids: { imdb_id: "tt0120737" },
 	tagline: "One ring to rule them all.",
 	status: "Released",
 	original_language: "en",
@@ -1073,6 +1078,38 @@ function seasonsheet(root: HTMLElement): void {
 	mountSheet(root, new SeasonSheet(plugin.app, plugin, LONG_SHOW, 21) as never);
 }
 
+/**
+ * The Discover preview sheet — the card you get by tapping a poster.
+ *
+ * Not the same screen as `quick`, which is the shortlist card inside the
+ * Discover tab. This is the modal with the trailer, the cast strip, the three
+ * actions and the IMDb / Parents guide / TMDB row, and it had never been drawn
+ * anywhere but on the phone. A photo of its bottom half is what put it here:
+ * cast names sliced through the middle, and each link wrapped in what looked
+ * like a pair of brackets.
+ */
+function preview(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(
+		root,
+		new PreviewSheet(
+			plugin,
+			{
+				id: 120,
+				media_type: "movie",
+				title: "A Preview Title Long Enough To Wrap",
+				poster_path: "Preview",
+				release_date: "2023-09-01",
+				vote_average: 7.4,
+				overview:
+					"A synopsis of the kind the sheet actually receives: several sentences, long enough to need a clamp, and written to be read rather than counted.",
+			} as never,
+			() => {},
+			"A Character With A Considerably Longer Name"
+		) as never
+	);
+}
+
 /** A person and their filmography — sixty poster cards on a 375px screen. */
 function personsheet(root: HTMLElement): void {
 	root.addClass("reel-view-body");
@@ -1115,6 +1152,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	logsheet,
 	seasonsheet,
 	personsheet,
+	preview,
 	longshow,
 	quick,
 };
@@ -1370,6 +1408,7 @@ async function runAudit(app: HTMLElement): Promise<void> {
 		"passphrase",
 		"seasonsheet",
 		"personsheet",
+		"preview",
 	]);
 	const skipped: string[] = [];
 

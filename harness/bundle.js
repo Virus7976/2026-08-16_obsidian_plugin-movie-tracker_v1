@@ -1602,9 +1602,9 @@
     });
     const heading = toggle2.createDiv({ cls: "reel-fold-heading" });
     heading.createDiv({ cls: "reel-chart-title", text: title });
-    const preview = data.slice(0, 3).map((d) => d.label).join(" \xB7 ");
-    if (preview)
-      heading.createDiv({ cls: "reel-fold-preview", text: preview });
+    const preview2 = data.slice(0, 3).map((d) => d.label).join(" \xB7 ");
+    if (preview2)
+      heading.createDiv({ cls: "reel-fold-preview", text: preview2 });
     toggle2.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
     const body = box.createDiv({ cls: "reel-chart-body" });
     const setOpen = (open) => {
@@ -3960,6 +3960,8 @@
       this.onAdded = onAdded;
       this.role = role;
       this.busy = false;
+      /** The sticky foot, kept so it can be put back at the end. */
+      this.actionsEl = null;
     }
     onOpen() {
       const { contentEl, modalEl } = this;
@@ -3992,7 +3994,8 @@
       if (this.item.overview)
         contentEl.createDiv({ cls: "reel-preview-overview", text: this.item.overview });
       void this.loadTrailer(contentEl.createDiv({ cls: "reel-preview-trailer" }), isTv);
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions reel-preview-actions" });
+      this.actionsEl = actions;
       const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
       later.addEventListener("click", () => void this.add(true, later));
       const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it" });
@@ -4043,6 +4046,10 @@
         }
         this.paintLinks(slot, meta, isTv);
       } catch {
+      } finally {
+        const actions = this.actionsEl;
+        if (actions?.parentElement)
+          actions.parentElement.appendChild(actions);
       }
     }
     /**
@@ -6561,7 +6568,9 @@ ${body}
       out = out.filter((e) => e.type === f.type);
     if (f.statuses.length) {
       out = out.filter(
-        (e) => f.statuses.some((s) => s === "watched" && e.type !== "tv" ? e.watched.length > 0 : e.status === s)
+        (e) => f.statuses.some(
+          (s) => s === "watched" && e.type !== "tv" ? e.watched.length > 0 || e.status === "watched" : e.status === s
+        )
       );
     }
     if (f.genres.length)
@@ -7266,6 +7275,11 @@ ${body}
       { id: 14, name: "Fantasy" },
       { id: 28, name: "Action" }
     ],
+    // Without an IMDb id the links row renders a single chip, and a one-chip
+    // row cannot show what a three-chip row does — which is the row in the
+    // photo, wrapping and then being clipped.
+    imdb_id: "tt0120737",
+    external_ids: { imdb_id: "tt0120737" },
     tagline: "One ring to rule them all.",
     status: "Released",
     original_language: "en",
@@ -7909,6 +7923,27 @@ ${body}
     root.addClass("reel-view-body");
     mountSheet(root, new SeasonSheet(plugin.app, plugin, LONG_SHOW, 21));
   }
+  function preview(root) {
+    root.addClass("reel-view-body");
+    mountSheet(
+      root,
+      new PreviewSheet(
+        plugin,
+        {
+          id: 120,
+          media_type: "movie",
+          title: "A Preview Title Long Enough To Wrap",
+          poster_path: "Preview",
+          release_date: "2023-09-01",
+          vote_average: 7.4,
+          overview: "A synopsis of the kind the sheet actually receives: several sentences, long enough to need a clamp, and written to be read rather than counted."
+        },
+        () => {
+        },
+        "A Character With A Considerably Longer Name"
+      )
+    );
+  }
   function personsheet(root) {
     root.addClass("reel-view-body");
     mountSheet(root, new PersonSheet(plugin, 525, "Marguerite Vance-Ashworth"));
@@ -7939,6 +7974,7 @@ ${body}
     logsheet,
     seasonsheet,
     personsheet,
+    preview,
     longshow,
     quick
   };
@@ -8018,7 +8054,8 @@ ${e?.stack ?? ""}` });
       "whatsnew",
       "passphrase",
       "seasonsheet",
-      "personsheet"
+      "personsheet",
+      "preview"
     ]);
     const skipped = [];
     const results = [];

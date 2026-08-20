@@ -1,12 +1,12 @@
 {
   "name": "obsidian-reel",
-  "version": "0.8.18",
+  "version": "0.8.19",
   "description": "Track films and series in your Obsidian vault with TMDB metadata. Mobile-first.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot && npm run test:reviews",
+    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:filters && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot && npm run test:reviews",
     "test:content": "esbuild tests/content.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.content.cjs --log-level=error && node tests/.content.cjs",
     "test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
     "test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
@@ -33,6 +33,7 @@
     "test:milestones": "esbuild tests/milestones.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.milestones.cjs --log-level=error && node tests/.milestones.cjs",
     "test:blend": "esbuild tests/blend.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.blend.cjs --log-level=error && node tests/.blend.cjs",
     "test:cachekey": "esbuild tests/cachekey.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.cachekey.cjs --log-level=error && node tests/.cachekey.cjs",
+    "test:filters": "esbuild tests/filters.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.filters.cjs --log-level=error && node tests/.filters.cjs",
     "test:roving": "esbuild tests/roving.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.roving.cjs --log-level=error && node tests/.roving.cjs",
     "harness": "esbuild harness/main.ts --bundle --format=iife --alias:obsidian=./harness/shim.ts --outfile=harness/bundle.js --log-level=warning",
     "audit": "npm run harness && node scripts/audit.mjs",

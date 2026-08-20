@@ -119,9 +119,22 @@ export function narrow(rows: Entry[], f: FilterState): Entry[] {
 		 * already seen back on the watchlist sets `status` to "watchlist", and
 		 * filtering the raw field then dropped it out of "watched" entirely, so
 		 * the app appeared to forget you had ever seen it.
+		 *
+		 * That reasoning is right and the code got it backwards: it *replaced*
+		 * the status test with the dates test instead of adding to it. So a
+		 * film marked watched but carrying no logged dates — an import, or
+		 * anything ticked off without a date — matched neither branch and
+		 * vanished from its own filter. Selecting watched, watching and
+		 * completed then returned far fewer titles than the library holds,
+		 * with no way to tell which ones had gone or why.
+		 *
+		 * Either signal counts. A date proves it; the label claims it; both
+		 * mean you have seen it.
 		 */
 		out = out.filter((e) =>
-			f.statuses.some((s) => (s === "watched" && e.type !== "tv" ? e.watched.length > 0 : e.status === s))
+			f.statuses.some((s) =>
+				s === "watched" && e.type !== "tv" ? e.watched.length > 0 || e.status === "watched" : e.status === s
+			)
 		);
 	}
 	if (f.genres.length) out = out.filter((e) => f.genres.some((g) => e.genres.includes(g)));

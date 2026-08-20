@@ -953,14 +953,7 @@ export class ReelView extends ItemView {
 		setIcon(open.createSpan({ cls: "reel-filter-btn-icon" }), "sliders-horizontal");
 		open.createSpan({ text: "Filters" });
 		if (set.length) open.createSpan({ cls: "reel-filter-count", text: String(set.length) });
-		open.addEventListener("click", () => {
-			new FilterSheet(this.app, this.filters, {
-				pool: this.pool(),
-				lists: this.plugin.library.lists(),
-				showSort,
-				onChange: () => this.paint(),
-			}).open();
-		});
+		open.addEventListener("click", () => this.openFilters(showSort));
 
 		if (showSort) {
 			this.paintSortControls(bar);
@@ -989,20 +982,55 @@ export class ReelView extends ItemView {
 			});
 		}
 
+		/*
+		 * An active filter is two controls, not one.
+		 *
+		 * The whole chip used to clear the filter, so tapping "watched" to see
+		 * what else was set threw it away instead — and since the Filters
+		 * button scrolls off the left of this row once a few tags are on, the
+		 * tag is often the only filter-shaped thing on screen. Tapping the one
+		 * visible filter control and having it delete a filter is the opposite
+		 * of what it looks like it does.
+		 *
+		 * The label opens the sheet; the x removes it. Two buttons rather than
+		 * one with a hit-test inside it, so the keyboard and assistive tech get
+		 * the same two choices the thumb does — and a button cannot be nested
+		 * inside another button, so the pill is a group holding both.
+		 */
 		for (const f of set) {
-			const tag = bar.createEl("button", {
-				cls: "reel-chip is-active reel-filter-tag",
+			const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
+			tag.setAttr("role", "group");
+			tag.setAttr("aria-label", `${f.label} filter`);
+
+			const label = tag.createEl("button", {
+				cls: "reel-filter-tag-label",
+				text: f.label,
+				attr: { type: "button", "aria-label": `${f.label} — change the filters` },
+			});
+			label.addEventListener("click", () => this.openFilters(showSort));
+
+			const drop = tag.createEl("button", {
+				cls: "reel-filter-tag-x",
 				attr: { type: "button", "aria-label": `Remove the ${f.label} filter` },
 			});
-			tag.createSpan({ text: f.label });
-			setIcon(tag.createSpan({ cls: "reel-filter-x" }), "x");
-			tag.addEventListener("click", () => {
+			setIcon(drop.createSpan({ cls: "reel-filter-x" }), "x");
+			drop.addEventListener("click", () => {
 				clearFilter(this.filters, f.key, f.value);
 				this.paint();
 			});
 		}
 
 		return bar;
+	}
+
+	/** The one place the filter sheet is opened from. */
+	private openFilters(showSort: boolean): void {
+		new FilterSheet(this.app, this.filters, {
+			pool: this.pool(),
+			lists: this.plugin.library.lists(),
+			showSort,
+			onChange: () => this.paint(),
+		}).open();
 	}
 
 	/**

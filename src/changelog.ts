@@ -52,6 +52,40 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.19",
+		date: "2026-08-20",
+		headline: "Films you marked watched without a date were missing from their own filter.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Filtering by watched now finds every film you have marked watched, not only the ones with a logged date.",
+				note: "A film matched only if it had watch dates recorded, so anything imported or ticked off without one fell out of its own filter \u2014 which is why selecting watched, watching and completed returned far fewer titles than the library holds.",
+			},
+			{
+				kind: "better",
+				text: "Tapping an active filter chip opens the filters. Only its x removes it.",
+				note: "The whole chip used to clear the filter, so tapping the one filter-shaped thing on screen deleted a filter instead of letting you change it.",
+			},
+			{
+				kind: "fixed",
+				text: "The Discover preview sheet keeps its buttons at the bottom, below everything else.",
+				note: "The bar is sticky, and content loaded afterwards landed underneath it \u2014 so the IMDb row sat below the buttons at the screen edge and the cast names were sliced through the middle.",
+			},
+			{
+				kind: "better",
+				text: "IMDb, Parents guide and TMDB read as links rather than as three tall ovals.",
+			},
+			{
+				kind: "better",
+				text: "The three preview actions are equal width, so Not interested looks like the button it is.",
+			},
+			{
+				kind: "fixed",
+				text: "Cast members with no photograph get a visible circle instead of floating initials.",
+			},
+		],
+	},
+	{
 		version: "0.8.18",
 		date: "2026-08-20",
 		headline: "Filters let you pick more than one thing, and the episode list stopped overlapping itself.",

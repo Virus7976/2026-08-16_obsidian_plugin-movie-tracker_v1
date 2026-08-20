@@ -11431,3 +11431,138 @@ input.reel-input {
 	   card happened to be tinted. 1.31:1, worse than what it replaced. */
 	background: var(--background-secondary);
 }
+
+
+/* ==================================================================== */
+/* The Discover preview sheet, bottom half                              */
+/* ==================================================================== */
+
+/*
+ * Three equal actions, because they are three equal choices.
+ *
+ * "+ Watchlist", "Seen it" and "Not interested" were a filled pill sized to
+ * its own text and two lengths of bare label. Whatever the theme, that reads
+ * as one button and two captions — and "Not interested" is the one that
+ * permanently removes a title from every future queue, so being the least
+ * button-like thing on the row is the wrong way round.
+ */
+.reel-preview-actions {
+	display: flex;
+	gap: var(--reel-space-2);
+	align-items: stretch;
+}
+
+.reel-preview-actions .reel-btn {
+	flex: 1 1 0;
+	min-width: 0;
+	min-height: 46px;
+	padding-inline: var(--reel-space-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/*
+ * The out-links are links, not filter chips.
+ *
+ * `.reel-chip` carries a pill radius and the 44px minimum every chip got, so
+ * IMDb / Parents guide / TMDB came out as three tall ovals — which on a light
+ * theme with a pale border reads as a word with a bracket either side of it.
+ * A chip is something you switch on; these leave the app.
+ *
+ * Kept as a real target, just not a balloon: the radius comes down to the
+ * standard one and the height to what the text needs plus room for a thumb.
+ */
+.reel-preview-links .reel-chip {
+	border-radius: var(--reel-radius);
+	min-height: 40px;
+	padding: 0 var(--reel-space-3);
+	font-size: var(--font-ui-smaller);
+}
+
+/*
+ * A cast member with no photograph still needs a circle.
+ *
+ * The empty state fills with `--background-modifier-form-field`, which in
+ * plenty of themes is the same colour as the sheet behind it. When it is, the
+ * portrait vanishes and the initials are left floating in white space with a
+ * gap above the name where a face should be. A hairline costs nothing and
+ * makes the slot exist regardless of what the theme sets.
+ */
+.reel-caststrip-shot.is-empty {
+	border: 1px solid var(--background-modifier-border);
+}
+
+
+/* Both of the rules above lost to sheet-scoped selectors carrying more
+   classes. Stated at the same depth so they win on their own terms rather
+   than by !important, which would only move the same argument one level up. */
+.reel-modal.reel-sheet .reel-preview-actions .reel-btn,
+.reel-modal .reel-preview-actions .reel-btn {
+	flex: 1 1 0;
+	min-width: 0;
+	min-height: 46px;
+	padding-inline: var(--reel-space-2);
+}
+
+.reel-modal.reel-sheet .reel-preview-links .reel-chip,
+.reel-modal .reel-preview-links .reel-chip {
+	border-radius: var(--reel-radius);
+	min-height: 40px;
+	height: 40px;
+	padding: 0 var(--reel-space-3);
+}
+
+
+/* ==================================================================== */
+/* An active-filter tag is a pill with two halves                       */
+/* ==================================================================== */
+
+/*
+ * The label side opens the filters; the x side removes this one.
+ *
+ * Drawn as a single pill so it still reads as one object, with the x set
+ * apart by a hairline rather than by a gap — a gap would make it look like
+ * two chips that happen to be touching.
+ */
+.reel-filter-tag {
+	display: inline-flex;
+	align-items: stretch;
+	padding: 0;
+	overflow: hidden;
+}
+
+.reel-filter-tag-label,
+.reel-filter-tag-x {
+	background: none;
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.reel-filter-tag-label {
+	padding: 0 var(--reel-space-2) 0 var(--reel-space-3);
+	white-space: nowrap;
+}
+
+/* A 44px target for a small glyph, which is the trade this project keeps
+   making: the x stays the size it should be drawn at and the button reaches
+   past it. */
+.reel-filter-tag-x {
+	padding: 0 var(--reel-space-3) 0 var(--reel-space-2);
+	min-width: 44px;
+	border-left: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.reel-filter-tag-label:active,
+.reel-filter-tag-x:active {
+	background: color-mix(in srgb, currentColor 12%, transparent);
+}
