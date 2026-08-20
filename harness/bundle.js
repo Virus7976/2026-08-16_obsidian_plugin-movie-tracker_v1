@@ -1681,6 +1681,17 @@
     const preview2 = data.slice(0, 3).map((d) => d.label).join(" \xB7 ");
     if (preview2)
       heading.createDiv({ cls: "reel-fold-preview", text: preview2 });
+    if (plugin2) {
+      const faces2 = data.slice(0, 3).filter((d) => !d.noPosters);
+      const shots = faces2.map((d) => d.entries?.[0]).filter((e) => Boolean(e));
+      if (shots.length) {
+        const strip = heading.createDiv({ cls: "reel-fold-shots" });
+        for (const e of shots) {
+          const thumb = strip.createDiv({ cls: "reel-fold-shot" });
+          plugin2.posters.attach(thumb, e);
+        }
+      }
+    }
     toggle2.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
     const body = box.createDiv({ cls: "reel-chart-body" });
     const setOpen = (open) => {

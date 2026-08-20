@@ -13372,3 +13372,45 @@ input.reel-input {
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 }
+
+
+/* ==================================================================== */
+/* A closed chart shows what is in it                                   */
+/* ==================================================================== */
+
+/*
+ * Small, and in a row that cannot grow.
+ *
+ * This sits in the heading of a collapsed section, so it has to read as a hint
+ * about what is inside rather than as content in its own right — three little
+ * posters, roughly cap height of the title beside them. Anything larger and
+ * the closed state stops looking closed.
+ */
+.reel-fold-shots {
+	display: flex;
+	gap: 4px;
+	margin-top: var(--reel-space-2);
+}
+
+.reel-fold-shot {
+	flex: 0 0 auto;
+	width: 26px;
+	aspect-ratio: 2 / 3;
+	border-radius: 3px;
+	overflow: hidden;
+	background: var(--background-secondary);
+	box-shadow: var(--reel-shadow-raised);
+}
+
+.reel-fold-shot img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* Open the fold and the strip has done its job — the real rows are there,
+   each with its own posters, so keeping it would say the same thing twice. */
+.reel-chart.is-open .reel-fold-shots {
+	display: none;
+}

@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.32",
+		date: "2026-08-20",
+		headline: "Closed charts show what is inside them.",
+		changes: [
+			{
+				kind: "new",
+				text: "A collapsed chart shows small posters from its top rows instead of just naming them.",
+				note: "“Films per year · 1 · 2026” was three words standing for a set of titles the chart already held. Folds are closed by default, so this is the state the page is mostly in.",
+			},
+			{
+				kind: "better",
+				text: "Charts about people and characters still show no posters, closed or open.",
+				note: "A poster under someone's name reads as a picture of that person. That was fixed once for the open rows and is not coming back through the closed ones.",
+			},
+		],
+	},
+	{
 		version: "0.8.31",
 		date: "2026-08-20",
 		headline: "Every superlative shows the film it is about.",

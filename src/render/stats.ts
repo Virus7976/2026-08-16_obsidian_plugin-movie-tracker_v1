@@ -953,6 +953,37 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 		.map((d) => d.label)
 		.join(" · ");
 	if (preview) heading.createDiv({ cls: "reel-fold-preview", text: preview });
+
+	/*
+	 * The closed fold shows the films, not just their names.
+	 *
+	 * A closed chart was a title, a count and three words — "Films per year",
+	 * "1", "2026". Every one of those words stands for a set of titles the
+	 * chart already holds, so the closed state was describing pictures it was
+	 * choosing not to show. This is the same fault as the superlatives, in the
+	 * state you spend most of your time looking at: folds are closed by
+	 * default, so this is what the page mostly *is*.
+	 *
+	 * Taken across rows rather than down one, because the preview names the top
+	 * three rows and should illustrate those three rather than showing three
+	 * films from the first. One title per row, in row order, so the strip and
+	 * the text say the same thing.
+	 *
+	 * Skipped entirely where the rows are people or characters. A face does not
+	 * belong to a film poster, and putting one under "Top actors" was a fault
+	 * fixed once already — it is not coming back through the closed state.
+	 */
+	if (plugin) {
+		const faces = data.slice(0, 3).filter((d) => !d.noPosters);
+		const shots = faces.map((d) => d.entries?.[0]).filter((e): e is Entry => Boolean(e));
+		if (shots.length) {
+			const strip = heading.createDiv({ cls: "reel-fold-shots" });
+			for (const e of shots) {
+				const thumb = strip.createDiv({ cls: "reel-fold-shot" });
+				plugin.posters.attach(thumb, e);
+			}
+		}
+	}
 	toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
 	const body = box.createDiv({ cls: "reel-chart-body" });
 
