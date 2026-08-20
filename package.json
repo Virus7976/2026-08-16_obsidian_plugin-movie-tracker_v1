@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot",
+    "test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot && npm run test:reviews",
     "test:content": "esbuild tests/content.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.content.cjs --log-level=error && node tests/.content.cjs",
     "test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
     "test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
@@ -39,7 +39,8 @@
     "check": "npm run preflight && npm test && npm run audit",
     "test:settingsguard": "esbuild tests/settingsguard.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.settingsguard.cjs --log-level=error && node tests/.settingsguard.cjs",
     "test:gesture": "esbuild tests/gesture.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.gesture.cjs --log-level=error && node tests/.gesture.cjs",
-    "test:snapshot": "esbuild tests/snapshot.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.snapshot.cjs --log-level=error && node tests/.snapshot.cjs"
+    "test:snapshot": "esbuild tests/snapshot.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.snapshot.cjs --log-level=error && node tests/.snapshot.cjs",
+    "test:reviews": "esbuild tests/reviews.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.reviews.cjs --log-level=error && node tests/.reviews.cjs"
   },
   "keywords": [
     "obsidian",

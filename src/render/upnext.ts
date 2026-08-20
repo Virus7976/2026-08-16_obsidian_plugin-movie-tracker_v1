@@ -75,8 +75,15 @@ class UpNextBlock extends MarkdownRenderChild {
 }
 
 /** Shared by the code block and the Reel view. */
-export function paintUpNext(plugin: ReelPlugin, containerEl: HTMLElement, limit?: number, heading = false): void {
-	new UpNextPainter(plugin, containerEl, limit, heading).render();
+export function paintUpNext(
+	plugin: ReelPlugin,
+	containerEl: HTMLElement,
+	limit?: number,
+	heading = false,
+	/** Already narrowed by the view's filters and search, when there are any. */
+	entries?: Entry[]
+): void {
+	new UpNextPainter(plugin, containerEl, limit, heading, entries).render();
 }
 
 class UpNextPainter {
@@ -84,7 +91,8 @@ class UpNextPainter {
 		private plugin: ReelPlugin,
 		private containerEl: HTMLElement,
 		private limit?: number,
-		private heading = false
+		private heading = false,
+		private entries?: Entry[]
 	) {}
 
 	render(): void {
@@ -92,7 +100,16 @@ class UpNextPainter {
 		el.empty();
 		if (this.heading) el.createDiv({ cls: "reel-block-title", text: "Up next" });
 
-		const everything = this.plugin.visible(this.plugin.library.inProgress());
+		/*
+		 * `inProgress()` reads the whole index, so a search or a genre filter set
+		 * in the view had no effect here at all — the tab looked like it was
+		 * ignoring you. Narrowing the caller's set to the part-watched shows keeps
+		 * one definition of "in progress" while honouring what you asked for.
+		 */
+		const inProgress = this.plugin.visible(this.plugin.library.inProgress());
+		const everything = this.entries
+			? inProgress.filter((e) => this.entries?.some((v) => v.path === e.path))
+			: inProgress;
 		// Up Next answers "what do I watch tonight", so a long tail of shows
 		// you last touched months ago is noise. The rest stay one tap away.
 		const cap = this.limit ?? 12;

@@ -25,8 +25,18 @@ import { prettyDate } from "./util/dates";
 import { redact } from "./secrets";
 import { renderStarsStatic } from "./ui/stars";
 import { renderEmpty } from "./ui/empty";
+import { paintReviews } from "./ui/reviewPane";
 import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
+import {
+	FilterSheet,
+	activeFilters,
+	clearFilter,
+	emptyFilters,
+	narrow,
+	SORT_OPTIONS,
+	type FilterState,
+} from "./ui/filterSheet";
 import { unlink } from "./library";
 import { measure, stampWidth, stampChromeInsets, topInset, sizeBody } from "./util/panewidth";
 
@@ -43,21 +53,6 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 	{ id: "stats", label: "Stats", icon: "bar-chart-3" },
 ];
 
-const SORT_OPTIONS: [string, string][] = [
-	["watched", "Recently watched"],
-	["added", "Recently added"],
-	["rating", "My rating"],
-	["imdb_rating", "IMDb rating"],
-	["metacritic", "Metacritic"],
-	["tmdb_rating", "TMDB rating"],
-	["title", "Title"],
-	["year", "Year"],
-	["runtime", "Runtime"],
-	["popularity", "Popularity"],
-	["certification", "Certification"],
-	["random", "Shuffle"],
-];
-
 /**
  * Which direction reads as "natural" for a field. Titles and years want A–Z
  * and oldest-first; ratings and dates want best and newest first. Guessing
@@ -70,15 +65,16 @@ function ascending(field: string): 1 | -1 {
 export class ReelView extends ItemView {
 	private tab: Tab = "library";
 	private query = "";
-	private typeFilter: "all" | "film" | "tv" = "all";
-	private statusFilter: string | null = null;
-	private genreFilter: string | null = null;
-	private listFilter: string | null = null;
+	/**
+	 * One filter set, shared by every tab.
+	 *
+	 * These were six separate fields, read only by the Library, and thrown away
+	 * on each tab switch along with the search query. "Films, sci-fi" is the
+	 * same statement in the Diary as in the Library, and having to re-make it on
+	 * arrival is why the other tabs felt like different apps.
+	 */
+	private filters: FilterState = emptyFilters();
 	private diaryYear: number | null = null;
-	private statsScope: "all" | "film" | "tv" = "all";
-	private sort = "watched";
-	/** Secondary sort, applied when the primary ties. */
-	private sort2 = "";
 	private bodyEl!: HTMLElement;
 	/** Non-null when the detail screen is showing instead of the list. */
 	private detail: DetailScreen | null = null;
@@ -297,9 +293,12 @@ export class ReelView extends ItemView {
 				this.tab = t.id;
 				this.plugin.settings.lastTab = t.id;
 				void this.plugin.saveSettings();
-				// A search typed in the Library silently filtered the Diary
-				// too, which reads as missing data rather than a filter.
-				this.clearSearch();
+				// The query used to be dropped here, on the grounds that a
+				// search typed in the Library silently narrowing the Diary reads
+				// as missing data. It does — when nothing says so. Every tab now
+				// states what it is filtered by, so the query can survive the
+				// journey, which is what "search should work the same no matter
+				// what tab you are on" asks for.
 				this.paint();
 			});
 			btn.dataset.tab = t.id;
@@ -362,7 +361,7 @@ export class ReelView extends ItemView {
 		this.tab = "library";
 		this.detail = null;
 		this.clearSearch();
-		this.statusFilter = status;
+		this.filters.status = status;
 		this.plugin.settings.lastTab = "library";
 		void this.plugin.saveSettings();
 		this.paint();
@@ -551,40 +550,40 @@ export class ReelView extends ItemView {
 			this.paintLibrary();
 		} else if (this.tab === "discover") {
 			if (!this.discoverScreen) this.discoverScreen = new DiscoverScreen(this.plugin);
+			// Discover looks outward, so the library filters mean nothing to it —
+			// but the search box is the same box, and typing in it has to do
+			// something here too. It searches TMDB, which is the only sensible
+			// reading of a query on a screen about titles you do not own.
+			this.discoverScreen.query = this.query;
 			this.discoverScreen.render(this.bodyEl);
 		} else if (this.tab === "rate") {
 			if (!this.rateScreen) this.rateScreen = new RateScreen(this.plugin);
+			this.paintFilters({ showSort: false });
+			this.rateScreen.scope = this.narrowed() ? this.scoped() : null;
 			this.rateScreen.render(this.bodyEl);
 		} else if (this.tab === "upnext") {
+			this.paintFilters({ showSort: false });
 			// Above Up Next, not below: it is a grace note on the way to the
 			// thing you opened the screen for, and it renders nothing at all on
 			// the days it has nothing to say.
 			paintOnThisDay(this.plugin, this.bodyEl);
-			paintUpNext(this.plugin, this.bodyEl);
+			paintUpNext(this.plugin, this.bodyEl, undefined, false, this.narrowed() ? this.scoped() : undefined);
 			// Upcoming lives here rather than in its own tab: "what am I part
 			// way through" and "what's about to air" are the same question.
 			paintUpcoming(this.plugin, this.bodyEl.createDiv({ cls: "reel-upcoming-section" }));
 		} else if (this.tab === "diary") {
+			this.paintFilters({ showSort: false });
 			this.paintDiary();
 		} else {
 			// Films and shows answer different questions — hours of film and
-			// episodes watched aren't comparable — so the tab can scope like
-			// the code block always could.
-			this.filterEl.removeClass("is-empty");
-			const bar = this.filterEl.createDiv({ cls: "reel-chips" });
-			for (const [scope, label] of [
-				["all", "Everything"],
-				["film", "Films"],
-				["tv", "Series"],
-			] as const) {
-				const b = bar.createEl("button", { cls: "reel-chip", text: label });
-				setSelected(b, this.statsScope === scope);
-				b.addEventListener("click", () => {
-					this.statsScope = scope;
-					this.paint();
-				});
-			}
-			paintStats(this.plugin, this.bodyEl, { include: this.statsScope });
+			// episodes watched aren't comparable — so the tab scopes. It used to
+			// keep a `statsScope` of its own, which meant choosing "Films" here
+			// and choosing "Films" in the Library were two unrelated acts.
+			this.paintFilters({ showSort: false });
+			paintStats(this.plugin, this.bodyEl, {
+				include: this.filters.type,
+				entries: this.scoped(),
+			});
 		}
 	}
 
@@ -602,7 +601,7 @@ export class ReelView extends ItemView {
 	 * reads as the library being emptier than it is.
 	 */
 	private paintSuggestions(): void {
-		if (this.query || this.statusFilter || this.genreFilter || this.listFilter) return;
+		if (this.query || activeFilters(this.filters).length) return;
 
 		const rows = this.pool();
 		if (rows.length < 4) return; // too small to have a shape worth guessing at
@@ -794,14 +793,28 @@ export class ReelView extends ItemView {
 		].join("\n");
 	}
 
-	private paintFilters(): void {
+	/**
+	 * One row that says what you are looking at, and one button for the rest.
+	 *
+	 * The old bar drew the entire filter set flat: type chips, a status row, up
+	 * to fourteen genres, every list, and two sort dropdowns. That is six rows on
+	 * a phone, and the fix shipped for it was to hide all of it the moment a
+	 * search was typed — which is how the library ended up with no filtering.
+	 *
+	 * A filter you have not set does not need to be on screen. So this shows only
+	 * what is currently true, each chip tappable to undo it, and everything else
+	 * lives in a sheet one tap away. Same function, one row, and it survives the
+	 * keyboard being open.
+	 */
+	private paintFilters(opts: { showSort?: boolean } = {}): void {
+		const showSort = opts.showSort !== false;
 		this.filterEl.removeClass("is-empty");
 
 		// A way back, when you arrived here by tapping a number somewhere else.
 		//
-		// Filters you did not set by hand are hard to undo: you have to work
-		// out which chips are lit, clear them, and then find your way back to
-		// the tab you came from. One button does all three.
+		// Filters you did not set by hand are hard to undo: you have to work out
+		// which chips are lit, clear them, and then find your way back to the tab
+		// you came from. One button does all three.
 		if (this.cameFrom) {
 			const origin = this.cameFrom;
 			const crumb = this.filterEl.createDiv({ cls: "reel-crumb" });
@@ -813,78 +826,83 @@ export class ReelView extends ItemView {
 
 		this.paintSuggestions();
 
-		const bar = this.filterEl.createDiv({ cls: "reel-chips" });
+		const bar = this.filterEl.createDiv({ cls: "reel-chips reel-filterbar" });
+		const set = activeFilters(this.filters);
 
-		const chip = (label: string, active: boolean, onClick: () => void) => {
-			const b = bar.createEl("button", { cls: "reel-chip", text: label });
-			setSelected(b, active);
-			b.addEventListener("click", () => {
-				onClick();
+		const open = bar.createEl("button", {
+			cls: "reel-chip reel-filter-btn",
+			attr: { type: "button", "aria-label": "Filters" },
+		});
+		setIcon(open.createSpan({ cls: "reel-filter-btn-icon" }), "sliders-horizontal");
+		open.createSpan({ text: "Filters" });
+		if (set.length) open.createSpan({ cls: "reel-filter-count", text: String(set.length) });
+		open.addEventListener("click", () => {
+			new FilterSheet(this.app, this.filters, {
+				pool: this.pool(),
+				lists: this.plugin.library.lists(),
+				showSort,
+				onChange: () => this.paint(),
+			}).open();
+		});
+
+		/*
+		 * The search reads as a filter, because it is one.
+		 *
+		 * The query now survives a tab switch, which is what makes it useful — and
+		 * also what would make an unexplained three-item Diary look like data loss.
+		 * Saying "search: nolan" with an x on it is the difference between a filter
+		 * and a bug.
+		 */
+		if (this.query) {
+			const tag = bar.createEl("button", {
+				cls: "reel-chip is-active reel-filter-tag",
+				attr: { type: "button", "aria-label": `Clear the search for ${this.query}` },
+			});
+			tag.createSpan({ text: `“${this.query}”` });
+			setIcon(tag.createSpan({ cls: "reel-filter-x" }), "x");
+			tag.addEventListener("click", () => {
+				this.clearSearch();
 				this.paint();
 			});
-		};
+		}
 
-		chip("All", this.typeFilter === "all", () => (this.typeFilter = "all"));
-		chip("Films", this.typeFilter === "film", () => (this.typeFilter = "film"));
-		chip("Series", this.typeFilter === "tv", () => (this.typeFilter = "tv"));
-
-		bar.createSpan({ cls: "reel-chip-sep", text: "·" });
-
-		const pool = this.pool();
-		for (const status of [...new Set(pool.map((e) => e.status))].sort()) {
-			chip(status, this.statusFilter === status, () => {
-				this.statusFilter = this.statusFilter === status ? null : status;
+		for (const f of set) {
+			const tag = bar.createEl("button", {
+				cls: "reel-chip is-active reel-filter-tag",
+				attr: { type: "button", "aria-label": `Remove the ${f.label} filter` },
+			});
+			tag.createSpan({ text: f.label });
+			setIcon(tag.createSpan({ cls: "reel-filter-x" }), "x");
+			tag.addEventListener("click", () => {
+				clearFilter(this.filters, f.key);
+				this.paint();
 			});
 		}
 
-		const genres = [...new Set(pool.flatMap((e) => e.genres))].sort();
-		if (genres.length > 1) {
-			bar.createSpan({ cls: "reel-chip-sep", text: "·" });
-			for (const g of genres.slice(0, 14)) {
-				chip(g, this.genreFilter === g, () => {
-					this.genreFilter = this.genreFilter === g ? null : g;
-				});
-			}
-		}
+		if (!showSort) return;
 
-		// Until now a title could be added to a list and then never seen
-		// again — there was nowhere that showed one.
-		const lists = this.plugin.library.lists();
-		if (lists.length) {
-			bar.createSpan({ cls: "reel-chip-sep", text: "·" });
-			for (const name of lists) {
-				chip(`☰ ${name}`, this.listFilter === name, () => {
-					this.listFilter = this.listFilter === name ? null : name;
-				});
-			}
-		}
-
+		// Sort stays in the bar rather than the sheet: it is the control changed
+		// most often, and it is never *off*, so it costs a chip either way.
 		const sortBar = this.filterEl.createDiv({ cls: "reel-sortbar" });
-
 		sortBar.createSpan({ cls: "reel-dim", text: "Sort" });
 		const select = sortBar.createEl("select", { cls: "reel-select dropdown" });
 		for (const [value, label] of SORT_OPTIONS) select.createEl("option", { value, text: label });
-		select.value = this.sort;
+		select.value = this.filters.sort;
 		select.addEventListener("change", () => {
-			this.sort = select.value;
+			this.filters.sort = select.value;
 			this.paint();
 		});
-
-		// Second criterion, applied where the first ties — "highest rated, and
-		// among equals the most recent" is a real question the single sort
-		// could not answer.
-		sortBar.createSpan({ cls: "reel-dim", text: "then" });
-		const select2 = sortBar.createEl("select", { cls: "reel-select dropdown" });
-		select2.createEl("option", { value: "", text: "—" });
-		for (const [value, label] of SORT_OPTIONS) {
-			if (value === this.sort || value === "random") continue;
-			select2.createEl("option", { value, text: label });
+		// The tiebreaker lives in the sheet now. It is a real feature and a rare
+		// one, and it was costing a phone a permanent row.
+		if (this.filters.sort2) {
+			const label = SORT_OPTIONS.find(([v]) => v === this.filters.sort2)?.[1] ?? this.filters.sort2;
+			sortBar.createSpan({ cls: "reel-dim reel-sort-then", text: `then ${label.toLowerCase()}` });
 		}
-		select2.value = this.sort2;
-		select2.addEventListener("change", () => {
-			this.sort2 = select2.value;
-			this.paint();
-		});
+	}
+
+	/** Is anything narrowing the list at all? */
+	private narrowed(): boolean {
+		return Boolean(this.query) || activeFilters(this.filters).length > 0;
 	}
 
 	/** Escape backs out of the detail screen, as it does from every modal. */
@@ -928,34 +946,25 @@ export class ReelView extends ItemView {
 		return this.plugin.visible(this.plugin.library.all());
 	}
 
+	/**
+	 * The pool as the current filters and search leave it.
+	 *
+	 * Every tab draws from this rather than from `pool()`, which is the whole
+	 * of "search should work the same no matter what tab you are on": the Diary,
+	 * Up Next, Rate and Stats were all reading the unfiltered library and
+	 * ignoring the search box entirely.
+	 */
+	private scoped(): Entry[] {
+		return this.plugin.library.search(this.query, narrow(this.pool(), this.filters));
+	}
+
 	private paintLibrary(): void {
-		let rows = this.pool();
-		if (this.typeFilter !== "all") rows = rows.filter((e) => e.type === this.typeFilter);
-		if (this.statusFilter) {
-			// "Watched" means you have seen it, which is a fact about your
-			// history — not a label that a later intent can overwrite.
-			//
-			// `status` is one field doing two jobs: have I seen this, and do I
-			// mean to watch it. Putting a film you have already seen back on
-			// the watchlist sets status to "watchlist", and filtering on the
-			// raw field then dropped it out of "watched" entirely — the app
-			// appeared to forget you had ever seen it. Reading the watch
-			// history instead means a film you intend to rewatch correctly
-			// shows under both, because both are true.
-			rows = rows.filter((e) =>
-				this.statusFilter === "watched" && e.type !== "tv"
-					? e.watched.length > 0
-					: e.status === this.statusFilter
-			);
-		}
-		if (this.genreFilter) rows = rows.filter((e) => e.genres.includes(this.genreFilter!));
-		if (this.listFilter) rows = rows.filter((e) => e.lists.includes(this.listFilter!));
-		rows = this.plugin.library.search(this.query, rows);
+		let rows = this.scoped();
 		// Secondary sort first, primary second: a stable sort preserves the
 		// earlier order within ties, so sorting by the tiebreaker first is what
 		// makes it act as a tiebreaker.
-		if (this.sort2) rows = sortEntries(rows, this.sort2, ascending(this.sort2));
-		rows = sortEntries(rows, this.sort, ascending(this.sort));
+		if (this.filters.sort2) rows = sortEntries(rows, this.filters.sort2, ascending(this.filters.sort2));
+		rows = sortEntries(rows, this.filters.sort, ascending(this.filters.sort));
 
 		const hiddenCount = this.plugin.hiddenCount(this.plugin.library.all());
 		const count = this.bodyEl.createDiv({ cls: "reel-block-count" });
@@ -1038,7 +1047,7 @@ export class ReelView extends ItemView {
 	private paintDiary(): void {
 		// The ```diary``` block took a year and the tab didn't, so the tab
 		// could only ever show everything.
-		const all = viewings(this.plugin.library.search(this.query, this.pool()));
+		const all = viewings(this.scoped());
 		const years = [...new Set(all.map((v) => v.date.slice(0, 4)))].sort().reverse();
 		if (years.length > 1) {
 			this.filterEl.removeClass("is-empty");
@@ -1088,6 +1097,17 @@ export class ReelView extends ItemView {
 			if (v.rating != null) renderStarsStatic(meta, v.rating);
 			if (v.rewatch) meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
 			meta.createSpan({ cls: "reel-dim", text: prettyDate(v.date) });
+
+			/*
+			 * What you wrote that night, under the night you wrote it.
+			 *
+			 * The diary is a list of viewings and a review is a fact about one
+			 * viewing, so this is the one screen where the date match is exact —
+			 * a rewatch shows its own review rather than the most recent one.
+			 * Silent when there is nothing: an empty prompt on four hundred rows
+			 * would be four hundred pieces of furniture.
+			 */
+			paintReviews(this.plugin, body, v.entry, { onlyDate: v.date, heading: "" });
 
 			row.addEventListener("click", () => this.openDetail(v.entry));
 		}

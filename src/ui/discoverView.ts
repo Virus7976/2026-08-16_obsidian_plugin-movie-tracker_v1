@@ -14,7 +14,7 @@
 import { Modal, Notice, Platform, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
 import type { TmdbSearchResult, TmdbFilm, TmdbShow } from "../types";
-import type { DiscoverRow, TasteProfile } from "../discover";
+import type { DiscoverRow, RowSource, TasteProfile } from "../discover";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { renderStars } from "./stars";
@@ -41,8 +41,63 @@ interface Filters {
 
 const EMPTY: Filters = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
 
+/** A mounted shelf: what it holds, how deep it has been read, and whether it is spent. */
+interface FeedRow {
+	source: RowSource;
+	items: TmdbSearchResult[];
+	page: number;
+	done: boolean;
+	loading: boolean;
+	/** Consecutive pages that returned nothing new. Two means stop. */
+	empties?: number;
+}
+
 export class DiscoverScreen {
-	private rows: DiscoverRow[] | null = null;
+	/**
+	 * The feed as recipes, before any of it has been fetched.
+	 *
+	 * Null until a taste profile has been read. Long — sixty-odd rows on a
+	 * library with ratings in it, and an unbounded popularity tail after that —
+	 * because the feed is meant not to end.
+	 */
+	private sources: RowSource[] | null = null;
+	/** Sources that have been mounted, in the order they appear. */
+	private feed: FeedRow[] = [];
+	/** Index of the next source to mount. */
+	private nextSource = 0;
+	/** One mount at a time, or a fast scroll fires four of them at once. */
+	private mounting = false;
+	/** Torn down and rebuilt on every draw, or they accumulate per repaint. */
+	private watchers: IntersectionObserver[] = [];
+	/** Where new rows are appended, so mounting one does not redraw the page. */
+	private feedEl: HTMLElement | null = null;
+
+	/**
+	 * The view's search box, pointed outward.
+	 *
+	 * Discover is the one tab where the library filters mean nothing — it is
+	 * about titles you do *not* have. But the search box is the same box, and a
+	 * query that silently did nothing here was most of "the search should work
+	 * the same no matter what tab you are on".
+	 */
+	query = "";
+	private searchResults: TmdbSearchResult[] | null = null;
+	/** What `searchResults` is an answer to, so a new query refetches. */
+	private searchedFor = "";
+	/** How many results were dropped for already being in your library. */
+	private searchOwned = 0;
+
+	/**
+	 * The mounted rows, in the shape the rest of the screen already expects.
+	 *
+	 * Quick mode and the narrowing pass both read the loaded pool, and neither
+	 * cares that it now arrives a row at a time.
+	 */
+	private get rows(): DiscoverRow[] | null {
+		if (!this.sources) return null;
+		return this.feed.map((f) => ({ id: f.source.id, title: f.source.title, reason: f.source.reason, items: f.items }));
+	}
+
 	private profile: TasteProfile | null = null;
 	private results: TmdbSearchResult[] | null = null;
 	private genres: { id: number; name: string }[] = [];
@@ -68,6 +123,14 @@ export class DiscoverScreen {
 	 * still believes you dealt with.
 	 */
 	private lastAction: { id: number; at: number } | null = null;
+	/**
+	 * Every title the feed has already shown, across all rows.
+	 *
+	 * Trending and your top genre overlap heavily, and the same poster turning
+	 * up in four consecutive shelves is what makes an endless feed feel like a
+	 * short one on a loop.
+	 */
+	private seen = new Set<number>();
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -82,7 +145,12 @@ export class DiscoverScreen {
 
 	reset(): void {
 		this.seed = null;
-		this.rows = null;
+		this.sources = null;
+		this.feed = [];
+		this.nextSource = 0;
+		this.mounting = false;
+		this.searchResults = null;
+		this.searchedFor = "";
 		this.profile = null;
 		this.results = null;
 		this.error = null;
@@ -127,6 +195,11 @@ export class DiscoverScreen {
 	private draw(container: HTMLElement): void {
 		container.empty();
 		container.addClass("reel-discover");
+		// The old ones point at elements that no longer exist, and an observer
+		// nobody disconnects keeps its callback — and this screen — alive.
+		for (const w of this.watchers) w.disconnect();
+		this.watchers = [];
+		this.feedEl = null;
 
 		// Consumed rather than read: a shortlist is for the run you just
 		// asked for, and finding it still there on a later visit would be a
@@ -150,7 +223,8 @@ export class DiscoverScreen {
 			return;
 		}
 
-		if (this.quick) this.paintQuick(container);
+		if (this.query) this.paintSearch(container);
+		else if (this.quick) this.paintQuick(container);
 		else if (this.filtered) this.paintResults(container);
 		else this.paintForYou(container);
 	}
@@ -185,7 +259,7 @@ export class DiscoverScreen {
 	private paintQuick(container: HTMLElement): void {
 		// Quick mode reads whatever the browsing mode already loaded, so
 		// entering it cold has to trigger the same fetch the rows would.
-		if (!this.filtered && !this.rows) {
+		if (!this.filtered && !this.sources) {
 			void this.loadRows(container);
 			// Quick mode shows one big card at a time, so the placeholder is a
 			// single card rather than a strip of them.
@@ -537,7 +611,10 @@ export class DiscoverScreen {
 		const setType = (next: "movie" | "tv") => {
 			if (this.filters.type === next) return;
 			this.filters.type = next;
-			this.rows = null;
+			// A different medium is a different feed, not a filtered one.
+			this.sources = null;
+			this.feed = [];
+			this.nextSource = 0;
 			this.genres = [];
 			this.filters.genreId = null;
 			this.filters.genreName = null;
@@ -676,9 +753,19 @@ export class DiscoverScreen {
 				text: `Based on your library — mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`,
 			});
 		}
-		const reload = head.createEl("button", { cls: "reel-chip", text: "Refresh" });
+		const reload = head.createEl("button", { cls: "reel-chip reel-refresh", attr: { type: "button" } });
+		setIcon(reload.createSpan({ cls: "reel-refresh-icon" }), "refresh-cw");
+		reload.createSpan({ text: "Refresh" });
 		reload.addEventListener("click", () => {
-			reload.setText("Refreshing…");
+			reload.addClass("is-spinning");
+			/*
+			 * Refresh used to clear the cache and re-request the same pages, which
+			 * is asking TMDB the identical question and hoping for a different
+			 * answer — the trending list does not change between two taps. Rolling
+			 * the feed forward asks a different question, so it comes back with
+			 * different titles.
+			 */
+			this.plugin.discover.reroll();
 			void this.plugin.tmdb.clearDiscoverCache().then(() => {
 				this.reset();
 				this.render(container);
@@ -698,15 +785,48 @@ export class DiscoverScreen {
 		const narrowed = this.rows
 			.map((r) => ({ ...r, items: r.items.filter((i) => !this.handled.has(i.id) && this.matchesFilters(i)) }))
 			.filter((r) => r.items.length);
-		for (const row of narrowed) this.paintRow(container, row);
+		for (const row of narrowed) this.paintStaticRow(container, row);
 		return narrowed.length > 0;
 	}
 
+	/**
+	 * A shelf that does not page.
+	 *
+	 * These are rows you have already loaded, shown with some of their cards
+	 * filtered out. Asking such a row for another page would fetch titles the
+	 * filter is about to discard, so it stays as it is and the fetched results
+	 * underneath do the widening.
+	 */
+	private paintStaticRow(container: HTMLElement, row: DiscoverRow): void {
+		const items = row.items.filter((i) => !this.handled.has(i.id));
+		if (!items.length) return;
+
+		const section = container.createDiv({ cls: "reel-drow" });
+		const head = section.createDiv({ cls: "reel-drow-head" });
+		head.createDiv({ cls: "reel-drow-title", text: row.title });
+		if (row.reason) head.createDiv({ cls: "reel-drow-reason", text: row.reason });
+
+		const strip = section.createDiv({ cls: "reel-drow-strip" });
+		for (const item of items) strip.appendChild(this.card(item, container));
+	}
+
+	/**
+	 * The feed.
+	 *
+	 * It used to be eight rows, fetched all at once, each holding one page of
+	 * about twenty cards. Every row ended, the page ended, and tomorrow it said
+	 * the same thing — which is exactly what "a hardcoded block I cannot refresh"
+	 * describes.
+	 *
+	 * Now both axes keep going. Reaching the end of a row asks that row for its
+	 * next page; reaching the bottom of the page mounts the next row. The list of
+	 * rows is long and its tail is unbounded, so there is no last one to reach.
+	 */
 	private paintForYou(container: HTMLElement): void {
-		if (!this.rows) {
-			// Three sections' worth, because that is roughly what comes back —
-			// the page ends up close to the height it will be, so nothing jumps
-			// when the results land.
+		if (!this.sources) {
+			// Three sections' worth, because that is roughly what comes back — the
+			// page ends up close to the height it will be, so nothing jumps when
+			// the results land.
 			container.createDiv({ cls: "reel-loading", text: "Finding things for you…" });
 			for (let i = 0; i < 3; i++) skeletonCards(container, 6, "Finding things for you");
 			if (this.loading) return;
@@ -717,8 +837,12 @@ export class DiscoverScreen {
 
 		this.paintHead(container);
 
-		const visible = this.rows.filter((r) => r.items.some((i) => !this.handled.has(i.id)));
-		if (!visible.length) {
+		const feedEl = container.createDiv({ cls: "reel-feed" });
+		this.feedEl = feedEl;
+		for (const row of this.feed) this.mountRow(feedEl, row, container);
+
+		const live = this.feed.some((r) => r.items.some((i) => !this.handled.has(i.id)));
+		if (!live && this.exhausted) {
 			const empty = container.createDiv({ cls: "reel-empty" });
 			empty.createDiv({ text: "Nothing left to suggest — try a genre above." });
 			// Dismissals are permanent by design, so the way back has to be
@@ -732,18 +856,100 @@ export class DiscoverScreen {
 			}
 			return;
 		}
-		for (const row of visible) this.paintRow(container, row);
+
+		this.paintFeedSentinel(container);
+	}
+
+	/**
+	 * The thing at the bottom that asks for more.
+	 *
+	 * A sentinel plus an observer rather than a scroll handler: the body is a
+	 * measured, fixed-height element and its scroll events fire at whatever rate
+	 * the device feels like, whereas an intersection is asked once and answered
+	 * once. The rootMargin means the fetch starts a screen early, so the next row
+	 * is usually there before you arrive at the gap.
+	 */
+	private paintFeedSentinel(container: HTMLElement): void {
+		const more = this.sources ? this.nextSource < this.sources.length : false;
+		if (!more) return;
+
+		const sentinel = container.createDiv({ cls: "reel-feed-end" });
+		sentinel.createDiv({ cls: "reel-loading", text: "Loading more…" });
+
+		const scroller = container.closest(".reel-view-body") ?? null;
+		const io = new IntersectionObserver(
+			(entries) => {
+				if (!entries.some((e) => e.isIntersecting)) return;
+				void this.mountNext(container);
+			},
+			{ root: scroller as Element | null, rootMargin: "600px 0px" }
+		);
+		io.observe(sentinel);
+		this.watchers.push(io);
+	}
+
+	/**
+	 * Mount the next row, skipping ones that come back empty.
+	 *
+	 * A source can legitimately return nothing — every title in it is already in
+	 * your library, or dismissed, or has no poster. Stopping there would end the
+	 * feed on a technicality, so it tries the next one, up to a handful of times
+	 * per scroll so a run of empties cannot become an unbounded request loop.
+	 */
+	private async mountNext(container: HTMLElement): Promise<void> {
+		if (this.mounting || !this.sources) return;
+		this.mounting = true;
+		try {
+			for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
+				const source = this.sources[this.nextSource++];
+				const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
+				for (const i of items) this.seen.add(i.id);
+				if (!items.length) continue;
+				const row: FeedRow = { source, items, page: 1, done: false, loading: false };
+				this.feed.push(row);
+				if (this.feedEl && this.feedEl.isConnected) {
+					// Appended rather than repainted: a repaint would throw away the
+					// scroll position of every strip above, which on a feed is the
+					// difference between "more arrived" and "it jumped".
+					this.mountRow(this.feedEl, row, container);
+					return;
+				}
+				this.render(container);
+				return;
+			}
+			// Nothing left to try.
+			if (this.nextSource >= (this.sources?.length ?? 0)) {
+				this.exhausted = true;
+				this.render(container);
+			}
+		} catch {
+			/* one row failing is not worth taking the feed down for */
+		} finally {
+			this.mounting = false;
+		}
 	}
 
 	private async loadRows(container: HTMLElement): Promise<void> {
 		try {
 			const profile = await this.plugin.discover.taste(this.filters.type);
-			this.rows = await this.plugin.discover.rows(profile, this.filters.type);
 			this.profile = profile;
+			this.sources = this.plugin.discover.rowSources(profile, this.filters.type);
+			this.feed = [];
+			this.nextSource = 0;
+			this.seen.clear();
+			this.exhausted = false;
+			// Enough to fill a screen, so the feed does not arrive one row at a
+			// time in front of the user.
+			this.mounting = false;
+			for (let i = 0; i < 4; i++) {
+				const before = this.feed.length;
+				await this.mountNextSilently();
+				if (this.feed.length === before) break;
+			}
 		} catch (e) {
-			// The diagnosis, not the raw error. A retry button already
-			// existed here, but above a redacted stack fragment — so it told
-			// you to try again without telling you whether that could help.
+			// The diagnosis, not the raw error. A retry button already existed
+			// here, but above a redacted stack fragment — so it told you to try
+			// again without telling you whether that could help.
 			this.error = diagnoseError(e).message;
 		} finally {
 			this.loading = false;
@@ -751,17 +957,52 @@ export class DiscoverScreen {
 		}
 	}
 
-	private paintRow(container: HTMLElement, row: DiscoverRow): void {
+	/** The same step as `mountNext`, without touching the DOM. */
+	private async mountNextSilently(): Promise<void> {
+		if (!this.sources) return;
+		for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
+			const source = this.sources[this.nextSource++];
+			const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
+			for (const i of items) this.seen.add(i.id);
+			if (!items.length) continue;
+			this.feed.push({ source, items, page: 1, done: false, loading: false });
+			return;
+		}
+	}
+
+	/**
+	 * One shelf, which pages as you scroll it.
+	 *
+	 * The horizontal sentinel sits at the right-hand end of the strip and is
+	 * observed against the strip itself, so it fires when you scroll the row
+	 * rather than when the row happens to be on screen. Cards are appended in
+	 * place: rebuilding the strip would send it back to the left, which on a row
+	 * you are actively scrolling is the most annoying thing a feed can do.
+	 */
+	private mountRow(into: HTMLElement, row: FeedRow, container: HTMLElement): void {
 		const items = row.items.filter((i) => !this.handled.has(i.id));
 		if (!items.length) return;
 
-		const section = container.createDiv({ cls: "reel-drow" });
+		const section = into.createDiv({ cls: "reel-drow" });
 		const head = section.createDiv({ cls: "reel-drow-head" });
-		head.createDiv({ cls: "reel-drow-title", text: row.title });
-		if (row.reason) head.createDiv({ cls: "reel-drow-reason", text: row.reason });
+		head.createDiv({ cls: "reel-drow-title", text: row.source.title });
+		if (row.source.reason) head.createDiv({ cls: "reel-drow-reason", text: row.source.reason });
 
 		const strip = section.createDiv({ cls: "reel-drow-strip" });
 		for (const item of items) strip.appendChild(this.card(item, container));
+
+		if (!row.done) {
+			const tail = strip.createDiv({ cls: "reel-drow-tail" });
+			const io = new IntersectionObserver(
+				(entries) => {
+					if (!entries.some((e) => e.isIntersecting)) return;
+					void this.extendRow(row, strip, tail, container);
+				},
+				{ root: strip, rootMargin: "0px 600px" }
+			);
+			io.observe(tail);
+			this.watchers.push(io);
+		}
 
 		if (!Platform.isMobile) {
 			const nav = head.createDiv({ cls: "reel-drow-nav" });
@@ -773,6 +1014,105 @@ export class DiscoverScreen {
 			setIcon(right, "chevron-right");
 			right.addEventListener("click", () => by(600));
 		}
+	}
+
+	/** Another page for one shelf, appended where you are already looking. */
+	private async extendRow(row: FeedRow, strip: HTMLElement, tail: HTMLElement, container: HTMLElement): Promise<void> {
+		if (row.loading || row.done) return;
+		row.loading = true;
+		try {
+			const next = await row.source.fetch(row.page + 1);
+			row.page += 1;
+			const fresh = next.filter((i) => !this.seen.has(i.id) && !this.handled.has(i.id));
+			for (const i of fresh) this.seen.add(i.id);
+			if (!fresh.length) {
+				/*
+				 * One empty page is not the end of a row.
+				 *
+				 * Everything on it may already be in your library, which says nothing
+				 * about page four. Two in a row is a fair signal that the endpoint has
+				 * run out, and stopping there keeps a dead row from requesting
+				 * forever.
+				 */
+				row.empties = (row.empties ?? 0) + 1;
+				if (row.empties >= 2 || row.page > 20) {
+					row.done = true;
+					tail.remove();
+				}
+				return;
+			}
+			row.empties = 0;
+			row.items = [...row.items, ...fresh];
+			for (const item of fresh) strip.insertBefore(this.card(item, container), tail);
+		} catch {
+			row.done = true;
+			tail.remove();
+		} finally {
+			row.loading = false;
+		}
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Search — the view's own box, pointed at TMDB                        */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * What a search means on a screen about titles you do not own.
+	 *
+	 * Anything already in your library is dropped, because the card's actions are
+	 * "add" and "watchlist" and offering those for a note you already have is how
+	 * you end up with two of them. The count is stated rather than swallowed, with
+	 * a way through to the library search, so a title you know you own not
+	 * appearing here is explained rather than mysterious.
+	 */
+	private paintSearch(container: HTMLElement): void {
+		const q = this.query.trim();
+		if (this.searchedFor !== q) {
+			this.searchResults = null;
+			this.searchedFor = q;
+		}
+
+		if (!this.searchResults) {
+			skeletonGrid(container, 12, "Searching");
+			if (this.loading) return;
+			this.loading = true;
+			void this.plugin.tmdb
+				.searchMulti(q)
+				.then((items) => {
+					const usable = items.filter((i) => !i.adult && i.poster_path);
+					const fresh = this.plugin.discover.filterOut(usable);
+					this.searchOwned = usable.length - fresh.length;
+					this.searchResults = fresh;
+				})
+				.catch((e: unknown) => {
+					this.error = diagnoseError(e).message;
+				})
+				.finally(() => {
+					this.loading = false;
+					this.render(container);
+				});
+			return;
+		}
+
+		const items = this.searchResults.filter((i) => !this.handled.has(i.id));
+		const count = container.createDiv({ cls: "reel-block-count" });
+		count.setText(`${items.length} on TMDB for “${q}”`);
+		if (this.searchOwned) {
+			count.createSpan({ cls: "reel-dim", text: ` · ${this.searchOwned} already in your library` });
+		}
+
+		if (!items.length) {
+			const none = container.createDiv({ cls: "reel-empty" });
+			none.createDiv({
+				text: this.searchOwned
+					? "Everything matching is already in your library."
+					: "Nothing on TMDB matches that.",
+			});
+			return;
+		}
+
+		const grid = container.createDiv({ cls: "reel-dgrid" });
+		for (const item of items) grid.appendChild(this.card(item, container));
 	}
 
 	/* ------------------------------------------------------------------ */

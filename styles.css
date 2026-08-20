@@ -3045,7 +3045,7 @@ input.reel-input {
 }
 
 .reel-drow-reason {
-	color: var(--text-faint);
+	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 }
 
@@ -7697,16 +7697,19 @@ input.reel-input {
 
 
 
-/* While searching, the filter chips step aside.
+/* The filters used to be deleted from the screen the moment you typed.
  *
- * With a keyboard open the view has roughly 288px of usable height on a 384px
- * phone, and the search row plus two chip rows take 171 of it. Sixty percent of
- * the screen spent on controls left about one third of one poster visible —
- * which is what "I can see the head of two titles but not the information" was.
+ * The reasoning was about height and it was sound — with a keyboard open the
+ * view has roughly 288px on a 384px phone, and the search row plus two chip
+ * rows took 171 of it. The conclusion was not: "nobody searches and filters at
+ * once" is a guess, and the result was a library with no filtering, which is
+ * how it was reported.
  *
- * Searching and filtering narrow the same list, and nobody does both at once.
- * Only while there is a query: an empty field changes nothing. */
-.reel-view.is-searching:not(.is-w700) .reel-view-filters {
+ * The bar is one row now — the filters you have actually set, and a button for
+ * the rest — so it costs about 40px whether or not a keyboard is up, and there
+ * is nothing left to hide. What goes while searching is the *suggestion* row,
+ * which is a prompt for a search you have already started making. */
+.reel-view.is-searching:not(.is-w700) .reel-suggest {
 	display: none;
 }
 
@@ -8590,4 +8593,362 @@ input.reel-input {
 
 .reel-view:not(.is-w700) .reel-stats .reel-fact:last-child {
 	border-bottom: none;
+}
+
+
+/* ================================================================== *
+ * The filter bar: one row, and a sheet for the rest                   *
+ *                                                                     *
+ * Six stacked rows of chips is a desktop filter panel on a phone. The *
+ * bar states what is true and nothing else; every option lives in a   *
+ * sheet, where it has room to be read.                                *
+ * ================================================================== */
+
+.reel-filterbar {
+	align-items: center;
+	gap: var(--reel-space-1);
+}
+
+/* The button that holds everything not currently set. Outlined rather than
+   filled: it is a way in, not a statement about the list. */
+.reel-filter-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35em;
+	flex: 0 0 auto;
+	font-weight: var(--font-medium);
+}
+
+.reel-filter-btn-icon {
+	display: inline-flex;
+	align-items: center;
+}
+
+.reel-filter-btn-icon .svg-icon {
+	width: 0.95em;
+	height: 0.95em;
+}
+
+/* How many filters are on, so the button is honest when the chips have
+   scrolled out of sight. */
+.reel-filter-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.35em;
+	height: 1.35em;
+	padding: 0 0.3em;
+	border-radius: 999px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+}
+
+/* A set filter, and the x that removes it. Filled, because it is doing
+   something to what you are looking at. */
+.reel-filter-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3em;
+	flex: 0 0 auto;
+	max-width: 14em;
+}
+
+.reel-filter-tag > span:first-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}
+
+.reel-filter-x {
+	display: inline-flex;
+	align-items: center;
+	opacity: 0.7;
+}
+
+.reel-filter-x .svg-icon {
+	width: 0.85em;
+	height: 0.85em;
+}
+
+.reel-filter-tag:hover .reel-filter-x {
+	opacity: 1;
+}
+
+/* The tiebreaker, stated rather than given a permanent dropdown. It is a real
+   feature and a rare one, and it was costing a phone a whole row. */
+.reel-sort-then {
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+/* ---------------- the sheet ---------------- */
+
+.reel-filter-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--reel-space-3);
+}
+
+.reel-filter-clear {
+	flex: 0 0 auto;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-filter-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-4);
+	/* The sheet scrolls; the bar could not, which is why the genre list was
+	   capped at fourteen. */
+	overflow-y: auto;
+	max-height: 60vh;
+	padding-top: var(--reel-space-2);
+}
+
+.reel-filter-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2);
+	min-width: 0;
+}
+
+.reel-filter-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	font-weight: var(--font-medium);
+}
+
+/* Wrapping, not scrolling. There is room here, and a row you have to drag
+   sideways hides options behind a gesture nobody is told about. */
+.reel-filter-chips {
+	flex-wrap: wrap;
+	overflow: visible;
+}
+
+.reel-view.is-narrow .reel-filter-chips,
+.reel-view.is-phone .reel-filter-chips {
+	flex-wrap: wrap;
+	overflow-x: visible;
+}
+
+/* ================================================================== *
+ * Discover: a feed with no end                                        *
+ * ================================================================== */
+
+.reel-feed {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	max-width: 100%;
+}
+
+/* The thing at the bottom that asks for the next shelf. It is deliberately
+   visible: an invisible sentinel that fails to fire looks identical to a feed
+   that has genuinely ended, and those need to be told apart. */
+.reel-feed-end {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--reel-space-5) 0 var(--reel-space-6);
+	min-height: 64px;
+}
+
+/* The same, at the right-hand end of one shelf. No width of its own — a strip
+   that always ends in a gap reads as a missing card. */
+.reel-drow-tail {
+	flex: 0 0 1px;
+	width: 1px;
+	align-self: stretch;
+}
+
+.reel-refresh {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35em;
+}
+
+.reel-refresh-icon {
+	display: inline-flex;
+	align-items: center;
+}
+
+.reel-refresh-icon .svg-icon {
+	width: 0.9em;
+	height: 0.9em;
+}
+
+.reel-refresh.is-spinning .reel-refresh-icon {
+	animation: reel-spin 0.9s linear infinite;
+}
+
+@keyframes reel-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-refresh.is-spinning .reel-refresh-icon {
+		animation: none;
+	}
+}
+
+/* ================================================================== *
+ * Your own reviews                                                    *
+ *                                                                     *
+ * Written into the note body since the first release and read back by *
+ * nothing until now. Styled as writing, not as data: a quote rule and *
+ * prose measure, so it reads differently from the metadata around it. *
+ * ================================================================== */
+
+.reel-yours {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-3);
+	margin: var(--reel-space-4) 0;
+	min-width: 0;
+}
+
+/* Reserve the height while the note is being read, so the screen does not
+   jump when the text lands. */
+.reel-yours.is-loading {
+	min-height: 1px;
+}
+
+.reel-yours-label {
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-medium);
+	color: var(--text-muted);
+}
+
+.reel-yours-item {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-1);
+	padding-left: var(--reel-space-3);
+	border-left: 2px solid var(--background-modifier-border-hover);
+	min-width: 0;
+}
+
+.reel-yours-head {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.reel-yours-date {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-yours-edit {
+	margin-left: auto;
+	flex: 0 0 auto;
+	/* `clickable-icon` sizes itself to the glyph, which is 33px — fine in a
+	   dense toolbar, not fine as the only way to edit what you wrote. */
+	min-width: 44px;
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Prose, so it reads as prose: a measure, a line height, and the newlines you
+   typed left where you put them. */
+.reel-yours-body {
+	color: var(--text-normal);
+	line-height: var(--line-height-normal);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+
+.reel-yours-more,
+.reel-yours-add {
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35em;
+	background: none;
+	border: none;
+	box-shadow: none;
+	/* A borderless button is still a target. Vertical padding rather than a
+	   height, so the text sits where it looks like it sits and the tappable
+	   area is the full 44px around it. */
+	min-height: 44px;
+	padding: var(--reel-space-2) 0;
+	color: var(--text-accent);
+	font-size: var(--font-ui-smaller);
+	cursor: pointer;
+}
+
+.reel-yours-more:hover,
+.reel-yours-add:hover {
+	text-decoration: underline;
+}
+
+.reel-yours-empty {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2);
+	align-items: flex-start;
+}
+
+.reel-yours-count {
+	font-size: var(--font-ui-smaller);
+}
+
+/* In the diary a review is an aside on one row, not a section with a heading —
+   smaller, quieter, and clipped to two lines so a long one cannot turn a
+   list of viewings into a wall of text. */
+.reel-diary-body .reel-yours {
+	margin: var(--reel-space-1) 0 0;
+	gap: var(--reel-space-1);
+}
+
+.reel-diary-body .reel-yours-item {
+	border-left: none;
+	padding-left: 0;
+}
+
+.reel-diary-body .reel-yours-head {
+	display: none;
+}
+
+.reel-diary-body .reel-yours-body {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	white-space: normal;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-review-box {
+	width: 100%;
+	min-height: 8em;
+	resize: vertical;
+	font-family: inherit;
+	line-height: var(--line-height-normal);
+}
+
+
+/* A select in the filter sheet is a control you tap, and it was 34px.
+ *
+ * The global rule that stops every chip inflating into a giant pill quite
+ * rightly exempts `.reel-select` — a sort dropdown in a dense bar should not be
+ * 44px tall. In the sheet it is a primary control with room around it, so here
+ * it takes the full target. */
+.reel-filter-sheet .reel-select {
+	min-height: 44px;
+	width: 100%;
 }

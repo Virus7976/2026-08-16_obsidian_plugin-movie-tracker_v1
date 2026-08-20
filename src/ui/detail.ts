@@ -41,6 +41,7 @@ import { compactCount } from "../util/format";
 import { ContentFlag, FLAG_LABELS } from "../content";
 import { haptic } from "../util/haptics";
 import { badgePerson } from "./personBadge";
+import { paintReviews } from "./reviewPane";
 
 /**
  * "GB" → 🇬🇧.
@@ -341,6 +342,20 @@ export class DetailScreen {
 		// unless you opened the Crew tab and scrolled.
 		this.renderCreditRows(wrap, cast, crew, isTv);
 
+		/*
+		 * Your own review, above the tabs rather than behind one.
+		 *
+		 * It is the only thing on this screen you wrote, and until now the only
+		 * thing on this screen that could not be seen at all — `appendReview` put
+		 * it in the note body and nothing ever read it back. Putting it behind a
+		 * tap alongside "Releases" and "Photos" would be a strange ranking of
+		 * whose opinion matters on a page about a film you have watched.
+		 */
+		paintReviews(this.plugin, wrap, this.entry, {
+			editable: true,
+			onChange: () => this.rerender(),
+		});
+
 		const tabs: { id: string; label: string; render: (el: HTMLElement) => void }[] = [];
 
 		if (cast.length) tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
@@ -362,7 +377,7 @@ export class DetailScreen {
 		if (reviews.length) {
 			tabs.push({
 				id: "reviews",
-				label: `Reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
+				label: `Other reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
 				render: (el) => this.renderReviews(el, reviews),
 			});
 		}

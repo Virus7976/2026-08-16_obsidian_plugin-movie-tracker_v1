@@ -27,6 +27,15 @@ import { TitlesSheet } from "../ui/titlesSheet";
 export interface StatsOptions {
 	year?: number;
 	include: "all" | "film" | "tv";
+	/**
+	 * The titles to count, when the caller has already narrowed them.
+	 *
+	 * The Reel view passes its filtered-and-searched set so the page answers
+	 * "how much sci-fi have I watched" rather than always answering for the
+	 * whole library. The code block passes nothing and gets everything, which
+	 * is what a block in a note means.
+	 */
+	entries?: Entry[];
 }
 
 export function registerStatsBlock(plugin: ReelPlugin): void {
@@ -61,7 +70,7 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	el.empty();
 	el.addClass("reel-stats");
 
-	const all = plugin.visible(plugin.library.all());
+	const all = opts.entries ?? plugin.visible(plugin.library.all());
 	const films = opts.include === "tv" ? [] : all.filter((e) => e.type === "film");
 	const shows = opts.include === "film" ? [] : all.filter((e) => e.type === "tv");
 	/*

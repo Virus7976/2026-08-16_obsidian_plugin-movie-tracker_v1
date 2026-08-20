@@ -365,6 +365,14 @@
     const snapped = Math.round(value / STEP) * STEP;
     return Math.min(MAX_STARS, Math.max(0, snapped));
   }
+  function starString(rating) {
+    if (rating == null || rating <= 0)
+      return "";
+    const r = clampRating(rating);
+    const full = Math.floor(r);
+    const half = r - full >= STEP;
+    return "\u2605".repeat(full) + (half ? "\xBD" : "");
+  }
 
   // src/util/haptics.ts
   var PATTERNS = {
@@ -1069,7 +1077,7 @@
   function paintStats(plugin2, el, opts) {
     el.empty();
     el.addClass("reel-stats");
-    const all2 = plugin2.visible(plugin2.library.all());
+    const all2 = opts.entries ?? plugin2.visible(plugin2.library.all());
     const films = opts.include === "tv" ? [] : all2.filter((e) => e.type === "film");
     const shows = opts.include === "film" ? [] : all2.filter((e) => e.type === "tv");
     const watched = viewings(films, opts.year).filter((v) => typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(v.date));
@@ -1826,22 +1834,24 @@
   };
 
   // src/render/upnext.ts
-  function paintUpNext(plugin2, containerEl, limit, heading = false) {
-    new UpNextPainter(plugin2, containerEl, limit, heading).render();
+  function paintUpNext(plugin2, containerEl, limit, heading = false, entries) {
+    new UpNextPainter(plugin2, containerEl, limit, heading, entries).render();
   }
   var UpNextPainter = class {
-    constructor(plugin2, containerEl, limit, heading = false) {
+    constructor(plugin2, containerEl, limit, heading = false, entries) {
       this.plugin = plugin2;
       this.containerEl = containerEl;
       this.limit = limit;
       this.heading = heading;
+      this.entries = entries;
     }
     render() {
       const el = this.containerEl;
       el.empty();
       if (this.heading)
         el.createDiv({ cls: "reel-block-title", text: "Up next" });
-      const everything = this.plugin.visible(this.plugin.library.inProgress());
+      const inProgress = this.plugin.visible(this.plugin.library.inProgress());
+      const everything = this.entries ? inProgress.filter((e) => this.entries?.some((v) => v.path === e.path)) : inProgress;
       const cap = this.limit ?? 12;
       let rows2 = everything.slice(0, cap);
       const hidden = everything.length - rows2.length;
@@ -2547,7 +2557,38 @@
   var DiscoverScreen = class {
     constructor(plugin2) {
       this.plugin = plugin2;
-      this.rows = null;
+      /**
+       * The feed as recipes, before any of it has been fetched.
+       *
+       * Null until a taste profile has been read. Long — sixty-odd rows on a
+       * library with ratings in it, and an unbounded popularity tail after that —
+       * because the feed is meant not to end.
+       */
+      this.sources = null;
+      /** Sources that have been mounted, in the order they appear. */
+      this.feed = [];
+      /** Index of the next source to mount. */
+      this.nextSource = 0;
+      /** One mount at a time, or a fast scroll fires four of them at once. */
+      this.mounting = false;
+      /** Torn down and rebuilt on every draw, or they accumulate per repaint. */
+      this.watchers = [];
+      /** Where new rows are appended, so mounting one does not redraw the page. */
+      this.feedEl = null;
+      /**
+       * The view's search box, pointed outward.
+       *
+       * Discover is the one tab where the library filters mean nothing — it is
+       * about titles you do *not* have. But the search box is the same box, and a
+       * query that silently did nothing here was most of "the search should work
+       * the same no matter what tab you are on".
+       */
+      this.query = "";
+      this.searchResults = null;
+      /** What `searchResults` is an answer to, so a new query refetches. */
+      this.searchedFor = "";
+      /** How many results were dropped for already being in your library. */
+      this.searchOwned = 0;
       this.profile = null;
       this.results = null;
       this.genres = [];
@@ -2573,13 +2614,37 @@
        * still believes you dealt with.
        */
       this.lastAction = null;
+      /**
+       * Every title the feed has already shown, across all rows.
+       *
+       * Trending and your top genre overlap heavily, and the same poster turning
+       * up in four consecutive shelves is what makes an endless feed feel like a
+       * short one on a loop.
+       */
+      this.seen = /* @__PURE__ */ new Set();
+    }
+    /**
+     * The mounted rows, in the shape the rest of the screen already expects.
+     *
+     * Quick mode and the narrowing pass both read the loaded pool, and neither
+     * cares that it now arrives a row at a time.
+     */
+    get rows() {
+      if (!this.sources)
+        return null;
+      return this.feed.map((f) => ({ id: f.source.id, title: f.source.title, reason: f.source.reason, items: f.items }));
     }
     get filtered() {
       return this.seed != null || this.filters.genreId != null || this.filters.decade != null || this.filters.minRating != null;
     }
     reset() {
       this.seed = null;
-      this.rows = null;
+      this.sources = null;
+      this.feed = [];
+      this.nextSource = 0;
+      this.mounting = false;
+      this.searchResults = null;
+      this.searchedFor = "";
       this.profile = null;
       this.results = null;
       this.error = null;
@@ -2620,6 +2685,10 @@
     draw(container) {
       container.empty();
       container.addClass("reel-discover");
+      for (const w of this.watchers)
+        w.disconnect();
+      this.watchers = [];
+      this.feedEl = null;
       const staged = this.plugin.discover.takeStaged();
       if (staged) {
         this.shortlist = staged;
@@ -2636,7 +2705,9 @@
         });
         return;
       }
-      if (this.quick)
+      if (this.query)
+        this.paintSearch(container);
+      else if (this.quick)
         this.paintQuick(container);
       else if (this.filtered)
         this.paintResults(container);
@@ -2668,7 +2739,7 @@
       return out;
     }
     paintQuick(container) {
-      if (!this.filtered && !this.rows) {
+      if (!this.filtered && !this.sources) {
         void this.loadRows(container);
         skeletonCards(container, 1, "Loading");
         return;
@@ -2927,7 +2998,9 @@
         if (this.filters.type === next)
           return;
         this.filters.type = next;
-        this.rows = null;
+        this.sources = null;
+        this.feed = [];
+        this.nextSource = 0;
         this.genres = [];
         this.filters.genreId = null;
         this.filters.genreName = null;
@@ -3044,9 +3117,12 @@
           text: `Based on your library \u2014 mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`
         });
       }
-      const reload = head.createEl("button", { cls: "reel-chip", text: "Refresh" });
+      const reload = head.createEl("button", { cls: "reel-chip reel-refresh", attr: { type: "button" } });
+      setIcon(reload.createSpan({ cls: "reel-refresh-icon" }), "refresh-cw");
+      reload.createSpan({ text: "Refresh" });
       reload.addEventListener("click", () => {
-        reload.setText("Refreshing\u2026");
+        reload.addClass("is-spinning");
+        this.plugin.discover.reroll();
         void this.plugin.tmdb.clearDiscoverCache().then(() => {
           this.reset();
           this.render(container);
@@ -3065,50 +3141,18 @@
         return false;
       const narrowed = this.rows.map((r) => ({ ...r, items: r.items.filter((i) => !this.handled.has(i.id) && this.matchesFilters(i)) })).filter((r) => r.items.length);
       for (const row of narrowed)
-        this.paintRow(container, row);
+        this.paintStaticRow(container, row);
       return narrowed.length > 0;
     }
-    paintForYou(container) {
-      if (!this.rows) {
-        container.createDiv({ cls: "reel-loading", text: "Finding things for you\u2026" });
-        for (let i = 0; i < 3; i++)
-          skeletonCards(container, 6, "Finding things for you");
-        if (this.loading)
-          return;
-        this.loading = true;
-        void this.loadRows(container);
-        return;
-      }
-      this.paintHead(container);
-      const visible = this.rows.filter((r) => r.items.some((i) => !this.handled.has(i.id)));
-      if (!visible.length) {
-        const empty = container.createDiv({ cls: "reel-empty" });
-        empty.createDiv({ text: "Nothing left to suggest \u2014 try a genre above." });
-        const dismissed = this.plugin.settings.dismissedIds.length;
-        if (dismissed) {
-          empty.createDiv({
-            cls: "reel-dim",
-            text: `${dismissed} dismissed \u2014 clear them in Settings \u2192 Reel to see them again.`
-          });
-        }
-        return;
-      }
-      for (const row of visible)
-        this.paintRow(container, row);
-    }
-    async loadRows(container) {
-      try {
-        const profile = await this.plugin.discover.taste(this.filters.type);
-        this.rows = await this.plugin.discover.rows(profile, this.filters.type);
-        this.profile = profile;
-      } catch (e) {
-        this.error = diagnoseError(e).message;
-      } finally {
-        this.loading = false;
-        this.render(container);
-      }
-    }
-    paintRow(container, row) {
+    /**
+     * A shelf that does not page.
+     *
+     * These are rows you have already loaded, shown with some of their cards
+     * filtered out. Asking such a row for another page would fetch titles the
+     * filter is about to discard, so it stays as it is and the fetched results
+     * underneath do the widening.
+     */
+    paintStaticRow(container, row) {
       const items = row.items.filter((i) => !this.handled.has(i.id));
       if (!items.length)
         return;
@@ -3120,6 +3164,187 @@
       const strip = section.createDiv({ cls: "reel-drow-strip" });
       for (const item of items)
         strip.appendChild(this.card(item, container));
+    }
+    /**
+     * The feed.
+     *
+     * It used to be eight rows, fetched all at once, each holding one page of
+     * about twenty cards. Every row ended, the page ended, and tomorrow it said
+     * the same thing — which is exactly what "a hardcoded block I cannot refresh"
+     * describes.
+     *
+     * Now both axes keep going. Reaching the end of a row asks that row for its
+     * next page; reaching the bottom of the page mounts the next row. The list of
+     * rows is long and its tail is unbounded, so there is no last one to reach.
+     */
+    paintForYou(container) {
+      if (!this.sources) {
+        container.createDiv({ cls: "reel-loading", text: "Finding things for you\u2026" });
+        for (let i = 0; i < 3; i++)
+          skeletonCards(container, 6, "Finding things for you");
+        if (this.loading)
+          return;
+        this.loading = true;
+        void this.loadRows(container);
+        return;
+      }
+      this.paintHead(container);
+      const feedEl = container.createDiv({ cls: "reel-feed" });
+      this.feedEl = feedEl;
+      for (const row of this.feed)
+        this.mountRow(feedEl, row, container);
+      const live = this.feed.some((r) => r.items.some((i) => !this.handled.has(i.id)));
+      if (!live && this.exhausted) {
+        const empty = container.createDiv({ cls: "reel-empty" });
+        empty.createDiv({ text: "Nothing left to suggest \u2014 try a genre above." });
+        const dismissed = this.plugin.settings.dismissedIds.length;
+        if (dismissed) {
+          empty.createDiv({
+            cls: "reel-dim",
+            text: `${dismissed} dismissed \u2014 clear them in Settings \u2192 Reel to see them again.`
+          });
+        }
+        return;
+      }
+      this.paintFeedSentinel(container);
+    }
+    /**
+     * The thing at the bottom that asks for more.
+     *
+     * A sentinel plus an observer rather than a scroll handler: the body is a
+     * measured, fixed-height element and its scroll events fire at whatever rate
+     * the device feels like, whereas an intersection is asked once and answered
+     * once. The rootMargin means the fetch starts a screen early, so the next row
+     * is usually there before you arrive at the gap.
+     */
+    paintFeedSentinel(container) {
+      const more = this.sources ? this.nextSource < this.sources.length : false;
+      if (!more)
+        return;
+      const sentinel = container.createDiv({ cls: "reel-feed-end" });
+      sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
+      const scroller = container.closest(".reel-view-body") ?? null;
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting))
+            return;
+          void this.mountNext(container);
+        },
+        { root: scroller, rootMargin: "600px 0px" }
+      );
+      io.observe(sentinel);
+      this.watchers.push(io);
+    }
+    /**
+     * Mount the next row, skipping ones that come back empty.
+     *
+     * A source can legitimately return nothing — every title in it is already in
+     * your library, or dismissed, or has no poster. Stopping there would end the
+     * feed on a technicality, so it tries the next one, up to a handful of times
+     * per scroll so a run of empties cannot become an unbounded request loop.
+     */
+    async mountNext(container) {
+      if (this.mounting || !this.sources)
+        return;
+      this.mounting = true;
+      try {
+        for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
+          const source = this.sources[this.nextSource++];
+          const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
+          for (const i of items)
+            this.seen.add(i.id);
+          if (!items.length)
+            continue;
+          const row = { source, items, page: 1, done: false, loading: false };
+          this.feed.push(row);
+          if (this.feedEl && this.feedEl.isConnected) {
+            this.mountRow(this.feedEl, row, container);
+            return;
+          }
+          this.render(container);
+          return;
+        }
+        if (this.nextSource >= (this.sources?.length ?? 0)) {
+          this.exhausted = true;
+          this.render(container);
+        }
+      } catch {
+      } finally {
+        this.mounting = false;
+      }
+    }
+    async loadRows(container) {
+      try {
+        const profile = await this.plugin.discover.taste(this.filters.type);
+        this.profile = profile;
+        this.sources = this.plugin.discover.rowSources(profile, this.filters.type);
+        this.feed = [];
+        this.nextSource = 0;
+        this.seen.clear();
+        this.exhausted = false;
+        this.mounting = false;
+        for (let i = 0; i < 4; i++) {
+          const before = this.feed.length;
+          await this.mountNextSilently();
+          if (this.feed.length === before)
+            break;
+        }
+      } catch (e) {
+        this.error = diagnoseError(e).message;
+      } finally {
+        this.loading = false;
+        this.render(container);
+      }
+    }
+    /** The same step as `mountNext`, without touching the DOM. */
+    async mountNextSilently() {
+      if (!this.sources)
+        return;
+      for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
+        const source = this.sources[this.nextSource++];
+        const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
+        for (const i of items)
+          this.seen.add(i.id);
+        if (!items.length)
+          continue;
+        this.feed.push({ source, items, page: 1, done: false, loading: false });
+        return;
+      }
+    }
+    /**
+     * One shelf, which pages as you scroll it.
+     *
+     * The horizontal sentinel sits at the right-hand end of the strip and is
+     * observed against the strip itself, so it fires when you scroll the row
+     * rather than when the row happens to be on screen. Cards are appended in
+     * place: rebuilding the strip would send it back to the left, which on a row
+     * you are actively scrolling is the most annoying thing a feed can do.
+     */
+    mountRow(into, row, container) {
+      const items = row.items.filter((i) => !this.handled.has(i.id));
+      if (!items.length)
+        return;
+      const section = into.createDiv({ cls: "reel-drow" });
+      const head = section.createDiv({ cls: "reel-drow-head" });
+      head.createDiv({ cls: "reel-drow-title", text: row.source.title });
+      if (row.source.reason)
+        head.createDiv({ cls: "reel-drow-reason", text: row.source.reason });
+      const strip = section.createDiv({ cls: "reel-drow-strip" });
+      for (const item of items)
+        strip.appendChild(this.card(item, container));
+      if (!row.done) {
+        const tail = strip.createDiv({ cls: "reel-drow-tail" });
+        const io = new IntersectionObserver(
+          (entries) => {
+            if (!entries.some((e) => e.isIntersecting))
+              return;
+            void this.extendRow(row, strip, tail, container);
+          },
+          { root: strip, rootMargin: "0px 600px" }
+        );
+        io.observe(tail);
+        this.watchers.push(io);
+      }
       if (!Platform.isMobile) {
         const nav = head.createDiv({ cls: "reel-drow-nav" });
         const by = (delta) => strip.scrollBy({ left: delta, behavior: "smooth" });
@@ -3130,6 +3355,89 @@
         setIcon(right, "chevron-right");
         right.addEventListener("click", () => by(600));
       }
+    }
+    /** Another page for one shelf, appended where you are already looking. */
+    async extendRow(row, strip, tail, container) {
+      if (row.loading || row.done)
+        return;
+      row.loading = true;
+      try {
+        const next = await row.source.fetch(row.page + 1);
+        row.page += 1;
+        const fresh = next.filter((i) => !this.seen.has(i.id) && !this.handled.has(i.id));
+        for (const i of fresh)
+          this.seen.add(i.id);
+        if (!fresh.length) {
+          row.empties = (row.empties ?? 0) + 1;
+          if (row.empties >= 2 || row.page > 20) {
+            row.done = true;
+            tail.remove();
+          }
+          return;
+        }
+        row.empties = 0;
+        row.items = [...row.items, ...fresh];
+        for (const item of fresh)
+          strip.insertBefore(this.card(item, container), tail);
+      } catch {
+        row.done = true;
+        tail.remove();
+      } finally {
+        row.loading = false;
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    /* Search — the view's own box, pointed at TMDB                        */
+    /* ------------------------------------------------------------------ */
+    /**
+     * What a search means on a screen about titles you do not own.
+     *
+     * Anything already in your library is dropped, because the card's actions are
+     * "add" and "watchlist" and offering those for a note you already have is how
+     * you end up with two of them. The count is stated rather than swallowed, with
+     * a way through to the library search, so a title you know you own not
+     * appearing here is explained rather than mysterious.
+     */
+    paintSearch(container) {
+      const q = this.query.trim();
+      if (this.searchedFor !== q) {
+        this.searchResults = null;
+        this.searchedFor = q;
+      }
+      if (!this.searchResults) {
+        skeletonGrid(container, 12, "Searching");
+        if (this.loading)
+          return;
+        this.loading = true;
+        void this.plugin.tmdb.searchMulti(q).then((items2) => {
+          const usable = items2.filter((i) => !i.adult && i.poster_path);
+          const fresh = this.plugin.discover.filterOut(usable);
+          this.searchOwned = usable.length - fresh.length;
+          this.searchResults = fresh;
+        }).catch((e) => {
+          this.error = diagnoseError(e).message;
+        }).finally(() => {
+          this.loading = false;
+          this.render(container);
+        });
+        return;
+      }
+      const items = this.searchResults.filter((i) => !this.handled.has(i.id));
+      const count = container.createDiv({ cls: "reel-block-count" });
+      count.setText(`${items.length} on TMDB for \u201C${q}\u201D`);
+      if (this.searchOwned) {
+        count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
+      }
+      if (!items.length) {
+        const none = container.createDiv({ cls: "reel-empty" });
+        none.createDiv({
+          text: this.searchOwned ? "Everything matching is already in your library." : "Nothing on TMDB matches that."
+        });
+        return;
+      }
+      const grid = container.createDiv({ cls: "reel-dgrid" });
+      for (const item of items)
+        grid.appendChild(this.card(item, container));
     }
     /* ------------------------------------------------------------------ */
     /* Filtered results                                                    */
@@ -3794,6 +4102,293 @@
     return role || void 0;
   }
 
+  // src/reviews.ts
+  var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  function dateFromHeading(heading) {
+    const iso = /(\d{4})-(\d{2})-(\d{2})/.exec(heading);
+    if (iso)
+      return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const pretty = /\b(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})\b/.exec(heading);
+    if (pretty) {
+      const month = MONTHS.indexOf(pretty[2].slice(0, 3).toLowerCase());
+      if (month >= 0) {
+        return `${pretty[3]}-${String(month + 1).padStart(2, "0")}-${pretty[1].padStart(2, "0")}`;
+      }
+    }
+    return void 0;
+  }
+  function ratingFromHeading(heading) {
+    const stars2 = (heading.match(/★/g) ?? []).length;
+    if (!stars2)
+      return void 0;
+    return stars2 + (heading.includes("\xBD") ? 0.5 : 0);
+  }
+  function parseReviews(content) {
+    const out = [];
+    const headings = [...content.matchAll(/^##[ \t]+(.+?)[ \t]*$/gm)];
+    headings.forEach((match, i) => {
+      const heading = match[1];
+      const date = dateFromHeading(heading);
+      if (!date)
+        return;
+      const from = (match.index ?? 0) + match[0].length;
+      const rest = content.slice(from);
+      const nextHeading = /^#{1,6}[ \t]+/m.exec(rest);
+      const to = nextHeading ? from + (nextHeading.index ?? 0) : content.length;
+      out.push({
+        date,
+        heading,
+        rating: ratingFromHeading(heading),
+        text: content.slice(from, to).trim(),
+        from,
+        to
+      });
+    });
+    return out;
+  }
+  function reviewsNewestFirst(content) {
+    return parseReviews(content).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }
+  function replaceReview(content, review, text) {
+    const body = text.trim();
+    const block = body ? `
+
+${body}
+` : "\n";
+    return content.slice(0, review.from) + block + content.slice(review.to);
+  }
+  function appendReviewSection(content, date, rating, text) {
+    const body = text.trim();
+    if (!body)
+      return content;
+    const stars2 = rating != null && rating > 0 ? ` \xB7 ${starString(rating)}` : "";
+    const heading = `## ${prettyDate(date) || date}${stars2}`;
+    const gap = content.endsWith("\n") ? "\n" : "\n\n";
+    return `${content}${gap}${heading}
+
+${body}
+`;
+  }
+  function headingFor(review, rating) {
+    const base = review.date ? prettyDate(review.date) || review.date : review.heading.replace(/\s*·.*$/, "").trim();
+    const stars2 = rating != null && rating > 0 ? ` \xB7 ${starString(rating)}` : "";
+    return `## ${base}${stars2}`;
+  }
+  function replaceHeading(content, review, heading) {
+    const lineStart = content.lastIndexOf("\n", review.from - 1) + 1;
+    return content.slice(0, lineStart) + heading + content.slice(review.from);
+  }
+
+  // src/ui/reviewPane.ts
+  var EXCERPT = 220;
+  function fileFor(plugin2, entry) {
+    const f = plugin2.app.vault.getAbstractFileByPath(entry.path);
+    return f instanceof TFile ? f : null;
+  }
+  var cache = /* @__PURE__ */ new Map();
+  async function readReviews(plugin2, entry) {
+    const file = fileFor(plugin2, entry);
+    if (!file)
+      return [];
+    const hit = cache.get(file.path);
+    if (hit && hit.mtime === file.stat.mtime)
+      return hit.reviews;
+    try {
+      const reviews2 = reviewsNewestFirst(await plugin2.app.vault.cachedRead(file));
+      cache.set(file.path, { mtime: file.stat.mtime, reviews: reviews2 });
+      return reviews2;
+    } catch {
+      return [];
+    }
+  }
+  function forgetReviews(path) {
+    cache.delete(path);
+  }
+  function paintReviews(plugin2, container, entry, opts = {}) {
+    const pane = container.createDiv({ cls: "reel-yours is-loading" });
+    void readReviews(plugin2, entry).then((all2) => {
+      if (!pane.isConnected)
+        return;
+      pane.removeClass("is-loading");
+      draw(plugin2, pane, entry, all2, opts);
+    });
+  }
+  function draw(plugin2, pane, entry, all2, opts) {
+    pane.empty();
+    const reviews2 = opts.onlyDate ? all2.filter((r) => r.date === opts.onlyDate) : all2;
+    const shown2 = opts.limit ? reviews2.slice(0, opts.limit) : reviews2;
+    const repaint = () => {
+      forgetReviews(entry.path);
+      void readReviews(plugin2, entry).then((fresh) => {
+        if (pane.isConnected)
+          draw(plugin2, pane, entry, fresh, opts);
+      });
+      opts.onChange?.();
+    };
+    if (!shown2.length) {
+      if (!opts.editable) {
+        pane.remove();
+        return;
+      }
+      const empty = pane.createDiv({ cls: "reel-yours-empty" });
+      empty.createDiv({ cls: "reel-yours-label", text: opts.heading ?? "Your review" });
+      empty.createDiv({
+        cls: "reel-dim",
+        text: entry.watched.length ? "You have not written about this one yet." : "Write about it now, or when you log it."
+      });
+      const write = empty.createEl("button", { cls: "reel-btn", attr: { type: "button" } });
+      setIcon(write.createSpan(), "pencil-line");
+      write.createSpan({ text: "Write a review" });
+      write.addEventListener("click", () => {
+        new ReviewEditor(plugin2, entry, null, repaint).open();
+      });
+      return;
+    }
+    if (opts.heading !== "")
+      pane.createDiv({ cls: "reel-yours-label", text: opts.heading ?? "Your review" });
+    for (const review of shown2) {
+      const box = pane.createDiv({ cls: "reel-yours-item" });
+      const head = box.createDiv({ cls: "reel-yours-head" });
+      head.createSpan({ cls: "reel-yours-date", text: review.date ? prettyDate(review.date) : review.heading });
+      if (review.rating != null)
+        renderStarsStatic(head.createSpan({ cls: "reel-yours-stars" }), review.rating);
+      if (opts.editable) {
+        const edit = head.createEl("button", {
+          cls: "reel-yours-edit clickable-icon",
+          attr: { type: "button", "aria-label": "Edit this review" }
+        });
+        setIcon(edit, "pencil-line");
+        edit.addEventListener("click", () => new ReviewEditor(plugin2, entry, review, repaint).open());
+      }
+      const long = review.text.length > EXCERPT;
+      const body = box.createDiv({ cls: "reel-yours-body" });
+      body.setText(long && !opts.editable ? `${review.text.slice(0, EXCERPT).trimEnd()}\u2026` : review.text);
+      if (long && !opts.editable) {
+        const more = box.createEl("button", { cls: "reel-yours-more", text: "Read the rest", attr: { type: "button" } });
+        more.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const file = fileFor(plugin2, entry);
+          if (file)
+            void plugin2.app.workspace.getLeaf(false).openFile(file);
+        });
+      }
+    }
+    if (opts.editable) {
+      const add = pane.createEl("button", { cls: "reel-yours-add", attr: { type: "button" } });
+      setIcon(add.createSpan(), "plus");
+      add.createSpan({ text: "Add another" });
+      add.addEventListener("click", () => new ReviewEditor(plugin2, entry, null, repaint).open());
+    } else if (opts.limit && reviews2.length > opts.limit) {
+      pane.createDiv({ cls: "reel-dim reel-yours-count", text: `${reviews2.length - opts.limit} more` });
+    }
+  }
+  var ReviewEditor = class extends Modal {
+    constructor(plugin2, entry, review, onSaved) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.entry = entry;
+      this.review = review;
+      this.onSaved = onSaved;
+      this.saving = false;
+      this.text = review?.text ?? "";
+      this.rating = review?.rating ?? (review ? void 0 : entry.rating);
+      this.date = review?.date ?? this.mostRecentWatch();
+    }
+    /**
+     * The date a fresh review belongs to.
+     *
+     * The last time you watched it, not today: you write the review after the
+     * film, sometimes days after, and dating it "today" quietly puts a viewing
+     * in your diary on a night you were doing something else.
+     */
+    mostRecentWatch() {
+      const dates = this.entry.watched.map((w) => w.date).filter(Boolean).sort();
+      return dates[dates.length - 1] ?? todayISO();
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
+      contentEl.createDiv({ cls: "reel-log-sub", text: this.entry.title });
+      const dateRow = contentEl.createDiv({ cls: "reel-field" });
+      dateRow.createDiv({ cls: "reel-field-label", text: "Date" });
+      const dateEl = dateRow.createEl("input", { cls: "reel-input", attr: { type: "date" } });
+      dateEl.value = this.date;
+      dateEl.disabled = this.review != null;
+      dateEl.addEventListener("change", () => this.date = dateEl.value);
+      const rateRow = contentEl.createDiv({ cls: "reel-field" });
+      rateRow.createDiv({ cls: "reel-field-label", text: "Rating" });
+      const stars2 = rateRow.createDiv({ cls: "reel-chips" });
+      const paintStars = () => {
+        stars2.empty();
+        const none = stars2.createEl("button", { cls: "reel-chip", text: "\u2014", attr: { type: "button" } });
+        none.toggleClass("is-active", this.rating == null);
+        none.addEventListener("click", () => {
+          this.rating = void 0;
+          paintStars();
+        });
+        for (let r = STEP; r <= MAX_STARS; r += STEP) {
+          const b = stars2.createEl("button", { cls: "reel-chip", text: String(r), attr: { type: "button" } });
+          b.toggleClass("is-active", this.rating === r);
+          b.addEventListener("click", () => {
+            this.rating = r;
+            paintStars();
+          });
+        }
+      };
+      paintStars();
+      const box = contentEl.createEl("textarea", {
+        cls: "reel-input reel-review-box",
+        attr: { rows: "8", placeholder: "What did you think?" }
+      });
+      box.value = this.text;
+      box.addEventListener("input", () => this.text = box.value);
+      const actions = contentEl.createDiv({ cls: "reel-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel", attr: { type: "button" } });
+      cancel.addEventListener("click", () => this.close());
+      const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Save", attr: { type: "button" } });
+      save.addEventListener("click", () => void this.save(save));
+      if (!Platform.isPhone)
+        window.setTimeout(() => box.focus(), 0);
+    }
+    async save(button) {
+      if (this.saving)
+        return;
+      this.saving = true;
+      button.disabled = true;
+      button.setText("Saving\u2026");
+      const file = fileFor(this.plugin, this.entry);
+      if (!file) {
+        new Notice("That note has moved or been deleted.");
+        this.close();
+        return;
+      }
+      try {
+        const review = this.review;
+        await this.plugin.app.vault.process(file, (data) => {
+          if (!review)
+            return appendReviewSection(data, this.date, this.rating, this.text);
+          const withHeading = replaceHeading(data, review, headingFor(review, this.rating));
+          const again = reviewsNewestFirst(withHeading).find((r) => r.date === review.date);
+          return again ? replaceReview(withHeading, again, this.text) : withHeading;
+        });
+        forgetReviews(file.path);
+        this.onSaved();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel could not save that review \u2014 ${redact(e)}`);
+        button.disabled = false;
+        button.setText("Save");
+        this.saving = false;
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/ui/detail.ts
   function flagEmoji(iso) {
     const code = iso.trim().toUpperCase();
@@ -3996,6 +4591,10 @@
       if (cast.length)
         this.renderCastStrip(wrap, cast);
       this.renderCreditRows(wrap, cast, crew, isTv);
+      paintReviews(this.plugin, wrap, this.entry, {
+        editable: true,
+        onChange: () => this.rerender()
+      });
       const tabs = [];
       if (cast.length)
         tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
@@ -4014,12 +4613,12 @@
       if (related.length)
         tabs.push({ id: "related", label: "Related", render: (el) => this.renderRelated(el, related) });
       tabs.push({ id: "photos", label: "Photos", render: (el) => void this.renderPhotos(el, isTv) });
-      const reviews = meta.reviews?.results ?? [];
-      if (reviews.length) {
+      const reviews2 = meta.reviews?.results ?? [];
+      if (reviews2.length) {
         tabs.push({
           id: "reviews",
-          label: `Reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
-          render: (el) => this.renderReviews(el, reviews)
+          label: `Other reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
+          render: (el) => this.renderReviews(el, reviews2)
         });
       }
       if (!tabs.length)
@@ -4432,8 +5031,8 @@
      * republishing them. The opening lines are enough to decide whether to
      * read the rest on TMDB.
      */
-    renderReviews(el, reviews) {
-      for (const r of reviews.slice(0, 6)) {
+    renderReviews(el, reviews2) {
+      for (const r of reviews2.slice(0, 6)) {
         const box = el.createDiv({ cls: "reel-review" });
         const head = box.createDiv({ cls: "reel-review-head" });
         head.createSpan({ cls: "reel-review-author", text: r.author ?? r.author_details?.username ?? "Anonymous" });
@@ -5917,26 +6516,160 @@
     for (const s of ["Inside Man", "Christopher Nolan", "Denis Villeneuve", "Action", "Crime", "2010s"]) {
       suggest.createEl("button", { cls: "reel-chip reel-suggest-chip", text: s });
     }
-    const chips = filters.createDiv({ cls: "reel-chips" });
-    for (const [label, on] of [["All", true], ["Films", false], ["Series", false]]) {
-      const b = chips.createEl("button", { cls: "reel-chip", text: label });
-      if (on)
-        b.addClass("is-active");
-    }
-    chips.createSpan({ cls: "reel-dim", text: "\xB7" });
-    for (const s of ["watched", "watchlist", "watching", "completed", "paused"]) {
-      chips.createEl("button", { cls: "reel-chip", text: s });
-    }
+    filterBar(filters, ["Films", "Science Fiction", "\u2630 Christmas with the family"]);
     const sort = filters.createDiv({ cls: "reel-sortbar" });
     sort.createSpan({ cls: "reel-dim", text: "Sort" });
     const sel = sort.createEl("select", { cls: "reel-select dropdown" });
     sel.createEl("option", { text: "Recently watched" });
-    sort.createSpan({ cls: "reel-dim", text: "then" });
-    const sel2 = sort.createEl("select", { cls: "reel-select dropdown" });
-    sel2.createEl("option", { text: "\u2014" });
+    sort.createSpan({ cls: "reel-dim reel-sort-then", text: "then my rating" });
     const body = root.createDiv({ cls: "reel-view-body" });
     body.createDiv({ cls: "reel-view-count", text: `${all.length} titles` });
     renderPosterGrid(plugin, body, all);
+  }
+  function filterBar(into, active) {
+    const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
+    const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
+    open.createSpan({ cls: "reel-filter-btn-icon", text: "\u2699" });
+    open.createSpan({ text: "Filters" });
+    if (active.length)
+      open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
+    for (const label of active) {
+      const tag = bar.createEl("button", { cls: "reel-chip is-active reel-filter-tag" });
+      tag.createSpan({ text: label });
+      tag.createSpan({ cls: "reel-filter-x", text: "\xD7" });
+    }
+    return bar;
+  }
+  function reviewPane(into, editable = true) {
+    const pane = into.createDiv({ cls: "reel-yours" });
+    pane.createDiv({ cls: "reel-yours-label", text: "Your review" });
+    const item = pane.createDiv({ cls: "reel-yours-item" });
+    const head = item.createDiv({ cls: "reel-yours-head" });
+    head.createSpan({ cls: "reel-yours-date", text: "4 Aug 2026" });
+    head.createSpan({ cls: "reel-yours-stars", text: "\u2605\u2605\u2605\u2605" });
+    if (editable)
+      head.createEl("button", { cls: "reel-yours-edit clickable-icon", text: "\u270E" });
+    item.createDiv({
+      cls: "reel-yours-body",
+      text: "Held up far better than I expected. The middle hour drags, and then the last twenty minutes earn every bit of it back \u2014 I have not stopped thinking about the final shot since."
+    });
+    if (editable) {
+      const add = pane.createEl("button", { cls: "reel-yours-add" });
+      add.createSpan({ text: "+" });
+      add.createSpan({ text: "Add another" });
+    }
+    return pane;
+  }
+  function feed(root) {
+    root.addClass("reel-view-body");
+    root.addClass("reel-discover");
+    const head = root.createDiv({ cls: "reel-discover-head" });
+    head.createDiv({
+      cls: "reel-discover-note",
+      text: "Based on your library \u2014 mostly drama, science fiction, thriller."
+    });
+    const refresh = head.createEl("button", { cls: "reel-chip reel-refresh" });
+    refresh.createSpan({ cls: "reel-refresh-icon", text: "\u27F3" });
+    refresh.createSpan({ text: "Refresh" });
+    const feedEl = root.createDiv({ cls: "reel-feed" });
+    for (const [title, reason] of [
+      ["Because you liked Sinners", "Age limit does not apply to this row"],
+      ["Science fiction from the nineties", ""]
+    ]) {
+      const section = feedEl.createDiv({ cls: "reel-drow" });
+      const h = section.createDiv({ cls: "reel-drow-head" });
+      h.createDiv({ cls: "reel-drow-title", text: title });
+      if (reason)
+        h.createDiv({ cls: "reel-drow-reason", text: reason });
+      const strip = section.createDiv({ cls: "reel-drow-strip" });
+      for (const e of all.slice(0, 10)) {
+        const card = strip.createDiv({ cls: "reel-dcard" });
+        plugin.posters.attach(card.createDiv({ cls: "reel-dcard-poster" }), e);
+        card.createDiv({ cls: "reel-dcard-title", text: e.title });
+      }
+      strip.createDiv({ cls: "reel-drow-tail" });
+    }
+    const end = root.createDiv({ cls: "reel-feed-end" });
+    end.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
+  }
+  function filterSheet(root) {
+    const modal = root.createDiv({ cls: "reel-modal reel-filter-sheet reel-sheet" });
+    const head = modal.createDiv({ cls: "reel-filter-head" });
+    head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
+    head.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all" });
+    const body = modal.createDiv({ cls: "reel-filter-body" });
+    const section = (label, values, activeAt = -1) => {
+      const box = body.createDiv({ cls: "reel-filter-section" });
+      box.createDiv({ cls: "reel-filter-label", text: label });
+      const chips = box.createDiv({ cls: "reel-chips reel-filter-chips" });
+      values.forEach((v, i) => {
+        const b = chips.createEl("button", { cls: "reel-chip", text: v });
+        if (i === activeAt)
+          b.addClass("is-active");
+      });
+    };
+    section("Type", ["Everything", "Films", "Series"], 1);
+    section("Status", ["watched", "watchlist", "watching", "completed", "paused", "abandoned"]);
+    section(
+      "Genre",
+      [
+        "Action",
+        "Adventure",
+        "Animation",
+        "Comedy",
+        "Crime",
+        "Documentary",
+        "Drama",
+        "Family",
+        "Fantasy",
+        "History",
+        "Horror",
+        "Music",
+        "Mystery",
+        "Romance",
+        "Science Fiction",
+        "Thriller",
+        "War",
+        "Western"
+      ],
+      14
+    );
+    section("Lists", ["Christmas with the family", "Rewatch pile", "Letterboxd top 250"]);
+    const sortBox = body.createDiv({ cls: "reel-filter-section" });
+    sortBox.createDiv({ cls: "reel-filter-label", text: "Sort" });
+    const sel = sortBox.createEl("select", { cls: "reel-select dropdown" });
+    sel.createEl("option", { text: "Recently watched" });
+    sortBox.createDiv({ cls: "reel-filter-label", text: "Then by" });
+    const sel2 = sortBox.createEl("select", { cls: "reel-select dropdown" });
+    sel2.createEl("option", { text: "My rating" });
+  }
+  function reviews(root) {
+    root.addClass("reel-view-body");
+    root.addClass("reel-detail");
+    reviewPane(root, true);
+    const empty = root.createDiv({ cls: "reel-yours" });
+    empty.createDiv({ cls: "reel-yours-label", text: "Your review" });
+    const box = empty.createDiv({ cls: "reel-yours-empty" });
+    box.createDiv({ cls: "reel-dim", text: "You have not written about this one yet." });
+    const write = box.createEl("button", { cls: "reel-btn" });
+    write.createSpan({ text: "\u270E" });
+    write.createSpan({ text: "Write a review" });
+    const diary = root.createDiv({ cls: "reel-diary" });
+    for (const e of all.slice(0, 3)) {
+      const row = diary.createDiv({ cls: "reel-diary-row" });
+      row.createDiv({ cls: "reel-diary-day", text: "4" });
+      plugin.posters.attach(row.createDiv({ cls: "reel-diary-thumb" }), e);
+      const body = row.createDiv({ cls: "reel-diary-body" });
+      body.createDiv({ cls: "reel-diary-title", text: e.title });
+      const meta = body.createDiv({ cls: "reel-diary-meta" });
+      meta.createSpan({ cls: "reel-dim", text: "4 Aug 2026" });
+      const pane = body.createDiv({ cls: "reel-yours" });
+      const item = pane.createDiv({ cls: "reel-yours-item" });
+      item.createDiv({
+        cls: "reel-yours-body",
+        text: "Held up far better than I expected. The middle hour drags, and then the last twenty minutes earn every bit of it back \u2014 I have not stopped thinking about the final shot."
+      });
+    }
   }
   function rows(root) {
     root.addClass("reel-view-body");
@@ -6030,6 +6763,9 @@
   }
   var SCREENS = {
     library,
+    feed,
+    filterSheet,
+    reviews,
     rows,
     stats,
     upnext,
@@ -6098,7 +6834,7 @@ ${e?.stack ?? ""}` });
   if (app)
     mountObsidianChrome(app);
   if (app && params2.get("audit") != null) {
-    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate"]);
+    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate", "filterSheet"]);
     const skipped = [];
     const results = [];
     for (const name of Object.keys(SCREENS)) {

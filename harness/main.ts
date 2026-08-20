@@ -183,27 +183,198 @@ function library(root: HTMLElement): void {
 		suggest.createEl("button", { cls: "reel-chip reel-suggest-chip", text: s });
 	}
 
-	const chips = filters.createDiv({ cls: "reel-chips" });
-	for (const [label, on] of [["All", true], ["Films", false], ["Series", false]] as const) {
-		const b = chips.createEl("button", { cls: "reel-chip", text: label });
-		if (on) b.addClass("is-active");
-	}
-	chips.createSpan({ cls: "reel-dim", text: "·" });
-	for (const s of ["watched", "watchlist", "watching", "completed", "paused"]) {
-		chips.createEl("button", { cls: "reel-chip", text: s });
-	}
+	// The bar as it ships now: what is set, and a button for everything else.
+	// Long labels on purpose — a director's name and a list called something
+	// unreasonable are the cases that used to widen the whole pane.
+	filterBar(filters, ["Films", "Science Fiction", "☰ Christmas with the family"]);
 
 	const sort = filters.createDiv({ cls: "reel-sortbar" });
 	sort.createSpan({ cls: "reel-dim", text: "Sort" });
 	const sel = sort.createEl("select", { cls: "reel-select dropdown" });
 	sel.createEl("option", { text: "Recently watched" });
-	sort.createSpan({ cls: "reel-dim", text: "then" });
-	const sel2 = sort.createEl("select", { cls: "reel-select dropdown" });
-	sel2.createEl("option", { text: "—" });
+	sort.createSpan({ cls: "reel-dim reel-sort-then", text: "then my rating" });
 
 	const body = root.createDiv({ cls: "reel-view-body" });
 	body.createDiv({ cls: "reel-view-count", text: `${all.length} titles` });
 	renderPosterGrid(plugin, body, all);
+}
+
+/**
+ * The filter bar, as the view draws it.
+ *
+ * One row: a Filters button carrying a count, then one removable chip per
+ * filter that is actually on. The audit cares that this stays a single row
+ * whose width is the pane's — the six-row stack it replaced is what made the
+ * first poster start below the fold.
+ */
+function filterBar(into: HTMLElement, active: string[]): HTMLElement {
+	const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
+	const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
+	open.createSpan({ cls: "reel-filter-btn-icon", text: "⚙" });
+	open.createSpan({ text: "Filters" });
+	if (active.length) open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
+	for (const label of active) {
+		const tag = bar.createEl("button", { cls: "reel-chip is-active reel-filter-tag" });
+		tag.createSpan({ text: label });
+		tag.createSpan({ cls: "reel-filter-x", text: "×" });
+	}
+	return bar;
+}
+
+/**
+ * A review as the detail screen shows it.
+ *
+ * Prose rather than metadata, which is the point — it has to read differently
+ * from the facts around it, and it has to wrap rather than widen the pane.
+ */
+function reviewPane(into: HTMLElement, editable = true): HTMLElement {
+	const pane = into.createDiv({ cls: "reel-yours" });
+	pane.createDiv({ cls: "reel-yours-label", text: "Your review" });
+	const item = pane.createDiv({ cls: "reel-yours-item" });
+	const head = item.createDiv({ cls: "reel-yours-head" });
+	head.createSpan({ cls: "reel-yours-date", text: "4 Aug 2026" });
+	head.createSpan({ cls: "reel-yours-stars", text: "★★★★" });
+	if (editable) head.createEl("button", { cls: "reel-yours-edit clickable-icon", text: "✎" });
+	item.createDiv({
+		cls: "reel-yours-body",
+		text:
+			"Held up far better than I expected. The middle hour drags, and then the last twenty minutes " +
+			"earn every bit of it back — I have not stopped thinking about the final shot since.",
+	});
+	if (editable) {
+		const add = pane.createEl("button", { cls: "reel-yours-add" });
+		add.createSpan({ text: "+" });
+		add.createSpan({ text: "Add another" });
+	}
+	return pane;
+}
+
+/**
+ * The Discover feed, mid-scroll.
+ *
+ * Two mounted shelves, each ending in the sentinel that fetches its next page,
+ * and the page-level sentinel underneath. All three are elements the audit has
+ * to see, because an endless feed that pushes the pane sideways is worse than a
+ * short one that does not.
+ */
+function feed(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	root.addClass("reel-discover");
+
+	const head = root.createDiv({ cls: "reel-discover-head" });
+	head.createDiv({
+		cls: "reel-discover-note",
+		text: "Based on your library — mostly drama, science fiction, thriller.",
+	});
+	const refresh = head.createEl("button", { cls: "reel-chip reel-refresh" });
+	refresh.createSpan({ cls: "reel-refresh-icon", text: "⟳" });
+	refresh.createSpan({ text: "Refresh" });
+
+	const feedEl = root.createDiv({ cls: "reel-feed" });
+	for (const [title, reason] of [
+		["Because you liked Sinners", "Age limit does not apply to this row"],
+		["Science fiction from the nineties", ""],
+	] as const) {
+		const section = feedEl.createDiv({ cls: "reel-drow" });
+		const h = section.createDiv({ cls: "reel-drow-head" });
+		h.createDiv({ cls: "reel-drow-title", text: title });
+		if (reason) h.createDiv({ cls: "reel-drow-reason", text: reason });
+		const strip = section.createDiv({ cls: "reel-drow-strip" });
+		for (const e of all.slice(0, 10)) {
+			const card = strip.createDiv({ cls: "reel-dcard" });
+			plugin.posters.attach(card.createDiv({ cls: "reel-dcard-poster" }), e);
+			card.createDiv({ cls: "reel-dcard-title", text: e.title });
+		}
+		strip.createDiv({ cls: "reel-drow-tail" });
+	}
+
+	const end = root.createDiv({ cls: "reel-feed-end" });
+	end.createDiv({ cls: "reel-loading", text: "Loading more…" });
+}
+
+/** The filter sheet, open. Every option at full height, which is the trade. */
+function filterSheet(root: HTMLElement): void {
+	const modal = root.createDiv({ cls: "reel-modal reel-filter-sheet reel-sheet" });
+	const head = modal.createDiv({ cls: "reel-filter-head" });
+	head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
+	head.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all" });
+
+	const body = modal.createDiv({ cls: "reel-filter-body" });
+	const section = (label: string, values: string[], activeAt = -1) => {
+		const box = body.createDiv({ cls: "reel-filter-section" });
+		box.createDiv({ cls: "reel-filter-label", text: label });
+		const chips = box.createDiv({ cls: "reel-chips reel-filter-chips" });
+		values.forEach((v, i) => {
+			const b = chips.createEl("button", { cls: "reel-chip", text: v });
+			if (i === activeAt) b.addClass("is-active");
+		});
+	};
+
+	section("Type", ["Everything", "Films", "Series"], 1);
+	section("Status", ["watched", "watchlist", "watching", "completed", "paused", "abandoned"]);
+	// Every genre, not the first fourteen — the cap existed because the bar was
+	// one line, and a sheet scrolls.
+	section(
+		"Genre",
+		[
+			"Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family",
+			"Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction",
+			"Thriller", "War", "Western",
+		],
+		14
+	);
+	section("Lists", ["Christmas with the family", "Rewatch pile", "Letterboxd top 250"]);
+
+	const sortBox = body.createDiv({ cls: "reel-filter-section" });
+	sortBox.createDiv({ cls: "reel-filter-label", text: "Sort" });
+	const sel = sortBox.createEl("select", { cls: "reel-select dropdown" });
+	sel.createEl("option", { text: "Recently watched" });
+	sortBox.createDiv({ cls: "reel-filter-label", text: "Then by" });
+	const sel2 = sortBox.createEl("select", { cls: "reel-select dropdown" });
+	sel2.createEl("option", { text: "My rating" });
+}
+
+/**
+ * Reviews, on the two surfaces that show them.
+ *
+ * `DetailScreen` draws the real pane, but it fills in from a file read that
+ * the harness has no vault for — so it removes itself and the audit measures
+ * nothing. This mounts the same markup directly, in both its shapes: the
+ * editable block on a detail screen, and the clipped two-line aside on a diary
+ * row, where a long review would otherwise turn a list of viewings into a wall
+ * of text.
+ */
+function reviews(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	root.addClass("reel-detail");
+	reviewPane(root, true);
+
+	const empty = root.createDiv({ cls: "reel-yours" });
+	empty.createDiv({ cls: "reel-yours-label", text: "Your review" });
+	const box = empty.createDiv({ cls: "reel-yours-empty" });
+	box.createDiv({ cls: "reel-dim", text: "You have not written about this one yet." });
+	const write = box.createEl("button", { cls: "reel-btn" });
+	write.createSpan({ text: "✎" });
+	write.createSpan({ text: "Write a review" });
+
+	const diary = root.createDiv({ cls: "reel-diary" });
+	for (const e of all.slice(0, 3)) {
+		const row = diary.createDiv({ cls: "reel-diary-row" });
+		row.createDiv({ cls: "reel-diary-day", text: "4" });
+		plugin.posters.attach(row.createDiv({ cls: "reel-diary-thumb" }), e);
+		const body = row.createDiv({ cls: "reel-diary-body" });
+		body.createDiv({ cls: "reel-diary-title", text: e.title });
+		const meta = body.createDiv({ cls: "reel-diary-meta" });
+		meta.createSpan({ cls: "reel-dim", text: "4 Aug 2026" });
+		const pane = body.createDiv({ cls: "reel-yours" });
+		const item = pane.createDiv({ cls: "reel-yours-item" });
+		item.createDiv({
+			cls: "reel-yours-body",
+			text:
+				"Held up far better than I expected. The middle hour drags, and then the last twenty " +
+				"minutes earn every bit of it back — I have not stopped thinking about the final shot.",
+		});
+	}
 }
 
 function rows(root: HTMLElement): void {
@@ -337,6 +508,9 @@ function logsheet(root: HTMLElement): void {
 
 const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	library,
+	feed,
+	filterSheet,
+	reviews,
 	rows,
 	stats,
 	upnext,
@@ -524,7 +698,7 @@ if (app && params.get("audit") != null) {
 	 * Logged rather than dropped quietly. A pass that silently covers less than
 	 * it appears to is how a green tick stops meaning anything.
 	 */
-	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate"]);
+	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet"]);
 	const skipped: string[] = [];
 
 	const results: { screen: string; checks: Check[] }[] = [];

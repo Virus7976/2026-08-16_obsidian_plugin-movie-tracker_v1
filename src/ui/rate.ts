@@ -53,12 +53,21 @@ export class RateScreen {
 
 	constructor(private plugin: ReelPlugin) {}
 
+	/**
+	 * The view's filtered-and-searched set, when it has one.
+	 *
+	 * Assigned rather than passed to the constructor because the screen is kept
+	 * across repaints — that is what preserves your place in the queue — so it
+	 * outlives any one set of filters.
+	 */
+	scope: Entry[] | null = null;
+
 	private get def(): QueueDef {
 		return QUEUES.find((q) => q.id === this.queue) ?? QUEUES[0];
 	}
 
 	private pool(): Entry[] {
-		const all = this.plugin.visible(this.plugin.library.all());
+		const all = this.scope ?? this.plugin.visible(this.plugin.library.all());
 		const base =
 			this.queue === "unrated"
 				? all.filter((e) => e.rating == null && (e.watched.length > 0 || e.status === "watched" || e.status === "completed"))

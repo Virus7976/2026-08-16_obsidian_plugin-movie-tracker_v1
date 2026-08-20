@@ -151,7 +151,7 @@ export class TmdbClient {
 	 * request each time. Trending changes daily, so a short TTL is honest; the
 	 * shared cache TTL is close enough and keeps one policy rather than two.
 	 */
-	async discover(kind: "trending" | "popular" | "top" | "upcoming"): Promise<TmdbSearchResult[]> {
+	async discover(kind: "trending" | "popular" | "top" | "upcoming", page = 1): Promise<TmdbSearchResult[]> {
 		const path =
 			kind === "trending"
 				? "/trending/all/week"
@@ -161,8 +161,13 @@ export class TmdbClient {
 						? "/movie/top_rated"
 						: "/movie/upcoming";
 
-		const data = await this.cached(`discover-${kind}`, () =>
-			this.request<{ results?: TmdbSearchResult[] }>(path, {})
+		// Page one and only page one, until now — which is most of why every
+		// Discover row ended at about twenty cards and stayed identical between
+		// visits. The cache key has to carry the page or page two would be served
+		// page one's answer forever.
+		const n = Math.max(1, Math.min(500, Math.floor(page)));
+		const data = await this.cached(`discover-${kind}${n > 1 ? `-p${n}` : ""}`, () =>
+			this.request<{ results?: TmdbSearchResult[] }>(path, n > 1 ? { page: String(n) } : {})
 		);
 
 		return (data.results ?? [])
@@ -179,9 +184,13 @@ export class TmdbClient {
 	 * that merely share a genre — which is why it beats `/similar` as the seed
 	 * for a "because you liked X" row.
 	 */
-	async recommendations(id: number, kind: "movie" | "tv"): Promise<TmdbSearchResult[]> {
-		const data = await this.cached(`rec-${kind}-${id}`, () =>
-			this.request<{ results?: TmdbSearchResult[] }>(`/${kind}/${id}/recommendations`, {})
+	async recommendations(id: number, kind: "movie" | "tv", page = 1): Promise<TmdbSearchResult[]> {
+		const n = Math.max(1, Math.min(500, Math.floor(page)));
+		const data = await this.cached(`rec-${kind}-${id}${n > 1 ? `-p${n}` : ""}`, () =>
+			this.request<{ results?: TmdbSearchResult[] }>(
+				`/${kind}/${id}/recommendations`,
+				n > 1 ? { page: String(n) } : {}
+			)
 		);
 		return (data.results ?? []).map((r) => ({ ...r, media_type: r.media_type ?? kind }));
 	}

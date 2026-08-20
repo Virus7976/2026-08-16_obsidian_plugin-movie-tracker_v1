@@ -40,6 +40,26 @@ export interface DiscoverRow {
 	items: TmdbSearchResult[];
 }
 
+/**
+ * A row that has not been fetched yet, and can be asked for more.
+ *
+ * The screen used to receive eight finished rows of about twenty cards each
+ * and that was the entire feed: every row ended, the page ended, and coming
+ * back tomorrow showed exactly the same thing. It read as a hardcoded block
+ * because functionally it was one.
+ *
+ * A source is the row *before* it exists — a title, a reason, and a way to ask
+ * for page n. The screen mounts them as you scroll down and pages them as you
+ * scroll sideways, so both axes keep going.
+ */
+export interface RowSource {
+	id: string;
+	title: string;
+	reason?: string;
+	/** Page n, 1-based. An empty array means this row has run out. */
+	fetch(page: number): Promise<TmdbSearchResult[]>;
+}
+
 export interface TasteProfile {
 	/** Genre ids, most-liked first. */
 	genreIds: number[];
@@ -284,6 +304,136 @@ export class DiscoverEngine {
 
 		const rows = await Promise.all(jobs);
 		return rows.filter((r): r is DiscoverRow => r != null && r.items.length > 0);
+	}
+
+	/**
+	 * How far the feed has been re-rolled.
+	 *
+	 * Refresh does not re-request the same pages and hope TMDB changed its mind;
+	 * it moves every row along. Kept on the engine rather than the screen so a
+	 * tab switch does not quietly undo a refresh you just asked for.
+	 */
+	private salt = 0;
+
+	reroll(): void {
+		this.salt += 1;
+	}
+
+	get rollCount(): number {
+		return this.salt;
+	}
+
+	/**
+	 * Every row this library can produce, in the order it should appear.
+	 *
+	 * Long by construction, and unbounded at the tail. The personal rows come
+	 * first because they are the only ones a tracker can do better than a
+	 * streaming front page; then the broad ones; then genre and decade
+	 * combinations drawn from your own taste, which is where the count stops
+	 * being small; then popularity, paged forever, so scrolling never hits a
+	 * wall even on a library with nothing rated in it.
+	 */
+	rowSources(profile: TasteProfile, type: "movie" | "tv" = "movie"): RowSource[] {
+		const out: RowSource[] = [];
+		// Every fetch is offset by the reroll count, so "refresh" means different
+		// titles rather than the same ones in a different order.
+		const at = (page: number): number => page + this.salt;
+		const push = (id: string, title: string, fetch: (page: number) => Promise<TmdbSearchResult[]>, reason?: string): void => {
+			out.push({ id, title, reason, fetch: (p) => fetch(p).then((items) => this.filterOut(items)).catch(() => []) });
+		};
+
+		// People you have explicitly liked or rated lead everything else. TMDB's
+		// with_cast and with_crew exist only on /discover/movie, so for series
+		// this group is absent rather than silently returning something else.
+		if (type === "movie") {
+			for (const person of this.favouritePeople()) {
+				push(
+					`person-${person.id}`,
+					person.as === "crew" ? `More from ${person.name}` : `More with ${person.name}`,
+					(p) => this.plugin.tmdb.discoverBy({ type, withPerson: person.id, personAs: person.as, page: at(p) }),
+					"Someone you rated"
+				);
+			}
+		}
+
+		// Eight seeds rather than three: the cap existed because every row was
+		// fetched up front, and now they are fetched as you reach them.
+		const ceiling = this.plugin.settings.maxCertification;
+		for (const seed of profile.seeds.slice(0, 8)) {
+			push(
+				`rec-${seed.tmdbId}`,
+				`Because you liked ${seed.title}`,
+				(p) => this.plugin.tmdb.recommendations(seed.tmdbId, seed.type === "tv" ? "tv" : "movie", at(p)),
+				// Honest rather than silent: TMDB offers no certification ceiling on
+				// this endpoint, and pretending otherwise is how a content filter
+				// loses your trust for good.
+				ceiling ? "Age limit does not apply to this row" : undefined
+			);
+		}
+
+		// /trending cannot take a certification ceiling. Rather than show an
+		// unfiltered row to someone who set one, ask /discover for popular titles
+		// instead — a slightly different list, but one the ceiling reaches.
+		if (ceiling && type === "movie") {
+			push("trending", "Popular right now", (p) => this.plugin.tmdb.discoverBy({ type, page: at(p) }), `Within your ${ceiling} limit`);
+		} else {
+			push("trending", "Trending this week", (p) => this.plugin.tmdb.discover("trending", at(p)));
+		}
+
+		push("top", type === "tv" ? "Acclaimed series" : "Acclaimed films you have missed", (p) =>
+			type === "tv"
+				? this.plugin.tmdb.discoverBy({ type, minRating: 8, page: at(p) })
+				: this.plugin.tmdb.discover("top", at(p))
+		);
+
+		if (type === "movie") {
+			push("upcoming", "Coming soon", (p) => this.plugin.tmdb.discover("upcoming", at(p)));
+		}
+
+		// Your genres, each one its own row, then each one crossed with a decade.
+		// Ten genres and six decades is sixty rows before the endless tail begins,
+		// and every one of them is built from what you actually rate highly.
+		const genreIds = profile.genreIds.slice(0, 10);
+		const genreNames = profile.genreNames.slice(0, 10);
+		genreIds.forEach((id, i) => {
+			const name = genreNames[i] ?? "";
+			if (!name) return;
+			push(
+				`genre-${id}`,
+				`Highly rated ${name.toLowerCase()}`,
+				(p) => this.plugin.tmdb.discoverBy({ type, genreId: id, minRating: 7, page: at(p) }),
+				i === 0 ? "Your most-watched genre" : undefined
+			);
+		});
+
+		const decades = [2020, 2010, 2000, 1990, 1980, 1970];
+		for (const decade of decades) {
+			genreIds.forEach((id, i) => {
+				const name = genreNames[i] ?? "";
+				if (!name) return;
+				push(`genre-${id}-${decade}`, `${name} from the ${String(decade).slice(2)}s`, (p) =>
+					this.plugin.tmdb.discoverBy({ type, genreId: id, decade, page: at(p) })
+				);
+			});
+		}
+
+		/*
+		 * The tail, which never runs out.
+		 *
+		 * Without this a library with nothing rated in it reaches the end of the
+		 * feed in four rows, and "there is always more" has to be true on the
+		 * first day as well as the hundredth. Each row is a deeper slice of
+		 * popularity, so it stays ordered rather than turning into noise.
+		 */
+		for (let i = 0; i < 40; i++) {
+			const from = i * 3 + 1;
+			push(`more-${i}`, i === 0 ? "More to look at" : `Still more`, async (p) => {
+				const page = at(from + p - 1);
+				return this.plugin.tmdb.discoverBy({ type, page });
+			});
+		}
+
+		return out;
 	}
 
 	/** Stop suggesting something. Persisted, so it stays gone. */
