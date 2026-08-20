@@ -1441,8 +1441,13 @@
       const box = el.createDiv({ cls: "reel-facts" });
       for (const f of facts) {
         const row = box.createDiv({ cls: "reel-fact" });
-        row.createDiv({ cls: "reel-fact-label", text: f.label });
-        row.createDiv({ cls: "reel-fact-value", text: f.value });
+        if (f.entry) {
+          const thumb = row.createDiv({ cls: "reel-fact-thumb" });
+          plugin2.posters.attach(thumb, f.entry);
+        }
+        const text = row.createDiv({ cls: "reel-fact-text" });
+        text.createDiv({ cls: "reel-fact-label", text: f.label });
+        text.createDiv({ cls: "reel-fact-value", text: f.value });
         if (!f.entry)
           continue;
         const entry = f.entry;

@@ -498,8 +498,32 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		const box = el.createDiv({ cls: "reel-facts" });
 		for (const f of facts) {
 			const row = box.createDiv({ cls: "reel-fact" });
-			row.createDiv({ cls: "reel-fact-label", text: f.label });
-			row.createDiv({ cls: "reel-fact-value", text: f.value });
+
+			/*
+			 * Show the film the sentence is about.
+			 *
+			 * "Highest rated — Iron Man — 5★" is a statement about a specific
+			 * title, printed as text, with the title itself absent. Reported as
+			 * "plain text with nothing to show what it's saying", which is
+			 * exactly right: this is the one part of the page where naming a
+			 * film and showing nothing of it is least defensible, because the
+			 * film is already identified. Every one of these rows has carried
+			 * its `entry` since they were written — the poster was one property
+			 * away the whole time.
+			 *
+			 * Unlike a wash, this is a real thumbnail rather than a blur. A wash
+			 * is for surfaces that are *about* a title without naming one; here
+			 * the title is named, so the honest illustration is the actual
+			 * poster at a size you can recognise.
+			 */
+			if (f.entry) {
+				const thumb = row.createDiv({ cls: "reel-fact-thumb" });
+				plugin.posters.attach(thumb, f.entry);
+			}
+
+			const text = row.createDiv({ cls: "reel-fact-text" });
+			text.createDiv({ cls: "reel-fact-label", text: f.label });
+			text.createDiv({ cls: "reel-fact-value", text: f.value });
 			// Each superlative names one title, so it should open that title.
 			if (!f.entry) continue;
 			const entry = f.entry;

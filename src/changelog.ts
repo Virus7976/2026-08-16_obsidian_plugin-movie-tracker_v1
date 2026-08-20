@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.31",
+		date: "2026-08-20",
+		headline: "Every superlative shows the film it is about.",
+		changes: [
+			{
+				kind: "new",
+				text: "“Highest rated”, “Longest” and the rest now show the film's poster beside them.",
+				note: "These rows name one specific title and showed nothing of it — plain text describing a film, with the film absent. Each row has carried its entry since it was written, so the poster was one property away the whole time.",
+			},
+			{
+				kind: "better",
+				text: "Those rows read as a poster with a caption rather than a line of text.",
+				note: "The label sits above the title, at body size and clamped to two lines, so the row height is set by the poster instead of by however long the film's name happens to be.",
+			},
+		],
+	},
+	{
 		version: "0.8.30",
 		date: "2026-08-20",
 		headline: "The stats facts really do fit on one line now.",

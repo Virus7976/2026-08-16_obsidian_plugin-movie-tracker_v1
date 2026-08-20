@@ -13286,3 +13286,89 @@ input.reel-input {
 		filter: blur(26px);
 	}
 }
+
+
+/* ==================================================================== */
+/* A superlative shows the film it is about                             */
+/* ==================================================================== */
+
+/*
+ * These rows became a poster beside its sentence, which changes the layout
+ * they want.
+ *
+ * The one-line treatment added earlier was the right answer for a bare
+ * label-and-value pair: with nothing else in the row, side by side is denser
+ * and scans better. With a thumbnail present the correct shape is the standard
+ * media row — image, then a text column stacked beside it — because the poster
+ * now anchors the left edge and the text has a column of its own to occupy.
+ *
+ * So the label goes back above the value, and it costs nothing: the row's
+ * height is set by the poster either way.
+ */
+.reel-view .reel-stats .reel-fact {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--reel-space-3);
+	padding-block: var(--reel-space-2);
+}
+
+.reel-fact-thumb {
+	flex: 0 0 auto;
+	width: 40px;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--reel-radius-sm, 6px);
+	overflow: hidden;
+	background: var(--background-secondary);
+	box-shadow: var(--reel-shadow-poster);
+}
+
+.reel-fact-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.reel-fact-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+/* Left, not right. The value used to be right-aligned because it was the far
+   end of a two-column row; now it opens a text column, and a column reads from
+   its own left edge. */
+.reel-view .reel-stats .reel-fact-value {
+	text-align: left;
+}
+
+.reel-view .reel-stats .reel-fact-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+/*
+ * The value sits at body size and stops after two lines.
+ *
+ * It was set at display size for a row that had nothing else in it. Beside a
+ * poster it is one element among several, and at that scale in a column 40px
+ * narrower it wrapped to four lines — rows went to 138px to hold a sentence
+ * that reads perfectly well at 15px. The number in it is the emphasis, not the
+ * whole string.
+ *
+ * Clamped rather than truncated with an ellipsis: two lines is enough for
+ * almost every real title, and a film cut off mid-word to save 20px is a worse
+ * trade than a row that is occasionally two lines tall.
+ */
+.reel-view .reel-stats .reel-fact-value {
+	font-size: var(--font-ui-medium);
+	line-height: 1.35;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
