@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.17",
+		date: "2026-08-20",
+		headline: "The stars on the Rate tab look like something you can press.",
+		changes: [
+			{
+				kind: "better",
+				text: "The five stars on the Rate card are legible and respond to a press.",
+				note: "They were drawn in a border colour, so the one control the whole tab exists for was the palest thing on the screen and read as disabled.",
+			},
+			{
+				kind: "fixed",
+				text: "The keyboard hint under the Rate card is readable on a wide pane.",
+			},
+		],
+	},
+	{
 		version: "0.8.16",
 		date: "2026-08-20",
 		headline: "The fix for long titles now covers the Upcoming rows too.",

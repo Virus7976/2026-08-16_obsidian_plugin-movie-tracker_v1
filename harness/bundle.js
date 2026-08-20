@@ -401,7 +401,8 @@
         const dom = 1 + Math.floor(rand() * 27);
         const date = `2025-${String(m + 1).padStart(2, "0")}-${String(dom).padStart(2, "0")}`;
         const r = rand();
-        const rating = r > 0.92 ? 2.5 : r > 0.75 ? 3 : r > 0.4 ? 3.5 : r > 0.15 ? 4 : r > 0.04 ? 4.5 : 5;
+        const unrated = r > 0.84;
+        const rating = unrated ? void 0 : r > 0.75 ? 3 : r > 0.4 ? 3.5 : r > 0.15 ? 4 : r > 0.04 ? 4.5 : 5;
         const decade = 1970 + Math.floor(rand() * 6) * 10;
         out.push(
           film({
@@ -1307,11 +1308,11 @@
       tile("Films per month", (watched.length / perMonth).toFixed(1));
     const watchlist = all2.filter((e) => e.status === "watchlist").length;
     if (watchlist) {
-      const rate = perMonth ? watched.length / perMonth : 0;
+      const rate2 = perMonth ? watched.length / perMonth : 0;
       tile(
         "On the watchlist",
         String(watchlist),
-        rate > 0 ? `${Math.ceil(watchlist / rate)} months at this pace` : void 0,
+        rate2 > 0 ? `${Math.ceil(watchlist / rate2)} months at this pace` : void 0,
         show("On the watchlist", all2.filter((e) => e.status === "watchlist"))
       );
     }
@@ -6312,6 +6313,237 @@ ${body}
     }
   };
 
+  // src/ui/rate.ts
+  var QUEUES = [
+    { id: "unrated", label: "Unrated", empty: "Everything you've watched is rated." },
+    { id: "watchlist", label: "Watchlist", empty: "Nothing on the watchlist." },
+    { id: "all", label: "Everything", empty: "Nothing in the library yet." }
+  ];
+  var RateScreen = class {
+    constructor(plugin2) {
+      this.plugin = plugin2;
+      this.queue = "unrated";
+      this.index = 0;
+      this.skipped = /* @__PURE__ */ new Set();
+      /**
+       * Acted on this session. The queue is rebuilt from the library index on
+       * every repaint, but metadataCache hasn't reparsed by then — so a film you
+       * just rated still looks unrated and you'd be handed the same card again.
+       */
+      this.handled = /* @__PURE__ */ new Set();
+      /**
+       * The view's filtered-and-searched set, when it has one.
+       *
+       * Assigned rather than passed to the constructor because the screen is kept
+       * across repaints — that is what preserves your place in the queue — so it
+       * outlives any one set of filters.
+       */
+      this.scope = null;
+    }
+    get def() {
+      return QUEUES.find((q) => q.id === this.queue) ?? QUEUES[0];
+    }
+    pool() {
+      const all2 = this.scope ?? this.plugin.visible(this.plugin.library.all());
+      const base = this.queue === "unrated" ? all2.filter((e) => e.rating == null && (e.watched.length > 0 || e.status === "watched" || e.status === "completed")) : this.queue === "watchlist" ? all2.filter((e) => e.status === "watchlist") : all2;
+      return base.filter((e) => !this.skipped.has(e.path) && !this.handled.has(e.path));
+    }
+    render(container) {
+      container.empty();
+      container.addClass("reel-rate");
+      const bar = container.createDiv({ cls: "reel-chips" });
+      for (const q of QUEUES) {
+        const chip = bar.createEl("button", { cls: "reel-chip", text: q.label });
+        chip.toggleClass("is-active", this.queue === q.id);
+        chip.addEventListener("click", () => {
+          this.queue = q.id;
+          this.index = 0;
+          this.handled.clear();
+          this.skipped.clear();
+          this.render(container);
+        });
+      }
+      this.renderLibraryQueue(container);
+    }
+    /* ------------------------------------------------------------------ */
+    /* Rate — titles you already have                                      */
+    /* ------------------------------------------------------------------ */
+    renderLibraryQueue(container) {
+      const rows2 = this.pool();
+      if (!rows2.length) {
+        const done = container.createDiv({ cls: "reel-empty" });
+        done.createDiv({ text: this.skipped.size ? "Nothing left in this queue." : this.def.empty });
+        if (this.handled.size) {
+          done.createDiv({
+            cls: "reel-dim",
+            text: `${this.handled.size} handled this session.`
+          });
+        }
+        if (this.skipped.size) {
+          const again = done.createEl("button", { cls: "reel-btn", text: `Bring back ${this.skipped.size} skipped` });
+          again.addEventListener("click", () => {
+            this.skipped.clear();
+            this.index = 0;
+            this.render(container);
+          });
+        }
+        return;
+      }
+      if (this.index >= rows2.length)
+        this.index = 0;
+      const entry = rows2[this.index];
+      container.createDiv({ cls: "reel-rate-count", text: `${this.index + 1} of ${rows2.length}` });
+      const card = container.createDiv({ cls: "reel-rate-card" });
+      card.setAttr("tabindex", "0");
+      card.addEventListener("keydown", (ev) => void this.handleKey(ev, entry, container, rows2.length));
+      if (!Platform.isMobile)
+        window.setTimeout(() => card.focus(), 0);
+      const posterEl = card.createDiv({ cls: "reel-rate-poster" });
+      this.plugin.posters.attach(posterEl, entry);
+      posterEl.addEventListener("click", () => void this.plugin.openDetail(entry));
+      const body = card.createDiv({ cls: "reel-rate-body" });
+      const title = body.createDiv({ cls: "reel-rate-title" });
+      title.createSpan({ text: entry.title });
+      const year = entry.year ?? entry.firstAirYear;
+      if (year)
+        title.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const facts = body.createDiv({ cls: "reel-header-facts" });
+      const people = entry.type === "tv" ? entry.creators : entry.director;
+      if (people.length)
+        facts.createSpan({ text: people.map(unlink).slice(0, 2).join(", ") });
+      if (entry.runtime)
+        facts.createSpan({ text: formatMinutes(entry.runtime) });
+      if (entry.genres.length)
+        facts.createSpan({ cls: "reel-dim", text: entry.genres.slice(0, 2).join(", ") });
+      if (entry.imdbRating != null)
+        facts.createSpan({ cls: "reel-dim", text: `IMDb ${entry.imdbRating.toFixed(1)}` });
+      if (entry.overview)
+        body.createDiv({ cls: "reel-rate-overview", text: entry.overview });
+      const starRow = body.createDiv({ cls: "reel-rating-row big" });
+      renderStars(starRow, {
+        value: entry.rating,
+        onChange: (v) => void this.applyRating(entry, v, container, rows2.length)
+      });
+      const actions = container.createDiv({ cls: "reel-rate-actions" });
+      const act = (label, cls, fn) => {
+        const b = actions.createEl("button", { cls: `reel-btn ${cls}`, text: label });
+        b.addEventListener("click", () => void Promise.resolve(fn(b)));
+        return b;
+      };
+      act("Skip", "", () => {
+        this.skipped.add(entry.path);
+        this.render(container);
+      });
+      act(entry.liked ? "\u2665 Liked" : "\u2661 Like", entry.liked ? "is-liked" : "", async (b) => {
+        const file = this.fileFor(entry);
+        if (!file)
+          return;
+        const on = await this.plugin.notes.toggleLiked(file);
+        entry.liked = on;
+        b.setText(on ? "\u2665 Liked" : "\u2661 Like");
+        b.toggleClass("is-liked", on);
+      });
+      if (entry.status !== "watchlist") {
+        act("\u2192 Watchlist", "", async () => {
+          const file = this.fileFor(entry);
+          if (!file)
+            return;
+          await this.plugin.notes.setStatus(file, "watchlist");
+          this.handled.add(entry.path);
+          this.plugin.undo.offer(`${entry.title} moved to the watchlist`);
+          this.advance(container, rows2.length);
+        });
+      } else {
+        act("Mark watched", "mod-cta", async () => {
+          const file = this.fileFor(entry);
+          if (!file)
+            return;
+          if (entry.type === "tv")
+            await this.plugin.notes.setStatus(file, "watching");
+          else
+            await this.plugin.notes.logFilm(file, { date: todayISO(), rating: entry.rating });
+          this.handled.add(entry.path);
+          this.plugin.undo.offer(`${entry.title} marked watched`);
+          this.advance(container, rows2.length);
+        });
+      }
+      if (!Platform.isMobile) {
+        container.createDiv({
+          cls: "reel-rate-hint",
+          text: "1\u20135 to rate \xB7 shift for halves \xB7 \u2190 \u2192 to move \xB7 s skip \xB7 l like"
+        });
+      }
+      this.renderNav(container, rows2.length);
+    }
+    renderNav(container, total) {
+      const nav = container.createDiv({ cls: "reel-rate-nav" });
+      const prev = nav.createEl("button", { cls: "reel-btn", text: "\u2190 Previous" });
+      prev.disabled = this.index === 0;
+      prev.addEventListener("click", () => {
+        this.index = Math.max(0, this.index - 1);
+        this.render(container);
+      });
+      const next = nav.createEl("button", { cls: "reel-btn", text: "Next \u2192" });
+      next.addEventListener("click", () => {
+        this.index = this.index + 1 >= total ? 0 : this.index + 1;
+        this.render(container);
+      });
+    }
+    async applyRating(entry, v, container, total) {
+      const file = this.fileFor(entry);
+      if (!file)
+        return;
+      try {
+        await this.plugin.notes.setRating(file, v ?? null);
+        if (v != null)
+          this.handled.add(entry.path);
+        new Notice(v == null ? `${entry.title}: rating cleared` : `${entry.title}: ${v}\u2605`);
+        this.advance(container, total);
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+      }
+    }
+    /** 1–5 rate, shift for halves, arrows move, s skips, l likes. */
+    async handleKey(ev, entry, container, total) {
+      const file = this.fileFor(entry);
+      if (!file)
+        return;
+      if (ev.key >= "1" && ev.key <= "5") {
+        ev.preventDefault();
+        const whole = Number(ev.key);
+        await this.applyRating(entry, ev.shiftKey ? whole - 0.5 : whole, container, total);
+        return;
+      }
+      switch (ev.key) {
+        case "ArrowRight":
+        case "s":
+          ev.preventDefault();
+          this.skipped.add(entry.path);
+          this.render(container);
+          break;
+        case "ArrowLeft":
+          ev.preventDefault();
+          this.index = Math.max(0, this.index - 1);
+          this.render(container);
+          break;
+        case "l":
+          ev.preventDefault();
+          await this.plugin.notes.toggleLiked(file);
+          this.render(container);
+          break;
+      }
+    }
+    advance(container, total) {
+      if (this.queue !== "unrated")
+        this.index = this.index + 1 >= total ? 0 : this.index + 1;
+      this.render(container);
+    }
+    fileFor(entry) {
+      const f = this.plugin.app.vault.getAbstractFileByPath(entry.path);
+      return f instanceof TFile ? f : null;
+    }
+  };
+
   // src/settings.ts
   var DEFAULT_SETTINGS = {
     keyMode: "encrypted",
@@ -7345,6 +7577,10 @@ ${body}
     tintWorstCase(root);
     withPool(YEAR, () => paintStats(plugin, root, { include: "all" }));
   }
+  function rate(root) {
+    root.addClass("reel-view-body");
+    withPool(YEAR, () => new RateScreen(plugin).render(root));
+  }
   function upnext(root) {
     root.addClass("reel-view-body");
     heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance \u2014 up to S2E4", art: true, compact: true });
@@ -7441,6 +7677,7 @@ ${body}
     filterSheet,
     reviews,
     rows,
+    rate,
     stats,
     statsYear,
     upnext,

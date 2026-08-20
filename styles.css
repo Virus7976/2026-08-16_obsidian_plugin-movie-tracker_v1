@@ -10891,3 +10891,59 @@ input.reel-input {
  *
  * The ragged height is the better failure. It is the wrap doing its job.
  */
+
+
+/* ==================================================================== */
+/* The Rate card's stars are the point of the screen                    */
+/* ==================================================================== */
+
+/*
+ * An empty star is `--background-modifier-border`, which is a *border* colour:
+ * right for the small read-only stars scattered through a list, where the row
+ * is the content and the rating is an annotation on it.
+ *
+ * The Rate tab inverts that. There is one title on screen and one thing to do
+ * with it, and the five stars are that thing — yet they were the palest element
+ * on the card, light grey on light grey, sitting under a poster that takes half
+ * the screen. The control the whole tab exists for looked disabled.
+ *
+ * No check could have found this. `contrastAA` skips `.reel-stars` on purpose,
+ * because a star is a glyph rather than text and the rating is announced by the
+ * control's own aria-label — a sound exemption that happens to cover the one
+ * place where the glyph *is* the interface.
+ *
+ * Scoped to the big centred widget so the annotation stars elsewhere keep
+ * receding, which is correct for them.
+ */
+.reel-rate .reel-rating-row.big .reel-star-bg,
+.reel-rate .reel-stars .reel-star-bg {
+	color: var(--text-faint);
+	opacity: 0.85;
+}
+
+/* And it should look pressable, not painted on. */
+.reel-rate .reel-stars .reel-star {
+	transition: transform 120ms ease;
+}
+
+.reel-rate .reel-stars .reel-star:active {
+	transform: scale(0.88);
+}
+
+
+/*
+ * `--text-faint` as text, for the sixth time in this stylesheet.
+ *
+ * 2.85:1 on the keyboard hint under the Rate card. It only appears on a wide
+ * pane, which is why the phone passes and three other passes did not — and why
+ * it survived until the Rate screen was first put in the rig at all.
+ *
+ * The pattern is worth stating plainly at this point: `--text-faint` is a
+ * *hairline* colour, meant for borders and dividers. It looks correct in every
+ * design mockup and fails the moment somebody reads it. Anything with words in
+ * it wants `--text-muted`, which is the quietest colour that is still text.
+ */
+.reel-rate .reel-rate-hint,
+.reel-rate-hint {
+	color: var(--text-muted);
+}

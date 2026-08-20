@@ -278,7 +278,30 @@ export const YEAR: Entry[] = (() => {
 			// Ratings cluster high with a thin tail, which is what a rating
 			// histogram is supposed to reveal and cannot when every bucket is 0.
 			const r = rand();
-			const rating = r > 0.92 ? 2.5 : r > 0.75 ? 3 : r > 0.4 ? 3.5 : r > 0.15 ? 4 : r > 0.04 ? 4.5 : 5;
+			/*
+			 * One in six goes unrated, which is both realistic and the only way
+			 * the Rate tab has anything to show.
+			 *
+			 * Rating every title made that screen render "Everything you've
+			 * watched is rated" — so the first time it was ever put in the rig,
+			 * what got rendered was its empty state. A fixture where every
+			 * record is complete does not exercise the screens that exist to
+			 * deal with incomplete ones, and it quietly skews the stats page
+			 * too: an average rating over 100% of a library is a number nobody
+			 * has.
+			 */
+			const unrated = r > 0.84;
+			const rating = unrated
+				? undefined
+				: r > 0.75
+					? 3
+					: r > 0.4
+						? 3.5
+						: r > 0.15
+							? 4
+							: r > 0.04
+								? 4.5
+								: 5;
 			const decade = 1970 + Math.floor(rand() * 6) * 10;
 			out.push(
 				film({

@@ -27,6 +27,7 @@ import { DetailScreen } from "../src/ui/detail";
 import { DiscoverScreen } from "../src/ui/discoverView";
 import { RecipeSheet } from "../src/ui/recipeSheet";
 import { QuickRate } from "../src/ui/quickRate";
+import { RateScreen } from "../src/ui/rate";
 import { LogSheet } from "../src/ui/logSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { auditScreen, type Check } from "./audit";
@@ -814,6 +815,19 @@ function statsYear(root: HTMLElement): void {
 	withPool(YEAR, () => paintStats(plugin, root, { include: "all" }));
 }
 
+/**
+ * The Rate tab, which is the last of the daily screens never rendered here.
+ *
+ * It is a queue: one title at a time with a decision attached, so unlike a
+ * list it has no natural worst case to build — the awkward shape is the *card*,
+ * not the collection. Rendered against the year fixture so the queue is deep
+ * enough to have a position in it rather than being its own last item.
+ */
+function rate(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	withPool(YEAR, () => new RateScreen(plugin).render(root));
+}
+
 function upnext(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance — up to S2E4", art: true, compact: true });
@@ -951,6 +965,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	filterSheet,
 	reviews,
 	rows,
+	rate,
 	stats,
 	statsYear,
 	upnext,
