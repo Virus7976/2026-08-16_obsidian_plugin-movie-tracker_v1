@@ -14,7 +14,7 @@
  */
 
 import "./shim";
-import { LIBRARY, SHOW, AWKWARD, LONG_SHOW } from "./fixtures";
+import { LIBRARY, SHOW, AWKWARD, LONG_SHOW, YEAR } from "./fixtures";
 import type { Entry } from "../src/types";
 import { renderPosterGrid, renderRowList } from "../src/render/grid";
 import { paintStats } from "../src/render/stats";
@@ -59,16 +59,39 @@ function poster(title: string): string {
 // well-behaved data, which is not the question.
 const all = [...LIBRARY, SHOW, ...AWKWARD, LONG_SHOW];
 
+/*
+ * What the stubbed library reports, which is not always `all`.
+ *
+ * One screen — the stats page with a year of viewing behind it — needs a
+ * different pool to say anything useful, and the charts read the library rather
+ * than taking their data as an argument. Swapped around a single synchronous
+ * paint and put back immediately; see `withPool`.
+ */
+let pool: Entry[] = all;
+
+/** Render something against a different library, and always give it back. */
+function withPool(rows: Entry[], run: () => void): void {
+	pool = rows;
+	try {
+		run();
+	} finally {
+		// In a `finally` because the audit mounts every screen in one loop: a
+		// screen that throws would otherwise leave every screen after it
+		// reporting on the wrong library.
+		pool = all;
+	}
+}
+
 const plugin = {
 	settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
 	app: { vault: { getAbstractFileByPath: () => null }, workspace: { getLeaf: () => null } },
 	library: {
-		all: () => all,
-		films: () => all.filter((e) => e.type === "film"),
-		shows: () => all.filter((e) => e.type === "tv"),
-		inProgress: () => all.filter((e) => e.type === "tv"),
-		byPath: (p: string) => all.find((e) => e.path === p),
-		byTmdbId: (id: number) => all.find((e) => e.tmdbId === id),
+		all: () => pool,
+		films: () => pool.filter((e) => e.type === "film"),
+		shows: () => pool.filter((e) => e.type === "tv"),
+		inProgress: () => pool.filter((e) => e.type === "tv"),
+		byPath: (p: string) => pool.find((e) => e.path === p),
+		byTmdbId: (id: number) => pool.find((e) => e.tmdbId === id),
 		peopleIds: () => new Map<string, number>([["Christopher Nolan", 525]]),
 		size: all.length,
 		on: () => ({}),
@@ -686,6 +709,25 @@ function stats(root: HTMLElement): void {
 	paintStats(plugin, root, { include: "all" });
 }
 
+/**
+ * The stats page with a year of watching behind it.
+ *
+ * The plain `stats` screen stays as it is: four titles is the *empty-ish*
+ * case, and "does this look sensible when there is barely any data" is a real
+ * question — it is where a chart with one row and a full-width bar lives.
+ *
+ * This is the other half. Every chart here answers a question about
+ * distribution, and against four titles the day-of-week chart was five zeroes,
+ * the rating histogram was ten empty rows, and every bar that was not zero was
+ * 100% wide. That is how a gradient fill that made length unreadable survived
+ * for weeks: there was no length to read.
+ */
+function statsYear(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	tintWorstCase(root);
+	withPool(YEAR, () => paintStats(plugin, root, { include: "all" }));
+}
+
 function upnext(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance — up to S2E4", art: true, compact: true });
@@ -818,6 +860,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	reviews,
 	rows,
 	stats,
+	statsYear,
 	upnext,
 	empties,
 	stars,

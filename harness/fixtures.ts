@@ -201,3 +201,85 @@ export const LONG_SHOW: Entry = {
 	})),
 	lastWatched: { season: 20, episode: 22, date: "2026-01-01" },
 } as Entry;
+
+/* ------------------------------------------------------------------ */
+/* A year of watching                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Enough viewing history for a chart to have a shape.
+ *
+ * Every chart on the stats page answers a question about *distribution* — which
+ * months, which days, which ratings, which decades — and the existing fixtures
+ * hold four titles. Against those, "films per year" drew two full-width bars,
+ * "by day of week" drew five zeroes and two ones, and the rating histogram was
+ * ten empty rows. All three looked like working charts, so for weeks the only
+ * thing anyone could tell about them was that they rendered.
+ *
+ * That is how the gradient fill survived: with every bar at 100% there was
+ * nothing to notice. The bug was not that the chart was wrong, it was that the
+ * rig could not show it being wrong.
+ *
+ * Deliberately lumpy. A flat distribution is the one shape that makes every
+ * chart look fine — real viewing has a quiet spring, a binge in October and
+ * three films on one Saturday, and those are the cases where labels collide,
+ * a tall bar squashes the rest, and an axis runs out of room.
+ */
+
+/** Deterministic, so a screenshot means the same thing twice. */
+function rng(seed: number): () => number {
+	let s = seed;
+	return () => {
+		// A plain 32-bit LCG. Nothing here needs to be a good random number,
+		// only the same one every run — `Math.random()` would make two
+		// screenshots of the same commit incomparable.
+		s = (s * 1_664_525 + 1_013_904_223) >>> 0;
+		return s / 0x1_0000_0000;
+	};
+}
+
+const GENRES = [
+	"Drama", "Comedy", "Thriller", "Science Fiction", "Horror",
+	"Documentary", "Animation", "Romance", "Crime", "Western",
+];
+const DIRECTORS = [
+	"Denis Villeneuve", "Greta Gerwig", "Bong Joon-ho", "Céline Sciamma",
+	"Ryusuke Hamaguchi", "Jordan Peele", "Lynne Ramsay", "Wes Anderson",
+];
+const CERTS = ["PG", "PG-13", "R", "15", "12A"];
+/** Watches per month, Jan..Dec. Lumpy on purpose — see above. */
+const PER_MONTH = [14, 9, 4, 3, 6, 8, 11, 7, 5, 22, 16, 13];
+
+export const YEAR: Entry[] = (() => {
+	const rand = rng(20_260_820);
+	const out: Entry[] = [];
+	for (let m = 0; m < 12; m++) {
+		for (let i = 0; i < PER_MONTH[m]; i++) {
+			// Weekend-weighted, because that is when people watch things and
+			// because a flat week hides a day-of-week chart's whole point.
+			const dayBias = rand();
+			const dom = 1 + Math.floor(rand() * 27);
+			const date = `2025-${String(m + 1).padStart(2, "0")}-${String(dom).padStart(2, "0")}`;
+			// Ratings cluster high with a thin tail, which is what a rating
+			// histogram is supposed to reveal and cannot when every bucket is 0.
+			const r = rand();
+			const rating = r > 0.92 ? 2.5 : r > 0.75 ? 3 : r > 0.4 ? 3.5 : r > 0.15 ? 4 : r > 0.04 ? 4.5 : 5;
+			const decade = 1970 + Math.floor(rand() * 6) * 10;
+			out.push(
+				film({
+					title: `Fixture ${m + 1}-${i + 1}${dayBias > 0.7 ? " — A Considerably Longer Title Than Fits" : ""}`,
+					year: decade + Math.floor(rand() * 10),
+					rating,
+					runtime: 80 + Math.floor(rand() * 90),
+					genres: [GENRES[Math.floor(rand() * GENRES.length)]],
+					director: [DIRECTORS[Math.floor(rand() * DIRECTORS.length)]],
+					certification: CERTS[Math.floor(rand() * CERTS.length)],
+					imdbRating: 5 + rand() * 4,
+					watched: [{ date, rating }],
+					liked: rand() > 0.7,
+				})
+			);
+		}
+	}
+	return out;
+})();

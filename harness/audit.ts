@@ -290,7 +290,23 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 
 	const small = [...view.querySelectorAll<HTMLElement>('button, [role="button"], select')].filter((el) => {
 		const h = el.getBoundingClientRect().height;
+		/*
+		 * The heatmap is one control with 365 parts, like the star widget above.
+		 *
+		 * A year at a glance is 53 columns of 7. At 44px that is a 2,300px-wide
+		 * chart, which is not a year and not at a glance — the size *is* the
+		 * feature, and every implementation of this chart anywhere uses roughly
+		 * an 11px cell. Tapping a day is a shortcut to that day's titles, and
+		 * the same titles are reachable from the sections below, so nothing is
+		 * only available through an 11px target.
+		 *
+		 * The report was also partly an artefact: the strip scrolls sideways, so
+		 * cells scrolled out of view measured at x = -312 and failed on being
+		 * off-screen rather than on being small. That is a scrolling question,
+		 * which this check explicitly does not ask.
+		 */
 		if (h <= 0 || !shown(el) || el.closest(".reel-stars") || el.closest(".reel-episode-stars")) return false;
+		if (el.closest(".reel-heatmap-grid")) return false;
 		if (h >= 44) return false;
 		return !reaches44(el);
 	});

@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.12",
+		date: "2026-08-20",
+		headline: "The year heatmap reads as one scale, and its labels are legible.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Your busiest day is drawn in the same colour as the rest of the heatmap.",
+				note: "The top step used Obsidian's accent instead of the page's, so one square came out purple in a field of green and read as an error or a selection.",
+			},
+			{
+				kind: "fixed",
+				text: "The month labels above the heatmap are readable, and the “+7 more” on a poster strip has enough contrast to see.",
+			},
+		],
+	},
+	{
 		version: "0.8.11",
 		date: "2026-08-20",
 		headline: "On Stats, colour goes back to meaning one thing.",

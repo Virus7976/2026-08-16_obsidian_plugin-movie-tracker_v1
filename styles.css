@@ -10678,3 +10678,61 @@ input.reel-input {
 .reel-view .reel-stats .reel-fold.is-open > .reel-chart-body {
 	padding-top: var(--reel-space-2);
 }
+
+
+/* ==================================================================== */
+/* The heatmap's top step belongs to the same scale as the other three   */
+/* ==================================================================== */
+
+/*
+ * Levels 1 to 3 are the accent this page pulled off your own posters, at 0.30,
+ * 0.52 and 0.76. Level 4 was `--interactive-accent` — Obsidian's colour, not
+ * the page's — so the busiest day of the year came out in a hue nothing else in
+ * the chart used.
+ *
+ * On a real year that is one purple square in a field of greens, and it reads
+ * as an error state or a selection rather than as "the most you watched". A
+ * four-step ramp has to be four steps of one thing; the moment the last step
+ * changes hue it stops being a scale and starts being a highlight.
+ *
+ * Invisible until this iteration because the fixtures held four titles, so no
+ * day ever reached level 4. It took a year of viewing in the rig to draw a
+ * single cell in the wrong colour.
+ */
+.reel-view .reel-stats .reel-heatmap-cell.is-l4 {
+	background: hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 1);
+}
+
+/* The legend swatches step through the same four, so it has to follow. */
+.reel-view .reel-stats .reel-heatmap-legend .is-l4 {
+	background: hsl(var(--reel-accent-h, 0) var(--reel-accent-s, 0%) var(--reel-accent-l, 50%) / 1);
+}
+
+
+/* ---- what a year of real data exposed -------------------------------- */
+
+/*
+ * The month labels are read, so they are legible.
+ *
+ * 10px, which `textAtLeast12px` has now caught for the fourth time in this
+ * stylesheet. There is room: a month is about four and a half 11px columns, so
+ * roughly 56px, and "Sep" at 12px is 24. The label was small because it felt
+ * like chart furniture — but the whole job of a label above a heatmap is to be
+ * read, or the chart is 365 anonymous squares.
+ */
+.reel-view .reel-stats .reel-heatmap-month,
+.reel-view .reel-stats .reel-heatmap-box .reel-dim {
+	font-size: 12px;
+}
+
+/*
+ * `--text-faint` again, on the "+7" that says a strip has more posters in it.
+ *
+ * 2.85:1 in light, 2.57:1 on the desktop pane. This is the fifth element in
+ * this file to have used `--text-faint` as *text* and had to be changed; the
+ * variable is a hairline colour, and the only reason it keeps reappearing is
+ * that it looks right in a mockup and fails the moment anyone reads it.
+ */
+.reel-view .reel-stats .reel-chart-more {
+	color: var(--text-muted);
+}

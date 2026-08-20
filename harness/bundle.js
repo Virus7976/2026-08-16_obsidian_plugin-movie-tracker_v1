@@ -346,6 +346,66 @@
     })),
     lastWatched: { season: 20, episode: 22, date: "2026-01-01" }
   };
+  function rng(seed) {
+    let s = seed;
+    return () => {
+      s = s * 1664525 + 1013904223 >>> 0;
+      return s / 4294967296;
+    };
+  }
+  var GENRES = [
+    "Drama",
+    "Comedy",
+    "Thriller",
+    "Science Fiction",
+    "Horror",
+    "Documentary",
+    "Animation",
+    "Romance",
+    "Crime",
+    "Western"
+  ];
+  var DIRECTORS = [
+    "Denis Villeneuve",
+    "Greta Gerwig",
+    "Bong Joon-ho",
+    "C\xE9line Sciamma",
+    "Ryusuke Hamaguchi",
+    "Jordan Peele",
+    "Lynne Ramsay",
+    "Wes Anderson"
+  ];
+  var CERTS = ["PG", "PG-13", "R", "15", "12A"];
+  var PER_MONTH = [14, 9, 4, 3, 6, 8, 11, 7, 5, 22, 16, 13];
+  var YEAR = (() => {
+    const rand = rng(20260820);
+    const out = [];
+    for (let m = 0; m < 12; m++) {
+      for (let i = 0; i < PER_MONTH[m]; i++) {
+        const dayBias = rand();
+        const dom = 1 + Math.floor(rand() * 27);
+        const date = `2025-${String(m + 1).padStart(2, "0")}-${String(dom).padStart(2, "0")}`;
+        const r = rand();
+        const rating = r > 0.92 ? 2.5 : r > 0.75 ? 3 : r > 0.4 ? 3.5 : r > 0.15 ? 4 : r > 0.04 ? 4.5 : 5;
+        const decade = 1970 + Math.floor(rand() * 6) * 10;
+        out.push(
+          film({
+            title: `Fixture ${m + 1}-${i + 1}${dayBias > 0.7 ? " \u2014 A Considerably Longer Title Than Fits" : ""}`,
+            year: decade + Math.floor(rand() * 10),
+            rating,
+            runtime: 80 + Math.floor(rand() * 90),
+            genres: [GENRES[Math.floor(rand() * GENRES.length)]],
+            director: [DIRECTORS[Math.floor(rand() * DIRECTORS.length)]],
+            certification: CERTS[Math.floor(rand() * CERTS.length)],
+            imdbRating: 5 + rand() * 4,
+            watched: [{ date, rating }],
+            liked: rand() > 0.7
+          })
+        );
+      }
+    }
+    return out;
+  })();
 
   // src/secrets.ts
   var guarded = /* @__PURE__ */ new Set();
@@ -2872,8 +2932,8 @@
         this.paintResults(container);
         return;
       }
-      const pool = this.quickPool();
-      if (!pool.length) {
+      const pool2 = this.quickPool();
+      if (!pool2.length) {
         const done = container.createDiv({ cls: "reel-empty" });
         done.createDiv({ text: "Nothing left in this queue." });
         const back = done.createEl("button", { cls: "reel-btn mod-cta", text: "Back to rows" });
@@ -2883,9 +2943,9 @@
         });
         return;
       }
-      if (this.quickAt >= pool.length)
+      if (this.quickAt >= pool2.length)
         this.quickAt = 0;
-      const item = pool[this.quickAt];
+      const item = pool2[this.quickAt];
       const isTv = item.media_type === "tv";
       const title = (isTv ? item.name : item.title) ?? "Untitled";
       const card = container.createDiv({ cls: "reel-quickcard" });
@@ -2894,7 +2954,7 @@
         this.plugin.tmdb.posterUrl(item.poster_path, "w342"),
         document.body.hasClass("theme-dark")
       );
-      card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool.length}` });
+      card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool2.length}` });
       const posterEl = card.createDiv({ cls: "reel-quickcard-poster" });
       this.plugin.posters.attach(posterEl, {
         posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? void 0,
@@ -5812,14 +5872,14 @@ ${body}
           this.paint();
         });
       }
-      const pool = this.plugin.discover.seedPool(this.recipe.pool);
-      if (!pool.length) {
+      const pool2 = this.plugin.discover.seedPool(this.recipe.pool);
+      if (!pool2.length) {
         const why = this.recipe.pool === "rewatch" ? "Nothing is marked 'would rewatch' yet \u2014 long-press a poster and tap Again." : this.recipe.pool === "loved" ? "Nothing rated 4 or above yet. Try Everything, or rate a few first." : "Nothing logged yet.";
         el.createDiv({ cls: "reel-empty", text: why });
         this.paintNav(el, { next: "Skip to mood", onNext: () => this.go("mood") });
         return;
       }
-      if (pool.length > 12) {
+      if (pool2.length > 12) {
         const search = el.createEl("input", {
           cls: "reel-input",
           attr: { type: "search", placeholder: "Find one of yours\u2026", enterkeyhint: "search" }
@@ -5827,11 +5887,11 @@ ${body}
         search.value = this.seedFilter;
         search.addEventListener("input", () => {
           this.seedFilter = search.value;
-          this.paintSeedGrid(grid, pool);
+          this.paintSeedGrid(grid, pool2);
         });
       }
       const grid = el.createDiv({ cls: "reel-recipe-seeds" });
-      this.paintSeedGrid(grid, pool);
+      this.paintSeedGrid(grid, pool2);
       const n2 = this.recipe.seeds.length;
       this.paintNav(el, {
         count: n2 ? `${n2} picked` : "None picked yet",
@@ -5839,10 +5899,10 @@ ${body}
         onNext: () => this.go("mood")
       });
     }
-    paintSeedGrid(grid, pool) {
+    paintSeedGrid(grid, pool2) {
       grid.empty();
       const q = this.seedFilter.trim().toLowerCase();
-      const rows2 = q ? pool.filter((e) => e.title.toLowerCase().includes(q)) : pool;
+      const rows2 = q ? pool2.filter((e) => e.title.toLowerCase().includes(q)) : pool2;
       if (!rows2.length) {
         grid.createDiv({ cls: "reel-empty", text: `Nothing of yours matches "${this.seedFilter}".` });
         return;
@@ -6352,6 +6412,8 @@ ${body}
       const h = el.getBoundingClientRect().height;
       if (h <= 0 || !shown(el) || el.closest(".reel-stars") || el.closest(".reel-episode-stars"))
         return false;
+      if (el.closest(".reel-heatmap-grid"))
+        return false;
       if (h >= 44)
         return false;
       return !reaches44(el);
@@ -6665,16 +6727,25 @@ ${body}
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
   var all = [...LIBRARY, SHOW, ...AWKWARD, LONG_SHOW];
+  var pool = all;
+  function withPool(rows2, run) {
+    pool = rows2;
+    try {
+      run();
+    } finally {
+      pool = all;
+    }
+  }
   var plugin = {
     settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
     app: { vault: { getAbstractFileByPath: () => null }, workspace: { getLeaf: () => null } },
     library: {
-      all: () => all,
-      films: () => all.filter((e) => e.type === "film"),
-      shows: () => all.filter((e) => e.type === "tv"),
-      inProgress: () => all.filter((e) => e.type === "tv"),
-      byPath: (p) => all.find((e) => e.path === p),
-      byTmdbId: (id) => all.find((e) => e.tmdbId === id),
+      all: () => pool,
+      films: () => pool.filter((e) => e.type === "film"),
+      shows: () => pool.filter((e) => e.type === "tv"),
+      inProgress: () => pool.filter((e) => e.type === "tv"),
+      byPath: (p) => pool.find((e) => e.path === p),
+      byTmdbId: (id) => pool.find((e) => e.tmdbId === id),
       peopleIds: () => /* @__PURE__ */ new Map([["Christopher Nolan", 525]]),
       size: all.length,
       on: () => ({}),
@@ -7120,6 +7191,11 @@ ${body}
     tintWorstCase(root);
     paintStats(plugin, root, { include: "all" });
   }
+  function statsYear(root) {
+    root.addClass("reel-view-body");
+    tintWorstCase(root);
+    withPool(YEAR, () => paintStats(plugin, root, { include: "all" }));
+  }
   function upnext(root) {
     root.addClass("reel-view-body");
     heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance \u2014 up to S2E4", art: true, compact: true });
@@ -7215,6 +7291,7 @@ ${body}
     reviews,
     rows,
     stats,
+    statsYear,
     upnext,
     empties,
     stars,
