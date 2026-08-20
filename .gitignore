@@ -23,3 +23,6 @@ secrets.json
 Thumbs.db
 .idea/
 .vscode/
+
+# Screenshots from `npm run shot` — a look, not an artefact.
+shots/

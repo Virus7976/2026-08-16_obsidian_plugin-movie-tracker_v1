@@ -10630,3 +10630,51 @@ input.reel-input {
 .reel-view .reel-stats .reel-tile.is-clickable:focus-visible .reel-tile-go {
 	transform: translateY(-50%) rotate(45deg) translate(1px, -1px);
 }
+
+
+/* ==================================================================== */
+/* Stats: one accent, doing one job                                     */
+/* ==================================================================== */
+
+/*
+ * The open section's header stops wearing the accent.
+ *
+ * This page already decided that the bar fill is the only place colour carries
+ * meaning rather than decoration — a bar is longer *because there is more of
+ * it*, and that is the one thing on the screen a colour can honestly say.
+ *
+ * The open-fold header then took the same hue at 0.07 to say "this one is
+ * open", which is a different claim in the same voice. Expanded, a section read
+ * as a single block of tint: the header wash and the row washes are the same
+ * colour, so structure and data were indistinguishable, and the bars — the part
+ * that means something — lost against a background already in their colour.
+ *
+ * A neutral fill says "open" just as clearly, and gives the bars the only
+ * coloured surface on the page back.
+ */
+.reel-view .reel-stats .reel-fold.is-open > .reel-fold-toggle {
+	background: var(--background-modifier-hover);
+}
+
+/*
+ * The heading leads its own section.
+ *
+ * Open, the section's title sat at the same weight as the rows beneath it, so
+ * eleven expanded sections read as one continuous list with occasional bold
+ * words in it. The size stays; the weight does the separating, which costs no
+ * vertical space on a screen that has none to give.
+ */
+.reel-view .reel-stats .reel-fold.is-open .reel-chart-title {
+	font-weight: 650;
+	color: var(--text-normal);
+}
+
+/*
+ * A little air under the header before the first row.
+ *
+ * The first row butted directly against the header, so the wash on a full-width
+ * top row merged with the header's own fill into one shape.
+ */
+.reel-view .reel-stats .reel-fold.is-open > .reel-chart-body {
+	padding-top: var(--reel-space-2);
+}

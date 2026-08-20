@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.11",
+		date: "2026-08-20",
+		headline: "On Stats, colour goes back to meaning one thing.",
+		changes: [
+			{
+				kind: "better",
+				text: "An open section's header is no longer tinted, so the bars are the only coloured thing on the page.",
+				note: "A bar is longer because there is more of it. The header was using the same colour to say something else, and expanded sections read as one block of tint with the bars lost inside it.",
+			},
+			{
+				kind: "better",
+				text: "A section's heading leads it, and its first row no longer butts against it.",
+			},
+		],
+	},
+	{
 		version: "0.8.10",
 		date: "2026-08-20",
 		headline: "Reel behaves like a phone app: taps respond instantly, sheets have a grabber, and nothing scrolls the page behind it.",
