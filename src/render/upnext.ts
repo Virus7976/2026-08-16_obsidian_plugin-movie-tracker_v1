@@ -75,6 +75,26 @@ class UpNextBlock extends MarkdownRenderChild {
 }
 
 /** Shared by the code block and the Reel view. */
+/**
+ * The title line of an Up Next row, with the name in a span that can elide.
+ *
+ * A helper rather than a convention, because a convention only has to be
+ * forgotten once. `.reel-upnext-title` is a flex container — it holds the name
+ * *and* a badge — and `text-overflow` applies to the inline content of a block
+ * container, so an ellipsis declared on the row itself does nothing at all. The
+ * name has to be its own inline box for the browser to have something to elide.
+ *
+ * That was fixed here in 0.8.14 and the calendar's upcoming rows, which build
+ * the same markup in another file, kept cutting titles mid-word — because the
+ * fix was a shape the caller had to remember rather than a function it could
+ * call. Both go through this now.
+ */
+export function upnextTitle(body: HTMLElement, text: string): HTMLElement {
+	const title = body.createDiv({ cls: "reel-upnext-title" });
+	title.createSpan({ cls: "reel-upnext-name", text });
+	return title;
+}
+
 export function paintUpNext(
 	plugin: ReelPlugin,
 	containerEl: HTMLElement,
@@ -165,11 +185,7 @@ class UpNextPainter {
 		thumb.addEventListener("click", () => void this.plugin.openDetail(entry));
 
 		const body = row.createDiv({ cls: "reel-upnext-body" });
-		const title = body.createDiv({ cls: "reel-upnext-title" });
-		// Classed so it can be the thing that truncates. `text-overflow` applies
-		// to a block container's inline content, and the row above is a flex
-		// container — so the ellipsis declared on it has never done anything.
-		title.createSpan({ cls: "reel-upnext-name", text: entry.title });
+		const title = upnextTitle(body, entry.title);
 		if (this.plugin.upNext.airingToday(entry)) {
 			title.createSpan({ cls: "reel-badge new", text: "New" });
 		}

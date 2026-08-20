@@ -189,6 +189,21 @@ export const AWKWARD: Entry[] = [
 export const LONG_SHOW: Entry = {
 	...film({ title: "A Very Long Running Series Indeed", genres: ["Drama"] }),
 	type: "tv",
+	/*
+	 * An air date three days out, computed rather than written down.
+	 *
+	 * The upcoming rows need a series with something due, and a fixed date
+	 * would put this fixture in the past within the week — after which
+	 * `paintUpcoming` renders nothing, the screen quietly stops being covered,
+	 * and the audit keeps reporting the same number of passing checks. Coverage
+	 * that expires without saying so is worse than coverage that was never
+	 * there, because the count still looks right.
+	 *
+	 * This is also deliberately the longest title in the fixtures: the calendar
+	 * builds its own version of the Up Next row, and a long name is exactly
+	 * what was being cut mid-word there.
+	 */
+	nextAirDate: new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10),
 	firstAirYear: 1989,
 	totalEpisodes: 750,
 	episodeRuntime: 22,

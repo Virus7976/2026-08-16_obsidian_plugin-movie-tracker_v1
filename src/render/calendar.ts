@@ -7,6 +7,7 @@
  */
 
 import { MarkdownPostProcessorContext, MarkdownRenderChild, TFile } from "obsidian";
+import { upnextTitle } from "./upnext";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { daysBetween, prettyDate, todayISO } from "../util/dates";
@@ -96,7 +97,11 @@ class CalendarPainter {
 		this.plugin.posters.attach(thumb, entry);
 
 		const body = row.createDiv({ cls: "reel-upnext-body" });
-		body.createDiv({ cls: "reel-upnext-title", text: entry.title });
+		// Shared with Up Next, so a long series name elides here too. Setting
+		// the text directly on the row put it in a flex container with nothing
+		// to elide, and these titles were still being cut mid-word after the
+		// same bug was fixed on the other screen.
+		upnextTitle(body, entry.title);
 
 		const gap = daysBetween(today, entry.nextAirDate!);
 		const meta = body.createDiv({ cls: "reel-upnext-meta" });

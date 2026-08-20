@@ -19,6 +19,7 @@ import type { Entry } from "../src/types";
 import { renderPosterGrid, renderRowList } from "../src/render/grid";
 import { paintStats } from "../src/render/stats";
 import { paintUpNext } from "../src/render/upnext";
+import { paintUpcoming } from "../src/render/calendar";
 import { renderEmpty } from "../src/ui/empty";
 import { skeletonCards, skeletonGrid } from "../src/ui/skeleton";
 import { renderStars } from "../src/ui/stars";
@@ -817,6 +818,11 @@ function upnext(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance — up to S2E4", art: true, compact: true });
 	paintUpNext(plugin, root, undefined, true);
+	// The upcoming rows, which the view draws directly under Up Next and the
+	// rig had never rendered. They are built by calendar.ts, not upnext.ts —
+	// the same markup from a second file, which is how a title-truncation fix
+	// landed on one screen and not the other.
+	paintUpcoming(plugin, root.createDiv({ cls: "reel-upcoming-section" }));
 }
 
 function empties(root: HTMLElement): void {

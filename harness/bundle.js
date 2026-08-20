@@ -334,6 +334,21 @@
   var LONG_SHOW = {
     ...film({ title: "A Very Long Running Series Indeed", genres: ["Drama"] }),
     type: "tv",
+    /*
+     * An air date three days out, computed rather than written down.
+     *
+     * The upcoming rows need a series with something due, and a fixed date
+     * would put this fixture in the past within the week — after which
+     * `paintUpcoming` renders nothing, the screen quietly stops being covered,
+     * and the audit keeps reporting the same number of passing checks. Coverage
+     * that expires without saying so is worse than coverage that was never
+     * there, because the count still looks right.
+     *
+     * This is also deliberately the longest title in the fixtures: the calendar
+     * builds its own version of the Up Next row, and a long name is exactly
+     * what was being cut mid-word there.
+     */
+    nextAirDate: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10),
     firstAirYear: 1989,
     totalEpisodes: 750,
     episodeRuntime: 22,
@@ -2007,6 +2022,11 @@
   };
 
   // src/render/upnext.ts
+  function upnextTitle(body, text) {
+    const title = body.createDiv({ cls: "reel-upnext-title" });
+    title.createSpan({ cls: "reel-upnext-name", text });
+    return title;
+  }
   function paintUpNext(plugin2, containerEl, limit, heading = false, entries) {
     new UpNextPainter(plugin2, containerEl, limit, heading, entries).render();
   }
@@ -2065,8 +2085,7 @@
       this.plugin.posters.attach(thumb, entry);
       thumb.addEventListener("click", () => void this.plugin.openDetail(entry));
       const body = row.createDiv({ cls: "reel-upnext-body" });
-      const title = body.createDiv({ cls: "reel-upnext-title" });
-      title.createSpan({ cls: "reel-upnext-name", text: entry.title });
+      const title = upnextTitle(body, entry.title);
       if (this.plugin.upNext.airingToday(entry)) {
         title.createSpan({ cls: "reel-badge new", text: "New" });
       }
@@ -2114,6 +2133,61 @@
       more.addEventListener("click", (e) => {
         e.stopPropagation();
         new SeasonSheet(this.plugin.app, this.plugin, entry, next?.season ?? 1).open();
+      });
+      return row;
+    }
+  };
+
+  // src/render/calendar.ts
+  function paintUpcoming(plugin2, containerEl, withinDays, showEmpty = false) {
+    new CalendarPainter(plugin2, containerEl, withinDays, showEmpty).render();
+  }
+  var CalendarPainter = class {
+    constructor(plugin2, containerEl, withinDays, showEmpty = false) {
+      this.plugin = plugin2;
+      this.containerEl = containerEl;
+      this.withinDays = withinDays;
+      this.showEmpty = showEmpty;
+    }
+    render() {
+      const el = this.containerEl;
+      el.empty();
+      const today = todayISO();
+      const rows2 = this.plugin.visible(this.plugin.library.shows()).filter((e) => !!e.nextAirDate && e.status !== "dropped").filter((e) => {
+        if (!this.withinDays)
+          return true;
+        const gap = daysBetween(today, e.nextAirDate);
+        return Number.isFinite(gap) && gap <= this.withinDays;
+      }).sort((a, b) => (a.nextAirDate ?? "").localeCompare(b.nextAirDate ?? ""));
+      if (!rows2.length) {
+        if (this.showEmpty) {
+          el.createDiv({ cls: "reel-block-title", text: "Upcoming" });
+          el.createDiv({ cls: "reel-empty", text: "Nothing scheduled. Only shows TMDB lists as returning appear here." });
+        }
+        return;
+      }
+      el.createDiv({ cls: "reel-block-title", text: "Upcoming" });
+      const list = el.createDiv({ cls: "reel-upnext" });
+      for (const entry of rows2)
+        list.appendChild(this.row(entry, today));
+    }
+    row(entry, today) {
+      const row = createDiv({ cls: "reel-upnext-row" });
+      const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
+      this.plugin.posters.attach(thumb, entry);
+      const body = row.createDiv({ cls: "reel-upnext-body" });
+      upnextTitle(body, entry.title);
+      const gap = daysBetween(today, entry.nextAirDate);
+      const meta = body.createDiv({ cls: "reel-upnext-meta" });
+      const when = gap === 0 ? "Today" : gap === 1 ? "Tomorrow" : gap > 0 ? `In ${gap} days` : "Aired";
+      meta.createSpan({ cls: "reel-upnext-ep", text: when });
+      meta.createSpan({ cls: "reel-dim", text: prettyDate(entry.nextAirDate) });
+      if (gap <= 0)
+        body.createDiv({ cls: "reel-badge new", text: "Out now" });
+      row.addEventListener("click", async () => {
+        const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
+        if (file instanceof TFile)
+          await this.plugin.app.workspace.getLeaf(false).openFile(file);
       });
       return row;
     }
@@ -7275,6 +7349,7 @@ ${body}
     root.addClass("reel-view-body");
     heroBand(root, { label: "Tonight", title: "6 on the go", sub: "Severance \u2014 up to S2E4", art: true, compact: true });
     paintUpNext(plugin, root, void 0, true);
+    paintUpcoming(plugin, root.createDiv({ cls: "reel-upcoming-section" }));
   }
   function empties(root) {
     root.addClass("reel-view-body");

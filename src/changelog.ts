@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.16",
+		date: "2026-08-20",
+		headline: "The fix for long titles now covers the Upcoming rows too.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Upcoming episode rows can truncate a long series name properly, like Up Next already could.",
+				note: "Those rows are built in a different file from the ones above them, so last release's fix reached only half of them.",
+			},
+		],
+	},
+	{
 		version: "0.8.15",
 		date: "2026-08-20",
 		headline: "The Diary tab catches up with the Diary block it had quietly fallen behind.",
