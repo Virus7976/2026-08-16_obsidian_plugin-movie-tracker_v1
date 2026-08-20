@@ -52,6 +52,35 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.10",
+		date: "2026-08-20",
+		headline: "Reel behaves like a phone app: taps respond instantly, sheets have a grabber, and nothing scrolls the page behind it.",
+		changes: [
+			{
+				kind: "better",
+				text: "Taps register immediately instead of pausing first.",
+				note: "A browser holds every tap for a third of a second in case a second one means “zoom”. That delay is most of why a phone web page feels slower than an app.",
+			},
+			{
+				kind: "better",
+				text: "Buttons and posters respond the moment your finger lands.",
+				note: "The grey flash was suppressed in fifteen places and nothing put in its place, so a tap that worked looked like a tap that missed.",
+			},
+			{
+				kind: "better",
+				text: "Bottom sheets have a grabber, and dragging past the end of one no longer scrolls the library behind it.",
+			},
+			{
+				kind: "fixed",
+				text: "Holding a button no longer selects its label and raises the copy bar over it.",
+			},
+			{
+				kind: "better",
+				text: "Stats tiles are tighter, and the arrow that means “this opens” sits against the right edge rather than floating in a corner.",
+			},
+		],
+	},
+	{
 		version: "0.8.9",
 		date: "2026-08-20",
 		headline: "Sheets fit the screen they are on, so the passphrase box is where you can see it.",

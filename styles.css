@@ -10420,3 +10420,213 @@ input.reel-input {
 	max-height: 4.6em;
 	overflow-y: auto;
 }
+
+
+/* ==================================================================== */
+/* Native on a phone: the four things that make a web page feel like one */
+/* ==================================================================== */
+
+/*
+ * These are decided once here rather than per element.
+ *
+ * `-webkit-tap-highlight-color` was already set in fifteen separate places and
+ * `touch-action` in two, which is the shape of a decision that was never made:
+ * every control that happened to be noticed got the treatment, and every one
+ * added since did not. The result is that some things in Reel feel like an app
+ * and the ones beside them feel like a web page, which is worse than if none of
+ * them did.
+ */
+
+/*
+ * 1. No 300ms wait before a tap does anything.
+ *
+ * A browser holds every tap for a third of a second in case a second one
+ * arrives and means "zoom". On a control that can never be zoomed into, that
+ * delay is the entire difference between a button and a link — it is why a
+ * phone web page feels slow even when nothing is slow.
+ */
+.reel-view button,
+.reel-view select,
+.reel-view input,
+.reel-view textarea,
+.reel-view [role="button"],
+.reel-view .reel-cell,
+.reel-modal button,
+.reel-modal select,
+.reel-modal input,
+.reel-modal textarea,
+.reel-modal [role="button"] {
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * 2. Something has to happen on touch-down.
+ *
+ * Turning the grey flash off is only half a decision. A native control darkens
+ * the instant your finger lands, before it knows whether you will lift or drag;
+ * with the flash suppressed and nothing put in its place, a tap that is working
+ * perfectly looks like a tap that missed, and the reflex is to press again.
+ *
+ * No transition on the way in and a short one on the way out — the response
+ * must be immediate, the recovery need not be.
+ */
+.reel-view button:active,
+.reel-view [role="button"]:active,
+.reel-modal button:active,
+.reel-modal [role="button"]:active {
+	background-color: var(--background-modifier-hover);
+	transition: none;
+}
+
+.reel-view .reel-cell:active,
+.reel-view .reel-dcard:active,
+.reel-view .reel-tile.is-clickable:active {
+	transform: scale(0.985);
+	transition: none;
+}
+
+.reel-view button,
+.reel-view [role="button"],
+.reel-modal button,
+.reel-modal [role="button"] {
+	transition: background-color 140ms ease-out, transform 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-view .reel-cell:active,
+	.reel-view .reel-dcard:active,
+	.reel-view .reel-tile.is-clickable:active {
+		transform: none;
+	}
+}
+
+/*
+ * 3. A long press on a button is a press, not a text selection.
+ *
+ * Holding a control long enough selects its label and raises the selection
+ * handles and the copy bar — over the thing you were trying to press. Scoped to
+ * controls: your own review, a synopsis and a title are all text somebody may
+ * legitimately want to copy, and taking that away to tidy up a button would be
+ * a bad trade.
+ */
+.reel-view button,
+.reel-view .reel-tab,
+.reel-view .reel-chip,
+.reel-view .reel-badge,
+.reel-view [role="button"],
+.reel-modal button,
+.reel-modal [role="button"] {
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/*
+ * 4. Scrolling a sheet must not drag the page behind it.
+ *
+ * Reaching the end of a sheet's list and continuing to drag scrolls the library
+ * underneath, so closing the sheet returns you somewhere you never went. Two
+ * containers already had this; every scrolling container needs it.
+ */
+.reel-modal.reel-sheet,
+.reel-modal .reel-wn-body,
+.reel-view .reel-view-body,
+.reel-view .reel-chart-body {
+	overscroll-behavior: contain;
+}
+
+/*
+ * The grabber.
+ *
+ * One 36×4 rounded bar is the whole visual grammar of a bottom sheet on both
+ * phone platforms: it says this panel came up from the bottom and goes back
+ * down, before you have touched anything. Reel's sheets are shaped like sheets
+ * and read like dialogs that happen to be at the bottom.
+ *
+ * Sticky rather than fixed so it stays at the top of the sheet as the content
+ * scrolls under it, which is where the affordance belongs.
+ */
+.reel-modal.reel-sheet::before {
+	content: "";
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	display: block;
+	width: 36px;
+	height: 4px;
+	margin: 0 auto var(--reel-space-2);
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+	flex: none;
+}
+
+/* ---- stats, continued ------------------------------------------------ */
+
+/*
+ * The count on a collapsed section is a count, not a badge.
+ *
+ * Filled with the accent, it was the loudest thing in a row whose actual
+ * subject is the heading beside it — eleven stacked sections, each led by a
+ * bright pill saying how many rows are hidden inside. The number is useful and
+ * it is not the point.
+ */
+.reel-view .reel-stats .reel-fold-count {
+	background: var(--background-modifier-border);
+	/*
+	 * `--text-normal`, not `--text-muted`.
+	 *
+	 * Muting the digits as well as the fill was one step too far: the audit
+	 * measured 3.75:1 in light and 4.43:1 in dark, both under AA, because a
+	 * muted grey on a border grey is two greys. Quieting a thing means taking
+	 * away its colour, not its legibility — the pill recedes now because it is
+	 * no longer accent-filled, and the number stays readable.
+	 */
+	color: var(--text-normal);
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+/*
+ * The chevron on a tile sits with the label it belongs to.
+ *
+ * Pinned to the top-right corner it floated away from everything, so a tile
+ * read as a number with a stray mark above it rather than as a row you can
+ * open. Next to the label it is punctuation on a sentence.
+ */
+.reel-view .reel-stats .reel-tile-go {
+	/*
+	 * Centred against the right edge, which is where a list says "this opens".
+	 *
+	 * It was pinned to the top-right corner, floating clear of everything, so a
+	 * tile read as a number with a stray mark above it. Making it static was
+	 * worse: the chevron is a *sibling* of the label rather than a child, so
+	 * putting it in flow dropped it to the bottom-right, below the sub-line and
+	 * even further from anything it relates to.
+	 *
+	 * Absolute and vertically centred is the disclosure position every phone
+	 * list uses, and it needs no change to the markup.
+	 */
+	position: absolute;
+	right: var(--reel-space-3);
+	top: 50%;
+	/*
+	 * The rotation is what draws the chevron.
+	 *
+	 * It is two borders on a 6px box turned 45 degrees — so `translateY(-50%)`
+	 * on its own does not move a chevron, it deletes one, leaving the corner
+	 * mark the borders actually are. `transform` is a single property and the
+	 * last declaration wins outright; the same slip left the search field's
+	 * clear button 22px above its pill three releases ago.
+	 *
+	 * Translate first, then rotate: the shift has to happen in the box's own
+	 * axes, not in the rotated ones.
+	 */
+	transform: translateY(-50%) rotate(45deg);
+	opacity: 0.55;
+}
+
+/* The hover nudge has to carry both as well, for the same reason. */
+.reel-view .reel-stats .reel-tile.is-clickable:hover .reel-tile-go,
+.reel-view .reel-stats .reel-tile.is-clickable:focus-visible .reel-tile-go {
+	transform: translateY(-50%) rotate(45deg) translate(1px, -1px);
+}
