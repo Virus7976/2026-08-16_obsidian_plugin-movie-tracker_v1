@@ -52,6 +52,32 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.24",
+		date: "2026-08-20",
+		headline: "Cached artwork stays out of your phone's photo gallery.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Cached posters and portraits no longer appear in Google Photos alongside your own pictures.",
+				note: "Nothing was ever uploaded anywhere. Android indexes every image file in shared storage, and a vault is an ordinary folder there, so the cache was being handed to the gallery. Reel now marks that folder as not-media, which is the documented way to opt out.",
+			},
+			{
+				kind: "better",
+				text: "Chart bars take the colour of the film behind them instead of a flat block of accent.",
+				note: "Every recurring character is in exactly three films, so every bar was three-out-of-three — eight identical full-width slabs that looked like rows selected by accident rather than a chart.",
+			},
+			{
+				kind: "fixed",
+				text: "Active filter chips are chip-sized again, and read as one control rather than two welded together.",
+				note: "The dismiss half was picking up a background of its own. The tap target is still full size; only the ink shrank.",
+			},
+			{
+				kind: "better",
+				text: "Discover shows a title sooner — the taste note and Refresh share a row, and the sections sit closer on a phone.",
+			},
+		],
+	},
+	{
 		version: "0.8.23",
 		date: "2026-08-20",
 		headline: "The Rate card takes the colour of the film it is asking about.",
