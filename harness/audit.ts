@@ -245,7 +245,15 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	check("gridTracksEqual", uneven.length === 0, uneven.map((g) => getComputedStyle(g).gridTemplateColumns).join(" | "));
 
 	// How much of the screen is chrome before the first piece of content.
-	const first = view.querySelector(".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed");
+	/*
+	 * Discover's cards were not in this list, so the one screen with the most
+	 * chrome above its content was the one screen this check could not see.
+	 * "How much of the screen is spent on controls before the first title" is
+	 * exactly the question it exists to ask, and Discover asks the most of it.
+	 */
+	const first = view.querySelector(
+		".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed, .reel-dcard, .reel-drow-card"
+	);
 	/*
 	 * Not while the keyboard is up.
 	 *

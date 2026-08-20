@@ -844,7 +844,35 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 			// No posters to show — a date bucket, a rating band — so the bar
 			// stays, since something has to carry the comparison.
 			const track = row.createDiv({ cls: "reel-chart-track" });
-			track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
+			const fill = track.createDiv({ cls: "reel-chart-fill" });
+			fill.setCssProps({ "--reel-fill": String(d.n / max) });
+
+			/*
+			 * The bar, in the colour of what it counts.
+			 *
+			 * Recurring characters are the case that broke this. Every one of
+			 * them appears in exactly three films, so every bar was `3 / 3` —
+			 * eight identical full-width slabs of flat accent down the card. As
+			 * a chart it carried no information at all, and as a surface it read
+			 * like eight rows had been selected by accident.
+			 *
+			 * The earlier decision not to put a poster under a character's name
+			 * still holds: a sharp poster beside "Jack Sparrow" claims to be a
+			 * picture of Jack Sparrow, and it isn't. But the blurred wash the
+			 * sheets use makes no such claim — at this radius there is no image
+			 * left to misread, only the film's colour. So the row is tinted by
+			 * the film the character is in, which is true, and legible as decor
+			 * rather than as a portrait.
+			 *
+			 * Only where the row genuinely has a title behind it. A rating band
+			 * or a date bucket keeps the plain fill, because there is no single
+			 * artwork that belongs to "3½ stars".
+			 */
+			const art = plugin && d.entries?.length ? plugin.posters.displayUrl(d.entries[0]) : null;
+			if (art) {
+				fill.addClass("has-wash");
+				fill.setCssProps({ "--reel-wash": `url("${art}")` });
+			}
 		}
 
 		// Every bar answers a question you can only otherwise ask by hand:

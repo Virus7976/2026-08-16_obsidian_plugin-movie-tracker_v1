@@ -12290,3 +12290,187 @@ input.reel-input {
 	border-top: 1px solid rgba(255, 255, 255, 0.05);
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
+
+
+/* ==================================================================== */
+/* Discover: half the screen was controls                               */
+/* ==================================================================== */
+
+/*
+ * 411px of chrome above the first title, on an 812px screen.
+ *
+ * Measured only once `.reel-dcard` was added to the check's list of "first
+ * real content" — until then the screen with the most chrome in the app was
+ * the one screen this check could not see. The Library had this exact problem
+ * fixed months ago; Discover simply never got looked at.
+ *
+ * The sentence explaining where the suggestions come from and the button that
+ * fetches new ones are two halves of the same thought, and they were stacked
+ * as two rows. Side by side they cost one row instead of two, and read better
+ * for it: the button is now visibly attached to the thing it refreshes.
+ */
+/*
+ * The taste note and Refresh, on one row.
+ *
+ * The head was already `display: flex`, which is why this looked right in the
+ * source and wrong on screen: `flex-wrap: wrap` was set too, and a wrapping
+ * flex line breaks *before* it shrinks. The note's max-content width is a whole
+ * sentence, far wider than the 295px available, so it claimed its own line and
+ * pushed the button below it — 75px spent on two things that fit in 44.
+ *
+ * `flex-basis: 0` is the part that matters. With `auto` the item asks for its
+ * content width and wraps; with `0` it asks for nothing and grows into whatever
+ * is left over after the button, which is what shrink-to-fit means here.
+ */
+.reel-discover-head {
+	flex-wrap: nowrap;
+}
+
+.reel-discover-head .reel-discover-note {
+	flex: 1 1 0;
+	min-width: 0;
+	margin: 0;
+}
+
+.reel-discover-head .reel-refresh {
+	flex: 0 0 auto;
+}
+
+/*
+ * Discover's column gap, at phone width.
+ *
+ * 24px between every section is a desktop measure, chosen where the screen is
+ * 900px tall and five sections still leave room for content. On a 375px phone
+ * the same gap is spent four times before the first poster, which makes it the
+ * largest single non-content cost on the screen.
+ *
+ * 16px still separates the sections legibly — each one opens with a heading or
+ * a scrolling row, so they were never relying on the gap alone to be told
+ * apart.
+ */
+.reel-view:not(.is-w700) .reel-discover {
+	gap: var(--reel-space-4);
+}
+
+
+/* ==================================================================== */
+/* The chart bar as artwork, not a slab                                 */
+/* ==================================================================== */
+
+/*
+ * See the note in stats.ts. The short version: when every value in a chart is
+ * equal — which is the normal case for recurring characters — every bar is
+ * 100% wide, and a 100%-wide flat accent bar is not a bar, it is a highlighted
+ * row. Eight of them is a page that looks broken.
+ */
+.reel-chart-fill.has-wash {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+	border-radius: inherit;
+	/* The flat accent underneath is what made the slab. The artwork replaces
+	   it rather than sitting on top of it. */
+	background: var(--background-secondary);
+}
+
+.reel-chart-fill.has-wash::before {
+	content: "";
+	position: absolute;
+	inset: -30px;
+	background-image: var(--reel-wash);
+	background-size: cover;
+	background-position: center 30%;
+	filter: blur(22px) saturate(1.25);
+	opacity: 0.55;
+}
+
+/*
+ * And it fades out to the right.
+ *
+ * "Blurred to white" — the row should dissolve into the card rather than stop
+ * at a hard edge, which is the difference between a tint and a block of
+ * colour. The gradient is in the theme's own background, so it works in both
+ * modes and under this cream theme without being told about either.
+ */
+.reel-chart-fill.has-wash::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		to right,
+		rgb(from var(--background-primary) r g b / 0.34) 0%,
+		rgb(from var(--background-primary) r g b / 0.62) 55%,
+		rgb(from var(--background-primary) r g b / 0.92) 100%
+	);
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-chart-fill.has-wash::after {
+		background: linear-gradient(to right, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.9));
+	}
+	.theme-dark .reel-chart-fill.has-wash::after {
+		background: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.9));
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-chart-fill.has-wash::before {
+		filter: blur(22px);
+	}
+}
+
+/* ==================================================================== */
+/* The active filter chip, at the size a chip actually is               */
+/* ==================================================================== */
+
+/*
+ * Reported twice now, and the screenshot says why the first attempt missed.
+ *
+ * The chip is drawn as two halves so the label and the x can do different
+ * things. The x half was picking up a background of its own — so what shipped
+ * was a dark pill with a lighter rounded square welded to its right end, which
+ * reads as two buttons stuck together rather than one chip with a dismiss on
+ * it. The extra tone is most of why it looked oversized: two visible slabs
+ * occupy the eye like two controls.
+ *
+ * `!important` here, and it is the right call rather than laziness: this is
+ * resetting a *theme's* button styling, and themes load after plugins, so an
+ * equal-specificity rule loses on source order no matter how it is written.
+ * The alternative is guessing at a selector long enough to outrank whatever
+ * this theme happens to use, on a phone I cannot inspect.
+ */
+.reel-filter-tag-label,
+.reel-filter-tag-x {
+	background: none !important;
+	background-color: transparent !important;
+	box-shadow: none !important;
+	border: none !important;
+}
+
+/* Smaller, too. 30px of ink is the chip; the x still reaches 44px of target
+   by padding past the pill, which `overflow: visible` above allows. */
+.reel-filter-tag {
+	min-height: 30px;
+	height: 30px;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-filter-tag-label {
+	height: 30px;
+	line-height: 30px;
+	padding: 0 1px 0 var(--reel-space-3);
+	max-width: 38vw;
+}
+
+.reel-filter-tag-x {
+	height: 44px;
+	margin: -7px 0;
+	padding: 7px var(--reel-space-2) 7px 1px;
+	min-width: 26px;
+	opacity: 0.6;
+}
+
+.reel-filter-tag-x .svg-icon {
+	width: 13px;
+	height: 13px;
+}

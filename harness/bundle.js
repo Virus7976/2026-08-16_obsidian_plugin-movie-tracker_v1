@@ -1639,7 +1639,13 @@
         }
       } else {
         const track = row.createDiv({ cls: "reel-chart-track" });
-        track.createDiv({ cls: "reel-chart-fill" }).setCssProps({ "--reel-fill": String(d.n / max) });
+        const fill = track.createDiv({ cls: "reel-chart-fill" });
+        fill.setCssProps({ "--reel-fill": String(d.n / max) });
+        const art = plugin2 && d.entries?.length ? plugin2.posters.displayUrl(d.entries[0]) : null;
+        if (art) {
+          fill.addClass("has-wash");
+          fill.setCssProps({ "--reel-wash": `url("${art}")` });
+        }
       }
       if (plugin2 && (d.search || d.go)) {
         row.addClass("is-clickable");
@@ -6886,7 +6892,9 @@ ${body}
       return w.length > 1 && Math.max(...w) - Math.min(...w) > 2;
     });
     check("gridTracksEqual", uneven.length === 0, uneven.map((g) => getComputedStyle(g).gridTemplateColumns).join(" | "));
-    const first = view.querySelector(".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed");
+    const first = view.querySelector(
+      ".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed, .reel-dcard, .reel-drow-card"
+    );
     if (first && !opts.keyboard) {
       const top = first.getBoundingClientRect().top;
       check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round(top / vh * 100)}%`);

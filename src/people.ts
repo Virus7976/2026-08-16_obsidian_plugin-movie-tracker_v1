@@ -21,6 +21,7 @@
 import { Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type ReelPlugin from "./main";
 import { redact } from "./secrets";
+import { hideFromGallery } from "./posters";
 
 export class PeopleStore {
 	constructor(private plugin: ReelPlugin) {}
@@ -184,6 +185,9 @@ export class PeopleStore {
 				}
 			}
 		}
+		// The portraits are the half of the cache that actually showed up in
+		// the phone's gallery. See the note on the helper.
+		await hideFromGallery(vault, this.folder);
 	}
 
 	/**

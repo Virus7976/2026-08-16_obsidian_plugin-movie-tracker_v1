@@ -11,6 +11,7 @@
  */
 
 import { Notice, TFile, TFolder, normalizePath } from "obsidian";
+import type { Vault } from "obsidian";
 import type ReelPlugin from "./main";
 import { redact } from "./secrets";
 import { orphanedPosters } from "./util/prune";
@@ -156,6 +157,7 @@ export class PosterStore {
 				}
 			}
 		}
+		await hideFromGallery(vault, this.folder);
 	}
 
 	/** Backfill posters for entries that have none. Used by the repair command. */
@@ -277,4 +279,38 @@ function hueOf(title: string): number {
 	let h = 0;
 	for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) % 360;
 	return h;
+}
+
+/**
+ * Keep the cache out of the phone's photo gallery.
+ *
+ * Reported from a screenshot of Google Photos: portraits of Johnny Depp,
+ * Robert Downey Jr and Jonathan Pryce sitting in the user's camera roll among
+ * their own pictures. Nothing was uploaded anywhere — these are the cached
+ * TMDB stills, and the cause is entirely local. Android's MediaStore walks
+ * shared storage and indexes every image file it finds, and an Obsidian vault
+ * is an ordinary folder on shared storage. Writing real `.jpg` files into it,
+ * which is exactly what the poster and portrait caches do, hands them to the
+ * gallery.
+ *
+ * `.nomedia` is the documented way to opt a directory out, honoured by the
+ * scanner and by every gallery app on top of it. One empty file covers the
+ * whole subtree, and both caches live in the same folder, so either one
+ * creating it is enough.
+ *
+ * Written through the adapter rather than the vault: dotfiles are not vault
+ * files, and `vault.create` will not make one.
+ *
+ * Best effort by design. If this throws — a read-only adapter, a desktop
+ * platform that has no such convention — the cache still works and the only
+ * cost is on a platform where the file meant nothing anyway.
+ */
+export async function hideFromGallery(vault: Vault, folder: string): Promise<void> {
+	const marker = normalizePath(`${folder}/.nomedia`);
+	try {
+		if (await vault.adapter.exists(marker)) return;
+		await vault.adapter.write(marker, "");
+	} catch {
+		// Not every platform allows this, and none of them need it to work.
+	}
 }
