@@ -547,7 +547,7 @@
         }
       });
       const reactions = contentEl.createDiv({ cls: "reel-reactions" });
-      const reaction = (on, iconOn, iconOff, label, toggle) => {
+      const reaction = (on, iconOn, iconOff, label, toggle2) => {
         const b = reactions.createEl("button", { cls: "reel-reaction", attr: { type: "button" } });
         const paint = (state) => {
           b.empty();
@@ -562,7 +562,7 @@
           paint(next);
           haptic("tick");
           try {
-            const actual = await toggle();
+            const actual = await toggle2();
             if (actual !== next)
               paint(actual);
           } catch (e) {
@@ -1591,28 +1591,28 @@
     const max = Math.max(...data.map((d) => d.n), 1);
     const faces = data.some((d) => d.face) ? plugin2?.library.peopleIds() : void 0;
     const box = el.createDiv({ cls: "reel-chart reel-fold" });
-    const toggle = box.createDiv({ cls: "reel-fold-toggle" });
-    toggle.setAttr("role", "button");
-    toggle.setAttr("tabindex", "0");
-    toggle.addEventListener("keydown", (ev) => {
+    const toggle2 = box.createDiv({ cls: "reel-fold-toggle" });
+    toggle2.setAttr("role", "button");
+    toggle2.setAttr("tabindex", "0");
+    toggle2.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") {
         ev.preventDefault();
-        toggle.click();
+        toggle2.click();
       }
     });
-    const heading = toggle.createDiv({ cls: "reel-fold-heading" });
+    const heading = toggle2.createDiv({ cls: "reel-fold-heading" });
     heading.createDiv({ cls: "reel-chart-title", text: title });
     const preview = data.slice(0, 3).map((d) => d.label).join(" \xB7 ");
     if (preview)
       heading.createDiv({ cls: "reel-fold-preview", text: preview });
-    toggle.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
+    toggle2.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
     const body = box.createDiv({ cls: "reel-chart-body" });
     const setOpen = (open) => {
       box.toggleClass("is-open", open);
-      toggle.setAttr("aria-expanded", String(open));
+      toggle2.setAttr("aria-expanded", String(open));
     };
     setOpen(false);
-    toggle.addEventListener("click", () => setOpen(!box.hasClass("is-open")));
+    toggle2.addEventListener("click", () => setOpen(!box.hasClass("is-open")));
     for (const d of data) {
       const row = body.createDiv({ cls: "reel-chart-row" });
       const head = row.createDiv({ cls: "reel-chart-head" });
@@ -5997,17 +5997,17 @@ ${body}
         if (on)
           setIcon(poster2.createDiv({ cls: "reel-recipe-seed-tick" }), "check");
         cell.createDiv({ cls: "reel-recipe-seed-title", text: entry.title });
-        const toggle = () => {
+        const toggle2 = () => {
           haptic("tick");
           this.recipe.seeds = on ? this.recipe.seeds.filter((id) => id !== entry.tmdbId) : [...this.recipe.seeds, entry.tmdbId];
           this.paint();
         };
-        cell.addEventListener("click", toggle);
+        cell.addEventListener("click", toggle2);
         cell.addEventListener("keydown", (ev) => {
           if (ev.key !== "Enter" && ev.key !== " ")
             return;
           ev.preventDefault();
-          toggle();
+          toggle2();
         });
       }
     }
@@ -6544,6 +6544,177 @@ ${body}
     }
   };
 
+  // src/ui/filterSheet.ts
+  function emptyFilters() {
+    return { type: "all", genres: [], statuses: [], lists: [], sort: "watched", sort2: "", layout: "grid" };
+  }
+  function toggle(set, value) {
+    const at = set.indexOf(value);
+    if (at >= 0)
+      set.splice(at, 1);
+    else
+      set.push(value);
+  }
+  function narrow(rows2, f) {
+    let out = rows2;
+    if (f.type !== "all")
+      out = out.filter((e) => e.type === f.type);
+    if (f.statuses.length) {
+      out = out.filter(
+        (e) => f.statuses.some((s) => s === "watched" && e.type !== "tv" ? e.watched.length > 0 : e.status === s)
+      );
+    }
+    if (f.genres.length)
+      out = out.filter((e) => f.genres.some((g) => e.genres.includes(g)));
+    if (f.lists.length)
+      out = out.filter((e) => f.lists.some((l) => e.lists.includes(l)));
+    return out;
+  }
+  var SORT_OPTIONS = [
+    ["watched", "Recently watched"],
+    ["added", "Recently added"],
+    ["rating", "My rating"],
+    ["imdb_rating", "IMDb rating"],
+    ["metacritic", "Metacritic"],
+    ["tmdb_rating", "TMDB rating"],
+    ["title", "Title"],
+    ["year", "Year"],
+    ["runtime", "Runtime"],
+    ["popularity", "Popularity"],
+    ["certification", "Certification"],
+    ["random", "Shuffle"]
+  ];
+  var FilterSheet = class extends Modal {
+    constructor(app2, filters, opts) {
+      super(app2);
+      this.filters = filters;
+      this.opts = opts;
+      this.countEl = null;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      modalEl.addClass("reel-filter-sheet");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      const head = contentEl.createDiv({ cls: "reel-filter-head" });
+      head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
+      const clear = head.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all" });
+      clear.addEventListener("click", () => {
+        const { sort, sort2, layout } = this.filters;
+        Object.assign(this.filters, emptyFilters(), { sort, sort2, layout });
+        this.opts.onChange();
+        this.redraw();
+      });
+      this.body = contentEl.createDiv({ cls: "reel-filter-body" });
+      this.redraw();
+      const foot = contentEl.createDiv({ cls: "reel-log-actions reel-filter-actions" });
+      const done = foot.createEl("button", { cls: "reel-btn mod-cta reel-filter-done" });
+      this.countEl = done.createSpan();
+      done.addEventListener("click", () => this.close());
+      this.paintCount();
+    }
+    /** How many titles the current set would show. */
+    paintCount() {
+      if (!this.countEl)
+        return;
+      const n2 = narrow(this.opts.pool, this.filters).length;
+      this.countEl.setText(n2 === 1 ? "Show 1 title" : `Show ${n2} titles`);
+    }
+    /**
+     * Rebuild the body, keeping your place in it.
+     *
+     * Called only when the offered chips could actually have changed — Type,
+     * and Clear all. Everything else toggles in place.
+     */
+    redraw() {
+      const el = this.body;
+      const keepScroll = el.scrollTop;
+      el.empty();
+      const section = (label) => {
+        const box = el.createDiv({ cls: "reel-filter-section" });
+        box.createDiv({ cls: "reel-filter-label", text: label });
+        return box.createDiv({ cls: "reel-chips reel-filter-chips" });
+      };
+      const one = (into, label, active, onClick) => {
+        const b = into.createEl("button", { cls: "reel-chip", text: label, attr: { type: "button" } });
+        setSelected(b, active);
+        b.addEventListener("click", () => {
+          onClick();
+          this.opts.onChange();
+          this.redraw();
+        });
+      };
+      const many = (into, label, set, value) => {
+        const b = into.createEl("button", { cls: "reel-chip", text: label, attr: { type: "button" } });
+        setSelected(b, set.includes(value));
+        b.addEventListener("click", () => {
+          toggle(set, value);
+          setSelected(b, set.includes(value));
+          this.opts.onChange();
+          this.paintCount();
+        });
+      };
+      const kinds = section("Type");
+      for (const [value, label] of [
+        ["all", "Everything"],
+        ["film", "Films"],
+        ["tv", "Series"]
+      ]) {
+        one(kinds, label, this.filters.type === value, () => this.filters.type = value);
+      }
+      const pool2 = narrow(this.opts.pool, { ...this.filters, statuses: [], genres: [], lists: [] });
+      const statuses = [...new Set(pool2.map((e) => e.status))].filter(Boolean).sort();
+      if (statuses.length > 1) {
+        const row = section("Status");
+        for (const s of statuses)
+          many(row, s, this.filters.statuses, s);
+      }
+      const genres = [...new Set(pool2.flatMap((e) => e.genres))].filter(Boolean).sort();
+      if (genres.length > 1) {
+        const row = section("Genre");
+        for (const g of genres)
+          many(row, g, this.filters.genres, g);
+      }
+      if (this.opts.lists.length) {
+        const row = section("Lists");
+        for (const name of this.opts.lists)
+          many(row, name, this.filters.lists, name);
+      }
+      if (this.opts.showSort) {
+        const sortBox = el.createDiv({ cls: "reel-filter-section" });
+        sortBox.createDiv({ cls: "reel-filter-label", text: "Sort" });
+        const first = sortBox.createEl("select", { cls: "reel-select dropdown" });
+        for (const [value, label] of SORT_OPTIONS)
+          first.createEl("option", { value, text: label });
+        first.value = this.filters.sort;
+        first.addEventListener("change", () => {
+          this.filters.sort = first.value;
+          this.opts.onChange();
+          this.redraw();
+        });
+        sortBox.createDiv({ cls: "reel-filter-label", text: "Then by" });
+        const second = sortBox.createEl("select", { cls: "reel-select dropdown" });
+        second.createEl("option", { value: "", text: "\u2014" });
+        for (const [value, label] of SORT_OPTIONS) {
+          if (value === this.filters.sort || value === "random")
+            continue;
+          second.createEl("option", { value, text: label });
+        }
+        second.value = this.filters.sort2;
+        second.addEventListener("change", () => {
+          this.filters.sort2 = second.value;
+          this.opts.onChange();
+        });
+      }
+      el.scrollTop = keepScroll;
+      this.paintCount();
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/settings.ts
   var DEFAULT_SETTINGS = {
     keyMode: "encrypted",
@@ -6845,6 +7016,21 @@ ${body}
         const b = targets[j];
         if (a.contains(b) || b.contains(a))
           continue;
+        const clipped2 = (el) => {
+          const r = el.getBoundingClientRect();
+          for (let p = el.parentElement; p; p = p.parentElement) {
+            const cs = getComputedStyle(p);
+            const scrolls = /auto|scroll|hidden/.test(cs.overflowY) || /auto|scroll|hidden/.test(cs.overflowX);
+            if (!scrolls)
+              continue;
+            const pr = p.getBoundingClientRect();
+            if (r.bottom > pr.bottom + 1 || r.top < pr.top - 1)
+              return true;
+            if (r.right > pr.right + 1 || r.left < pr.left - 1)
+              return true;
+          }
+          return false;
+        };
         const floats = (el) => {
           for (let p = el; p; p = p.parentElement) {
             const pos = getComputedStyle(p).position;
@@ -6854,6 +7040,8 @@ ${body}
           return false;
         };
         if (floats(a) || floats(b))
+          continue;
+        if (clipped2(a) || clipped2(b))
           continue;
         const inside = (x, y) => x.left >= y.left - 1 && x.right <= y.right + 1 && x.top >= y.top - 1 && x.bottom <= y.bottom + 1;
         if (inside(a.getBoundingClientRect(), b.getBoundingClientRect()))
@@ -6890,9 +7078,9 @@ ${body}
   var NARROW_AT = 600;
   function stampWidth(el, width) {
     const w = Number.isFinite(width) && width > 0 ? width : 0;
-    const narrow = w > 0 ? w < NARROW_AT : true;
-    el.toggleClass("is-narrow", narrow);
-    el.toggleClass("is-wide", !narrow);
+    const narrow2 = w > 0 ? w < NARROW_AT : true;
+    el.toggleClass("is-narrow", narrow2);
+    el.toggleClass("is-wide", !narrow2);
     for (const step of WIDTH_STEPS)
       el.toggleClass(`is-w${step}`, w >= step);
   }
@@ -7042,6 +7230,25 @@ ${body}
 	</svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
+  function feedPage(offset, page) {
+    const start = (offset + (page - 1) * 8) % LIBRARY.length;
+    return Array.from({ length: 8 }, (_, i) => {
+      const e = LIBRARY[(start + i) % LIBRARY.length];
+      return {
+        id: 9e4 + start + i,
+        media_type: e.type === "tv" ? "tv" : "movie",
+        title: e.title,
+        name: e.title,
+        poster_path: e.title,
+        overview: "A synopsis long enough to wrap onto a second line, because a card that has only ever been shown a short one has never been asked the question.",
+        vote_average: 6 + (start + i) % 4,
+        release_date: `${2e3 + (start + i) % 25}-06-01`,
+        first_air_date: `${2e3 + (start + i) % 25}-06-01`,
+        genre_ids: [28, 35],
+        adult: false
+      };
+    });
+  }
   var all = [...LIBRARY, SHOW, ...AWKWARD, LONG_SHOW];
   var pool = all;
   function withPool(rows2, run) {
@@ -7096,6 +7303,48 @@ ${body}
       ]
     },
     videos: { results: [] }
+  };
+  var SEASON_META = {
+    episodes: Array.from({ length: 22 }, (_, i) => {
+      const n2 = i + 1;
+      return {
+        episode_number: n2,
+        name: n2 === 4 ? "An Episode Title That Is Considerably Longer Than The Row It Has To Fit Inside" : n2 === 22 ? "" : `Episode ${n2}`,
+        air_date: n2 === 22 ? void 0 : `2026-0${1 + i % 9}-1${i % 10}`,
+        runtime: n2 === 12 ? 91 : 22,
+        overview: n2 % 3 === 0 ? "A summary long enough to wrap onto a second line on a phone, which is where an episode row has to decide what it is willing to lose." : "",
+        still_path: null
+      };
+    })
+  };
+  var PERSON_META = {
+    id: 525,
+    name: "Marguerite Vance-Ashworth",
+    known_for_department: "Directing",
+    birthday: "1970-07-30",
+    deathday: null,
+    place_of_birth: "London, England",
+    profile_path: null,
+    biography: "A director and screenwriter whose work is invented entirely for this test harness. This paragraph exists to be longer than two hundred and eighty characters, because the sheet clamps a biography at that length and offers a Read more button, and a clamp that is never reached is a branch that has never been drawn on a phone screen.",
+    combined_credits: {
+      cast: Array.from({ length: 26 }, (_, i) => ({
+        id: 3e3 + i,
+        title: i === 0 ? "A Credit Whose Title Will Not Fit Under Its Poster" : `Credit ${i}`,
+        poster_path: `/c${i}.jpg`,
+        media_type: i % 5 === 0 ? "tv" : "movie",
+        character: i % 4 === 0 ? "A Character With A Considerably Longer Name" : "Herself",
+        popularity: 100 - i,
+        release_date: `${1994 + i % 30}-05-01`,
+        vote_average: 6 + i % 4
+      })),
+      crew: [
+        // The same title twice, with two jobs. Three identical posters in a
+        // row is what this de-duplication exists to stop.
+        { id: 3e3, title: "A Credit Whose Title Will Not Fit Under Its Poster", poster_path: "/c0.jpg", media_type: "movie", job: "Director", popularity: 100, release_date: "1994-05-01" },
+        { id: 3e3, title: "A Credit Whose Title Will Not Fit Under Its Poster", poster_path: "/c0.jpg", media_type: "movie", job: "Writer", popularity: 100, release_date: "1994-05-01" },
+        { id: 3100, title: "A Directed Film", poster_path: "/c100.jpg", media_type: "movie", job: "Director", popularity: 55, release_date: "2011-05-01" }
+      ]
+    }
   };
   var plugin = {
     settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
@@ -7160,6 +7409,31 @@ ${body}
       ],
       count: async () => 100,
       run: async () => [],
+      /*
+       * The feed, as the screen has asked for it since it became endless.
+       *
+       * The stub still answered `rows()` — the shape from before Discover was
+       * rewritten into a paging feed — so `rowSources` was undefined, the
+       * await threw, and every run since has rendered "That didn't work."
+       * with a Try again button. It passed because the audit measured the
+       * screen while it was still a skeleton; adding the settle is what made
+       * it visible.
+       *
+       * A stub is a claim about an interface. When the interface moves and
+       * the stub does not, the test keeps reporting on a version of the app
+       * that no longer exists.
+       */
+      rowSources: () => [
+        { id: "people", title: "More with Denzel Washington", reason: "You rated three of his films 4 or more", fetch: async (p) => p > 2 ? [] : feedPage(0, p) },
+        { id: "seed", title: "Because you liked Inside Man", reason: "Similar to a film you rated 5", fetch: async (p) => p > 2 ? [] : feedPage(6, p) },
+        { id: "trend", title: "Trending this week", fetch: async (p) => p > 3 ? [] : feedPage(12, p) },
+        { id: "genre", title: "Action from the 2010s", reason: "Your most-watched genre", fetch: async (p) => p > 3 ? [] : feedPage(18, p) }
+      ],
+      filterOut: (items) => items,
+      like: async () => feedPage(3, 1),
+      search: async () => feedPage(9, 1),
+      reroll: () => {
+      },
       blameFor: async () => null,
       describeQueries: () => [],
       dismiss: async () => {
@@ -7188,7 +7462,8 @@ ${body}
       getFilm: async () => FILM_META,
       getShow: async () => FILM_META,
       getImages: async () => ({ backdrops: [], posters: [] }),
-      getSeason: async () => ({ episodes: [] })
+      getSeason: async () => SEASON_META,
+      getPerson: async () => PERSON_META
     },
     openSearch: () => {
     },
@@ -7319,55 +7594,20 @@ ${body}
     end.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
   }
   function filterSheet(root) {
-    const modal = root.createDiv({ cls: "reel-modal reel-filter-sheet reel-sheet" });
-    const head = modal.createDiv({ cls: "reel-filter-head" });
-    head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
-    head.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all" });
-    const body = modal.createDiv({ cls: "reel-filter-body" });
-    const section = (label, values, activeAt = -1) => {
-      const box = body.createDiv({ cls: "reel-filter-section" });
-      box.createDiv({ cls: "reel-filter-label", text: label });
-      const chips = box.createDiv({ cls: "reel-chips reel-filter-chips" });
-      values.forEach((v, i) => {
-        const b = chips.createEl("button", { cls: "reel-chip", text: v });
-        if (i === activeAt)
-          b.addClass("is-active");
-      });
-    };
-    section("Type", ["Everything", "Films", "Series"], 1);
-    section("Status", ["watched", "watchlist", "watching", "completed", "paused", "abandoned"]);
-    section(
-      "Genre",
-      [
-        "Action",
-        "Adventure",
-        "Animation",
-        "Comedy",
-        "Crime",
-        "Documentary",
-        "Drama",
-        "Family",
-        "Fantasy",
-        "History",
-        "Horror",
-        "Music",
-        "Mystery",
-        "Romance",
-        "Science Fiction",
-        "Thriller",
-        "War",
-        "Western"
-      ],
-      14
+    root.addClass("reel-view-body");
+    const state = emptyFilters();
+    state.genres = ["Action", "Comedy"];
+    state.statuses = ["watchlist"];
+    mountSheet(
+      root,
+      new FilterSheet(plugin.app, state, {
+        pool: all,
+        lists: ["Christmas with the family", "Rewatch pile", "Letterboxd top 250"],
+        showSort: true,
+        onChange: () => {
+        }
+      })
     );
-    section("Lists", ["Christmas with the family", "Rewatch pile", "Letterboxd top 250"]);
-    const sortBox = body.createDiv({ cls: "reel-filter-section" });
-    sortBox.createDiv({ cls: "reel-filter-label", text: "Sort" });
-    const sel = sortBox.createEl("select", { cls: "reel-select dropdown" });
-    sel.createEl("option", { text: "Recently watched" });
-    sortBox.createDiv({ cls: "reel-filter-label", text: "Then by" });
-    const sel2 = sortBox.createEl("select", { cls: "reel-select dropdown" });
-    sel2.createEl("option", { text: "My rating" });
   }
   function reviews(root) {
     root.addClass("reel-view-body");
@@ -7665,6 +7905,14 @@ ${body}
     root.addClass("reel-view-body");
     mountSheet(root, new LogSheet(plugin.app, plugin, { entry: LIBRARY[0], file: {} }));
   }
+  function seasonsheet(root) {
+    root.addClass("reel-view-body");
+    mountSheet(root, new SeasonSheet(plugin.app, plugin, LONG_SHOW, 21));
+  }
+  function personsheet(root) {
+    root.addClass("reel-view-body");
+    mountSheet(root, new PersonSheet(plugin, 525, "Marguerite Vance-Ashworth"));
+  }
   var SCREENS = {
     library,
     libraryYear,
@@ -7689,6 +7937,8 @@ ${body}
     recipe,
     quickrate,
     logsheet,
+    seasonsheet,
+    personsheet,
     longshow,
     quick
   };
@@ -7750,11 +8000,26 @@ ${e?.stack ?? ""}` });
     return view;
   }
   sheetFit();
+  function settled() {
+    return new Promise((done) => {
+      setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => done())), 0);
+    });
+  }
   var app = document.getElementById("app");
   if (app)
     mountObsidianChrome(app);
-  if (app && params2.get("audit") != null) {
-    const MODAL_SCREENS = /* @__PURE__ */ new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet", "whatsnew", "passphrase"]);
+  async function runAudit(app2) {
+    const MODAL_SCREENS = /* @__PURE__ */ new Set([
+      "recipe",
+      "logsheet",
+      "quickrate",
+      "filterSheet",
+      "seensheet",
+      "whatsnew",
+      "passphrase",
+      "seasonsheet",
+      "personsheet"
+    ]);
     const skipped = [];
     const results = [];
     for (const name of Object.keys(SCREENS)) {
@@ -7762,14 +8027,15 @@ ${e?.stack ?? ""}` });
         skipped.push(name);
         continue;
       }
-      const view = mount(app, name);
+      const view = mount(app2, name);
+      await settled();
       results.push({ screen: name, checks: auditScreen(view, { phone: phone2, keyboard }) });
       view.remove();
     }
     const failures = results.flatMap((r) => r.checks.filter((c) => !c.ok).map((c) => ({ ...c, screen: r.screen })));
     const total = results.reduce((n2, r) => n2 + r.checks.length, 0);
     document.title = failures.length ? `FAIL ${failures.length}/${total}` : `PASS ${total}`;
-    const report = app.createDiv({ cls: "reel-audit" });
+    const report = app2.createDiv({ cls: "reel-audit" });
     report.createEl("h2", { text: document.title });
     if (!failures.length) {
       report.createEl("p", { text: `${Object.keys(SCREENS).length} screens, nothing to report.` });
@@ -7781,8 +8047,12 @@ ${e?.stack ?? ""}` });
         row.createEl("code", { text: f.detail });
     }
     window.REEL_AUDIT = { total, failures, skipped };
+  }
+  if (app && params2.get("audit") != null) {
+    void runAudit(app);
   } else if (app) {
     mount(app, wanted);
+    void settled().then(() => document.body.addClass("reel-settled"));
   }
   document.body.dataset.reelReady = "1";
 })();

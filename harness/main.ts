@@ -29,6 +29,9 @@ import { RecipeSheet } from "../src/ui/recipeSheet";
 import { QuickRate } from "../src/ui/quickRate";
 import { RateScreen } from "../src/ui/rate";
 import { LogSheet } from "../src/ui/logSheet";
+import { FilterSheet, emptyFilters } from "../src/ui/filterSheet";
+import { SeasonSheet } from "../src/ui/seasonSheet";
+import { PersonSheet } from "../src/ui/personSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { auditScreen, type Check } from "./audit";
 import { measure, stampWidth, stampChromeInsets, sizeBody, sheetFit } from "../src/util/panewidth";
@@ -50,6 +53,33 @@ function poster(title: string): string {
 		      text-anchor="middle">${short.replace(/[<>&]/g, "")}</text>
 	</svg>`;
 	return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * One page of feed results, as TMDB shapes them.
+ *
+ * Offset by row and by page so no two shelves show the same eight posters — a
+ * feed where every row is identical looks like one row repeated, and hides the
+ * horizontal-paging faults these rows exist to expose.
+ */
+function feedPage(offset: number, page: number): Record<string, unknown>[] {
+	const start = (offset + (page - 1) * 8) % LIBRARY.length;
+	return Array.from({ length: 8 }, (_, i) => {
+		const e = LIBRARY[(start + i) % LIBRARY.length];
+		return {
+			id: 90_000 + start + i,
+			media_type: e.type === "tv" ? "tv" : "movie",
+			title: e.title,
+			name: e.title,
+			poster_path: e.title,
+			overview: "A synopsis long enough to wrap onto a second line, because a card that has only ever been shown a short one has never been asked the question.",
+			vote_average: 6 + ((start + i) % 4),
+			release_date: `${2000 + ((start + i) % 25)}-06-01`,
+			first_air_date: `${2000 + ((start + i) % 25)}-06-01`,
+			genre_ids: [28, 35],
+			adult: false,
+		};
+	});
 }
 
 /* ------------------------------------------------------------------ */
@@ -137,6 +167,82 @@ const FILM_META = {
 	videos: { results: [] },
 };
 
+/**
+ * One season, as the episode checklist sees it.
+ *
+ * `getSeason` used to return `{ episodes: [] }`, which is not a season — it is
+ * the empty state of one, and a stub that returns an empty list quietly deletes
+ * whatever it stood in for from the test. Every row in the sheet is drawn from
+ * this, so an empty array meant the sheet had never been drawn at all.
+ *
+ * Shaped for the rows that break things rather than the tidy ones: an episode
+ * title longer than the row, one with no title at all (TMDB leaves it blank for
+ * unaired episodes), one with no air date, and a runtime that is a feature
+ * length rather than 22 minutes.
+ */
+const SEASON_META = {
+	episodes: Array.from({ length: 22 }, (_, i) => {
+		const n = i + 1;
+		return {
+			episode_number: n,
+			name:
+				n === 4
+					? "An Episode Title That Is Considerably Longer Than The Row It Has To Fit Inside"
+					: n === 22
+						? ""
+						: `Episode ${n}`,
+			air_date: n === 22 ? undefined : `2026-0${1 + (i % 9)}-1${i % 10}`,
+			runtime: n === 12 ? 91 : 22,
+			overview:
+				n % 3 === 0
+					? "A summary long enough to wrap onto a second line on a phone, which is where an episode row has to decide what it is willing to lose."
+					: "",
+			still_path: null,
+		};
+	}),
+};
+
+/**
+ * A person, and a filmography.
+ *
+ * Invented rather than borrowed: the sheet needs a biography long enough to
+ * trip the 280-character clamp and a name long enough to test the hero, and
+ * writing either for a real person would mean inventing facts about them.
+ */
+const PERSON_META = {
+	id: 525,
+	name: "Marguerite Vance-Ashworth",
+	known_for_department: "Directing",
+	birthday: "1970-07-30",
+	deathday: null,
+	place_of_birth: "London, England",
+	profile_path: null,
+	biography:
+		"A director and screenwriter whose work is invented entirely for this test harness. " +
+		"This paragraph exists to be longer than two hundred and eighty characters, because the " +
+		"sheet clamps a biography at that length and offers a Read more button, and a clamp that " +
+		"is never reached is a branch that has never been drawn on a phone screen.",
+	combined_credits: {
+		cast: Array.from({ length: 26 }, (_, i) => ({
+			id: 3000 + i,
+			title: i === 0 ? "A Credit Whose Title Will Not Fit Under Its Poster" : `Credit ${i}`,
+			poster_path: `/c${i}.jpg`,
+			media_type: i % 5 === 0 ? "tv" : "movie",
+			character: i % 4 === 0 ? "A Character With A Considerably Longer Name" : "Herself",
+			popularity: 100 - i,
+			release_date: `${1994 + (i % 30)}-05-01`,
+			vote_average: 6 + (i % 4),
+		})),
+		crew: [
+			// The same title twice, with two jobs. Three identical posters in a
+			// row is what this de-duplication exists to stop.
+			{ id: 3000, title: "A Credit Whose Title Will Not Fit Under Its Poster", poster_path: "/c0.jpg", media_type: "movie", job: "Director", popularity: 100, release_date: "1994-05-01" },
+			{ id: 3000, title: "A Credit Whose Title Will Not Fit Under Its Poster", poster_path: "/c0.jpg", media_type: "movie", job: "Writer", popularity: 100, release_date: "1994-05-01" },
+			{ id: 3100, title: "A Directed Film", poster_path: "/c100.jpg", media_type: "movie", job: "Director", popularity: 55, release_date: "2011-05-01" },
+		],
+	},
+};
+
 const plugin = {
 	settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
 	app: { vault: { getAbstractFileByPath: () => null }, workspace: { getLeaf: () => null } },
@@ -195,6 +301,30 @@ const plugin = {
 		],
 		count: async () => 100,
 		run: async () => [],
+		/*
+		 * The feed, as the screen has asked for it since it became endless.
+		 *
+		 * The stub still answered `rows()` — the shape from before Discover was
+		 * rewritten into a paging feed — so `rowSources` was undefined, the
+		 * await threw, and every run since has rendered "That didn't work."
+		 * with a Try again button. It passed because the audit measured the
+		 * screen while it was still a skeleton; adding the settle is what made
+		 * it visible.
+		 *
+		 * A stub is a claim about an interface. When the interface moves and
+		 * the stub does not, the test keeps reporting on a version of the app
+		 * that no longer exists.
+		 */
+		rowSources: () => [
+			{ id: "people", title: "More with Denzel Washington", reason: "You rated three of his films 4 or more", fetch: async (p: number) => (p > 2 ? [] : feedPage(0, p)) },
+			{ id: "seed", title: "Because you liked Inside Man", reason: "Similar to a film you rated 5", fetch: async (p: number) => (p > 2 ? [] : feedPage(6, p)) },
+			{ id: "trend", title: "Trending this week", fetch: async (p: number) => (p > 3 ? [] : feedPage(12, p)) },
+			{ id: "genre", title: "Action from the 2010s", reason: "Your most-watched genre", fetch: async (p: number) => (p > 3 ? [] : feedPage(18, p)) },
+		],
+		filterOut: (items: unknown[]) => items,
+		like: async () => feedPage(3, 1),
+		search: async () => feedPage(9, 1),
+		reroll: () => {},
 		blameFor: async () => null,
 		describeQueries: () => [],
 		dismiss: async () => {},
@@ -222,7 +352,8 @@ const plugin = {
 		getFilm: async () => FILM_META,
 		getShow: async () => FILM_META,
 		getImages: async () => ({ backdrops: [], posters: [] }),
-		getSeason: async () => ({ episodes: [] }),
+		getSeason: async () => SEASON_META,
+		getPerson: async () => PERSON_META,
 	},
 	openSearch: () => {},
 	openDetail: () => {},
@@ -431,46 +562,33 @@ function feed(root: HTMLElement): void {
 	end.createDiv({ cls: "reel-loading", text: "Loading more…" });
 }
 
-/** The filter sheet, open. Every option at full height, which is the trade. */
+/**
+ * The filter sheet, open — the real one.
+ *
+ * This screen used to be hand-written markup that looked like the sheet: a
+ * head, some chip rows, a select. It could not have caught anything the sheet
+ * actually does, because none of the sheet's code ran. It reported green while
+ * every section was single-select, every tap threw away the scroll position,
+ * and the body was a 60vh scroller nested inside a scrolling sheet.
+ *
+ * A copy of the markup tests the copy.
+ */
 function filterSheet(root: HTMLElement): void {
-	const modal = root.createDiv({ cls: "reel-modal reel-filter-sheet reel-sheet" });
-	const head = modal.createDiv({ cls: "reel-filter-head" });
-	head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
-	head.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all" });
-
-	const body = modal.createDiv({ cls: "reel-filter-body" });
-	const section = (label: string, values: string[], activeAt = -1) => {
-		const box = body.createDiv({ cls: "reel-filter-section" });
-		box.createDiv({ cls: "reel-filter-label", text: label });
-		const chips = box.createDiv({ cls: "reel-chips reel-filter-chips" });
-		values.forEach((v, i) => {
-			const b = chips.createEl("button", { cls: "reel-chip", text: v });
-			if (i === activeAt) b.addClass("is-active");
-		});
-	};
-
-	section("Type", ["Everything", "Films", "Series"], 1);
-	section("Status", ["watched", "watchlist", "watching", "completed", "paused", "abandoned"]);
-	// Every genre, not the first fourteen — the cap existed because the bar was
-	// one line, and a sheet scrolls.
-	section(
-		"Genre",
-		[
-			"Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family",
-			"Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction",
-			"Thriller", "War", "Western",
-		],
-		14
+	root.addClass("reel-view-body");
+	const state = emptyFilters();
+	// Several genres at once, because that is the state the sheet exists to
+	// hold and the one it could not represent until now.
+	state.genres = ["Action", "Comedy"];
+	state.statuses = ["watchlist"];
+	mountSheet(
+		root,
+		new FilterSheet(plugin.app, state, {
+			pool: all,
+			lists: ["Christmas with the family", "Rewatch pile", "Letterboxd top 250"],
+			showSort: true,
+			onChange: () => {},
+		}) as never
 	);
-	section("Lists", ["Christmas with the family", "Rewatch pile", "Letterboxd top 250"]);
-
-	const sortBox = body.createDiv({ cls: "reel-filter-section" });
-	sortBox.createDiv({ cls: "reel-filter-label", text: "Sort" });
-	const sel = sortBox.createEl("select", { cls: "reel-select dropdown" });
-	sel.createEl("option", { text: "Recently watched" });
-	sortBox.createDiv({ cls: "reel-filter-label", text: "Then by" });
-	const sel2 = sortBox.createEl("select", { cls: "reel-select dropdown" });
-	sel2.createEl("option", { text: "My rating" });
 }
 
 /**
@@ -943,6 +1061,24 @@ function logsheet(root: HTMLElement): void {
 	mountSheet(root, new LogSheet(plugin.app, plugin, { entry: LIBRARY[0], file: {} as never }) as never);
 }
 
+/**
+ * The episode checklist, on the show with 34 of them.
+ *
+ * Season 21 rather than season 1: the first twenty are fully watched in the
+ * fixture, so season 1 would draw twenty-two ticked rows and none of the
+ * mixed state the sheet actually spends its life in.
+ */
+function seasonsheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(root, new SeasonSheet(plugin.app, plugin, LONG_SHOW, 21) as never);
+}
+
+/** A person and their filmography — sixty poster cards on a 375px screen. */
+function personsheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(root, new PersonSheet(plugin, 525, "Marguerite Vance-Ashworth") as never);
+}
+
 /*
  * No diary screen.
  *
@@ -977,6 +1113,8 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	recipe,
 	quickrate,
 	logsheet,
+	seasonsheet,
+	personsheet,
 	longshow,
 	quick,
 };
@@ -1178,11 +1316,31 @@ function mount(app: HTMLElement, name: string): HTMLElement {
  */
 sheetFit();
 
+/**
+ * Let a screen finish arriving before measuring it.
+ *
+ * Half these screens fetch something. `DetailScreen.render` awaits `getFilm`,
+ * both sheets await their own request, and the stubs resolve on a microtask —
+ * so every one of them was being audited in its *loading* state: a spinner, a
+ * skeleton, or a heading with nothing under it. A skeleton has no contrast
+ * faults and no touch targets, which is exactly why those screens have been
+ * reporting green.
+ *
+ * Two frames and a task: the microtask drains the stub's promise, the task lets
+ * anything it scheduled run, and the frames let a transition settle — measuring
+ * mid-animation is how a 44px button was reported as 26px for three rounds.
+ */
+function settled(): Promise<void> {
+	return new Promise((done) => {
+		setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => done())), 0);
+	});
+}
+
 const app = document.getElementById("app");
 
 if (app) mountObsidianChrome(app);
 
-if (app && params.get("audit") != null) {
+async function runAudit(app: HTMLElement): Promise<void> {
 	/**
 	 * Check every screen in turn.
 	 *
@@ -1202,7 +1360,17 @@ if (app && params.get("audit") != null) {
 	 * Logged rather than dropped quietly. A pass that silently covers less than
 	 * it appears to is how a green tick stops meaning anything.
 	 */
-	const MODAL_SCREENS = new Set(["recipe", "logsheet", "quickrate", "filterSheet", "seensheet", "whatsnew", "passphrase"]);
+	const MODAL_SCREENS = new Set([
+		"recipe",
+		"logsheet",
+		"quickrate",
+		"filterSheet",
+		"seensheet",
+		"whatsnew",
+		"passphrase",
+		"seasonsheet",
+		"personsheet",
+	]);
 	const skipped: string[] = [];
 
 	const results: { screen: string; checks: Check[] }[] = [];
@@ -1212,6 +1380,7 @@ if (app && params.get("audit") != null) {
 			continue;
 		}
 		const view = mount(app, name);
+		await settled();
 		results.push({ screen: name, checks: auditScreen(view, { phone, keyboard }) });
 		view.remove();
 	}
@@ -1234,9 +1403,18 @@ if (app && params.get("audit") != null) {
 		if (f.detail) row.createEl("code", { text: f.detail });
 	}
 	// A machine-readable copy, so a future CI step needs no scraping.
+	// Written last, and the runner waits for it — the loop is asynchronous now,
+	// so "the page has stopped loading" no longer means "the audit has run".
 	(window as unknown as { REEL_AUDIT: unknown }).REEL_AUDIT = { total, failures, skipped };
+}
+
+if (app && params.get("audit") != null) {
+	void runAudit(app);
 } else if (app) {
 	mount(app, wanted);
+	// The screenshot tool waits on this rather than on the network, since
+	// nothing here touches the network and a data-URI poster is instant.
+	void settled().then(() => document.body.addClass("reel-settled"));
 }
 
 // A marker the screenshot step can wait on, rather than guessing at a delay.

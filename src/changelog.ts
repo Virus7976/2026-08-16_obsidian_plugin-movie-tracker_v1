@@ -52,6 +52,68 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.18",
+		date: "2026-08-20",
+		headline: "Filters let you pick more than one thing, and the episode list stopped overlapping itself.",
+		changes: [
+			{
+				kind: "better",
+				text: "Filters are multi-select: tick as many genres, statuses and lists as you like.",
+				note: "Each section only held one value, so choosing Comedy silently replaced Action \u2014 the chips looked like checkboxes and behaved like a radio group.",
+			},
+			{
+				kind: "fixed",
+				text: "The filter sheet keeps your place when you tick something.",
+				note: "Every tap rebuilt the whole sheet, which threw you back to the top \u2014 so picking a second genre meant scrolling down to find it again.",
+			},
+			{
+				kind: "new",
+				text: "The filter sheet has a foot that counts: \u201cShow 34 titles\u201d, and closes when you press it.",
+				note: "There was no confirm at all, so the only way out was the x in the corner, which reads as cancel.",
+			},
+			{
+				kind: "fixed",
+				text: "The filter sheet no longer cuts the genre list off mid-row.",
+				note: "The list was its own scroller inside a sheet that already scrolls, so it ended early and left a band of empty sheet below it.",
+			},
+			{
+				kind: "fixed",
+				text: "Removing one filter leaves the rest alone \u2014 each value has its own x in the bar.",
+			},
+			{
+				kind: "fixed",
+				text: "The episode checklist no longer draws each row on top of the next one.",
+				note: "Every row was squeezed to 48px while holding 87px of content, so each one painted its star strip over the title below it.",
+			},
+			{
+				kind: "better",
+				text: "Episode rows put the date and the stars on one line, and the tick has a full-size target.",
+			},
+			{
+				kind: "fixed",
+				text: "Sheet buttons reach the bottom of the sheet, instead of leaving a strip where content scrolled past underneath.",
+			},
+			{
+				kind: "fixed",
+				text: "Links like Read more, IMDb and Parents guide stopped drawing a pale capsule around themselves.",
+				note: "They are buttons that had never reset the button styling, which on a light theme reads as brackets and in dark mode left pale text on a pale slab \u2014 1.23:1.",
+			},
+			{
+				kind: "fixed",
+				text: "A long credit no longer stretches the whole row on a person\u2019s filmography.",
+			},
+			{
+				kind: "better",
+				text: "Faint grey text is gone from labels, placeholders, credits, years and counters.",
+				note: "The seventh time this has come up: --text-faint is a hairline colour at about 2.85:1, and it was being used wherever something wanted to be quiet.",
+			},
+			{
+				kind: "better",
+				text: "Cast and character names are at least 12px, and the Discover and preview controls are full-size targets.",
+			},
+		],
+	},
+	{
 		version: "0.8.17",
 		date: "2026-08-20",
 		headline: "The stars on the Rate tab look like something you can press.",

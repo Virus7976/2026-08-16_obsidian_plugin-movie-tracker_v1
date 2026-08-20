@@ -540,6 +540,23 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 			// under it. Flagging it would be the check misunderstanding the
 			// layout, the same way it once reported a 24px overflow that was
 			// really a missing box-sizing in the harness itself.
+			/** Whether a scrolling ancestor has cut this element off. */
+			const clipped = (el: HTMLElement) => {
+				const r = el.getBoundingClientRect();
+				for (let p = el.parentElement; p; p = p.parentElement) {
+					const cs = getComputedStyle(p);
+					const scrolls =
+						/auto|scroll|hidden/.test(cs.overflowY) || /auto|scroll|hidden/.test(cs.overflowX);
+					if (!scrolls) continue;
+					const pr = p.getBoundingClientRect();
+					// A pixel of tolerance: a row flush with the bottom edge of
+					// its container is inside it, not cut off by it.
+					if (r.bottom > pr.bottom + 1 || r.top < pr.top - 1) return true;
+					if (r.right > pr.right + 1 || r.left < pr.left - 1) return true;
+				}
+				return false;
+			};
+
 			const floats = (el: HTMLElement) => {
 				for (let p: HTMLElement | null = el; p; p = p.parentElement) {
 					const pos = getComputedStyle(p).position;
@@ -548,6 +565,20 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 				return false;
 			};
 			if (floats(a) || floats(b)) continue;
+			/*
+			 * An element scrolled out of its own list is not on the screen.
+			 *
+			 * `getBoundingClientRect()` reports where a box *would* be, with no
+			 * regard for an ancestor that clips it. The episode list is a 468px
+			 * scroller holding 1800px of rows, so every row below the fold
+			 * reported a position on top of whatever is drawn under the list —
+			 * and the check dutifully found an episode tick sitting on the Save
+			 * button, 200px past the end of the list it lives in.
+			 *
+			 * The overlap was real as arithmetic and imaginary as geometry.
+			 * Nothing there can be tapped, because nothing there is visible.
+			 */
+			if (clipped(a) || clipped(b)) continue;
 			// A clear button inside a search field, or a tick on a poster:
 			// deliberate placement, and the field reserves room for it in
 			// padding. Only a partial overlap is the accident worth catching.

@@ -10947,3 +10947,487 @@ input.reel-input {
 .reel-rate-hint {
 	color: var(--text-muted);
 }
+
+
+/* ==================================================================== */
+/* The episode checklist                                                */
+/* ==================================================================== */
+
+/*
+ * Every row was 48px tall holding 87px of content.
+ *
+ * `.reel-episodes` is a flex column with `max-height: 52dvh`. Twenty-two rows
+ * of 87px against a 420px cap is a 1500px overflow, so the flex algorithm did
+ * what it is supposed to do and shrank every item — down to the `min-height:
+ * 48px` floor, where it stopped. The rows kept `overflow: visible`, so each one
+ * painted its star strip 39px down over the title of the row beneath it.
+ *
+ * What made it survive: the season sheet is the one screen that had never been
+ * rendered anywhere but on the phone, and on the phone it reads as "the
+ * episode list looks a bit crowded" rather than as a layout that is broken.
+ * The rig now draws it, and the geometry probe answered in one line what four
+ * competing rule blocks could not: 371x48 with a scrollHeight of 87.
+ *
+ * A checklist row is content, not a flexible spacer. It never shrinks.
+ */
+.reel-episode {
+	flex: 0 0 auto;
+}
+
+/*
+ * Two lines, not three.
+ *
+ * Title, then date/runtime and the stars sharing the line below. Stacking all
+ * three put a 22-episode season at 1900px — the comment on the row grid worries
+ * about "nine screens of scrolling per season" and then the body below it
+ * stacked everything anyway. The date is short and the compact strip is 160px;
+ * on a 375px screen they fit beside each other with room left.
+ *
+ * The title spans both columns because it is the only part that ever needs the
+ * full width, and it is the part that gets truncated when it does not have it.
+ */
+.reel-episode-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	column-gap: var(--reel-space-2);
+}
+
+.reel-episode-title {
+	grid-column: 1 / -1;
+}
+
+.reel-episode-meta {
+	grid-column: 1;
+}
+
+.reel-episode-stars {
+	grid-column: 2;
+	justify-self: end;
+	margin-top: 0;
+}
+
+/*
+ * Wide enough, and all three go on one line.
+ *
+ * There were already rules for this, moving `.reel-episode-stars` to the third
+ * column of the *row* — but the stars are a child of `.reel-episode-body`, not
+ * of the row, so `grid-column` on them had never applied to anything. Dead
+ * since it was written. The breakpoint was the right idea; it just has to be
+ * aimed at the grid the element is actually in.
+ */
+.reel-view.is-w620 .reel-episode-body,
+.reel-modal.is-w620 .reel-episode-body {
+	grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.reel-view.is-w620 .reel-episode-title,
+.reel-modal.is-w620 .reel-episode-title {
+	grid-column: 1;
+}
+
+.reel-view.is-w620 .reel-episode-meta,
+.reel-modal.is-w620 .reel-episode-meta {
+	grid-column: 2;
+}
+
+.reel-view.is-w620 .reel-episode-stars,
+.reel-modal.is-w620 .reel-episode-stars {
+	grid-column: 3;
+}
+
+/*
+ * One scroller per sheet.
+ *
+ * The sheet scrolls, with the Save bar sticky at its foot. The episode list
+ * then declared `max-height: 52dvh; overflow-y: auto` and became a second
+ * scroll area inside the first — so a drag either moved the list or moved the
+ * sheet depending on where the list happened to be, and the last row sat
+ * half-cut behind the buttons whatever you did. Nested scrolling is the thing
+ * a bottom sheet is specifically shaped to avoid.
+ */
+.reel-modal.reel-sheet .reel-episodes {
+	max-height: none;
+	overflow-y: visible;
+}
+
+
+/*
+ * The sticky bar reaches the bottom of the sheet, rather than hovering 60px
+ * above it.
+ *
+ * The sheet reserves `12px + --reel-bottom-inset + safe-area` of bottom padding
+ * to clear Obsidian's floating + button. A `bottom: 0` sticky child pins to the
+ * *padding* edge, not the border edge — so the bar stopped 60px short and the
+ * list carried on scrolling through the gap underneath it, in full view. On the
+ * season sheet that is an episode row sitting below the Save button, outside
+ * the sheet's own rounded corner.
+ *
+ * Measured, not guessed: the sheet's box ends at 812 and the bar's at 752.
+ *
+ * Pulling the bar down by the same amount and giving it that space back as its
+ * own padding keeps the buttons exactly where they were relative to the + —
+ * which is what the padding was for — while the bar's background now covers the
+ * strip it was leaving open.
+ */
+.reel-modal.reel-sheet .reel-prompt-actions,
+.reel-modal.reel-sheet .reel-log-actions {
+	--reel-sheet-foot: calc(12px + var(--reel-bottom-inset, 0px) + env(safe-area-inset-bottom));
+	bottom: calc(-1 * var(--reel-sheet-foot));
+	padding-bottom: calc(var(--reel-space-2) + var(--reel-sheet-foot));
+}
+
+
+/* ==================================================================== */
+/* --text-faint is a hairline colour, not a text colour                 */
+/* ==================================================================== */
+
+/*
+ * The seventh time this has come up, so it is worth writing down properly.
+ *
+ * `--text-faint` exists for things that are barely there on purpose: a rule
+ * between rows, an empty-slot placeholder, a separator. It measures around
+ * 2.85:1 against the page in both themes, which is below the 4.5:1 that text
+ * needs, and it has been reached for every time something wanted to be quiet.
+ *
+ * Quiet is `--text-muted`. It is one step down from body text, it is what
+ * Obsidian's own secondary labels use, and it passes. The mistake each time
+ * was treating "less important" and "less legible" as the same instruction.
+ *
+ * Glyph-only uses stay as they are — the empty star behind a rating, the
+ * magnifier, the unfilled heart. Those are shapes, and their meaning is
+ * carried by an aria-label rather than by being read.
+ */
+.reel-facet-label,
+.reel-credit-label,
+.reel-placeholder-text,
+.reel-person-shot.is-empty .reel-placeholder-text,
+.reel-caststrip-shot.is-empty .reel-placeholder-text,
+.reel-person-hero-shot.is-empty .reel-placeholder-text,
+.reel-chart-thumb.is-empty .reel-placeholder-text {
+	color: var(--text-muted);
+}
+
+/*
+ * A link is a control, and it is read.
+ *
+ * `.reel-link` was `--text-muted` at 32px: 4.47:1 in light — a hair under the
+ * line — and 2.50:1 in dark, which is not close. "Read more" on the person
+ * sheet is the one thing standing between the reader and the rest of a
+ * biography, and it was the quietest thing on the screen.
+ *
+ * Normal ink with an underline. The underline is what says "link"; the colour
+ * was never doing that job, only making it hard to read.
+ */
+.reel-link {
+	color: var(--text-normal);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	min-height: 44px;
+}
+
+/* The trailer link keeps the accent — it is a play control, not prose. */
+.reel-link.trailer {
+	color: var(--text-accent);
+}
+
+/* ==================================================================== */
+/* Credit cards, cast strips: two lines, and readable ones              */
+/* ==================================================================== */
+
+/*
+ * `calc(var(--font-ui-smaller) * 0.9)` lands at 10.8px.
+ *
+ * Below the 12px floor this project set for itself, and it is a character name
+ * on a cast card — the line most likely to be read by someone who does not
+ * already know the answer. The multiplier was making room for long roles; the
+ * clamp below does that job without shrinking the type.
+ */
+.reel-caststrip-role,
+.reel-person-credit-sub {
+	font-size: max(12px, var(--font-ui-smaller));
+}
+
+/*
+ * One long credit was stretching the whole grid row.
+ *
+ * The person sheet lays out sixty posters in a three-column grid. A title that
+ * wraps to three lines and a character name that wraps to four made that cell
+ * 200px taller than its neighbours, and a CSS grid row is as tall as its
+ * tallest cell — so one awkward credit left two empty gaps beside it and
+ * pushed everything below it down a screen.
+ *
+ * Clamped, and the height reserved whether or not it is needed, so the rows
+ * stay level regardless of what is in them.
+ */
+.reel-person-credit-title,
+.reel-person-credit-sub {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	word-break: break-word;
+	min-height: 2.4em;
+}
+
+/* ==================================================================== */
+/* Targets                                                              */
+/* ==================================================================== */
+
+/*
+ * The heart on the person sheet was 34px.
+ *
+ * `.reel-heart` asks for 44px and gets it everywhere else; in the opinion row
+ * it sits beside a compact star strip, and the row's alignment was collapsing
+ * it. Stated on the row rather than globally, so the small static heart used
+ * as an indicator on a poster is untouched.
+ */
+.reel-person-opinion .reel-heart {
+	min-height: 44px;
+	height: 44px;
+	align-self: center;
+}
+
+/*
+ * The episode tick: a 44px target around a 30px circle.
+ *
+ * Same trade the chips and the search clear button settled on. The circle is
+ * the thing you aim at and 30px is the right size for it — twenty-two of them
+ * down a phone screen at 44px would be a column of buttons rather than a
+ * checklist. The target reaches further than the ink does.
+ *
+ * The border moves to the inner span, so growing the box does not grow the
+ * circle.
+ */
+.reel-episode-tick {
+	flex: 0 0 44px;
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+	border: none;
+	background: none;
+	margin-top: 0;
+	align-self: center;
+}
+
+.reel-episode-tick > span {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border-radius: var(--reel-radius-full);
+	border: 2px solid var(--background-modifier-border);
+	color: transparent;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.reel-episode.is-watched .reel-episode-tick {
+	background: none;
+}
+
+.reel-episode.is-watched .reel-episode-tick > span {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+/* The row's first column has to make room for the bigger target. */
+.reel-episode,
+.reel-view.is-w620 .reel-episode,
+.reel-modal.is-w620 .reel-episode {
+	grid-template-columns: 44px minmax(0, 1fr);
+}
+
+
+/* ==================================================================== */
+/* The filter sheet                                                     */
+/* ==================================================================== */
+
+/*
+ * One scroller, and a foot.
+ *
+ * `.reel-filter-body` capped itself at 60vh and scrolled — inside a sheet that
+ * already scrolls. On the phone that shows as a genre grid cut off mid-row with
+ * a band of empty sheet below it: the inner list has ended, the outer sheet has
+ * not, and there is no way to tell which one your thumb is about to move.
+ *
+ * The sheet is the scroller. The body just is however tall it is.
+ */
+.reel-modal.reel-sheet .reel-filter-body {
+	max-height: none;
+	overflow-y: visible;
+}
+
+/*
+ * The foot: what you are about to get, and the way out.
+ *
+ * A filter sheet with no confirm has only a close box, and a close box reads as
+ * "cancel" — so the natural move after ticking three genres is to look for a
+ * button, not find one, and wonder whether tapping the x throws the lot away.
+ * Naming the result on the button answers both questions at once: it says the
+ * filters are already applied, and it says what applying them did.
+ */
+.reel-filter-actions {
+	justify-content: stretch;
+}
+
+.reel-filter-done {
+	flex: 1 1 auto;
+	min-height: 48px;
+	font-weight: var(--reel-weight-medium);
+}
+
+
+/* ==================================================================== */
+/* A link that is a button has to stop looking like one                 */
+/* ==================================================================== */
+
+/*
+ * `.reel-link` is a <button>, and it had never reset the chrome.
+ *
+ * On the preview sheet that is the IMDb / Parents guide / TMDB row, and on a
+ * theme with rounded buttons it draws a pale capsule round each one — which on
+ * a cream background reads as a pair of brackets sitting either side of the
+ * word. On the person sheet it is "Read more", drawn as a grey slab.
+ *
+ * It also measured 1.23:1 in dark, and that number is the whole story: the
+ * *text* was following the theme into dark mode while the button's default
+ * fill stayed light, so pale ink sat on a pale slab. Setting the ink darker or
+ * lighter could never fix it; the background was the fault, and every earlier
+ * attempt to fix this by choosing a different text colour was treating the
+ * symptom.
+ *
+ * Same reset `.reel-credit-name` already carries, for the same reason: it
+ * navigates, so it should read as a link, but it must stay a real button for
+ * the keyboard and for screen readers.
+ */
+.reel-link {
+	background: none;
+	border: none;
+	box-shadow: none;
+	padding: 0;
+	color: var(--text-normal);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	min-height: 44px;
+}
+
+.reel-link:hover,
+.reel-link:active {
+	background: none;
+	box-shadow: none;
+	color: var(--text-accent);
+}
+
+.reel-link.trailer {
+	color: var(--text-accent);
+}
+
+/* ==================================================================== */
+/* The last of the faint text, and the targets under 44px               */
+/* ==================================================================== */
+
+/*
+ * Two more classes that were quiet by being hard to read.
+ *
+ * Both only turned up now because their screens had never rendered in the rig:
+ * the Discover card's year and the preview sheet's "3 of 12" counter. Same
+ * decision as the rest — quiet is `--text-muted`.
+ */
+.reel-dcard-year,
+.reel-quickcard-count {
+	color: var(--text-muted);
+}
+
+/*
+ * The badge was 3.23:1 in dark.
+ *
+ * `--text-muted` on `--background-secondary` is a muted colour on a *shifted*
+ * background, and the two move together in dark themes until there is barely a
+ * step between them. A badge is one or two words — a certificate, a type — and
+ * there is nothing else to read it from.
+ */
+.reel-badge {
+	color: var(--text-normal);
+}
+
+/*
+ * Targets, on the two screens that had never been measured.
+ *
+ * The Discover card's row of actions and the preview sheet's prev/next were
+ * 32–38px. Nothing here is dense — they are the primary controls of the screen
+ * they sit on, so unlike the episode tick there is no reason to keep the ink
+ * small and reach with padding. They simply get bigger.
+ */
+.reel-dcard-btn,
+.reel-quickcard-nav .reel-btn {
+	min-height: 44px;
+}
+
+.reel-drow-arrow {
+	width: 44px;
+	height: 44px;
+	min-width: 44px;
+	min-height: 44px;
+}
+
+/*
+ * A crew name in a wrapped list of them.
+ *
+ * 17px, because it is a line of text rather than a control — and it cannot
+ * simply grow, since four names on one line each becoming 44px tall would
+ * either overlap each other or turn the credits block into a list of buttons.
+ *
+ * Vertical padding on an inline box extends the hit area without moving a
+ * single character, so the names stay a sentence and the target stops being a
+ * sliver. The line spacing goes up to match, because a 44px target on a 20px
+ * line would overlap the names above and below it — trading one fault for a
+ * worse one.
+ */
+.reel-credit-names {
+	line-height: 2.9;
+}
+
+.reel-credit-name {
+	padding: 13px 0;
+}
+
+
+/*
+ * Three near-misses, each one lost to a more specific rule.
+ *
+ * A reminder that appending a fix is not the same as making it: the general
+ * selector loses to whichever narrower one was written first, and the audit is
+ * what says so rather than a reading of the file.
+ */
+
+/* 38px, set by a narrow-pane rule that outranked the plain class. */
+.reel-view:not(.is-w620) .reel-dcard-btn,
+.reel-dcard-actions .reel-dcard-btn {
+	min-height: 44px;
+}
+
+/* 43px, one short: 17px of text plus 13 above and below. */
+.reel-credit-name {
+	padding: 14px 0;
+}
+
+/*
+ * The type badge was a saturated blue word on a dark card — 3.23:1.
+ *
+ * The colour is the cue and the word is the content, and the word was losing.
+ * Tinting the background instead keeps the cue at full strength and lets the
+ * text be ink: the same trade the liked-heart pill already makes.
+ */
+.reel-badge.film,
+.reel-badge.tv {
+	color: var(--text-normal);
+	/* Not color-mix on currentColor: it resolves against the *inherited*
+	   colour, not the one being set two lines above, so the badge on the
+	   poster-washed quick card mixed itself a background out of whatever the
+	   card happened to be tinted. 1.31:1, worse than what it replaced. */
+	background: var(--background-secondary);
+}

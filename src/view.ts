@@ -458,7 +458,9 @@ export class ReelView extends ItemView {
 		this.tab = "library";
 		this.detail = null;
 		this.clearSearch();
-		this.filters.status = status;
+		// A null status means "every status" — the tile that counts the whole
+		// library rather than one of its states.
+		this.filters.statuses = status ? [status] : [];
 		this.plugin.settings.lastTab = "library";
 		void this.plugin.saveSettings();
 		this.paint();
@@ -995,7 +997,7 @@ export class ReelView extends ItemView {
 			tag.createSpan({ text: f.label });
 			setIcon(tag.createSpan({ cls: "reel-filter-x" }), "x");
 			tag.addEventListener("click", () => {
-				clearFilter(this.filters, f.key);
+				clearFilter(this.filters, f.key, f.value);
 				this.paint();
 			});
 		}

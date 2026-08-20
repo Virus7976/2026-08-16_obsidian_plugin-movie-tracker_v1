@@ -92,9 +92,26 @@ const page = await browser.newPage();
 // deviceScaleFactor 2, because a phone is a retina screen and half the things
 // worth looking at here are one or two pixels wide.
 await page.setViewport({ width: 375, height, deviceScaleFactor: 2 });
+/*
+ * What the page said on the way up.
+ *
+ * A screen that renders an error message has already swallowed the real one —
+ * `redact()` strips the detail on purpose, and what reaches the user is a
+ * sentence. The console still has the throw, and reading it is the difference
+ * between fixing the cause and guessing at it.
+ */
+if (args.includes("--console")) {
+	page.on("console", (m) => console.log(`[${m.type()}] ${m.text()}`));
+	page.on("pageerror", (e) => console.log(`[pageerror] ${e.message}`));
+}
+
 await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}`, {
 	waitUntil: "networkidle0",
 });
+
+// Screens that fetch finish arriving after load. Without this the screenshot
+// of a sheet is a picture of the word "Loading…".
+await page.waitForFunction(() => document.body.classList.contains("reel-settled"), { timeout: 30_000 }).catch(() => {});
 
 if (expand) {
 	await page.evaluate(() => {
@@ -103,6 +120,42 @@ if (expand) {
 	// The fold has a transition; measuring it mid-animation is how a 44px
 	// button was reported as 26px for three rounds.
 	await new Promise((r) => setTimeout(r, 400));
+}
+
+/*
+ * Geometry, when the picture shows something wrong but not why.
+ *
+ * A screenshot says "these two rows overlap"; it does not say which box is
+ * taller than its parent thinks. Working that out by reading four competing
+ * rule blocks is guesswork, and guessing at the cascade is what produced three
+ * rounds of the same 26px button. One selector, every match, measured.
+ */
+const probe = flag("probe", "");
+if (probe) {
+	const rows = await page.evaluate((sel) => {
+		const seen = [...document.querySelectorAll(sel)].slice(0, Number(new URLSearchParams(location.search).get("probeMax") ?? 12));
+		return seen.map((el) => {
+			const r = el.getBoundingClientRect();
+			const cs = getComputedStyle(el);
+			return {
+				cls: el.className,
+				box: `${Math.round(r.width)}x${Math.round(r.height)} @ ${Math.round(r.left)},${Math.round(r.top)}`,
+				display: cs.display,
+				position: cs.position,
+				// The two numbers that explain most overlaps: what the element
+				// says it is, and what it actually paints.
+				scroll: `${el.scrollWidth}x${el.scrollHeight}`,
+				overflow: `${cs.overflowX}/${cs.overflowY}`,
+				margin: cs.margin,
+				gridArea: cs.gridArea,
+				// Contrast failures are the other half of what a picture cannot
+				// answer: which of the several rules that name this element won.
+				color: cs.color,
+				background: cs.backgroundColor,
+			};
+		});
+	}, probe);
+	for (const r of rows) console.log(JSON.stringify(r));
 }
 
 await mkdir(dirname(out), { recursive: true });

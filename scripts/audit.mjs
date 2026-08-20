@@ -174,6 +174,11 @@ try {
 			waitUntil: "networkidle0",
 		});
 
+		// The harness audits asynchronously — screens that fetch are given the
+		// chance to finish arriving — so `networkidle0` is no longer the signal
+		// that it is done. Without this wait the runner reads `undefined` and
+		// reports zero checks as a pass.
+		await page.waitForFunction(() => window.REEL_AUDIT, { timeout: 60_000 });
 		const result = await page.evaluate(() => window.REEL_AUDIT);
 		const label = pane
 			? `docked pane ${pane}px in 1280x900 ${dark ? "dark" : "light"}`
