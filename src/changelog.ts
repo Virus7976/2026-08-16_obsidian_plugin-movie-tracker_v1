@@ -52,10 +52,20 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
-		version: "0.8.32",
+		version: "0.8.36",
 		date: "2026-08-20",
-		headline: "Closed charts show what is inside them.",
+		headline: "The film titles are back on the superlatives.",
 		changes: [
+			{
+				kind: "fixed",
+				text: "“Highest rated”, “Lowest rated” and “Longest” show their film's name again.",
+				note: "Trimming those rows to two lines in 0.8.31 collapsed the title to zero height instead — poster and label showed, the name did not. It was in the page the whole time, just never painted.",
+			},
+			{
+				kind: "fixed",
+				text: "The Library header's blurred image no longer ends in a hard line across the screen.",
+				note: "The same fix landed on Stats in 0.8.28 but was scoped to that screen, so the identical component on Library kept the square edge.",
+			},
 			{
 				kind: "new",
 				text: "A collapsed chart shows small posters from its top rows instead of just naming them.",
