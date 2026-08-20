@@ -958,7 +958,6 @@ export class ReelView extends ItemView {
 		if (showSort) {
 			this.paintSortControls(bar);
 			this.paintLayoutControl(bar);
-			bar.createSpan({ cls: "reel-chip-sep", text: "·" });
 		}
 
 		/*

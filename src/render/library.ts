@@ -116,13 +116,11 @@ class LibraryBlock extends MarkdownRenderChild {
 
 		const decades = [...new Set(rows.map(decadeOf).filter((d): d is number => d != null))].sort((a, b) => b - a);
 		if (decades.length > 1) {
-			bar.createSpan({ cls: "reel-chip-sep", text: "·" });
 			group("Any decade", decades, "decade", (v) => `${v}s`);
 		}
 
 		const genres = [...new Set(rows.flatMap((e) => e.genres))].sort();
 		if (genres.length > 1) {
-			bar.createSpan({ cls: "reel-chip-sep", text: "·" });
 			group("Any genre", genres.slice(0, 12), "genre", (v) => String(v));
 		}
 	}

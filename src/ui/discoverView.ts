@@ -695,7 +695,6 @@ export class DiscoverScreen {
 		});
 		quick.addClass("reel-chip-mode");
 
-		row1.createSpan({ cls: "reel-chip-sep", text: "·" });
 
 		// The genre list has to be fetched; until it arrives, show nothing
 		// rather than a row that pops in and shifts everything down.
@@ -728,7 +727,6 @@ export class DiscoverScreen {
 			});
 		}
 
-		row2.createSpan({ cls: "reel-chip-sep", text: "·" });
 		row2.createSpan({ cls: "reel-dim", text: "At least" });
 		for (const r of [6, 7, 8]) {
 			chip(row2, `${r}+`, this.filters.minRating === r, () => {

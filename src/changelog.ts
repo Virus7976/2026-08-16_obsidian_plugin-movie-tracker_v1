@@ -52,6 +52,44 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.21",
+		date: "2026-08-20",
+		headline: "A typography and materials pass: numbers that line up, surfaces that read as surfaces.",
+		changes: [
+			{
+				kind: "better",
+				text: "Every number in the app uses tabular figures, so columns of them line up and a counter no longer shifts what is beside it.",
+			},
+			{
+				kind: "better",
+				text: "Large numbers and titles are optically tightened.",
+				note: "Type is spaced for reading at body size; the same spacing at 34px looks loose, and no browser tightens it for you.",
+			},
+			{
+				kind: "better",
+				text: "Stats tiles keep the hue of the poster but not its intensity.",
+				note: "The tint was drawn at whatever saturation the artwork had, so a strongly coloured poster washed the whole page in it. The hue still travels; the chroma is held low.",
+			},
+			{
+				kind: "better",
+				text: "Shadows have two stops instead of one, so cards sit on the page instead of looking pasted on.",
+			},
+			{
+				kind: "better",
+				text: "Cards, tiles and rows all respond to a press the same way, on one easing curve.",
+			},
+			{
+				kind: "better",
+				text: "Sheets arrive on a curve with momentum rather than a symmetrical fade.",
+			},
+			{
+				kind: "fixed",
+				text: "The dot between the filter controls is gone.",
+				note: "It failed contrast on every colour tried, and the spacing either side of it already said what it said.",
+			},
+		],
+	},
+	{
 		version: "0.8.20",
 		date: "2026-08-20",
 		headline: "The Filters button stays put, and sheets stop ending in a band of nothing.",

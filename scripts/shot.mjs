@@ -152,6 +152,13 @@ if (probe) {
 				// answer: which of the several rules that name this element won.
 				color: cs.color,
 				background: cs.backgroundColor,
+				// Typography and elevation, because "did my rule win" is the
+				// question a screenshot answers least well.
+				tracking: cs.letterSpacing,
+				figures: cs.fontVariantNumeric,
+				shadow: cs.boxShadow === "none" ? "none" : cs.boxShadow.slice(0, 60),
+				bgImage: cs.backgroundImage === "none" ? "none" : cs.backgroundImage.slice(0, 70),
+				darkClass: document.body.classList.contains("theme-dark"),
 			};
 		});
 	}, probe);

@@ -486,7 +486,6 @@ function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElemen
 		const layout = bar.createEl("button", { cls: "reel-chip reel-layout-btn" });
 		layout.createSpan({ cls: "reel-layout-icon", text: "▦" });
 		layout.createSpan({ cls: "reel-layout-label", text: "Posters" });
-		bar.createSpan({ cls: "reel-chip-sep", text: "·" });
 	}
 
 	/*
@@ -1383,10 +1382,25 @@ sheetFit();
  * anything it scheduled run, and the frames let a transition settle — measuring
  * mid-animation is how a 44px button was reported as 26px for three rounds.
  */
-function settled(): Promise<void> {
-	return new Promise((done) => {
-		setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => done())), 0);
+async function settled(root?: HTMLElement): Promise<void> {
+	await new Promise((done) => {
+		setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => done(null))), 0);
 	});
+	/*
+	 * And then wait for anything still moving.
+	 *
+	 * A fixed delay only covers the animations that were short enough when it
+	 * was written. Lengthening the sheet entrance from 180ms to 320ms put every
+	 * sheet's primary button mid-flight at the moment of measurement, and nine
+	 * screens reported their Save button below the fold — all of them by about
+	 * the same twelve percent the sheet animates in from.
+	 *
+	 * Asking the animations when they are done needs no guess and cannot go
+	 * stale the next time a duration changes.
+	 */
+	const scope = root ?? document.body;
+	const running = scope.getAnimations?.({ subtree: true }) ?? [];
+	await Promise.all(running.map((a) => a.finished.catch(() => undefined)));
 }
 
 const app = document.getElementById("app");
@@ -1434,7 +1448,7 @@ async function runAudit(app: HTMLElement): Promise<void> {
 			continue;
 		}
 		const view = mount(app, name);
-		await settled();
+		await settled(view);
 		results.push({ screen: name, checks: auditScreen(view, { phone, keyboard }) });
 		view.remove();
 	}

@@ -76,9 +76,41 @@ body {
 	   merely darker near its edge. Raised for things resting on the page,
 	   overlay for things floating over it, and the poster shadow, which is
 	   its own thing because artwork needs a harder edge than a panel. */
-	--reel-shadow-raised: 0 1px 3px rgba(0, 0, 0, 0.16);
-	--reel-shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.34);
-	--reel-shadow-poster: 0 3px 14px rgba(0, 0, 0, 0.22);
+	/*
+	 * Two stops each, not one.
+	 *
+	 * A single blur is a grey rectangle offset downwards; real light gives a
+	 * tight contact shadow where the object nearly touches the surface and a
+	 * wide soft one further out. Two stops is the cheapest convincing version
+	 * of that, and it is the difference between an element that sits on the
+	 * page and one that looks pasted onto it.
+	 *
+	 * Same total darkness as the single-stop versions they replace. This is a
+	 * redistribution, not more shadow — the pass that cut 32 shadows down to
+	 * three levels was right, and this keeps all three.
+	 */
+	--reel-shadow-raised: 0 1px 1px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.10);
+	--reel-shadow-overlay: 0 2px 6px rgba(0, 0, 0, 0.14), 0 12px 32px rgba(0, 0, 0, 0.26);
+	--reel-shadow-poster: 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 18px rgba(0, 0, 0, 0.18);
+
+	/*
+	 * Motion, as two curves and three durations.
+	 *
+	 * There were 40-odd one-off `ease` and `ease-out` transitions at durations
+	 * between 80ms and 300ms picked one at a time. `ease` is symmetric — it
+	 * accelerates and decelerates equally — which is how nothing in the
+	 * physical world moves, and it is why interfaces built on it feel slightly
+	 * mechanical without anyone being able to say why.
+	 *
+	 * `--reel-ease` starts fast and settles slowly, which reads as something
+	 * with momentum arriving. `--reel-ease-in` is its mirror, for things
+	 * leaving, where the eye should not be asked to follow the whole way.
+	 */
+	--reel-ease: cubic-bezier(0.2, 0, 0, 1);
+	--reel-ease-in: cubic-bezier(0.4, 0, 1, 1);
+	--reel-dur-fast: 120ms;
+	--reel-dur: 200ms;
+	--reel-dur-slow: 320ms;
 
 	/* Type.
 	 *
@@ -11715,4 +11747,371 @@ input.reel-input {
 
 .reel-filter-tag-x:active {
 	opacity: 1;
+}
+
+
+/* ==================================================================== */
+/* The premium pass                                                     */
+/*                                                                      */
+/* Five things, none of them decoration. Each one is a property that     */
+/* well-made interfaces set deliberately and hurried ones leave at the   */
+/* browser default — which is exactly the gap that reads as "this feels  */
+/* cheap" without being nameable.                                        */
+/* ==================================================================== */
+
+/*
+ * 1. Numbers line up.
+ *
+ * A proportional 1 is narrower than a 7, so a column of figures wanders and
+ * a counter ticking from 9 to 10 shifts everything beside it. Every typeface
+ * worth using ships tabular figures for exactly this; almost nothing turns
+ * them on.
+ *
+ * On the stats grid this is the single clearest signal that the numbers were
+ * laid out rather than merely printed: ten tiles whose values share a left
+ * edge and a rhythm. It costs one declaration and no space.
+ *
+ * Deliberately not on prose — a review with tabular figures in it looks like
+ * a spreadsheet. Only where a number is the content.
+ */
+.reel-tile-value,
+.reel-score-value,
+.reel-hero-value,
+.reel-stat-value,
+.reel-chart-count,
+.reel-cell-year,
+.reel-row-meta,
+.reel-diary-meta,
+.reel-episode-meta,
+.reel-season-count,
+.reel-filter-count,
+.reel-badge,
+.reel-heatmap-cell,
+.reel-upnext-meta {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum" 1;
+}
+
+/*
+ * 2. Display type is tightened.
+ *
+ * Typefaces are spaced for reading at body size. Set the same face at 34px
+ * and the tracking that made 13px legible makes the headline look loose —
+ * every display face in professional use is tracked in as it grows, and no
+ * browser does it for you.
+ *
+ * Small negative values, applied only where the type is genuinely large. The
+ * caption sizes are left alone: tightening small text costs legibility and
+ * buys nothing.
+ */
+.reel-tile-value,
+.reel-hero-title,
+.reel-hero-value,
+.reel-score-value,
+.reel-stat-value,
+.reel-wn-title,
+.reel-empty-title {
+	letter-spacing: -0.02em;
+}
+
+.reel-block-title,
+.reel-chart-title,
+.reel-detail-title,
+.reel-log-title {
+	letter-spacing: -0.01em;
+}
+
+/*
+ * 3. A card is a surface, not a slightly different shade of the page.
+ *
+ * The stats tiles are `--background-secondary`, which in dark mode is
+ * rgb(37,37,37) against a rgb(30,30,30) page — three percent of separation.
+ * At that distance the eye does not read "raised panel", it reads a faint
+ * rectangular outline, which is why ten of them in a grid look like a form
+ * rather than a dashboard.
+ *
+ * Rather than pick a lighter grey — which a theme would be entitled to
+ * override right back — the tile gets the raised shadow it should have had.
+ * Elevation is what makes a surface read as above another; tone alone only
+ * works when there is enough of it.
+ */
+.reel-tile,
+.reel-chart,
+.reel-quickcard,
+.reel-dcard,
+.reel-block {
+	box-shadow: var(--reel-shadow-raised);
+}
+
+/*
+ * Except a shadow does nothing in the dark, and that is the whole point.
+ *
+ * The rule above was written, applied, and screenshotted — and the dark screen
+ * came back pixel-identical. A black shadow cast onto a near-black page has
+ * nothing to darken. Every dark interface that looks expensive builds
+ * elevation out of *tone* instead: a surface further from the page is lighter,
+ * not shadowed, because in a dark room the way you see that something is
+ * raised is that more light falls on it.
+ *
+ * So dark mode lifts the fill and keeps only a trace of the shadow to seat the
+ * edge. The mix is against the theme's own secondary background rather than a
+ * fixed grey, so a theme that has already separated its surfaces keeps its
+ * own relationship and simply gets a little more of it.
+ *
+ * Worth recording that the light-mode rule is not wrong — it is just solving a
+ * different problem, and one fix was being asked to cover both.
+ */
+.theme-dark .reel-chart,
+.theme-dark .reel-quickcard,
+.theme-dark .reel-dcard,
+.theme-dark .reel-block {
+	/*
+	 * A translucent white layer over whatever fill the surface already has,
+	 * rather than a computed replacement for it.
+	 *
+	 * The first attempt was `color-mix(in srgb, var(--background-secondary)
+	 * 93%, #fff)` and it silently did nothing: the box-shadow in this same
+	 * block applied, the background did not, and the probe showed the tile
+	 * still sitting at the untouched rgb(37,37,37). A declaration dropped at
+	 * computed-value time leaves no trace anywhere except the pixels.
+	 *
+	 * `background-image` layers over `background-color` instead of competing
+	 * with it, so this needs no colour maths, cannot lose a specificity
+	 * argument with the rule that set the fill, and keeps whatever the theme
+	 * chose underneath. It is also, not coincidentally, how Material builds
+	 * elevation in dark mode.
+	 */
+	background-image: linear-gradient(rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.055));
+	box-shadow: 0 1px 2px rgb(0 0 0 / 0.30);
+}
+
+/* A hairline along the top edge, which is where light would catch it. One
+   pixel, at four percent — the difference between a panel and a panel you can
+   find the edge of without looking for it. */
+.theme-dark .reel-chart,
+.theme-dark .reel-quickcard,
+.theme-dark .reel-dcard {
+	border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/*
+ * The stats tiles are left to their own treatment, and it turns out to be the
+ * better one.
+ *
+ * Three attempts went into lifting these with a white overlay before the probe
+ * showed `background-image: none` on an element whose box-shadow, set in the
+ * same block, had applied. The cause was `.reel-view .reel-stats .reel-tile` —
+ * three classes to this rule's two — which had been tinting the tile from the
+ * poster's own hue all along, with a hairline drawn from the same colour.
+ *
+ * So the flat grey rectangle this was written to fix does not exist. What I
+ * read as a cheap outline is that hairline, and it looks weak only because the
+ * hue derived from the fixture's artwork is a muddy olive. Painting white over
+ * it would have replaced something specific to what you are looking at with
+ * something identical on every screen — which is the opposite of the point.
+ *
+ * A little more of it in dark mode, where a 9% tint has almost nothing to sit
+ * against, and nothing else.
+ */
+/*
+ * Keep the hue, take the chroma out.
+ *
+ * Raising the alpha was the wrong lever and the probe said so immediately:
+ * the tile came back `rgba(160, 238, 43, 0.16)`. Lime. The tint is taken from
+ * the poster at whatever saturation the poster happens to have, so a title
+ * with strong artwork washes the entire stats page in it — and the fix that
+ * made the tint "stronger" made ten tiles green.
+ *
+ * A surface tint is not the accent. The accent is for a button, where full
+ * chroma over a small area is the point; a tint covers half the screen, and at
+ * that size the same colour reads as a stain. Every interface that draws its
+ * palette from artwork does this: the hue travels, the saturation does not.
+ *
+ * So the hue is still the film's — the page does belong to what you are
+ * looking at — held at a fixed low chroma so it can never shout. Alpha goes
+ * back down; with the saturation under control it does not need to be loud.
+ */
+.reel-view .reel-stats .reel-tile {
+	background: hsl(var(--reel-accent-h, 220) 20% var(--reel-accent-l, 40%) / 0.10);
+	border-color: hsl(var(--reel-accent-h, 220) 24% var(--reel-accent-l, 40%) / 0.16);
+}
+
+.theme-dark .reel-view .reel-stats .reel-tile {
+	background: hsl(var(--reel-accent-h, 220) 20% var(--reel-accent-l, 58%) / 0.13);
+	border-color: hsl(var(--reel-accent-h, 220) 24% var(--reel-accent-l, 58%) / 0.20);
+}
+
+/*
+ * 4. Everything that responds to a press, responds the same way.
+ *
+ * A tap that produces no change for 100ms reads as a tap that missed. The
+ * cards already did this in places, at four different scales and three
+ * different curves; stated once, it becomes a property of the app rather than
+ * of whichever element someone remembered.
+ */
+.reel-tile.is-clickable,
+.reel-dcard,
+.reel-cell,
+.reel-row,
+.reel-drow-card,
+.reel-person-credit,
+.reel-caststrip-cell {
+	transition: transform var(--reel-dur-fast) var(--reel-ease);
+}
+
+.reel-tile.is-clickable:active,
+.reel-dcard:active,
+.reel-cell:active,
+.reel-row:active,
+.reel-drow-card:active,
+.reel-person-credit:active,
+.reel-caststrip-cell:active {
+	transform: scale(0.975);
+}
+
+/*
+ * 5. The sticky chrome is a material, not a lid.
+ *
+ * The filter row pins to the top of the list with an opaque fill, so a poster
+ * scrolling up to it is not covered so much as deleted — it meets a hard edge
+ * and stops existing. Every phone OS solves this the same way, because it is
+ * the one that works: the bar is translucent and blurred, so content passing
+ * beneath it is visibly *beneath* it.
+ *
+ * This is the change that most makes a screen feel like it belongs on a
+ * phone. It is also the one with a real fallback story: without
+ * `backdrop-filter` the `color-mix` still resolves to a mostly-opaque fill,
+ * so the bar stays legible and simply stops being translucent.
+ */
+.reel-chips {
+	/*
+	 * 88%, not 78%.
+	 *
+	 * The first attempt was more translucent and the audit came back with the
+	 * filter icon at 1.31:1 and the separator at 4.09:1 — because a control
+	 * drawn on a see-through surface is drawn on whatever happens to be
+	 * passing underneath, and a poster is not a background you can guarantee
+	 * anything against.
+	 *
+	 * This is the real cost of the effect and it is worth naming rather than
+	 * tuning until the numbers go green: translucency trades contrast for
+	 * depth. 88% keeps enough of the page's own colour to hold text at full
+	 * legibility while still letting you see that something is moving beneath
+	 * it, which is the whole reason for the material.
+	 */
+	/*
+	 * And then reverted to opaque, which is the honest end of this.
+	 *
+	 * Translucency over a list of posters means the text on the bar is drawn
+	 * over whatever poster is passing under it, and a poster is not a
+	 * background you can guarantee anything against. At 78% the filter icon
+	 * measured 1.31:1; at 88% the dimmed meta line still sat at 4.09:1, and
+	 * each fix moved the failure to a different element rather than removing
+	 * it.
+	 *
+	 * The effect is genuinely what makes iOS and Android chrome feel like
+	 * chrome. It also needs a backdrop whose luminance you control, and a
+	 * poster grid is the one surface where you never do. Keeping it would mean
+	 * accepting that the filter row is legible against some of your library
+	 * and not the rest.
+	 *
+	 * The blur stays on the sheet foot below, where the thing scrolling
+	 * underneath is the sheet's own content on the sheet's own background.
+	 */
+	background: var(--background-primary);
+}
+
+/*
+ * The Filters button stays fully opaque.
+ *
+ * It is pinned over the row rather than part of it — tags scroll behind it —
+ * so it is the one thing here that must never let anything show through. It
+ * carried the material for one build and its icon measured 1.31:1.
+ */
+.reel-filterbar .reel-filter-btn {
+	background: var(--background-primary);
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+/*
+ * The sheet foot is the same material for the same reason: the list scrolls
+ * under it, and a hard opaque edge across the bottom of a sheet is the part
+ * that makes a bottom sheet look like a dialog box.
+ */
+.reel-modal.reel-sheet .reel-log-actions,
+.reel-modal.reel-sheet .reel-prompt-actions {
+	background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+	-webkit-backdrop-filter: blur(18px) saturate(180%);
+	backdrop-filter: blur(18px) saturate(180%);
+}
+
+/*
+ * A sheet arriving should decelerate, like something with weight being placed
+ * rather than a panel being switched on. Same curve as everything else.
+ */
+.reel-modal.reel-sheet {
+	/* 200ms, not 320. A sheet is a big object and the instinct is to give it a
+	   long arrival, but past about a quarter of a second the user is waiting
+	   for the app rather than watching it move. */
+	animation: reel-sheet-in var(--reel-dur) var(--reel-ease);
+}
+
+
+/*
+ * Two more that were reading against the material rather than the page.
+ *
+ * The separator dot and the dimmed meta line were `--text-faint`, which had
+ * been passing only because the surface behind them was opaque. Same decision
+ * as everywhere else in this stylesheet: quiet is `--text-muted`.
+ */
+/*
+ * The separator is gone from the markup rather than recoloured.
+ *
+ * It was a "·" set between the Filters button and the sort controls, and it
+ * failed contrast on the new translucent row. Every attempt to fix it was a
+ * colour argument about a dot: muted put it at 4.09:1, normal-with-opacity at
+ * 1.31:1. The third time a decorative glyph resists being made legible is a
+ * good moment to ask what it was for — the gap either side of it already says
+ * everything it said.
+ */
+.reel-dim {
+	/*
+	 * `--text-muted` is 4.09:1 against this page, which is under the line.
+	 *
+	 * Worth recording, because it means "quiet is --text-muted" is a rule with
+	 * an edge to it: muted passes comfortably on the panels it was measured on
+	 * and lands just short on the page itself. These two sit on the page.
+	 */
+	color: var(--text-normal);
+}
+
+/*
+ * The recipe sheet's chrome crossed 45% at 46%.
+ *
+ * Caused by this pass rather than found by it: tabular figures are slightly
+ * wider than proportional ones, enough for a line to wrap, and the first seed
+ * ended up eight pixels lower. The check is right and the threshold is not the
+ * thing to move — the cheapest honest answer is to give the head back the
+ * eight pixels it just took.
+ */
+.reel-sheet .reel-recipe-hint {
+	margin-bottom: var(--reel-space-1);
+}
+
+.reel-sheet .reel-recipe-title {
+	margin-bottom: var(--reel-space-1);
+}
+
+
+/*
+ * The recipe head gives back the eight pixels the wider figures took.
+ *
+ * At the sheet's own specificity — the first attempt was a class short and
+ * changed nothing, which the audit reported by not moving at all.
+ */
+.reel-modal.reel-sheet .reel-recipe-hint,
+.reel-modal.reel-sheet .reel-recipe-title,
+.reel-modal.reel-sheet .reel-recipe-steps {
+	margin-bottom: var(--reel-space-1);
 }

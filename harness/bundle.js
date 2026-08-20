@@ -3315,7 +3315,6 @@
         this.quickAt = 0;
       });
       quick2.addClass("reel-chip-mode");
-      row1.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
       if (!this.genres.length) {
         void this.plugin.tmdb.genreList(this.filters.type).then((list) => {
           this.genres = list;
@@ -3338,7 +3337,6 @@
           this.filters.decade = this.filters.decade === d ? null : d;
         });
       }
-      row2.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
       row2.createSpan({ cls: "reel-dim", text: "At least" });
       for (const r of [6, 7, 8]) {
         chip(row2, `${r}+`, this.filters.minRating === r, () => {
@@ -7546,7 +7544,6 @@ ${body}
       const layout = bar.createEl("button", { cls: "reel-chip reel-layout-btn" });
       layout.createSpan({ cls: "reel-layout-icon", text: "\u25A6" });
       layout.createSpan({ cls: "reel-layout-label", text: "Posters" });
-      bar.createSpan({ cls: "reel-chip-sep", text: "\xB7" });
     }
     for (const label of active) {
       const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
@@ -8041,10 +8038,13 @@ ${e?.stack ?? ""}` });
     return view;
   }
   sheetFit();
-  function settled() {
-    return new Promise((done) => {
-      setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => done())), 0);
+  async function settled(root) {
+    await new Promise((done) => {
+      setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => done(null))), 0);
     });
+    const scope = root ?? document.body;
+    const running = scope.getAnimations?.({ subtree: true }) ?? [];
+    await Promise.all(running.map((a) => a.finished.catch(() => void 0)));
   }
   var app = document.getElementById("app");
   if (app)
@@ -8070,7 +8070,7 @@ ${e?.stack ?? ""}` });
         continue;
       }
       const view = mount(app2, name);
-      await settled();
+      await settled(view);
       results.push({ screen: name, checks: auditScreen(view, { phone: phone2, keyboard }) });
       view.remove();
     }
