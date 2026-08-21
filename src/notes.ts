@@ -16,7 +16,7 @@ import { Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type ReelPlugin from "./main";
 import { clampRating, starString } from "./util/ratings";
 import { addToRange, contiguousProgress, rangeCount } from "./util/ranges";
-import { nextShowStatus } from "./util/status";
+import { hasBeenWatched, nextShowStatus, type WatchedLike } from "./util/status";
 import { appendWatch, latestRating, mergeSeasons, rateEpisode as computeEpisodeRating } from "./util/mutations";
 import { normaliseDate, prettyDate, todayISO, yearOf } from "./util/dates";
 import type { Entry, SeasonProgress, TmdbFilm, TmdbShow, WatchEvent } from "./types";
@@ -513,6 +513,15 @@ export class NoteWriter {
 
 	async setStatus(file: TFile, status: string): Promise<void> {
 		await this.edit(file, `setting ${file.basename} to ${status}`, (fm) => {
+			// Queuing a rewatch must not retract having watched it.
+			//
+			// `status` holds one value, so moving a watched film onto the
+			// watchlist overwrites the only field that said you had seen it.
+			// For most titles that is harmless — the logged dates or the
+			// episode progress still prove it — but an imported note marked
+			// watched carries neither, and for those the label was the whole
+			// of the evidence. Stamp the fact before overwriting the claim.
+			if (status === "watchlist" && hasBeenWatched(fm as WatchedLike)) fm.seen = true;
 			fm.status = status;
 			// Marking a film watched has to record *that you watched it*, not
 			// merely relabel it. The Diary, the streak, hours-watched and every

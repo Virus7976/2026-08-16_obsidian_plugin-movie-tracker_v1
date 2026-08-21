@@ -17,6 +17,7 @@
 
 import { App, Modal, Platform } from "obsidian";
 import type { Entry } from "../types";
+import { matchesStatus } from "../util/status";
 import { setSelected } from "./a11y";
 
 /**
@@ -130,12 +131,20 @@ export function narrow(rows: Entry[], f: FilterState): Entry[] {
 		 *
 		 * Either signal counts. A date proves it; the label claims it; both
 		 * mean you have seen it.
+		 *
+		 * And it was still only half fixed, for two reasons that both bit.
+		 *
+		 * Series were excluded from the whole idea — `e.type !== "tv"` — so a
+		 * show only matched "watched" if its status said that word, which for a
+		 * series it never does: shows are "watching" or "completed". And
+		 * "completed" itself was tested against the raw label, so finishing a
+		 * series and then queuing it for a rewatch dropped it out of
+		 * "completed" as well.
+		 *
+		 * The reasoning now lives in `matchesStatus`, where every screen can
+		 * reach it, rather than being an expression inside one filter.
 		 */
-		out = out.filter((e) =>
-			f.statuses.some((s) =>
-				s === "watched" && e.type !== "tv" ? e.watched.length > 0 || e.status === "watched" : e.status === s
-			)
-		);
+		out = out.filter((e) => f.statuses.some((s) => matchesStatus(e, s)));
 	}
 	if (f.genres.length) out = out.filter((e) => f.genres.some((g) => e.genres.includes(g)));
 	if (f.lists.length) out = out.filter((e) => f.lists.some((l) => e.lists.includes(l)));

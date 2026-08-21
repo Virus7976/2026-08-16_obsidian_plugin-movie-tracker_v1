@@ -85,6 +85,17 @@ export interface Entry {
 	status: string;
 	rating?: number;
 	liked?: boolean;
+	/**
+	 * You have seen this, whatever the status says now.
+	 *
+	 * Only written when a title that claimed to be watched or completed is
+	 * moved onto the watchlist, and only because that move overwrites the one
+	 * field carrying the claim. A film with logged dates, or a series with
+	 * episode progress, needs nothing here — the evidence is already in the
+	 * note. This exists for the imported title that was marked watched with no
+	 * dates at all, where the label *was* the evidence.
+	 */
+	seen?: boolean;
 	/** "I'd watch that again" — deliberately separate from the rating. */
 	wouldRewatch?: boolean;
 	/** Rich metadata */

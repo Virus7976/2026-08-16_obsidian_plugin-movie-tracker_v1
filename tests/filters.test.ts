@@ -77,6 +77,66 @@ const show = entry({ title: "Show", type: "tv", status: "watching", watched: [] 
 eq(titles(narrow([show], withStatuses("watching"))), ["Show"], "a series matches its status");
 eq(titles(narrow([show], withStatuses("watched"))), [], "and not one it does not hold");
 
+/* ---- a series is judged on its episodes, not on a word it never holds ---- */
+
+/*
+ * The second half of the same bug. Series were excluded from the whole idea,
+ * so a show only matched "watched" if its status said that word — which for a
+ * series it never does. Shows are "watching" or "completed".
+ */
+const partly = entry({
+	title: "Partly",
+	type: "tv",
+	status: "watching",
+	seasons: [{ n: 1, watched: "1-4" }],
+	totalEpisodes: 10,
+});
+eq(titles(narrow([partly], withStatuses("watched"))), ["Partly"], "episodes ticked mean you have seen it");
+eq(titles(narrow([partly], withStatuses("completed"))), [], "but four of ten is not finished");
+
+/* ---- and finishing a series then queuing a rewatch keeps both facts ---- */
+
+// The reported case, in its series form: completed, then moved to the
+// watchlist to watch again. It dropped out of "completed" entirely.
+const rewatchShow = entry({
+	title: "Rewatch Show",
+	type: "tv",
+	status: "watchlist",
+	seasons: [{ n: 1, watched: "1-10" }],
+	totalEpisodes: 10,
+});
+eq(titles(narrow([rewatchShow], withStatuses("completed"))), ["Rewatch Show"], "all ten episodes is finished");
+eq(titles(narrow([rewatchShow], withStatuses("watched"))), ["Rewatch Show"], "and finished means seen");
+eq(titles(narrow([rewatchShow], withStatuses("watchlist"))), ["Rewatch Show"], "while still being queued");
+
+// An unknown episode count proves nothing either way. A missing field must not
+// promote a show to completed on the strength of one ticked episode.
+const unknownTotal = entry({ title: "Unknown", type: "tv", status: "watching", seasons: [{ n: 1, watched: "1-3" }] });
+eq(titles(narrow([unknownTotal], withStatuses("completed"))), [], "no denominator, no conclusion");
+
+/* ---- the imported film with no dates, moved to the watchlist ---- */
+
+/*
+ * Most of an imported library is marked watched with no dates at all, so the
+ * label is the whole of the evidence — and moving one to the watchlist
+ * overwrites it. `setStatus` stamps `seen` before the overwrite; this is that
+ * flag doing its job.
+ */
+const stamped = entry({ title: "Stamped", status: "watchlist", watched: [], seen: true });
+eq(titles(narrow([stamped], withStatuses("watched"))), ["Stamped"], "a stamped title stays watched");
+
+// And the flag is not a way to be watched without ever having been.
+const neverSeen = entry({ title: "Never", status: "watchlist", watched: [] });
+eq(titles(narrow([neverSeen], withStatuses("watched"))), [], "no flag, no dates, no claim");
+
+/* ---- a current-state label stays exclusive, because it is about now ---- */
+
+// "Paused" is a decision about right now, not a fact about your history, so it
+// must not start matching things you gave up on months ago.
+const dropped = entry({ title: "Dropped", type: "tv", status: "dropped", seasons: [{ n: 1, watched: "1-2" }] });
+eq(titles(narrow([dropped], withStatuses("paused"))), [], "dropped is not paused");
+eq(titles(narrow([dropped], withStatuses("watched"))), ["Dropped"], "though you did watch some of it");
+
 /* ---- several statuses are an OR, which is what ticking boxes means ---- */
 
 const pool = [

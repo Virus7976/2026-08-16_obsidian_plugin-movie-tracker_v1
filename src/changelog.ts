@@ -52,6 +52,32 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.38",
+		date: "2026-08-20",
+		headline: "Putting something back on the watchlist no longer forgets that you watched it.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "A film or series you move to the watchlist stays in Watched, and a finished series stays in Completed.",
+				note: "`status` holds one value, so moving a title to the watchlist overwrote the only field saying you had seen it, and it fell out of its own category. Watched and Completed are now answered from your logged dates and episode progress — facts about what happened — rather than from a label a later intention can overwrite.",
+			},
+			{
+				kind: "fixed",
+				text: "Series are included in Watched at all now.",
+				note: "The check asked whether the status field said the word “watched”, which for a series it never does — shows are “watching” or “completed” — so selecting Watched returned almost no television.",
+			},
+			{
+				kind: "better",
+				text: "An imported title marked watched with no dates keeps that fact when you queue it for a rewatch.",
+				note: "For those notes the label was the only evidence, so it is recorded before being overwritten rather than a watch date being invented.",
+			},
+			{
+				kind: "better",
+				text: "The artwork behind a title's tabs fades out at the bottom instead of ending in a straight line, and the open tab now runs into the list below it.",
+			},
+		],
+	},
+	{
 		version: "0.8.37",
 		date: "2026-08-20",
 		headline: "Tapping an actor shows what they played, not which chat shows they sat on.",

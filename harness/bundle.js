@@ -1227,7 +1227,7 @@
         chip(y, opts.year === Number(y), Number(y));
     }
     const filmMinutes = watched.reduce((n2, v) => n2 + (v.entry.runtime ?? 0), 0);
-    const episodesSeen = shows.reduce((n2, s) => n2 + s.seasons.reduce((m, x) => m + rangeCount(x.watched), 0), 0);
+    const episodesSeen2 = shows.reduce((n2, s) => n2 + s.seasons.reduce((m, x) => m + rangeCount(x.watched), 0), 0);
     const episodeMinutes = shows.reduce(
       (n2, s) => n2 + s.seasons.reduce((m, x) => m + rangeCount(x.watched), 0) * (s.episodeRuntime ?? 0),
       0
@@ -1337,7 +1337,7 @@
     if (shows.length) {
       tile(
         "Episodes",
-        String(episodesSeen),
+        String(episodesSeen2),
         `${shows.length} show${shows.length === 1 ? "" : "s"}`,
         show("Series you're watching", shows),
         // The first show, which is the one the episode count leads with.
@@ -2067,6 +2067,35 @@
 
   // src/util/status.ts
   var FROZEN_STATUSES = /* @__PURE__ */ new Set(["dropped", "paused", "watchlist"]);
+  function hasBeenWatched(e) {
+    if (e.seen === true)
+      return true;
+    if (e.status === "watched" || e.status === "completed")
+      return true;
+    if ((e.watched?.length ?? 0) > 0)
+      return true;
+    return episodesSeen(e) > 0;
+  }
+  function hasBeenCompleted(e) {
+    if (e.status === "completed")
+      return true;
+    if (e.type !== "tv")
+      return false;
+    const total = e.totalEpisodes ?? 0;
+    if (!Number.isFinite(total) || total <= 0)
+      return false;
+    return episodesSeen(e) >= total;
+  }
+  function matchesStatus(e, status) {
+    if (status === "watched")
+      return hasBeenWatched(e);
+    if (status === "completed")
+      return hasBeenCompleted(e);
+    return e.status === status;
+  }
+  function episodesSeen(e) {
+    return (e.seasons ?? []).reduce((n2, s) => n2 + rangeCount(s.watched), 0);
+  }
   function nextShowStatus(current, watchedCount, total) {
     if (FROZEN_STATUSES.has(String(current ?? "")))
       return null;
@@ -6861,11 +6890,7 @@ ${body}
     if (f.type !== "all")
       out = out.filter((e) => e.type === f.type);
     if (f.statuses.length) {
-      out = out.filter(
-        (e) => f.statuses.some(
-          (s) => s === "watched" && e.type !== "tv" ? e.watched.length > 0 || e.status === "watched" : e.status === s
-        )
-      );
+      out = out.filter((e) => f.statuses.some((s) => matchesStatus(e, s)));
     }
     if (f.genres.length)
       out = out.filter((e) => f.genres.some((g) => e.genres.includes(g)));

@@ -317,6 +317,7 @@ function toEntry(file: TFile, fm: Record<string, unknown>, seriesFolder: string)
 		status: String(fm.status ?? (type === "tv" ? "watching" : "watched")),
 		rating: numberOrUndef(fm.rating),
 		liked: fm.liked === true,
+		seen: fm.seen === true,
 		wouldRewatch: fm.would_rewatch === true,
 		cast: toStringArray(fm.cast),
 		characters: toStringArray(fm.characters),

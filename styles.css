@@ -13867,6 +13867,21 @@ button.reel-facet-tab {
 	background: transparent;
 }
 
+/*
+ * The band fades out at the bottom rather than stopping at a line.
+ *
+ * This is the same fault as the hero band's top edge and the role sheet's
+ * still, in the third place it could occur: a blurred image with one straight
+ * edge does not read as soft, because the eye goes to the edge. The strip runs
+ * into the cast list underneath it, so that is the edge that has to go.
+ *
+ * Masking the image rather than laying another gradient over it means there is
+ * no colour to match — there is simply less picture — so it works on any
+ * theme's background without knowing what that background is.
+ *
+ * The last 8% is left solid: the mask has to finish before the active tab's
+ * own fill does, or the lit panel would sit on a band that had already gone.
+ */
 .reel-facet-tabwrap.has-wash::before {
 	content: "";
 	position: absolute;
@@ -13875,8 +13890,10 @@ button.reel-facet-tab {
 	background-image: var(--reel-wash);
 	background-size: cover;
 	background-position: center 40%;
-	filter: blur(16px) saturate(1.4);
-	opacity: 0.55;
+	filter: blur(16px) saturate(1.55);
+	opacity: 0.6;
+	-webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 92%);
+	mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 92%);
 }
 
 .reel-facet-tabwrap.has-wash::after {
@@ -13922,10 +13939,29 @@ button.reel-facet-tab {
 		background-color var(--reel-dur-fast) var(--reel-ease);
 }
 
+/*
+ * The open tab joins the content below it.
+ *
+ * A tab is the top of the panel you are reading, so it should not end in a
+ * line either — the fill starts slightly translucent where the artwork is
+ * strongest and reaches the page's own colour by the bottom, which is where
+ * the cast list begins. That is the whole reason this shape reads as a tab
+ * rather than as a highlighted word.
+ */
 .reel-facet-tabwrap.has-wash .reel-facet-tab.is-active {
 	color: var(--text-normal);
-	background: var(--background-primary);
-	box-shadow: 0 -1px 0 rgb(0 0 0 / 0.06) inset;
+	background: linear-gradient(
+		to bottom,
+		rgb(from var(--background-primary) r g b / 0.82),
+		var(--background-primary) 70%
+	);
+	box-shadow: 0 -1px 0 rgb(0 0 0 / 0.05) inset;
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-facet-tabwrap.has-wash .reel-facet-tab.is-active {
+		background: var(--background-primary);
+	}
 }
 
 /* The underline stays, but as an accent bar on the lit panel rather than as
