@@ -370,7 +370,28 @@ export class DetailScreen {
 
 		if (!tabs.length) return;
 
-		const bar = wrap.createDiv({ cls: "reel-facet-tabs" });
+		// A wrapper holds the artwork; the strip inside it still scrolls.
+		//
+		// The wash cannot live on the strip itself. The strip is a horizontal
+		// scroller — nine tabs in 323px on a phone — and anything absolutely
+		// positioned inside a scroll container scrolls away with the content,
+		// so the image would cover the first screenful of tabs and nothing
+		// after it. Clipping the strip to stop that just disables the scroll
+		// and strands the last four tabs off the edge.
+		const shell = wrap.createDiv({ cls: "reel-facet-tabwrap" });
+		const bar = shell.createDiv({ cls: "reel-facet-tabs" });
+		// The film, behind its own tabs.
+		//
+		// "Cast / Crew / Details / Storyline" was five identical grey words in
+		// a row, and a row of words is the most text-shaped thing an interface
+		// can be. The strip carries the title's own frame, blurred, so the tabs
+		// are part of the thing you are reading about rather than a control
+		// panel bolted above it. One image, already loaded for the hero.
+		const strip = this.plugin.posters.washUrl(this.entry);
+		if (strip) {
+			shell.addClass("has-wash");
+			shell.setCssProps({ "--reel-wash": `url("${strip}")` });
+		}
 		const body = wrap.createDiv({ cls: "reel-facet-body" });
 		const buttons: HTMLElement[] = [];
 

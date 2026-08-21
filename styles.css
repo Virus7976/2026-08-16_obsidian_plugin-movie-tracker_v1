@@ -13440,3 +13440,503 @@ input.reel-input {
 .reel-chart.is-open .reel-fold-shots {
 	display: none;
 }
+
+
+/* ==================================================================== */
+/* The person sheet: a filmography that is about the person             */
+/* ==================================================================== */
+
+/*
+ * The head stopped collapsing.
+ *
+ * Giving it the artwork wash meant giving it `overflow: hidden`, and a flex
+ * item whose overflow is not `visible` has its automatic minimum size turned
+ * off — `min-height: auto` resolves to 0 rather than to the content. So in
+ * the sheet's column layout the head shrank to whatever space was left over
+ * and then clipped its own contents: the top of a portrait, and a name cut
+ * through the middle of the letters.
+ *
+ * That is the whole bug, and it is worth stating plainly because the same two
+ * lines — a wash and `overflow: hidden` — went onto four other sheets in
+ * the same pass, so the rule below covers all of them before they show it.
+ */
+.reel-person-head.has-wash,
+.reel-preview.has-wash,
+.reel-season.has-wash,
+.reel-log.has-wash,
+.reel-rate-card.has-wash {
+	flex: 0 0 auto;
+}
+
+/* And the head wraps below a phone's width, where 88px of portrait plus a
+   name plus a rating row will not sit on one line. */
+.reel-person-head {
+	flex-wrap: wrap;
+}
+
+.reel-person-hero-body {
+	flex: 1 1 180px;
+	min-width: 0;
+}
+
+/* The hint, which is how anyone learns the hold is there at all. */
+/* `--text-faint` came out at 4.26:1 on a warm light palette. This line is the
+   only place the press-and-hold is ever explained, so it is the last thing
+   that should be styled to the edge of legibility. */
+.reel-person-hint {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+	margin: -2px 0 var(--reel-space-2);
+}
+
+/*
+ * The part, on the card.
+ *
+ * Accent-coloured and above the year, because on a filmography the character
+ * is the content and the year is the filing. Two lines at most — some
+ * credits are "Tony Stark / Iron Man (voice) (uncredited)", which is not a
+ * headline.
+ */
+.reel-person-credit-role {
+	font-size: var(--reel-text-caption);
+	font-weight: var(--reel-weight-medium);
+	line-height: 1.25;
+	color: var(--text-accent);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* A crew job is a fact about the production rather than a part, so it reads
+   as supporting text and not as somebody's name. */
+.reel-person-credit-role.is-job {
+	color: var(--text-muted);
+	font-weight: var(--reel-weight-normal);
+	font-style: italic;
+}
+
+/* A press-and-hold has to look like it is being pressed and held, or the half
+   second before the sheet opens reads as a tap that missed. */
+.reel-person-credit {
+	-webkit-touch-callout: none;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.reel-person-credit.is-held .reel-person-credit-poster {
+	transform: scale(0.93);
+}
+
+/* The fold down to the chat-show credits: a quiet full-width row, not a
+   button competing with the grid above it. */
+.reel-person-fold {
+	display: block;
+	width: 100%;
+	/* It is the only way to reach a hundred credits, so it is a target like
+	   any other and not a caption that happens to be clickable. */
+	min-height: 44px;
+	margin-top: var(--reel-space-4);
+	padding: var(--reel-space-3);
+	background: var(--background-secondary);
+	border: none;
+	border-radius: var(--reel-radius);
+	color: var(--text-muted);
+	font-size: var(--reel-text-label);
+	text-align: center;
+	cursor: pointer;
+	box-shadow: var(--reel-shadow-raised);
+}
+
+/* ==================================================================== */
+/* The role sheet — one part, held down for                            */
+/* ==================================================================== */
+
+/*
+ * The frame from the film, with their face on it.
+ *
+ * The portrait overlaps the bottom edge of the still rather than sitting
+ * under it: the two images are about the same thing, and stacking them as
+ * separate blocks would read as two unrelated pictures.
+ */
+.reel-role-stage {
+	position: relative;
+	margin: calc(var(--reel-space-4) * -1) calc(var(--reel-space-4) * -1) 0;
+	aspect-ratio: 16 / 9;
+	background: var(--background-modifier-form-field);
+	border-radius: var(--reel-radius-lg) var(--reel-radius-lg) 0 0;
+	overflow: hidden;
+	flex: 0 0 auto;
+}
+
+.reel-role-stage.is-empty {
+	aspect-ratio: auto;
+	height: 64px;
+}
+
+.reel-role-still {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/*
+ * A gradient into the sheet's own background along the bottom, so the still
+ * ends in the page rather than in a line across it — the same hard-cutoff
+ * complaint already answered on Stats and on Library.
+ */
+.reel-role-stage::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: linear-gradient(
+		to bottom,
+		transparent 40%,
+		rgb(from var(--background-primary) r g b / 0.55) 78%,
+		var(--background-primary) 100%
+	);
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-role-stage::after {
+		background: linear-gradient(to bottom, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+	}
+}
+
+.reel-role-face {
+	position: absolute;
+	left: var(--reel-space-4);
+	bottom: calc(var(--reel-space-3) * -1);
+	z-index: 1;
+	width: 76px;
+	height: 76px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: var(--background-secondary);
+	border: 3px solid var(--background-primary);
+	box-shadow: var(--reel-shadow-poster);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-role-face img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-role-body {
+	padding-top: calc(var(--reel-space-4) + var(--reel-space-3));
+}
+
+.reel-role-kicker {
+	font-size: var(--reel-text-caption);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+}
+
+/* The character is the headline. That is the question that was asked. */
+.reel-role-name {
+	font-size: var(--reel-text-hero);
+	font-weight: var(--reel-weight-strong);
+	line-height: var(--reel-leading-tight);
+	letter-spacing: -0.015em;
+}
+
+.reel-role-what {
+	font-size: var(--reel-text-caption);
+	color: var(--text-faint);
+	margin-bottom: var(--reel-space-3);
+}
+
+.reel-role-in {
+	font-size: var(--reel-text-title);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+}
+
+.reel-role-facts {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	margin-top: 2px;
+}
+
+.reel-role-overview {
+	font-size: var(--font-ui-small);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	margin-top: var(--reel-space-3);
+}
+
+.reel-role-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--reel-space-2);
+	margin-top: var(--reel-space-4);
+}
+
+.reel-role-actions .reel-btn {
+	flex: 1 1 0;
+	min-width: 44%;
+}
+
+
+/* ==================================================================== */
+/* No more hard edge where a blur begins                                */
+/* ==================================================================== */
+
+/*
+ * Rounding the corners was half the answer.
+ *
+ * 0.8.28 and 0.8.36 gave the hero band a radius, which stopped it running to
+ * the screen edge — but the top of the artwork was still a straight line
+ * across the band, and a blur that fades softly out of the bottom and starts
+ * abruptly at the top does not read as soft: the eye goes to the one hard
+ * edge, which is exactly the "rough edge at the top" that kept being
+ * reported after the corners were fixed.
+ *
+ * The art now fades in as well as out. Masking the layer rather than adding
+ * another gradient over it means it works the same on any theme's background
+ * colour, because there is nothing to match — there is simply less image.
+ */
+.reel-hero-art {
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 100%);
+	mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 100%);
+}
+
+/* The compact band is a third of the height, so the same percentage would eat
+   most of it. A shorter fade, in proportion. */
+.reel-hero-band.is-compact .reel-hero-art {
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 100%);
+	mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 100%);
+}
+
+/* ==================================================================== */
+/* The Rate card fits on the screen it is used on                       */
+/* ==================================================================== */
+
+/*
+ * "This looks bad here — it would be better if it showed the entire
+ * thumbnail and then scrolled down."
+ *
+ * The card was a 190x285 poster stacked above the title, the credits, the
+ * overview, five stars and five buttons: about 900px on a device with roughly
+ * 600 to give. So rating anything meant scrolling, and scrolling put the
+ * poster underneath the sticky queue chips — which is the state in the
+ * screenshot, a 40px sliver of artwork with a hard line across it.
+ *
+ * An auto-scroll would have shown the poster and then taken it away again,
+ * and it would have fought the thumb the moment anyone scrolled themselves.
+ * The actual complaint is that the whole thumbnail is not visible, so: the
+ * card lays out poster-beside-details on a phone and fits, and the poster
+ * stays on screen the entire time you are deciding.
+ *
+ * A grid rather than a flex row, because the star row has to span both
+ * columns — five targets in a 200px column is a row of stamps.
+ */
+.reel-view:not(.is-w700) .reel-rate-card {
+	display: grid;
+	grid-template-columns: 124px minmax(0, 1fr);
+	grid-template-areas:
+		"poster body"
+		"stars stars";
+	column-gap: var(--reel-space-3);
+	row-gap: var(--reel-space-3);
+	align-items: start;
+	text-align: left;
+}
+
+.reel-view:not(.is-w700) .reel-rate-poster {
+	grid-area: poster;
+	width: 100%;
+	max-width: none;
+}
+
+.reel-view:not(.is-w700) .reel-rate-body {
+	grid-area: body;
+}
+
+.reel-view:not(.is-w700) .reel-rate-stars {
+	grid-area: stars;
+	justify-content: center;
+}
+
+/* The credits wrap left rather than centring, now that they sit in a column
+   beside the poster instead of under it. */
+.reel-view:not(.is-w700) .reel-rate-card .reel-header-facts {
+	justify-content: flex-start;
+}
+
+/*
+ * The overview is the one part of the card with no fixed size, so it is the
+ * part that would put the poster back off the screen. Four lines, and the
+ * whole thing is a tap away on the detail screen.
+ *
+ * `-webkit-line-clamp` needs `display: -webkit-box` to do anything, and a
+ * clamp without its box collapses the element to zero height instead of
+ * truncating it — which is how the superlative rows lost their film titles
+ * in 0.8.31. Both are set here, in one rule, at a specificity that wins.
+ */
+.reel-view:not(.is-w700) .reel-rate-overview {
+	display: -webkit-box;
+	-webkit-line-clamp: 4;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/*
+ * A new card arriving should look like it arrived.
+ *
+ * Rating advances automatically, so the only signal that anything happened is
+ * that the words changed. A short settle on the poster is enough to read as
+ * "next one" without being an animation anybody has to wait for.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.reel-rate-card .reel-rate-poster {
+		animation: reel-rate-in var(--reel-dur-slow) var(--reel-ease);
+	}
+}
+
+@keyframes reel-rate-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ==================================================================== */
+/* The detail tabs stop being five grey words                           */
+/* ==================================================================== */
+
+/*
+ * Reel's reset was losing to the theme, which is why they looked like this.
+ *
+ * `.reel-facet-tab` is one class — (0,1,0). Primary's `button:not(button.
+ * clickable-icon)` is (0,2,0), and themes load after plugins, so every one of
+ * `background: none`, `border: none`, `border-radius: 0` was overridden and
+ * the tabs rendered as the theme's default beige buttons with Reel's 2px
+ * underline hanging off the bottom of each. The row of flat identical pills
+ * in the screenshot is the theme's button style, not a design.
+ *
+ * `button.reel-facet-tab` is (0,2,1) and settles it. Same trick, same reason,
+ * as `button.reel-tick` above.
+ */
+button.reel-facet-tab {
+	background: none;
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+	padding: var(--reel-space-3);
+	min-height: 44px;
+	font-weight: var(--reel-weight-medium);
+	border-bottom: 2px solid transparent;
+}
+
+/*
+ * And then the film itself, behind them.
+ *
+ * Same two layers as every other surface in the app that is about one title:
+ * the artwork blurred past being readable as a picture, and a scrim in the
+ * theme's own background colour that the labels sit on. The strip is 44px
+ * tall, so the blur is smaller than the sheets use — a 38px blur on a 44px
+ * band is a flat smear of one colour.
+ */
+.reel-facet-tabwrap.has-wash {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	border-radius: var(--reel-radius) var(--reel-radius) 0 0;
+	padding: 0 2px;
+	margin-bottom: 12px;
+}
+
+/* The strip keeps its own scrolling and gives up its border, which the
+   wrapper's rounded edge now replaces. */
+.reel-facet-tabwrap.has-wash .reel-facet-tabs {
+	border-bottom: none;
+	margin-bottom: 0;
+	background: transparent;
+}
+
+.reel-facet-tabwrap.has-wash::before {
+	content: "";
+	position: absolute;
+	inset: -30px;
+	z-index: -2;
+	background-image: var(--reel-wash);
+	background-size: cover;
+	background-position: center 40%;
+	filter: blur(16px) saturate(1.4);
+	opacity: 0.55;
+}
+
+.reel-facet-tabwrap.has-wash::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: linear-gradient(
+		to bottom,
+		rgb(from var(--background-primary) r g b / 0.62),
+		rgb(from var(--background-primary) r g b / 0.86)
+	);
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-facet-tabwrap.has-wash::after {
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.7));
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-facet-tabwrap.has-wash::before {
+		filter: blur(16px);
+	}
+}
+
+/*
+ * The selected tab is a lit panel rather than a 2px line.
+ *
+ * A hairline under one of five words is the smallest possible way to say
+ * which one is on, and on a strip that now has a photograph behind it it is
+ * invisible. Clearing the artwork behind the active tab does the job with the
+ * material already there: the one you are reading is the one you can see
+ * through to the page.
+ */
+.reel-facet-tabwrap.has-wash .reel-facet-tab {
+	position: relative;
+	color: var(--text-muted);
+	border-bottom: none;
+	border-radius: var(--reel-radius) var(--reel-radius) 0 0;
+	transition:
+		color var(--reel-dur-fast) var(--reel-ease),
+		background-color var(--reel-dur-fast) var(--reel-ease);
+}
+
+.reel-facet-tabwrap.has-wash .reel-facet-tab.is-active {
+	color: var(--text-normal);
+	background: var(--background-primary);
+	box-shadow: 0 -1px 0 rgb(0 0 0 / 0.06) inset;
+}
+
+/* The underline stays, but as an accent bar on the lit panel rather than as
+   the entire signal — the state still survives being read in greyscale. */
+.reel-facet-tabwrap.has-wash .reel-facet-tab.is-active::after {
+	content: "";
+	position: absolute;
+	left: var(--reel-space-3);
+	right: var(--reel-space-3);
+	bottom: 0;
+	height: 2px;
+	border-radius: 2px 2px 0 0;
+	background: var(--interactive-accent);
+}

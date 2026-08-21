@@ -4404,7 +4404,28 @@
         this.contentEl.createDiv({ cls: "reel-empty", text: "No credits listed." });
         return;
       }
-      this.contentEl.createDiv({ cls: "reel-facet-label", text: `Known for \u2014 ${credits.length} titles` });
+      const roles = credits.filter((c) => !isAppearance(c));
+      const appearances = credits.filter(isAppearance);
+      const lead = roles.length ? roles : appearances;
+      this.renderGrid(person, lead, `Known for \u2014 ${lead.length} titles`);
+      if (roles.length && appearances.length) {
+        const fold = this.contentEl.createEl("button", {
+          cls: "reel-person-fold",
+          text: `As themselves \u2014 ${appearances.length} appearances`
+        });
+        fold.addEventListener("click", () => {
+          fold.remove();
+          this.renderGrid(person, appearances, "As themselves");
+        });
+      }
+    }
+    /** One grid of credits under one heading. */
+    renderGrid(person, credits, label) {
+      this.contentEl.createDiv({ cls: "reel-facet-label", text: label });
+      this.contentEl.createDiv({
+        cls: "reel-person-hint",
+        text: "Tap for the role \xB7 press and hold for the full part"
+      });
       const grid = this.contentEl.createDiv({ cls: "reel-person-credits" });
       for (const c of credits.slice(0, 60)) {
         const type = c.media_type === "tv" ? "tv" : "film";
@@ -4422,10 +4443,24 @@
           poster2.createSpan({ cls: "reel-person-credit-tick", text: "\u2713" });
         card.createDiv({ cls: "reel-person-credit-title", text: c.title ?? c.name ?? "Untitled" });
         const year = yearOf(c.release_date ?? c.first_air_date);
-        const role = c.character || c.job || "";
-        const sub = [year ? String(year) : "", role].filter(Boolean).join(" \xB7 ");
-        if (sub)
-          card.createDiv({ cls: "reel-person-credit-sub", text: sub });
+        const character = (c.character ?? "").trim();
+        const job = (c.job ?? "").trim();
+        const role = character || job;
+        if (role) {
+          card.createDiv({
+            cls: character ? "reel-person-credit-role" : "reel-person-credit-role is-job",
+            text: role
+          });
+        }
+        const bits = [];
+        if (year)
+          bits.push(String(year));
+        if (c.media_type === "tv" && c.episode_count) {
+          bits.push(c.episode_count === 1 ? "1 ep" : `${c.episode_count} eps`);
+        }
+        if (bits.length)
+          card.createDiv({ cls: "reel-person-credit-sub", text: bits.join(" \xB7 ") });
+        attachHold(card, () => new RoleSheet(this.plugin, person, c, mine).open());
         const open = () => this.toggleRole(card, c, mine, role);
         card.addEventListener("click", open);
         card.addEventListener("keydown", (ev) => {
@@ -4517,6 +4552,156 @@
     const role = (credit.character ?? credit.job ?? "").trim();
     return role || void 0;
   }
+  var CHAT_GENRES = /* @__PURE__ */ new Set([10763, 10764, 10767]);
+  function isAppearance(credit) {
+    const role = (credit.character ?? "").trim();
+    if (/^(self|himself|herself|themselves)\b/i.test(role))
+      return true;
+    if (/\bself\s*[-–—]/i.test(role))
+      return true;
+    return (credit.genre_ids ?? []).some((g) => CHAT_GENRES.has(g));
+  }
+  function attachHold(el, fire) {
+    let timer = null;
+    let from = null;
+    let fired = false;
+    const cancel = () => {
+      if (timer !== null)
+        window.clearTimeout(timer);
+      timer = null;
+      from = null;
+    };
+    el.addEventListener(
+      "click",
+      (ev) => {
+        if (!fired)
+          return;
+        fired = false;
+        ev.stopImmediatePropagation();
+        ev.preventDefault();
+      },
+      true
+    );
+    el.addEventListener("pointerdown", (ev) => {
+      if (ev.pointerType === "mouse" && ev.button !== 0)
+        return;
+      fired = false;
+      from = { x: ev.clientX, y: ev.clientY };
+      timer = window.setTimeout(() => {
+        timer = null;
+        from = null;
+        fired = true;
+        el.addClass("is-held");
+        window.setTimeout(() => el.removeClass("is-held"), 220);
+        fire();
+      }, 480);
+    });
+    el.addEventListener("pointermove", (ev) => {
+      if (!from)
+        return;
+      if (Math.abs(ev.clientX - from.x) > 10 || Math.abs(ev.clientY - from.y) > 10)
+        cancel();
+    });
+    el.addEventListener("pointerup", cancel);
+    el.addEventListener("pointercancel", cancel);
+    el.addEventListener("contextmenu", (ev) => ev.preventDefault());
+  }
+  var RoleSheet = class extends Modal {
+    constructor(plugin2, person, credit, mine) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.person = person;
+      this.credit = credit;
+      this.mine = mine;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal", "reel-role-sheet");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      const title = this.credit.title ?? this.credit.name ?? "Untitled";
+      const year = yearOf(this.credit.release_date ?? this.credit.first_air_date);
+      const character = (this.credit.character ?? "").trim();
+      const job = (this.credit.job ?? "").trim();
+      const stage = contentEl.createDiv({ cls: "reel-role-stage" });
+      const still = this.plugin.tmdb.posterUrl(this.credit.backdrop_path, "w780") ?? this.plugin.tmdb.posterUrl(this.credit.poster_path, "w500");
+      if (still) {
+        const img = stage.createEl("img", {
+          cls: "reel-role-still",
+          attr: { src: still, alt: "", decoding: "async" }
+        });
+        img.addEventListener("error", () => {
+          img.remove();
+          stage.addClass("is-empty");
+        });
+      } else {
+        stage.addClass("is-empty");
+      }
+      const face = stage.createDiv({ cls: "reel-role-face" });
+      const portrait = this.plugin.tmdb.posterUrl(this.person.profile_path, "w185");
+      if (portrait) {
+        const shot = face.createEl("img", { attr: { src: portrait, alt: "", decoding: "async" } });
+        shot.addEventListener("error", () => {
+          shot.remove();
+          face.createSpan({ cls: "reel-placeholder-text", text: this.person.name.slice(0, 2) });
+        });
+      } else {
+        face.createSpan({ cls: "reel-placeholder-text", text: this.person.name.slice(0, 2) });
+      }
+      const body = contentEl.createDiv({ cls: "reel-role-body" });
+      body.createDiv({ cls: "reel-role-kicker", text: this.person.name });
+      body.createDiv({
+        cls: "reel-role-name",
+        text: character || job || "No role recorded for this credit"
+      });
+      if (character || job) {
+        body.createDiv({ cls: "reel-role-what", text: character ? "the character" : "their job" });
+      }
+      const facts = [this.credit.media_type === "tv" ? "Series" : "Film"];
+      if (year)
+        facts.push(String(year));
+      if (this.credit.episode_count) {
+        facts.push(this.credit.episode_count === 1 ? "1 episode" : `${this.credit.episode_count} episodes`);
+      }
+      if (this.credit.vote_average)
+        facts.push(`${this.credit.vote_average.toFixed(1)} on TMDB`);
+      body.createDiv({ cls: "reel-role-in", text: title });
+      body.createDiv({ cls: "reel-role-facts", text: facts.join(" \xB7 ") });
+      if (this.credit.overview)
+        body.createDiv({ cls: "reel-role-overview", text: this.credit.overview });
+      const actions = contentEl.createDiv({ cls: "reel-role-actions" });
+      const details = actions.createEl("button", {
+        cls: "reel-btn mod-cta",
+        text: this.mine ? "Open in your library" : "Full details"
+      });
+      details.addEventListener("click", () => {
+        const mine = this.mine;
+        this.close();
+        if (mine) {
+          void this.plugin.openDetail(mine);
+          return;
+        }
+        new PreviewSheet(this.plugin, this.credit, () => {
+        }, roleOf(this.credit)).open();
+      });
+      if (!this.mine) {
+        const add = actions.createEl("button", { cls: "reel-btn", text: "+ Watchlist" });
+        add.addEventListener("click", () => {
+          add.setAttr("disabled", "true");
+          void this.plugin.notes.createFromResult(this.credit, { date: todayISO(), watchlist: true }).then(() => {
+            this.plugin.undo.offer(`Added ${title} to your watchlist`);
+            this.close();
+          }).catch((e) => {
+            add.removeAttribute("disabled");
+            new Notice(`Reel: ${redact(e)}`);
+          });
+        });
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
 
   // src/reviews.ts
   var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -5037,7 +5222,13 @@ ${body}
       }
       if (!tabs.length)
         return;
-      const bar = wrap.createDiv({ cls: "reel-facet-tabs" });
+      const shell = wrap.createDiv({ cls: "reel-facet-tabwrap" });
+      const bar = shell.createDiv({ cls: "reel-facet-tabs" });
+      const strip = this.plugin.posters.washUrl(this.entry);
+      if (strip) {
+        shell.addClass("has-wash");
+        shell.setCssProps({ "--reel-wash": `url("${strip}")` });
+      }
       const body = wrap.createDiv({ cls: "reel-facet-body" });
       const buttons = [];
       const show = (i) => {
@@ -6529,7 +6720,7 @@ ${body}
         facts.createSpan({ cls: "reel-dim", text: `IMDb ${entry.imdbRating.toFixed(1)}` });
       if (entry.overview)
         body.createDiv({ cls: "reel-rate-overview", text: entry.overview });
-      const starRow = body.createDiv({ cls: "reel-rating-row big" });
+      const starRow = card.createDiv({ cls: "reel-rating-row big reel-rate-stars" });
       renderStars(starRow, {
         value: entry.rating,
         onChange: (v) => void this.applyRating(entry, v, container, rows2.length)

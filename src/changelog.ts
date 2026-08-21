@@ -52,6 +52,47 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.37",
+		date: "2026-08-20",
+		headline: "Tapping an actor shows what they played, not which chat shows they sat on.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "A person's filmography leads with their parts. Chat-show appearances are collected underneath, behind a tap.",
+				note: "Robert Downey Jr's opened with The Tonight Show, Family Guy, Late Night, The Late Show and The Daily Show — all real credits, four of them him as himself. Chat shows run for decades and out-score any single film on a straight popularity sort, so this happened for every actor.",
+			},
+			{
+				kind: "fixed",
+				text: "The name and portrait at the top of a person are no longer cut through the middle.",
+				note: "The blurred backdrop added behind them in 0.8.34 also turned off the panel's minimum height, so it shrank to the space left over and clipped its own contents. The same two lines were on four other sheets and are fixed there too.",
+			},
+			{
+				kind: "new",
+				text: "Press and hold a poster on someone's filmography for the whole part: their face on a frame from the film, the character's name set large, the episode count, and the way in to the title.",
+				note: "The character used to be a fragment truncated off the end of a 96px card. Holding still for half a second opens it; moving cancels, so the grid still scrolls.",
+			},
+			{
+				kind: "better",
+				text: "The character is now its own line on each poster, in the accent, above the year.",
+			},
+			{
+				kind: "fixed",
+				text: "The Cast / Crew / Details tabs on a title were rendering as the theme's plain buttons.",
+				note: "Reel's reset for them was a single class and lost to the theme's own button rule on specificity. They now carry the film's artwork blurred behind them, and the open tab is a lit panel rather than a hairline.",
+			},
+			{
+				kind: "better",
+				text: "The Rate card fits on a phone: the poster sits beside the details instead of above them, so the whole thumbnail stays visible while you rate.",
+				note: "It was about 900px tall on a 600px screen, so rating anything meant scrolling the poster underneath the queue chips.",
+			},
+			{
+				kind: "fixed",
+				text: "The blurred image on Diary, Library, Stats and Up Next fades in at the top instead of starting at a line.",
+				note: "Rounding its corners in 0.8.36 was half the fix — the top edge was still straight across, which is where the eye went.",
+			},
+		],
+	},
+	{
 		version: "0.8.36",
 		date: "2026-08-20",
 		headline: "The film titles are back on the superlatives.",

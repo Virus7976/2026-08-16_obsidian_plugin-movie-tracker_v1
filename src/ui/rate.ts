@@ -158,7 +158,12 @@ export class RateScreen {
 
 		if (entry.overview) body.createDiv({ cls: "reel-rate-overview", text: entry.overview });
 
-		const starRow = body.createDiv({ cls: "reel-rating-row big" });
+		// The stars belong to the card, not to the text column.
+		//
+		// On a phone the card is now poster-beside-details, and five stars in a
+		// 200px column is a row of stamps. As a child of the card they can span
+		// the full width underneath both.
+		const starRow = card.createDiv({ cls: "reel-rating-row big reel-rate-stars" });
 		renderStars(starRow, {
 			value: entry.rating,
 			onChange: (v) => void this.applyRating(entry, v, container, rows.length),

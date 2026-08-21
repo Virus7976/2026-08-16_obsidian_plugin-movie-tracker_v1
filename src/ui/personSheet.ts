@@ -202,7 +202,46 @@ export class PersonSheet extends Modal {
 			return;
 		}
 
-		this.contentEl.createDiv({ cls: "reel-facet-label", text: `Known for — ${credits.length} titles` });
+		// Playing a part and turning up on a sofa are not the same credit.
+		//
+		// Sorting the raw list by popularity put Robert Downey Jr at the top of
+		// his own filmography with: The Tonight Show, Family Guy, Late Night
+		// with Seth Meyers, The Late Show, The Daily Show. All five are real
+		// credits and four of them are him as himself, so the grid you got for
+		// tapping his name was four other people's faces. Chat shows run for
+		// decades and accumulate a popularity no single film can reach, which
+		// is why they win a straight sort every time, for every actor.
+		//
+		// They are not discarded — they are a true part of what someone has
+		// done — but they go underneath, behind a tap, under a heading that
+		// says what they are.
+		const roles = credits.filter((c) => !isAppearance(c));
+		const appearances = credits.filter(isAppearance);
+		const lead = roles.length ? roles : appearances;
+
+		this.renderGrid(person, lead, `Known for — ${lead.length} titles`);
+
+		if (roles.length && appearances.length) {
+			const fold = this.contentEl.createEl("button", {
+				cls: "reel-person-fold",
+				text: `As themselves — ${appearances.length} appearances`,
+			});
+			fold.addEventListener("click", () => {
+				fold.remove();
+				this.renderGrid(person, appearances, "As themselves");
+			});
+		}
+	}
+
+	/** One grid of credits under one heading. */
+	private renderGrid(person: TmdbPerson, credits: TmdbPersonCredit[], label: string): void {
+		this.contentEl.createDiv({ cls: "reel-facet-label", text: label });
+		// Nobody finds a long-press by accident, and what is behind it is the
+		// answer to the question you tapped the name to ask.
+		this.contentEl.createDiv({
+			cls: "reel-person-hint",
+			text: "Tap for the role · press and hold for the full part",
+		});
 
 		const grid = this.contentEl.createDiv({ cls: "reel-person-credits" });
 		for (const c of credits.slice(0, 60)) {
@@ -228,10 +267,35 @@ export class PersonSheet extends Modal {
 
 
 			card.createDiv({ cls: "reel-person-credit-title", text: c.title ?? c.name ?? "Untitled" });
+
+			// The part, on its own line and in the accent.
+			//
+			// "2014 · Self - Guest" put the year first and let the character run
+			// off the end of a 96px column, so the one fact a filmography exists
+			// to carry — who were they in this — was the first thing truncated.
 			const year = yearOf(c.release_date ?? c.first_air_date);
-			const role = c.character || c.job || "";
-			const sub = [year ? String(year) : "", role].filter(Boolean).join(" · ");
-			if (sub) card.createDiv({ cls: "reel-person-credit-sub", text: sub });
+			const character = (c.character ?? "").trim();
+			const job = (c.job ?? "").trim();
+			const role = character || job;
+			if (role) {
+				card.createDiv({
+					cls: character ? "reel-person-credit-role" : "reel-person-credit-role is-job",
+					text: role,
+				});
+			}
+			const bits: string[] = [];
+			if (year) bits.push(String(year));
+			if (c.media_type === "tv" && c.episode_count) {
+				bits.push(c.episode_count === 1 ? "1 ep" : `${c.episode_count} eps`);
+			}
+			if (bits.length) card.createDiv({ cls: "reel-person-credit-sub", text: bits.join(" · ") });
+
+			// Press and hold for the whole part.
+			//
+			// Registered before the click handler on purpose: the tap that ends
+			// a hold is still a tap, and it would otherwise toggle the inline
+			// panel underneath the sheet that had just opened over it.
+			attachHold(card, () => new RoleSheet(this.plugin, person, c, mine).open());
 
 			// Tapping inspects; it does not act.
 			//
@@ -370,4 +434,207 @@ export class PersonSheet extends Modal {
 function roleOf(credit: { character?: string; job?: string }): string | undefined {
 	const role = (credit.character ?? credit.job ?? "").trim();
 	return role || undefined;
+}
+
+/** TMDB's ids for talk, news and reality — the formats people appear on. */
+const CHAT_GENRES = new Set([10763, 10764, 10767]);
+
+/**
+ * Is this someone turning up as themselves rather than playing a part?
+ *
+ * Two independent signals, because either alone misses. The character string
+ * catches "Self", "Self - Guest" and "Himself" on titles TMDB files under no
+ * useful genre; the genre catches the chat show that credited its guest by
+ * name instead. A voice part in Family Guy passes both tests and stays where
+ * it belongs, in the filmography.
+ */
+function isAppearance(credit: TmdbPersonCredit): boolean {
+	const role = (credit.character ?? "").trim();
+	if (/^(self|himself|herself|themselves)\b/i.test(role)) return true;
+	if (/\bself\s*[-–—]/i.test(role)) return true;
+	return (credit.genre_ids ?? []).some((g) => CHAT_GENRES.has(g));
+}
+
+/**
+ * Press and hold, without breaking scrolling.
+ *
+ * A grid of posters is something you flick through, so the hold has to lose to
+ * the scroll: any real movement cancels it, and only a thumb that stays put
+ * for about half a second counts. The tap that ends the hold is then swallowed
+ * in the capture phase, or letting go would also fire whatever `click` does.
+ *
+ * `contextmenu` is cancelled for the desktop case, where a right-click is the
+ * same intent and the browser's own menu is not the answer.
+ */
+function attachHold(el: HTMLElement, fire: () => void): void {
+	let timer: number | null = null;
+	let from: { x: number; y: number } | null = null;
+	let fired = false;
+
+	const cancel = () => {
+		if (timer !== null) window.clearTimeout(timer);
+		timer = null;
+		from = null;
+	};
+
+	// Capture, and registered first, so it beats the click handler on this
+	// element as well as any on the poster inside it.
+	el.addEventListener(
+		"click",
+		(ev) => {
+			if (!fired) return;
+			fired = false;
+			ev.stopImmediatePropagation();
+			ev.preventDefault();
+		},
+		true
+	);
+
+	el.addEventListener("pointerdown", (ev: PointerEvent) => {
+		if (ev.pointerType === "mouse" && ev.button !== 0) return;
+		fired = false;
+		from = { x: ev.clientX, y: ev.clientY };
+		timer = window.setTimeout(() => {
+			timer = null;
+			from = null;
+			fired = true;
+			el.addClass("is-held");
+			window.setTimeout(() => el.removeClass("is-held"), 220);
+			fire();
+		}, 480);
+	});
+
+	// Ten pixels of slop: a thumb held still on a phone is never perfectly
+	// still, and anything past that is the beginning of a scroll.
+	el.addEventListener("pointermove", (ev: PointerEvent) => {
+		if (!from) return;
+		if (Math.abs(ev.clientX - from.x) > 10 || Math.abs(ev.clientY - from.y) > 10) cancel();
+	});
+	el.addEventListener("pointerup", cancel);
+	el.addEventListener("pointercancel", cancel);
+	el.addEventListener("contextmenu", (ev) => ev.preventDefault());
+}
+
+/**
+ * One part, at the size the question deserves.
+ *
+ * "It doesn't show what character he is in that movie" was true twice over:
+ * the character was a truncated fragment on a 96px card, and the panel that
+ * expanded underneath it was a block of text inside a grid. This is the same
+ * information given a screen — the film's own frame, their face on top of it,
+ * and the character set as the headline, because that is what you held the
+ * poster down to find out.
+ *
+ * The still is the title's backdrop. TMDB has no endpoint that returns a
+ * photograph of a named person inside a named title, so this is a frame from
+ * the film with their portrait on it rather than a guaranteed shot of them in
+ * character — and the portrait is what makes the pairing legible.
+ */
+class RoleSheet extends Modal {
+	constructor(
+		private plugin: ReelPlugin,
+		private person: TmdbPerson,
+		private credit: TmdbPersonCredit,
+		private mine: ReturnType<ReelPlugin["library"]["byTmdbId"]>
+	) {
+		super(plugin.app);
+	}
+
+	onOpen(): void {
+		const { contentEl, modalEl } = this;
+		modalEl.addClass("reel-modal", "reel-role-sheet");
+		if (Platform.isPhone) modalEl.addClass("reel-sheet");
+
+		const title = this.credit.title ?? this.credit.name ?? "Untitled";
+		const year = yearOf(this.credit.release_date ?? this.credit.first_air_date);
+		const character = (this.credit.character ?? "").trim();
+		const job = (this.credit.job ?? "").trim();
+
+		const stage = contentEl.createDiv({ cls: "reel-role-stage" });
+		const still =
+			this.plugin.tmdb.posterUrl(this.credit.backdrop_path, "w780") ??
+			this.plugin.tmdb.posterUrl(this.credit.poster_path, "w500");
+		if (still) {
+			const img = stage.createEl("img", {
+				cls: "reel-role-still",
+				attr: { src: still, alt: "", decoding: "async" },
+			});
+			img.addEventListener("error", () => {
+				img.remove();
+				stage.addClass("is-empty");
+			});
+		} else {
+			stage.addClass("is-empty");
+		}
+
+		const face = stage.createDiv({ cls: "reel-role-face" });
+		const portrait = this.plugin.tmdb.posterUrl(this.person.profile_path, "w185");
+		if (portrait) {
+			const shot = face.createEl("img", { attr: { src: portrait, alt: "", decoding: "async" } });
+			shot.addEventListener("error", () => {
+				shot.remove();
+				face.createSpan({ cls: "reel-placeholder-text", text: this.person.name.slice(0, 2) });
+			});
+		} else {
+			face.createSpan({ cls: "reel-placeholder-text", text: this.person.name.slice(0, 2) });
+		}
+
+		const body = contentEl.createDiv({ cls: "reel-role-body" });
+		body.createDiv({ cls: "reel-role-kicker", text: this.person.name });
+		body.createDiv({
+			cls: "reel-role-name",
+			text: character || job || "No role recorded for this credit",
+		});
+		if (character || job) {
+			body.createDiv({ cls: "reel-role-what", text: character ? "the character" : "their job" });
+		}
+
+		const facts: string[] = [this.credit.media_type === "tv" ? "Series" : "Film"];
+		if (year) facts.push(String(year));
+		if (this.credit.episode_count) {
+			facts.push(this.credit.episode_count === 1 ? "1 episode" : `${this.credit.episode_count} episodes`);
+		}
+		if (this.credit.vote_average) facts.push(`${this.credit.vote_average.toFixed(1)} on TMDB`);
+
+		body.createDiv({ cls: "reel-role-in", text: title });
+		body.createDiv({ cls: "reel-role-facts", text: facts.join(" · ") });
+
+		if (this.credit.overview) body.createDiv({ cls: "reel-role-overview", text: this.credit.overview });
+
+		const actions = contentEl.createDiv({ cls: "reel-role-actions" });
+		const details = actions.createEl("button", {
+			cls: "reel-btn mod-cta",
+			text: this.mine ? "Open in your library" : "Full details",
+		});
+		details.addEventListener("click", () => {
+			const mine = this.mine;
+			this.close();
+			if (mine) {
+				void this.plugin.openDetail(mine);
+				return;
+			}
+			new PreviewSheet(this.plugin, this.credit, () => {}, roleOf(this.credit)).open();
+		});
+
+		if (!this.mine) {
+			const add = actions.createEl("button", { cls: "reel-btn", text: "+ Watchlist" });
+			add.addEventListener("click", () => {
+				add.setAttr("disabled", "true");
+				void this.plugin.notes
+					.createFromResult(this.credit, { date: todayISO(), watchlist: true })
+					.then(() => {
+						this.plugin.undo.offer(`Added ${title} to your watchlist`);
+						this.close();
+					})
+					.catch((e) => {
+						add.removeAttribute("disabled");
+						new Notice(`Reel: ${redact(e)}`);
+					});
+			});
+		}
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
 }

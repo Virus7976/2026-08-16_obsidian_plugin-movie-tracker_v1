@@ -197,6 +197,8 @@ export interface TmdbPersonCredit extends TmdbSearchResult {
 	/** A frame from the title — the credit carries it, so it costs nothing. */
 	backdrop_path?: string | null;
 	genre_ids?: number[];
+	/** TV only: how many episodes they were in. One is a guest spot. */
+	episode_count?: number;
 }
 
 /** One country's release for a film, from the release_dates append. */
