@@ -14037,3 +14037,95 @@ button.reel-facet-tab {
 		background: var(--background-primary);
 	}
 }
+
+/* ==================================================================== */
+/* The superlative rows, stated once instead of twenty times            */
+/* ==================================================================== */
+
+/*
+ * This row is the most-patched thing in the file: better than twenty rules
+ * across eight sections, each appended to correct the last, none of them in
+ * charge. The result was a row nobody had actually specified.
+ *
+ * What that produced, measured rather than read: the row 134px tall for one
+ * fact, the 40x60 poster starting at y=933 and the text starting at y=980 —
+ * the picture and the sentence about it barely overlapping, which is why the
+ * poster reads as floating loose above its own caption. The cause is
+ * `align-items: baseline`. For a box holding an image and no text, the
+ * baseline *is* the bottom margin edge, so the row lines the poster's bottom
+ * up with the label's first baseline and pushes the text down by nearly the
+ * height of the poster. Add the value taking its own right-aligned line on a
+ * phone and the eye has to travel to the far corner to find out which film the
+ * label is about.
+ *
+ * So this block states the whole row rather than adjusting it: box, alignment,
+ * sizes, direction, and which edge the text hangs off. It is deliberately the
+ * last word on the subject and specific enough to be — appending one more
+ * correction is what got us here.
+ *
+ * The shape is the ordinary one for "picture, then what it is": poster left,
+ * label and value stacked beside it, everything on the same left edge, the
+ * whole row centred on the poster. About 86px, against 134.
+ */
+.reel-view .reel-stats .reel-facts .reel-fact {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	flex-wrap: nowrap;
+	gap: var(--reel-space-3);
+	padding: var(--reel-space-3);
+	min-height: 0;
+}
+
+.reel-view .reel-stats .reel-facts .reel-fact-thumb {
+	flex: 0 0 44px;
+	width: 44px;
+	height: auto;
+	aspect-ratio: 2 / 3;
+	align-self: center;
+}
+
+/*
+ * The text column.
+ *
+ * `min-width: 0` is the load-bearing line: without it a flex item refuses to
+ * shrink below its content, so a long film title stops wrapping and pushes the
+ * row wider than the card instead.
+ */
+.reel-view .reel-stats .reel-facts .reel-fact-text {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 1px;
+	flex: 1 1 auto;
+	min-width: 0;
+	text-align: left;
+}
+
+.reel-view .reel-stats .reel-facts .reel-fact-label {
+	text-align: left;
+	width: auto;
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-tight);
+	color: var(--text-muted);
+}
+
+/*
+ * The film's name, which is the content of the row.
+ *
+ * Left-aligned to the same edge as its label, so the two read as one sentence
+ * rather than as a heading and a figure at opposite ends of the card. No
+ * clamp: a clamp without `display: -webkit-box` collapses the element to zero
+ * height instead of truncating, which is exactly how these rows lost their
+ * titles in 0.8.31, and wrapping to two lines costs nothing here.
+ */
+.reel-view .reel-stats .reel-facts .reel-fact-value {
+	text-align: left;
+	width: auto;
+	font-size: var(--reel-text-label);
+	font-weight: var(--reel-weight-medium);
+	line-height: var(--reel-leading-tight);
+	letter-spacing: -0.01em;
+}

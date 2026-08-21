@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.40",
+		date: "2026-08-20",
+		headline: "The superlative rows read as one line again.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "“Highest rated”, “Lowest rated” and “Longest” put the poster, the label and the film's name together on one line instead of leaving the poster floating above a name stranded in the far corner.",
+				note: "The row aligned on the text baseline, and for a box holding a picture and no text the baseline is its bottom edge — so the row lined the poster's bottom up with the label and pushed everything down by nearly the poster's height. Rows are a third shorter as well.",
+			},
+			{
+				kind: "fixed",
+				text: "“Films per year” shows small posters when closed, like the other charts do.",
+				note: "It was built from a count and a label and never carried the titles, so the poster strip added in 0.8.36 had nothing to draw — which looked like the feature being broken rather than that one chart having no data to give it.",
+			},
+		],
+	},
+	{
 		version: "0.8.39",
 		date: "2026-08-20",
 		headline: "Names you tap look like names again, not beige slabs.",

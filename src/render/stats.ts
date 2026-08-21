@@ -547,9 +547,23 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 
 	if (!opts.year && watched.length) {
 		const byYear = new Map<string, number>();
+		// The titles behind each year, not only how many there were.
+		//
+		// The closed-chart poster strip added in 0.8.36 draws one film per row
+		// from `entries`, and this chart never carried any — it was built from
+		// a count and a label. So "Films per year · 2026" stayed the three bare
+		// words the strip existed to replace, while By month and By day of week
+		// showed their posters, which reads as the feature being broken rather
+		// than as one chart having no data to give it.
+		const filmsByYear = new Map<string, Entry[]>();
 		for (const v of watched) {
 			const y = v.date.slice(0, 4);
 			byYear.set(y, (byYear.get(y) ?? 0) + 1);
+			const seen = filmsByYear.get(y) ?? [];
+			// A rewatch is two viewings of one film, and two copies of the same
+			// poster in a strip of three reads as a bug.
+			if (!seen.includes(v.entry)) seen.push(v.entry);
+			filmsByYear.set(y, seen);
 		}
 		// A year bar re-scopes the whole page to that year, which is what the
 		// year chips at the top already do — so the bar and the chip agree
@@ -559,7 +573,12 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 			"Films per year",
 			[...byYear.entries()]
 				.sort((a, b) => a[0].localeCompare(b[0]))
-				.map(([label, n]) => ({ label, n, go: () => paintStats(plugin, el, { ...opts, year: Number(label) }) })),
+				.map(([label, n]) => ({
+					label,
+					n,
+					entries: filmsByYear.get(label),
+					go: () => paintStats(plugin, el, { ...opts, year: Number(label) }),
+				})),
 			"",
 			plugin
 		);

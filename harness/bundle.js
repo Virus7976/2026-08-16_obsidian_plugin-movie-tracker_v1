@@ -1468,14 +1468,24 @@
     const charts = el.createDiv({ cls: "reel-chart-grid" });
     if (!opts.year && watched.length) {
       const byYear = /* @__PURE__ */ new Map();
+      const filmsByYear = /* @__PURE__ */ new Map();
       for (const v of watched) {
         const y = v.date.slice(0, 4);
         byYear.set(y, (byYear.get(y) ?? 0) + 1);
+        const seen2 = filmsByYear.get(y) ?? [];
+        if (!seen2.includes(v.entry))
+          seen2.push(v.entry);
+        filmsByYear.set(y, seen2);
       }
       bars(
         charts,
         "Films per year",
-        [...byYear.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, n2]) => ({ label, n: n2, go: () => paintStats(plugin2, el, { ...opts, year: Number(label) }) })),
+        [...byYear.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, n2]) => ({
+          label,
+          n: n2,
+          entries: filmsByYear.get(label),
+          go: () => paintStats(plugin2, el, { ...opts, year: Number(label) })
+        })),
         "",
         plugin2
       );
