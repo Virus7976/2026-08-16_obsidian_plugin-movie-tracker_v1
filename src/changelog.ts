@@ -52,6 +52,26 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.8.39",
+		date: "2026-08-20",
+		headline: "Names you tap look like names again, not beige slabs.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The three names under STARS on a title, and “Read more” under a biography, were rendering as filled boxes with the separating dots stranded between them.",
+				note: "Reel had always said those should be bare text. The declaration was there and losing to the theme, which styles every button on the page and does it more specifically than the obvious fix accounts for.",
+			},
+			{
+				kind: "fixed",
+				text: "“Add another” on the reviews pane was accent text on a grey fill — 4.05:1, under the readable minimum.",
+			},
+			{
+				kind: "better",
+				text: "The same fix covers the trailer button, “Read the rest”, the like toggle and the screen tabs, which were all one theme away from the same fault.",
+			},
+		],
+	},
+	{
 		version: "0.8.38",
 		date: "2026-08-20",
 		headline: "Putting something back on the watchlist no longer forgets that you watched it.",

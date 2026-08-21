@@ -214,10 +214,34 @@ body[data-palette="warm-dark"].theme-dark {
  * is what gave the dismiss half of a filter chip a background of its own and
  * made the chip look like two controls welded together.
  *
- * Kept out of the palettes so it applies on every pass.
+ * Kept out of the palettes so it applies on every pass. That was the intent
+ * and it was only half true: the rule sat outside them, but the *variable* it
+ * reads did not. `--interactive-normal` was declared only inside the two
+ * synthetic palette blocks, so on the six default-palette passes
+ * `background: var(--interactive-normal)` had no value to resolve, the whole
+ * declaration was dropped, and the fill silently never happened.
+ *
+ * The rule therefore only ever tested padding, radius and weight. Every
+ * background a theme would have imposed on one of Reel's controls was
+ * invisible here — which is how the credit names under STARS shipped as beige
+ * slabs on the phone while measuring perfectly bare in the harness.
+ *
+ * Two changes, because either alone would leave the trap open. The fallback
+ * means the rule can never again resolve to nothing, and the base declarations
+ * mean the neutral passes model a theme that actually fills its buttons.
  */
+:root {
+	--interactive-normal: hsl(0, 0%, 90%);
+	--interactive-hover: hsl(0, 0%, 85%);
+}
+
+.theme-dark {
+	--interactive-normal: hsl(0, 0%, 22%);
+	--interactive-hover: hsl(0, 0%, 28%);
+}
+
 button:not(button.clickable-icon) {
-	background: var(--interactive-normal);
+	background: var(--interactive-normal, hsl(0, 0%, 90%));
 	padding: var(--size-4-2, 8px) var(--size-4-4, 16px);
 	border-radius: 8px;
 	font-weight: 500;

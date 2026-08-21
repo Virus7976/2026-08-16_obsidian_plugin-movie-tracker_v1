@@ -13976,3 +13976,64 @@ button.reel-facet-tab {
 	border-radius: 2px 2px 0 0;
 	background: var(--interactive-accent);
 }
+
+/* ==================================================================== */
+/* Controls that are text stay text, whatever the theme thinks          */
+/* ==================================================================== */
+
+/*
+ * The same specificity loss as `button.reel-tick`, found this time by fixing
+ * the test rig rather than by reading a screenshot — and the arithmetic that
+ * fix relied on was wrong, which is why it needed doing twice.
+ *
+ * `button:not(button.clickable-icon)` reads as one class and one element. It
+ * is one class and *two*: `:not()` contributes the specificity of what is
+ * inside it, and there is a second `button` in there. So the theme's rule is
+ * (0,1,2), and `button.reel-credit-name` — the obvious fix, and the one this
+ * file already used elsewhere — is (0,1,1). It loses. Attaching the element
+ * name is not enough against a `:not()` holding an element of its own.
+ *
+ * Classes outrank elements no matter how many elements there are, so a second
+ * class settles it. Repeating the class the rule is already about, rather than
+ * requiring a `.reel-view` or `.reel-modal` ancestor, keeps it true wherever
+ * the control is used — these appear in both, and a rule that works on one
+ * screen is how this went unnoticed the first time.
+ *
+ * Every class below already says `background: none` somewhere above. The
+ * declarations were all present, correct, and losing. On the phone that looked
+ * like the three names under STARS rendering as beige slabs with the
+ * separating dots stranded between them, and "Read more" under a biography
+ * becoming a full-width outlined box: text you tap, drawn as furniture.
+ *
+ * Deliberately not extended to `.reel-back`, `.reel-more`, `.reel-crumb-btn`,
+ * `.reel-drow-arrow`, `.reel-quick-skip`, `.reel-reaction` or `.reel-refresh`:
+ * none of those ever declared a background, so they have always taken the
+ * theme's, and stripping it now would be a design change wearing a bug fix's
+ * clothes.
+ */
+.reel-credit-name.reel-credit-name,
+.reel-link.reel-link,
+.reel-heart.reel-heart,
+.reel-tab.reel-tab,
+.reel-trailer-play.reel-trailer-play,
+.reel-yours-more.reel-yours-more,
+.reel-yours-add.reel-yours-add {
+	background: none;
+	box-shadow: none;
+}
+
+/* The facet tab's lit panel is the one fill here that is meant to be there, so
+   it needs the same weight to survive the line above. */
+.reel-facet-tabwrap.has-wash .reel-facet-tab.is-active {
+	background: linear-gradient(
+		to bottom,
+		rgb(from var(--background-primary) r g b / 0.82),
+		var(--background-primary) 70%
+	);
+}
+
+@supports not (color: rgb(from white r g b / 50%)) {
+	.reel-facet-tabwrap.has-wash .reel-facet-tab.is-active {
+		background: var(--background-primary);
+	}
+}
