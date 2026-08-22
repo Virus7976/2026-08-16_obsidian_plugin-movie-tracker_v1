@@ -32,6 +32,7 @@ import { LogSheet } from "../src/ui/logSheet";
 import { FilterSheet, emptyFilters } from "../src/ui/filterSheet";
 import { SeasonSheet } from "../src/ui/seasonSheet";
 import { PersonSheet } from "../src/ui/personSheet";
+import { ReelSettingTab } from "../src/settings";
 import { PublishSheet } from "../src/ui/publishSheet";
 import { AskSheet } from "../src/ui/askSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
@@ -300,6 +301,24 @@ const plugin = {
 		}),
 	},
 	ai: { configured: true },
+	/*
+	 * Enough of the credential store for the settings screen to render.
+	 *
+	 * Keys are reported present so the sections that unfold behind one are
+	 * actually drawn — the collapsed screen is the easy case, and the long one
+	 * is where the overflow and the touch targets live. `store` and `remove`
+	 * exist because they are referenced in click handlers; nothing in the rig
+	 * ever presses anything.
+	 */
+	credentials: {
+		has: (name: string) => name !== "mastodon",
+		isUnlocked: true,
+		hasStoredKey: true,
+		store: async () => true,
+		remove: async () => undefined,
+		migrateTo: async () => undefined,
+		lock: () => undefined,
+	},
 	posters: {
 		attach(parent: HTMLElement, entry: { title: string }) {
 			parent.addClass("reel-poster-loading");
@@ -1233,6 +1252,37 @@ function asksheet(root: HTMLElement): void {
 	);
 }
 
+/**
+ * The settings screen — forty-nine controls, never once measured.
+ *
+ * This is the screen the audit could not reach, because `Setting` in the shim
+ * returned `this` and drew nothing. Every other surface in Reel has been
+ * checked eight ways on every release; this one, on a plugin whose whole point
+ * is being usable on a phone, had never been checked at all.
+ *
+ * Rendered with the optional features switched on. Off, the screen is barely
+ * half its length and none of the sections that unfold behind a key exist —
+ * which is the state that would pass most easily and prove least.
+ */
+function settings(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const before = { ...plugin.settings };
+	Object.assign(plugin.settings, {
+		publishTrakt: true,
+		publishMastodon: true,
+		mastodonHost: "mastodon.social",
+		aiEnabled: true,
+		dismissedIds: [1, 2, 3],
+	});
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+	} finally {
+		Object.assign(plugin.settings, before);
+	}
+}
+
 /*
  * No diary screen.
  *
@@ -1272,6 +1322,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	preview,
 	publishsheet,
 	asksheet,
+	settings,
 	longshow,
 	quick,
 };

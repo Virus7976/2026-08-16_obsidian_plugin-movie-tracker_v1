@@ -252,28 +252,291 @@ export class Plugin {
 	registerEvent(): void {}
 	registerDomEvent(): void {}
 }
-export class PluginSettingTab {}
-export class Setting {
-	constructor(public el: HTMLElement) {}
-	setName(): this {
+/* ------------------------------------------------------------------ */
+/* Settings                                                            */
+/* ------------------------------------------------------------------ */
+
+/*
+ * `Setting` used to be eight methods that returned `this` and drew nothing.
+ *
+ * That is why the settings screen is the one surface in Reel the audit has
+ * never covered. Not because it was skipped, or judged unimportant \u2014 the rig
+ * physically could not draw it. Forty-nine controls on a phone-first plugin,
+ * never once measured for a touch target, a contrast ratio or an overflow,
+ * while every other screen was checked eight ways on every release.
+ *
+ * So this builds Obsidian's actual DOM. The class names below are the ones
+ * Obsidian ships \u2014 `.setting-item`, `.setting-item-info`, `.setting-item-name`,
+ * `.setting-item-description`, `.setting-item-control` \u2014 because the plugin's
+ * own stylesheet targets them, and a shim inventing its own would measure a
+ * layout nobody has.
+ *
+ * The baseline layout for these lives in harness/theme.css, alongside the rest
+ * of the app-chrome approximation. It is an approximation and is commented as
+ * one: the value here is relative \u2014 does Reel's own content overflow, does a
+ * control fall under 44px, does a description go unreadable on a warm palette
+ * \u2014 not that a padding matches Obsidian's to the pixel.
+ */
+
+class BaseComponent {
+	disabled = false;
+	setDisabled(on: boolean): this {
+		this.disabled = on;
 		return this;
 	}
-	setDesc(): this {
+	then(cb: (c: this) => unknown): this {
+		cb(this);
+		return this;
+	}
+}
+
+export class TextComponent extends BaseComponent {
+	inputEl: HTMLInputElement;
+	constructor(parent: HTMLElement, textarea = false) {
+		super();
+		this.inputEl = document.createElement(textarea ? "textarea" : "input") as HTMLInputElement;
+		if (!textarea) this.inputEl.type = "text";
+		parent.appendChild(this.inputEl);
+	}
+	setPlaceholder(v: string): this {
+		this.inputEl.placeholder = v;
+		return this;
+	}
+	setValue(v: string): this {
+		this.inputEl.value = v;
+		return this;
+	}
+	getValue(): string {
+		return this.inputEl.value;
+	}
+	onChange(cb: (v: string) => unknown): this {
+		this.inputEl.addEventListener("input", () => cb(this.inputEl.value));
+		return this;
+	}
+	setDisabled(on: boolean): this {
+		this.inputEl.disabled = on;
+		return super.setDisabled(on);
+	}
+}
+
+export class ToggleComponent extends BaseComponent {
+	toggleEl: HTMLElement;
+	private on = false;
+	private handler: ((v: boolean) => unknown) | null = null;
+	constructor(parent: HTMLElement) {
+		super();
+		this.toggleEl = document.createElement("div");
+		this.toggleEl.className = "checkbox-container";
+		this.toggleEl.setAttribute("role", "checkbox");
+		this.toggleEl.setAttribute("tabindex", "0");
+		this.toggleEl.addEventListener("click", () => this.setValue(!this.on));
+		parent.appendChild(this.toggleEl);
+	}
+	setValue(v: boolean): this {
+		this.on = v;
+		this.toggleEl.classList.toggle("is-enabled", v);
+		this.toggleEl.setAttribute("aria-checked", v ? "true" : "false");
+		this.handler?.(v);
+		return this;
+	}
+	getValue(): boolean {
+		return this.on;
+	}
+	onChange(cb: (v: boolean) => unknown): this {
+		// Registered after the initial setValue, exactly as Obsidian does it \u2014
+		// otherwise every toggle would fire its own handler on first paint and
+		// the settings screen would save forty-nine times on open.
+		this.handler = cb;
+		return this;
+	}
+}
+
+export class ButtonComponent extends BaseComponent {
+	buttonEl: HTMLButtonElement;
+	constructor(parent: HTMLElement) {
+		super();
+		this.buttonEl = document.createElement("button");
+		parent.appendChild(this.buttonEl);
+	}
+	setButtonText(v: string): this {
+		this.buttonEl.textContent = v;
+		return this;
+	}
+	setIcon(): this {
+		return this;
+	}
+	setTooltip(v: string): this {
+		this.buttonEl.setAttribute("aria-label", v);
+		return this;
+	}
+	setCta(): this {
+		this.buttonEl.classList.add("mod-cta");
+		return this;
+	}
+	setWarning(): this {
+		this.buttonEl.classList.add("mod-warning");
+		return this;
+	}
+	setDisabled(on: boolean): this {
+		this.buttonEl.disabled = on;
+		return super.setDisabled(on);
+	}
+	onClick(cb: (ev: MouseEvent) => unknown): this {
+		this.buttonEl.addEventListener("click", cb);
+		return this;
+	}
+}
+
+export class DropdownComponent extends BaseComponent {
+	selectEl: HTMLSelectElement;
+	constructor(parent: HTMLElement) {
+		super();
+		this.selectEl = document.createElement("select");
+		this.selectEl.className = "dropdown";
+		parent.appendChild(this.selectEl);
+	}
+	addOption(value: string, label: string): this {
+		const o = document.createElement("option");
+		o.value = value;
+		o.textContent = label;
+		this.selectEl.appendChild(o);
+		return this;
+	}
+	// The plural form, used once, for poster quality. Missing it aborted the
+	// whole render mid-screen — and the audit dutifully reported the four
+	// faults it had found before the exception, as though that were the lot.
+	addOptions(map: Record<string, string>): this {
+		for (const [value, label] of Object.entries(map)) this.addOption(value, label);
+		return this;
+	}
+	setValue(v: string): this {
+		this.selectEl.value = v;
+		return this;
+	}
+	getValue(): string {
+		return this.selectEl.value;
+	}
+	onChange(cb: (v: string) => unknown): this {
+		this.selectEl.addEventListener("change", () => cb(this.selectEl.value));
+		return this;
+	}
+}
+
+export class SliderComponent extends BaseComponent {
+	sliderEl: HTMLInputElement;
+	constructor(parent: HTMLElement) {
+		super();
+		this.sliderEl = document.createElement("input");
+		this.sliderEl.type = "range";
+		this.sliderEl.className = "slider";
+		parent.appendChild(this.sliderEl);
+	}
+	setLimits(min: number, max: number, step: number): this {
+		this.sliderEl.min = String(min);
+		this.sliderEl.max = String(max);
+		this.sliderEl.step = String(step);
+		return this;
+	}
+	setValue(v: number): this {
+		this.sliderEl.value = String(v);
+		return this;
+	}
+	getValue(): number {
+		return Number(this.sliderEl.value);
+	}
+	setDynamicTooltip(): this {
+		return this;
+	}
+	onChange(cb: (v: number) => unknown): this {
+		this.sliderEl.addEventListener("input", () => cb(Number(this.sliderEl.value)));
+		return this;
+	}
+}
+
+export class PluginSettingTab {
+	containerEl: HTMLElement = document.createElement("div");
+	constructor(
+		public app: unknown,
+		public plugin: unknown
+	) {}
+	display(): void {}
+	hide(): void {}
+}
+
+export class Setting {
+	settingEl: HTMLElement;
+	infoEl: HTMLElement;
+	nameEl: HTMLElement;
+	descEl: HTMLElement;
+	controlEl: HTMLElement;
+
+	constructor(parent: HTMLElement) {
+		this.settingEl = document.createElement("div");
+		this.settingEl.className = "setting-item";
+
+		this.infoEl = document.createElement("div");
+		this.infoEl.className = "setting-item-info";
+		this.nameEl = document.createElement("div");
+		this.nameEl.className = "setting-item-name";
+		this.descEl = document.createElement("div");
+		this.descEl.className = "setting-item-description";
+		this.infoEl.appendChild(this.nameEl);
+		this.infoEl.appendChild(this.descEl);
+
+		this.controlEl = document.createElement("div");
+		this.controlEl.className = "setting-item-control";
+
+		this.settingEl.appendChild(this.infoEl);
+		this.settingEl.appendChild(this.controlEl);
+		parent.appendChild(this.settingEl);
+	}
+
+	setName(v: string): this {
+		this.nameEl.textContent = v;
+		return this;
+	}
+	setDesc(v: string): this {
+		this.descEl.textContent = v;
+		return this;
+	}
+	setClass(c: string): this {
+		this.settingEl.classList.add(c);
 		return this;
 	}
 	setHeading(): this {
+		this.settingEl.classList.add("setting-item-heading");
 		return this;
 	}
-	addText(): this {
+	setDisabled(on: boolean): this {
+		this.settingEl.classList.toggle("is-disabled", on);
 		return this;
 	}
-	addToggle(): this {
+	addText(cb: (c: TextComponent) => unknown): this {
+		cb(new TextComponent(this.controlEl));
 		return this;
 	}
-	addButton(): this {
+	addTextArea(cb: (c: TextComponent) => unknown): this {
+		cb(new TextComponent(this.controlEl, true));
 		return this;
 	}
-	addDropdown(): this {
+	addToggle(cb: (c: ToggleComponent) => unknown): this {
+		cb(new ToggleComponent(this.controlEl));
+		return this;
+	}
+	addButton(cb: (c: ButtonComponent) => unknown): this {
+		cb(new ButtonComponent(this.controlEl));
+		return this;
+	}
+	addExtraButton(cb: (c: ButtonComponent) => unknown): this {
+		cb(new ButtonComponent(this.controlEl));
+		return this;
+	}
+	addDropdown(cb: (c: DropdownComponent) => unknown): this {
+		cb(new DropdownComponent(this.controlEl));
+		return this;
+	}
+	addSlider(cb: (c: SliderComponent) => unknown): this {
+		cb(new SliderComponent(this.controlEl));
 		return this;
 	}
 }

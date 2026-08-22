@@ -176,6 +176,249 @@
     showAtPosition() {
     }
   };
+  var BaseComponent = class {
+    constructor() {
+      this.disabled = false;
+    }
+    setDisabled(on) {
+      this.disabled = on;
+      return this;
+    }
+    then(cb) {
+      cb(this);
+      return this;
+    }
+  };
+  var TextComponent = class extends BaseComponent {
+    constructor(parent, textarea = false) {
+      super();
+      this.inputEl = document.createElement(textarea ? "textarea" : "input");
+      if (!textarea)
+        this.inputEl.type = "text";
+      parent.appendChild(this.inputEl);
+    }
+    setPlaceholder(v) {
+      this.inputEl.placeholder = v;
+      return this;
+    }
+    setValue(v) {
+      this.inputEl.value = v;
+      return this;
+    }
+    getValue() {
+      return this.inputEl.value;
+    }
+    onChange(cb) {
+      this.inputEl.addEventListener("input", () => cb(this.inputEl.value));
+      return this;
+    }
+    setDisabled(on) {
+      this.inputEl.disabled = on;
+      return super.setDisabled(on);
+    }
+  };
+  var ToggleComponent = class extends BaseComponent {
+    constructor(parent) {
+      super();
+      this.on = false;
+      this.handler = null;
+      this.toggleEl = document.createElement("div");
+      this.toggleEl.className = "checkbox-container";
+      this.toggleEl.setAttribute("role", "checkbox");
+      this.toggleEl.setAttribute("tabindex", "0");
+      this.toggleEl.addEventListener("click", () => this.setValue(!this.on));
+      parent.appendChild(this.toggleEl);
+    }
+    setValue(v) {
+      this.on = v;
+      this.toggleEl.classList.toggle("is-enabled", v);
+      this.toggleEl.setAttribute("aria-checked", v ? "true" : "false");
+      this.handler?.(v);
+      return this;
+    }
+    getValue() {
+      return this.on;
+    }
+    onChange(cb) {
+      this.handler = cb;
+      return this;
+    }
+  };
+  var ButtonComponent = class extends BaseComponent {
+    constructor(parent) {
+      super();
+      this.buttonEl = document.createElement("button");
+      parent.appendChild(this.buttonEl);
+    }
+    setButtonText(v) {
+      this.buttonEl.textContent = v;
+      return this;
+    }
+    setIcon() {
+      return this;
+    }
+    setTooltip(v) {
+      this.buttonEl.setAttribute("aria-label", v);
+      return this;
+    }
+    setCta() {
+      this.buttonEl.classList.add("mod-cta");
+      return this;
+    }
+    setWarning() {
+      this.buttonEl.classList.add("mod-warning");
+      return this;
+    }
+    setDisabled(on) {
+      this.buttonEl.disabled = on;
+      return super.setDisabled(on);
+    }
+    onClick(cb) {
+      this.buttonEl.addEventListener("click", cb);
+      return this;
+    }
+  };
+  var DropdownComponent = class extends BaseComponent {
+    constructor(parent) {
+      super();
+      this.selectEl = document.createElement("select");
+      this.selectEl.className = "dropdown";
+      parent.appendChild(this.selectEl);
+    }
+    addOption(value, label) {
+      const o = document.createElement("option");
+      o.value = value;
+      o.textContent = label;
+      this.selectEl.appendChild(o);
+      return this;
+    }
+    // The plural form, used once, for poster quality. Missing it aborted the
+    // whole render mid-screen — and the audit dutifully reported the four
+    // faults it had found before the exception, as though that were the lot.
+    addOptions(map) {
+      for (const [value, label] of Object.entries(map))
+        this.addOption(value, label);
+      return this;
+    }
+    setValue(v) {
+      this.selectEl.value = v;
+      return this;
+    }
+    getValue() {
+      return this.selectEl.value;
+    }
+    onChange(cb) {
+      this.selectEl.addEventListener("change", () => cb(this.selectEl.value));
+      return this;
+    }
+  };
+  var SliderComponent = class extends BaseComponent {
+    constructor(parent) {
+      super();
+      this.sliderEl = document.createElement("input");
+      this.sliderEl.type = "range";
+      this.sliderEl.className = "slider";
+      parent.appendChild(this.sliderEl);
+    }
+    setLimits(min, max, step) {
+      this.sliderEl.min = String(min);
+      this.sliderEl.max = String(max);
+      this.sliderEl.step = String(step);
+      return this;
+    }
+    setValue(v) {
+      this.sliderEl.value = String(v);
+      return this;
+    }
+    getValue() {
+      return Number(this.sliderEl.value);
+    }
+    setDynamicTooltip() {
+      return this;
+    }
+    onChange(cb) {
+      this.sliderEl.addEventListener("input", () => cb(Number(this.sliderEl.value)));
+      return this;
+    }
+  };
+  var PluginSettingTab = class {
+    constructor(app2, plugin2) {
+      this.app = app2;
+      this.plugin = plugin2;
+      this.containerEl = document.createElement("div");
+    }
+    display() {
+    }
+    hide() {
+    }
+  };
+  var Setting = class {
+    constructor(parent) {
+      this.settingEl = document.createElement("div");
+      this.settingEl.className = "setting-item";
+      this.infoEl = document.createElement("div");
+      this.infoEl.className = "setting-item-info";
+      this.nameEl = document.createElement("div");
+      this.nameEl.className = "setting-item-name";
+      this.descEl = document.createElement("div");
+      this.descEl.className = "setting-item-description";
+      this.infoEl.appendChild(this.nameEl);
+      this.infoEl.appendChild(this.descEl);
+      this.controlEl = document.createElement("div");
+      this.controlEl.className = "setting-item-control";
+      this.settingEl.appendChild(this.infoEl);
+      this.settingEl.appendChild(this.controlEl);
+      parent.appendChild(this.settingEl);
+    }
+    setName(v) {
+      this.nameEl.textContent = v;
+      return this;
+    }
+    setDesc(v) {
+      this.descEl.textContent = v;
+      return this;
+    }
+    setClass(c) {
+      this.settingEl.classList.add(c);
+      return this;
+    }
+    setHeading() {
+      this.settingEl.classList.add("setting-item-heading");
+      return this;
+    }
+    setDisabled(on) {
+      this.settingEl.classList.toggle("is-disabled", on);
+      return this;
+    }
+    addText(cb) {
+      cb(new TextComponent(this.controlEl));
+      return this;
+    }
+    addTextArea(cb) {
+      cb(new TextComponent(this.controlEl, true));
+      return this;
+    }
+    addToggle(cb) {
+      cb(new ToggleComponent(this.controlEl));
+      return this;
+    }
+    addButton(cb) {
+      cb(new ButtonComponent(this.controlEl));
+      return this;
+    }
+    addExtraButton(cb) {
+      cb(new ButtonComponent(this.controlEl));
+      return this;
+    }
+    addDropdown(cb) {
+      cb(new DropdownComponent(this.controlEl));
+      return this;
+    }
+    addSlider(cb) {
+      cb(new SliderComponent(this.controlEl));
+      return this;
+    }
+  };
   function debounce(fn, _wait, _immediate) {
     return fn;
   }
@@ -762,6 +1005,7 @@
   }
 
   // src/content.ts
+  var CONTENT_FLAGS = ["sex", "nudity", "profanity", "violence", "gore", "drugs", "horror"];
   var FLAG_LABELS = {
     sex: "Sex",
     nudity: "Nudity",
@@ -771,6 +1015,23 @@
     drugs: "Drugs",
     horror: "Horror"
   };
+  var CERT_RANK = {
+    G: 0,
+    "TV-Y": 0,
+    "TV-Y7": 0,
+    "TV-G": 0,
+    PG: 1,
+    "TV-PG": 1,
+    "PG-13": 2,
+    "TV-14": 2,
+    R: 3,
+    "TV-MA": 4,
+    "NC-17": 5,
+    X: 5
+  };
+  function knownCertifications() {
+    return Object.keys(CERT_RANK);
+  }
 
   // src/render/query.ts
   var SYMBOL_OPS = [">=", "<=", "!=", "="];
@@ -2879,6 +3140,8 @@
     traktApp: "Trakt app",
     mastodon: "Mastodon"
   };
+  var READ_KEYS = ["tmdb", "omdb", "dtdd", "openrouter"];
+  var WRITE_KEYS = ["trakt", "traktApp", "mastodon"];
   var MissingKeyError = class extends Error {
     constructor(key = "tmdb", msg) {
       super(msg ?? `No ${KEY_LABELS[key]} key. Add one in Settings \u2192 Reel.`);
@@ -7321,6 +7584,930 @@ ${body}
     }
   };
 
+  // src/ui/confirm.ts
+  function confirm(app2, opts) {
+    return new Promise((resolve) => new ConfirmModal(app2, opts, resolve).open());
+  }
+  var ConfirmModal = class extends Modal {
+    constructor(app2, opts, done) {
+      super(app2);
+      this.opts = opts;
+      this.done = done;
+      this.answered = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: this.opts.title });
+      contentEl.createDiv({ cls: "reel-log-sub", text: this.opts.body });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.finish(false));
+      const go = actions.createEl("button", {
+        cls: this.opts.danger ? "reel-btn reel-btn-danger" : "reel-btn mod-cta",
+        text: this.opts.confirmText
+      });
+      go.addEventListener("click", () => this.finish(true));
+      cancel.focus();
+    }
+    finish(ok) {
+      this.answered = true;
+      this.done(ok);
+      this.close();
+    }
+    onClose() {
+      this.contentEl.empty();
+      if (!this.answered)
+        this.done(false);
+    }
+  };
+
+  // src/publish/mastodon.ts
+  function normaliseHost(raw) {
+    let host = (raw ?? "").trim();
+    if (!host)
+      return "";
+    host = host.replace(/^https?:\/\//i, "");
+    host = host.split("/")[0];
+    if (host.includes("@"))
+      host = host.slice(host.lastIndexOf("@") + 1);
+    return host.toLowerCase();
+  }
+
+  // src/publish/trakt.ts
+  var ACTIVATE_URL = "https://trakt.tv/activate";
+
+  // src/ui/traktSignIn.ts
+  var TraktSignIn = class extends Modal {
+    constructor(app2, plugin2, app_, onDone) {
+      super(app2);
+      this.plugin = plugin2;
+      this.app_ = app_;
+      this.onDone = onDone;
+      this.stop = false;
+      this.device = null;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-trakt");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
+      contentEl.createDiv({ cls: "reel-log-sub", text: "Asking Trakt for a code\u2026" });
+      void this.begin();
+    }
+    async begin() {
+      try {
+        this.device = await this.plugin.publish.trakt.requestDeviceCode(this.app_);
+      } catch (e) {
+        this.fail(redact(e));
+        return;
+      }
+      this.renderCode(this.device);
+      void this.poll(this.device);
+    }
+    renderCode(device) {
+      const { contentEl } = this;
+      contentEl.empty();
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
+      const steps = contentEl.createDiv({ cls: "reel-trakt-steps" });
+      steps.createDiv({ cls: "reel-trakt-step", text: "1. Open this page on any device:" });
+      const link = steps.createEl("a", {
+        cls: "reel-trakt-url",
+        text: device.verificationUrl || ACTIVATE_URL,
+        href: device.verificationUrl || ACTIVATE_URL
+      });
+      link.setAttr("target", "_blank");
+      link.setAttr("rel", "noopener");
+      steps.createDiv({ cls: "reel-trakt-step", text: "2. Enter this code:" });
+      const code = steps.createEl("button", { cls: "reel-trakt-code", text: device.userCode });
+      code.setAttr("aria-label", `Code ${device.userCode.split("").join(" ")}. Tap to copy.`);
+      code.addEventListener("click", () => {
+        navigator.clipboard?.writeText(device.userCode).then(() => new Notice("Reel: code copied.")).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
+      });
+      const status = contentEl.createDiv({ cls: "reel-trakt-status" });
+      status.createDiv({ cls: "reel-ask-spinner" });
+      status.createSpan({ text: "Waiting for you to approve it\u2026" });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+    }
+    /**
+     * Ask, wait, ask again, until Trakt says yes, no, or too late.
+     *
+     * The deadline is Trakt's own `expires_in` rather than a fixed number of
+     * attempts, because the interval can be raised mid-flow by a 429 and a loop
+     * counting attempts would then give up early — while the user is still
+     * typing, having done nothing wrong.
+     */
+    async poll(device) {
+      let wait = Math.max(1, device.interval) * 1e3;
+      const deadline = Date.now() + Math.max(60, device.expiresIn) * 1e3;
+      while (!this.stop && Date.now() < deadline) {
+        await sleep(wait);
+        if (this.stop)
+          return;
+        let token;
+        try {
+          token = await this.plugin.publish.trakt.pollDeviceToken(this.app_, device.deviceCode);
+        } catch (e) {
+          this.fail(redact(e));
+          return;
+        }
+        if (token) {
+          const saved = await this.plugin.publish.storeToken(JSON.stringify(token));
+          if (!saved) {
+            this.fail("Signed in, but the token wasn't saved \u2014 the passphrase prompt was cancelled.");
+            return;
+          }
+          this.succeed();
+          return;
+        }
+        wait = Math.min(wait + 500, 15e3);
+      }
+      if (!this.stop)
+        this.fail("The code expired before it was approved.");
+    }
+    succeed() {
+      const { contentEl } = this;
+      contentEl.empty();
+      const done = contentEl.createDiv({ cls: "reel-trakt-done" });
+      setIcon(done.createSpan({ cls: "reel-trakt-done-icon" }), "check");
+      done.createSpan({ text: "Signed in to Trakt." });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const ok = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
+      ok.addEventListener("click", () => this.close());
+      ok.focus();
+      this.stop = true;
+      this.onDone(true);
+      this.onDone = () => void 0;
+    }
+    fail(message) {
+      const { contentEl } = this;
+      contentEl.empty();
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Couldn't sign in" });
+      contentEl.createDiv({ cls: "reel-publish-warn", text: message });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const ok = actions.createEl("button", { cls: "reel-btn", text: "Close" });
+      ok.addEventListener("click", () => this.close());
+      this.stop = true;
+    }
+    onClose() {
+      this.stop = true;
+      this.contentEl.empty();
+      this.onDone(false);
+      this.onDone = () => void 0;
+    }
+  };
+  function sleep(ms) {
+    return new Promise((r) => window.setTimeout(r, ms));
+  }
+
+  // src/settings.ts
+  var DEFAULT_SETTINGS = {
+    keyMode: "encrypted",
+    keysPlain: null,
+    keyBlob: null,
+    keyNames: [],
+    enrich: true,
+    filmFolder: "Movies",
+    seriesFolder: "Series",
+    posterFolder: "Movies/_posters",
+    peopleFolder: "Movies/People",
+    linkPeople: true,
+    castLimit: 10,
+    region: "US",
+    includeSpecials: false,
+    askForReview: true,
+    linkFromDailyNote: false,
+    dailyNotePrefix: "- Watched",
+    dailyNoteFolder: "",
+    lastEpisodeCheck: "",
+    dismissedIds: [],
+    people: {},
+    lastTab: "library",
+    lastSeenVersion: "",
+    libraryLayout: "grid",
+    librarySort: "watched",
+    recentSearches: [],
+    recipes: [],
+    hideFlags: [],
+    maxCertification: null,
+    hideUnrated: false,
+    posterQuality: "w342",
+    downloadPosters: true,
+    cacheResponses: true,
+    cacheTtlDays: 30,
+    openNoteAfterCreate: true,
+    checkNewEpisodes: true,
+    language: "en-US",
+    noteTemplate: "\n## Notes\n\n",
+    publishTrakt: false,
+    publishMastodon: false,
+    mastodonHost: "",
+    publishRatings: true,
+    publishHashtags: "",
+    publishSpoilerDefault: true,
+    aiEnabled: false,
+    // Cheap, fast, and good enough to sort sixty one-line summaries by how well
+    // each answers a sentence, which is the whole of the job. A bigger model
+    // costs more per question without ranking a shortlist any better.
+    aiModel: "anthropic/claude-3.5-haiku",
+    aiShortlist: 60,
+    recentAsks: []
+  };
+  var MODE_LABELS = {
+    encrypted: "Encrypted in vault (recommended)",
+    session: "Session only \u2014 never written to disk",
+    plain: "Plain text in vault (not recommended)"
+  };
+  function sectionAfter(el) {
+    const parent = el.parentElement ?? el;
+    return parent.createDiv({ cls: "reel-settings-section is-actions" });
+  }
+  var ReelSettingTab = class extends PluginSettingTab {
+    constructor(app2, plugin2) {
+      super(app2, plugin2);
+      this.plugin = plugin2;
+      this.pendingKeyInput = null;
+    }
+    /**
+     * Nine sections, each in its own element.
+     *
+     * They all used to be appended straight onto `containerEl`, which made the
+     * screen one flat run of forty-nine rows: the headings were the only thing
+     * separating them, and a heading is a line of text, not a boundary. There
+     * was no element a stylesheet could reach to say "this group is one thing",
+     * which is why `.reel-settings` had no rules at all — there was nothing to
+     * write them against.
+     *
+     * The order is by how often you touch it, not by when it was built:
+     * credentials and folders are what a new install needs, publishing and Ask
+     * are opt-in features, and the things that act rather than remember go
+     * last.
+     */
+    display() {
+      const { containerEl } = this;
+      containerEl.empty();
+      containerEl.addClass("reel-settings");
+      const section = (render) => {
+        render(containerEl.createDiv({ cls: "reel-settings-section" }));
+      };
+      section((el) => this.renderCredentials(el));
+      section((el) => this.renderFolders(el));
+      section((el) => this.renderMetadata(el));
+      section((el) => this.renderReviews(el));
+      section((el) => this.renderPublishing(el));
+      section((el) => this.renderAsk(el));
+      section((el) => this.renderContent(el));
+      section((el) => this.renderBehaviour(el));
+    }
+    /** The live content policy, read by every surface that lists titles. */
+    get policy() {
+      return {
+        hideFlags: this.plugin.settings.hideFlags,
+        maxCertification: this.plugin.settings.maxCertification,
+        hideUnrated: this.plugin.settings.hideUnrated
+      };
+    }
+    /* ---------------------------------------------------------------- */
+    renderCredentials(el) {
+      new Setting(el).setName("API keys").setHeading();
+      const store = this.plugin.credentials;
+      const status = el.createDiv({ cls: "reel-key-status" });
+      const describe2 = () => {
+        status.empty();
+        const s = this.plugin.settings;
+        if (s.keyMode === "session") {
+          status.createSpan({
+            cls: store.isUnlocked ? "reel-pill ok" : "reel-pill",
+            text: store.isUnlocked ? "Keys held for this session" : "No keys this session"
+          });
+        } else if (s.keyBlob) {
+          status.createSpan({
+            cls: store.isUnlocked ? "reel-pill ok" : "reel-pill",
+            text: store.isUnlocked ? "Unlocked" : "Encrypted \u2014 locked"
+          });
+        } else if (s.keysPlain && Object.keys(s.keysPlain).length) {
+          const names = Object.keys(s.keysPlain).map((n2) => KEY_LABELS[n2] ?? n2);
+          status.createSpan({ cls: "reel-pill warn", text: `Plain text \xB7 ${names.join(", ")}` });
+        } else {
+          status.createSpan({ cls: "reel-pill warn", text: "No keys set" });
+        }
+        for (const name of [...READ_KEYS, ...WRITE_KEYS]) {
+          if (store.has(name))
+            status.createSpan({ cls: "reel-pill ok", text: KEY_LABELS[name] });
+        }
+      };
+      describe2();
+      new Setting(el).setName("Key storage").setDesc(
+        "Every key shares one encrypted blob and one passphrase \u2014 a prompt per service would be intolerable, and splitting them buys nothing, since whatever can read one can read the rest. Note that Trakt and Mastodon are different in kind from the others: those can post publicly as you."
+      ).addDropdown((d) => {
+        Object.keys(MODE_LABELS).forEach((m) => d.addOption(m, MODE_LABELS[m]));
+        d.setValue(this.plugin.settings.keyMode).onChange(async (value) => {
+          await this.plugin.credentials.migrateTo(value);
+          this.display();
+        });
+      });
+      const keyField = (name, label, desc) => this.keyField(el, name, label, desc);
+      keyField(
+        "tmdb",
+        "TMDB key or read access token",
+        "Required. A v4 read access token (starts with eyJ) is preferred \u2014 it travels in an Authorization header rather than the URL, so it can't end up in a log."
+      );
+      keyField(
+        "omdb",
+        "OMDb key",
+        "Optional. Adds IMDb rating, Rotten Tomatoes and Metacritic. Free tier is 1,000 requests a day, which the response cache makes ample. omdbapi.com/apikey.aspx"
+      );
+      keyField(
+        "dtdd",
+        "DoesTheDogDie key",
+        "Optional, and the best available answer to content filtering \u2014 community votes per topic, so you can tell one scene from constant. Request a free key at doesthedogdie.com/api."
+      );
+      new Setting(el).setName("Enrich new notes automatically").setDesc("Fetch OMDb scores and DoesTheDogDie topics after adding a title. Runs after the note is written, so a slow service never delays it.").addToggle(
+        (t) => t.setValue(this.plugin.settings.enrich).onChange(async (v) => {
+          this.plugin.settings.enrich = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Test connections").setDesc("One small request per configured service, so a mistyped key fails here rather than silently.").addButton(
+        (b) => b.setButtonText("Test").onClick(async () => {
+          b.setDisabled(true).setButtonText("Testing\u2026");
+          const lines = [];
+          const tmdb = await this.plugin.tmdb.testCredentials();
+          lines.push(tmdb.ok ? "TMDB works" : `TMDB: ${tmdb.error}`);
+          if (store.has("omdb")) {
+            const omdb = await this.plugin.omdb.test();
+            lines.push(omdb.ok ? "OMDb works" : `OMDb: ${omdb.error}`);
+          }
+          if (store.has("dtdd")) {
+            const dtdd = await this.plugin.dtdd.test();
+            lines.push(dtdd.ok ? "DoesTheDogDie works" : `DoesTheDogDie: ${dtdd.error}`);
+          }
+          b.setDisabled(false).setButtonText("Test");
+          new Notice(`Reel: ${lines.join(" \xB7 ")}`, 8e3);
+          describe2();
+        })
+      );
+      if (this.plugin.settings.keyMode === "encrypted" && store.isUnlocked) {
+        new Setting(el).setName("Lock now").setDesc("Forget the decrypted keys until the next unlock.").addButton(
+          (b) => b.setButtonText("Lock").onClick(() => {
+            store.lock();
+            new Notice("Reel: keys locked.");
+            this.display();
+          })
+        );
+      }
+      if (store.hasStoredKey) {
+        new Setting(el).setName("Remove all keys").addButton((b) => {
+          b.buttonEl.addClass("reel-btn-danger");
+          return b.setButtonText("Remove all").onClick(async () => {
+            const ok = await confirm(this.app, {
+              title: "Remove every stored key",
+              body: "All saved keys are deleted and cannot be recovered. You would need each original key again.",
+              confirmText: "Remove all",
+              danger: true
+            });
+            if (!ok)
+              return;
+            await store.clear();
+            new Notice("Reel: keys removed.");
+            this.display();
+          });
+        });
+      }
+      if (this.plugin.settings.keyMode === "plain") {
+        el.createDiv({
+          cls: "reel-callout warn",
+          text: `Plain text mode writes your keys readably into ${this.app.vault.configDir}/plugins/reel/data.json. If this vault is synced to git or a shared drive, treat them as public.`
+        });
+      }
+    }
+    /* ---------------------------------------------------------------- */
+    /**
+     * One credential: a password field, a Save, and a Remove once there is
+     * something to remove.
+     *
+     * A method rather than the closure it used to be inside the API-keys
+     * section, because publishing needs exactly the same control and a second
+     * copy of it would be a second place for the Remove confirmation to go
+     * missing, or for "paste to replace" to quietly stop being true.
+     */
+    keyField(el, name, label, desc) {
+      const store = this.plugin.credentials;
+      let input = null;
+      const setting = new Setting(el).setName(label).setDesc(desc).addText((t) => {
+        t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
+        t.inputEl.type = "password";
+        t.inputEl.autocomplete = "off";
+        t.inputEl.spellcheck = false;
+        t.inputEl.addClass("reel-input");
+        input = t.inputEl;
+      }).addButton(
+        (b) => b.setButtonText("Save").setCta().onClick(async () => {
+          const value = input?.value ?? "";
+          if (!value.trim()) {
+            new Notice("Reel: nothing to save.");
+            return;
+          }
+          const ok = await this.plugin.credentials.store(name, value);
+          if (input)
+            input.value = "";
+          new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
+          this.display();
+        })
+      );
+      if (store.has(name)) {
+        setting.addButton(
+          (b) => b.setButtonText("Remove").onClick(async () => {
+            const ok = await confirm(this.app, {
+              title: `Remove the ${KEY_LABELS[name]} key`,
+              body: "Reel cannot recover it. You would need the original key again to re-add it.",
+              confirmText: "Remove",
+              danger: true
+            });
+            if (!ok)
+              return;
+            await this.plugin.credentials.remove(name);
+            new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
+            this.display();
+          })
+        );
+      }
+    }
+    /* ---------------------------------------------------------------- */
+    /**
+     * Publishing \u2014 the only part of Reel that writes outside your vault.
+     *
+     * Written to be read before it is used, which is unusual for a settings
+     * section and correct for this one. The copy says what leaves, where it
+     * goes and under whose name, because switching this on is agreeing to
+     * something you cannot take back, and a toggle labelled "Trakt" with no
+     * further explanation is not an informed decision.
+     *
+     * IMDb is named explicitly. It is what people ask for, it is not possible,
+     * and leaving that unsaid means everyone who wants it goes hunting through
+     * the settings for an option that was never there.
+     */
+    renderPublishing(el) {
+      new Setting(el).setName("Publishing").setHeading();
+      el.createDiv({
+        cls: "reel-settings-note",
+        text: "Reviews stay in your vault unless you publish one, one at a time, from the button beside it. Nothing here posts automatically, and nothing posts without showing you the exact text first."
+      });
+      el.createDiv({
+        cls: "reel-settings-note reel-dim",
+        text: "IMDb isn't an option: it has no public way to post a review, and the only alternative would be driving a login and a form as you, which Reel won't do. Trakt is the closest equivalent with a real API \u2014 a public profile carrying ratings and reviews."
+      });
+      new Setting(el).setName("Trakt").setDesc("A public film and TV profile. Reviews post as comments, with your star rating alongside.").addToggle(
+        (t) => t.setValue(this.plugin.settings.publishTrakt).onChange(async (v) => {
+          this.plugin.settings.publishTrakt = v;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+      if (this.plugin.settings.publishTrakt)
+        this.renderTraktApp(el);
+      new Setting(el).setName("Mastodon").setDesc("One public post per review, with the title, your stars and the text.").addToggle(
+        (t) => t.setValue(this.plugin.settings.publishMastodon).onChange(async (v) => {
+          this.plugin.settings.publishMastodon = v;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+      if (this.plugin.settings.publishMastodon) {
+        new Setting(el).setName("Instance").setDesc("The server you post from, e.g. mastodon.social. Not a secret, so it isn't encrypted.").addText(
+          (t) => t.setPlaceholder("mastodon.social").setValue(this.plugin.settings.mastodonHost).onChange(
+            debounce(async (v) => {
+              this.plugin.settings.mastodonHost = normaliseHost(v);
+              await this.plugin.saveSettings();
+            }, 500)
+          )
+        );
+        this.keyField(
+          el,
+          "mastodon",
+          "Access token",
+          "Your instance \u2192 Preferences \u2192 Development \u2192 New application. Tick write:statuses; nothing else is needed."
+        );
+      }
+      if (!this.plugin.publish.anyEnabled)
+        return;
+      el.createDiv({
+        cls: "reel-settings-note reel-dim",
+        text: "There's no switch to skip the confirmation. Publishing is the one thing Reel does that can't be undone, so the sheet showing you the exact text is the feature rather than a step in front of it."
+      });
+      new Setting(el).setName("Publish ratings too").setDesc("Send the star rating to Trakt with the review. Your stars appear in the Mastodon text either way.").addToggle(
+        (t) => t.setValue(this.plugin.settings.publishRatings).onChange(async (v) => {
+          this.plugin.settings.publishRatings = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Assume spoilers").setDesc(
+        "Start each review marked as spoilers. Trakt requires the declaration either way, and on Mastodon it goes behind a content warning."
+      ).addToggle(
+        (t) => t.setValue(this.plugin.settings.publishSpoilerDefault).onChange(async (v) => {
+          this.plugin.settings.publishSpoilerDefault = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Hashtags").setDesc("Added to the end of a Mastodon post. Reserved out of the character budget, so they never get cut.").addText(
+        (t) => t.setPlaceholder("#film #tv").setValue(this.plugin.settings.publishHashtags).onChange(
+          debounce(async (v) => {
+            this.plugin.settings.publishHashtags = v.trim();
+            await this.plugin.saveSettings();
+          }, 500)
+        )
+      );
+    }
+    /**
+     * Your own Trakt application, and then the sign-in that uses it.
+     *
+     * You register the app rather than Reel shipping one, and the reason is
+     * worth stating in the UI as well as here: Trakt's device flow needs a
+     * client secret, and a secret compiled into an open-source plugin is
+     * printed in the repository for anyone to read. Shipping one and calling it
+     * secret would be theatre. Yours stays yours, in the same encrypted store
+     * as every other key.
+     */
+    renderTraktApp(el) {
+      const store = this.plugin.credentials;
+      const hasApp = store.has("traktApp");
+      const signedIn = store.has("trakt");
+      if (!hasApp) {
+        el.createDiv({
+          cls: "reel-settings-note",
+          text: "Trakt needs an application of your own: trakt.tv/oauth/applications \u2192 New Application. Any name will do, and set the redirect URI to urn:ietf:wg:oauth:2.0:oob. Then paste its client ID and secret below."
+        });
+      }
+      let idEl = null;
+      let secretEl = null;
+      const setting = new Setting(el).setName("Trakt application").setDesc(
+        hasApp ? "Saved. Paste both again to replace them." : "From trakt.tv/oauth/applications. Both are stored with your other keys."
+      ).addText((t) => {
+        t.setPlaceholder("Client ID");
+        t.inputEl.autocomplete = "off";
+        t.inputEl.spellcheck = false;
+        t.inputEl.addClass("reel-input");
+        idEl = t.inputEl;
+      }).addText((t) => {
+        t.setPlaceholder("Client secret");
+        t.inputEl.type = "password";
+        t.inputEl.autocomplete = "off";
+        t.inputEl.spellcheck = false;
+        t.inputEl.addClass("reel-input");
+        secretEl = t.inputEl;
+      }).addButton(
+        (b) => b.setButtonText("Save").setCta().onClick(async () => {
+          const clientId = (idEl?.value ?? "").trim();
+          const clientSecret = (secretEl?.value ?? "").trim();
+          if (!clientId || !clientSecret) {
+            new Notice("Reel: both the client ID and the secret are needed.");
+            return;
+          }
+          const ok = await this.plugin.credentials.store(
+            "traktApp",
+            JSON.stringify({ id: clientId, secret: clientSecret })
+          );
+          if (idEl)
+            idEl.value = "";
+          if (secretEl)
+            secretEl.value = "";
+          new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
+          this.display();
+        })
+      );
+      if (hasApp) {
+        setting.addButton(
+          (b) => b.setButtonText("Remove").onClick(async () => {
+            const ok = await confirm(this.app, {
+              title: "Remove the Trakt application",
+              body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
+              confirmText: "Remove",
+              danger: true
+            });
+            if (!ok)
+              return;
+            await this.plugin.credentials.remove("traktApp");
+            await this.plugin.credentials.remove("trakt");
+            this.display();
+          })
+        );
+      }
+      if (!hasApp)
+        return;
+      new Setting(el).setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
+        signedIn ? "Reel can post reviews and ratings as you. Sign out to stop that immediately." : "Trakt shows you a short code to type on any device. Nothing has to link back to this app."
+      ).addButton(
+        (b) => signedIn ? b.setButtonText("Sign out").onClick(async () => {
+          await this.plugin.publish.signOut();
+          new Notice("Reel: signed out of Trakt.");
+          this.display();
+        }) : b.setButtonText("Sign in").setCta().onClick(async () => {
+          const app2 = await this.plugin.publish.app();
+          if (!app2) {
+            new Notice("Reel: couldn't read the Trakt application.");
+            return;
+          }
+          new TraktSignIn(this.app, this.plugin, app2, (ok) => {
+            if (ok)
+              this.display();
+          }).open();
+        })
+      );
+    }
+    /**
+     * Ask \u2014 the one feature that sends your library somewhere else.
+     *
+     * The copy says exactly what goes and what doesn't, in the same words as
+     * the sheet, and it sits above the toggle rather than under it. "Titles,
+     * years, genres, runtimes and your ratings" is a specific enough claim to
+     * be checked against the code; "some data about your library" would not be.
+     */
+    renderAsk(el) {
+      new Setting(el).setName("Ask").setHeading();
+      el.createDiv({
+        cls: "reel-settings-note",
+        text: "Describe what you feel like watching and Reel finds it in your own library. A question sends your words, plus a short list of titles \u2014 names, years, genres, runtimes and your star ratings \u2014 to OpenRouter. Not your reviews, not your watch dates, not your file paths."
+      });
+      new Setting(el).setName("Enable Ask").setDesc("Off by default. With this off, no request is ever made, key or no key.").addToggle(
+        (t) => t.setValue(this.plugin.settings.aiEnabled).onChange(async (v) => {
+          this.plugin.settings.aiEnabled = v;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+      if (!this.plugin.settings.aiEnabled)
+        return;
+      this.keyField(
+        el,
+        "openrouter",
+        "OpenRouter key",
+        "From openrouter.ai/keys. You pay OpenRouter directly; Reel shows what each question cost in tokens."
+      );
+      new Setting(el).setName("Model").setDesc(
+        "An OpenRouter model slug. The job is ranking sixty one-line summaries, which a small fast model does as well as a large one and far more cheaply."
+      ).addText(
+        (t) => t.setPlaceholder("anthropic/claude-3.5-haiku").setValue(this.plugin.settings.aiModel).onChange(
+          debounce(async (v) => {
+            this.plugin.settings.aiModel = v.trim() || DEFAULT_SETTINGS.aiModel;
+            await this.plugin.saveSettings();
+          }, 500)
+        )
+      );
+      new Setting(el).setName("Shortlist size").setDesc(
+        "How many titles get sent for ranking. Larger casts a wider net and costs more per question; the filtering that chooses them runs over your whole library either way."
+      ).addSlider(
+        (sl) => sl.setLimits(20, 150, 10).setValue(this.plugin.settings.aiShortlist).setDynamicTooltip().onChange(async (v) => {
+          this.plugin.settings.aiShortlist = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      if (this.plugin.settings.recentAsks.length) {
+        new Setting(el).setName("Forget past questions").setDesc(`${this.plugin.settings.recentAsks.length} remembered, shown as shortcuts in the Ask sheet.`).addButton(
+          (b) => b.setButtonText("Forget").onClick(async () => {
+            this.plugin.settings.recentAsks = [];
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+      }
+    }
+    /* ---------------------------------------------------------------- */
+    renderFolders(el) {
+      new Setting(el).setName("Folders").setHeading();
+      const films = this.plugin.library.films().length;
+      const shows = this.plugin.library.shows().length;
+      el.createDiv({
+        cls: "reel-key-status",
+        text: films + shows === 0 ? "No titles indexed yet." : `Indexing ${films} film${films === 1 ? "" : "s"} and ${shows} series.`
+      });
+      const folder = (name, desc, key) => new Setting(el).setName(name).setDesc(desc).addText((t) => {
+        const apply = debounce(
+          async (v) => {
+            this.plugin.settings[key] = v.replace(/^\/+|\/+$/g, "") || DEFAULT_SETTINGS[key];
+            await this.plugin.saveSettings();
+            this.plugin.library.rebuild();
+          },
+          600,
+          true
+        );
+        t.setValue(this.plugin.settings[key]).onChange((v) => apply(v));
+      });
+      folder("Films folder", "One note per film.", "filmFolder");
+      folder("Series folder", "One note per show \u2014 not per season or episode.", "seriesFolder");
+      folder("Poster folder", "Shared by films and series.", "posterFolder");
+      folder(
+        "People folder",
+        "Where director and cast links point. Naming the folder explicitly is what stops person notes appearing in your vault root when you tap an unresolved link.",
+        "peopleFolder"
+      );
+      el.createDiv({
+        cls: "reel-callout",
+        text: "Everything Reel writes lives under these four folders and its own plugin folder. It never creates notes anywhere else \u2014 the daily-note link, if you turn it on, only appends to a note you already have."
+      });
+    }
+    renderMetadata(el) {
+      new Setting(el).setName("Metadata").setHeading();
+      new Setting(el).setName("Link people and use wikilinks").setDesc(
+        "Store directors and cast as [[People/Name|Name]] rather than plain text, so they appear in the graph and get backlinks. This is the thing Letterboxd cannot do."
+      ).addToggle(
+        (t) => t.setValue(this.plugin.settings.linkPeople).onChange(async (v) => {
+          this.plugin.settings.linkPeople = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Cast members to keep").setDesc("Top-billed order, as TMDB returns it.").addSlider(
+        (s) => s.setLimits(0, 25, 1).setValue(this.plugin.settings.castLimit).onChange(async (v) => {
+          this.plugin.settings.castLimit = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Region").setDesc("Drives which certification and streaming providers are stored. Two-letter country code.").addText((t) => {
+        const apply = debounce(
+          async (v) => {
+            const code = v.trim().toUpperCase().slice(0, 2);
+            this.plugin.settings.region = /^[A-Z]{2}$/.test(code) ? code : "US";
+            await this.plugin.saveSettings();
+          },
+          600,
+          true
+        );
+        t.setValue(this.plugin.settings.region).onChange((v) => apply(v));
+      });
+      new Setting(el).setName("Track specials").setDesc("Include season 0 \u2014 Christmas episodes, OVAs, and the like.").addToggle(
+        (t) => t.setValue(this.plugin.settings.includeSpecials).onChange(async (v) => {
+          this.plugin.settings.includeSpecials = v;
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    renderReviews(el) {
+      new Setting(el).setName("Reviews").setHeading();
+      new Setting(el).setName("Ask for a review when logging").setDesc("Adds a review box to the log sheet. Reviews are appended to the note body under a dated heading \u2014 never overwriting what's already there.").addToggle(
+        (t) => t.setValue(this.plugin.settings.askForReview).onChange(async (v) => {
+          this.plugin.settings.askForReview = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Link from today's daily note").setDesc("Appends a link when you log something. Only if today's daily note already exists \u2014 Reel will not create one.").addToggle(
+        (t) => t.setValue(this.plugin.settings.linkFromDailyNote).onChange(async (v) => {
+          this.plugin.settings.linkFromDailyNote = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Daily note folder").setDesc(
+        "Where your daily notes live \u2014 leave empty for the vault root. Files must be named YYYY-MM-DD.md. Reel asks rather than reading the Daily Notes plugin's configuration, which is undocumented API."
+      ).addText((t) => {
+        const apply = debounce(
+          async (v) => {
+            this.plugin.settings.dailyNoteFolder = v.replace(/^\/+|\/+$/g, "");
+            await this.plugin.saveSettings();
+          },
+          600,
+          true
+        );
+        t.setPlaceholder("e.g. Journal/Daily").setValue(this.plugin.settings.dailyNoteFolder).onChange((v) => apply(v));
+      });
+      new Setting(el).setName("Daily note line prefix").addText((t) => {
+        const apply = debounce(
+          async (v) => {
+            this.plugin.settings.dailyNotePrefix = v || "- Watched";
+            await this.plugin.saveSettings();
+          },
+          600,
+          true
+        );
+        t.setValue(this.plugin.settings.dailyNotePrefix).onChange((v) => apply(v));
+      });
+    }
+    renderContent(el) {
+      new Setting(el).setName("Content filtering").setHeading();
+      el.createDiv({
+        cls: "reel-callout",
+        text: "Read this before relying on it. TMDB has no structured content-advisory data. Certification (R, PG-13, TV-MA) comes from a ratings board and is dependable. Flags are inferred from crowd-sourced keywords, so they under-report: no flag means nothing was tagged, not that nothing is there. You can add or remove flags on any note by hand, and a refresh will not undo your edits."
+      });
+      new Setting(el).setName("Hide titles flagged with").setDesc("Applies across the library, Up Next and search.").setClass("reel-flag-setting");
+      const flagRow = el.createDiv({ cls: "reel-flag-row" });
+      for (const flag of CONTENT_FLAGS) {
+        const chip = flagRow.createEl("button", { cls: "reel-chip", text: FLAG_LABELS[flag] });
+        const paint = () => chip.toggleClass("is-active", this.plugin.settings.hideFlags.includes(flag));
+        chip.addEventListener("click", async () => {
+          const set = new Set(this.plugin.settings.hideFlags);
+          if (set.has(flag))
+            set.delete(flag);
+          else
+            set.add(flag);
+          this.plugin.settings.hideFlags = [...set];
+          await this.plugin.saveSettings();
+          paint();
+          this.plugin.library.refresh();
+        });
+        paint();
+      }
+      new Setting(el).setName("Maximum certification").setDesc("Hide anything rated above this.").addDropdown((d) => {
+        d.addOption("", "No limit");
+        for (const cert of knownCertifications())
+          d.addOption(cert, cert);
+        d.setValue(this.plugin.settings.maxCertification ?? "").onChange(async (v) => {
+          this.plugin.settings.maxCertification = v || null;
+          await this.plugin.saveSettings();
+          this.plugin.library.refresh();
+        });
+      });
+      new Setting(el).setName("Also hide unrated titles").setDesc("Strict mode. An unrated title is unknown, not safe \u2014 turn this on if that distinction matters to you.").addToggle(
+        (t) => t.setValue(this.plugin.settings.hideUnrated).onChange(async (v) => {
+          this.plugin.settings.hideUnrated = v;
+          await this.plugin.saveSettings();
+          this.plugin.library.refresh();
+        })
+      );
+    }
+    renderBehaviour(el) {
+      new Setting(el).setName("Behaviour").setHeading();
+      new Setting(el).setName("Rating scale").setDesc("Five stars with halves. Fixed \u2014 the stored numbers and the star widget assume it.").addText((t) => t.setValue("\u2605 0.5 \u2013 5.0").setDisabled(true));
+      new Setting(el).setName("Download posters").setDesc("Saves a jpg per title into the poster folder, so the library works offline.").addToggle(
+        (t) => t.setValue(this.plugin.settings.downloadPosters).onChange(async (v) => {
+          this.plugin.settings.downloadPosters = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Poster size").setDesc("w342 is about 30 KB per title and is what the grid is tuned for.").addDropdown(
+        (d) => d.addOptions({ w185: "w185 \u2014 smallest", w342: "w342 \u2014 recommended", w500: "w500 \u2014 sharpest" }).setValue(this.plugin.settings.posterQuality).onChange(async (v) => {
+          this.plugin.settings.posterQuality = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Cache TMDB responses").setDesc("On-disk, keyed by id. Keeps repeat opens instant and stays within rate limits.").addToggle(
+        (t) => t.setValue(this.plugin.settings.cacheResponses).onChange(async (v) => {
+          this.plugin.settings.cacheResponses = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Cache lifetime").setDesc("Days before a cached response is refetched. Ended shows are kept regardless.").addSlider(
+        (s) => s.setLimits(1, 90, 1).setValue(this.plugin.settings.cacheTtlDays).onChange(async (v) => {
+          this.plugin.settings.cacheTtlDays = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Check for new episodes").setDesc("Once a day, refreshes shows TMDB still marks as returning, to badge them in Up Next.").addToggle(
+        (t) => t.setValue(this.plugin.settings.checkNewEpisodes).onChange(async (v) => {
+          this.plugin.settings.checkNewEpisodes = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Open the note after adding").addToggle(
+        (t) => t.setValue(this.plugin.settings.openNoteAfterCreate).onChange(async (v) => {
+          this.plugin.settings.openNoteAfterCreate = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      this.renderMaintenance(sectionAfter(el));
+    }
+    renderMaintenance(maint) {
+      new Setting(maint).setName("Maintenance").setHeading();
+      maint.createDiv({
+        cls: "reel-setting-note",
+        text: "These run straight away rather than changing a preference. The ones that remove files move them to the trash, and ask first."
+      });
+      new Setting(maint).setName("Dismissed suggestions").setDesc("Titles you marked 'not interested' in Discover. Clearing brings them back.").addButton(
+        (b) => b.setButtonText(`Clear ${this.plugin.settings.dismissedIds.length}`).setDisabled(this.plugin.settings.dismissedIds.length === 0).onClick(async () => {
+          this.plugin.settings.dismissedIds = [];
+          await this.plugin.saveSettings();
+          new Notice("Reel: dismissed suggestions cleared.");
+          this.display();
+        })
+      );
+      const posterCount = this.plugin.library.all().filter((e) => !!e.poster).length;
+      new Setting(maint).setName("Posters").setDesc(`${posterCount} title${posterCount === 1 ? "" : "s"} have a cached poster.`).addButton(
+        (b) => b.setButtonText("Download missing").onClick(async () => {
+          const n2 = await this.plugin.posters.backfill();
+          if (n2 < 0) {
+            new Notice("Reel: stopping after the current poster.");
+            return;
+          }
+          new Notice(`Reel: cached ${n2} poster${n2 === 1 ? "" : "s"}.`);
+          this.display();
+        })
+      ).addButton(
+        (b) => b.setButtonText("Remove unused").onClick(async () => {
+          await this.plugin.prunePosters();
+          this.display();
+        })
+      );
+      new Setting(maint).setName("Clear cached responses").setDesc("Metadata Reel has already fetched. Clearing costs requests, not data \u2014 everything refetches on demand.").addButton(
+        (b) => b.setButtonText("Clear").onClick(async () => {
+          const n2 = await this.plugin.tmdb.clearCache();
+          new Notice(`Reel: cleared ${n2} cached response${n2 === 1 ? "" : "s"}.`);
+        })
+      );
+    }
+  };
+
   // src/ai/find.ts
   var EMPTY_CRITERIA = {
     pool: "any",
@@ -7878,60 +9065,6 @@ ${body}
       return items[0];
     return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
   }
-
-  // src/settings.ts
-  var DEFAULT_SETTINGS = {
-    keyMode: "encrypted",
-    keysPlain: null,
-    keyBlob: null,
-    keyNames: [],
-    enrich: true,
-    filmFolder: "Movies",
-    seriesFolder: "Series",
-    posterFolder: "Movies/_posters",
-    peopleFolder: "Movies/People",
-    linkPeople: true,
-    castLimit: 10,
-    region: "US",
-    includeSpecials: false,
-    askForReview: true,
-    linkFromDailyNote: false,
-    dailyNotePrefix: "- Watched",
-    dailyNoteFolder: "",
-    lastEpisodeCheck: "",
-    dismissedIds: [],
-    people: {},
-    lastTab: "library",
-    lastSeenVersion: "",
-    libraryLayout: "grid",
-    librarySort: "watched",
-    recentSearches: [],
-    recipes: [],
-    hideFlags: [],
-    maxCertification: null,
-    hideUnrated: false,
-    posterQuality: "w342",
-    downloadPosters: true,
-    cacheResponses: true,
-    cacheTtlDays: 30,
-    openNoteAfterCreate: true,
-    checkNewEpisodes: true,
-    language: "en-US",
-    noteTemplate: "\n## Notes\n\n",
-    publishTrakt: false,
-    publishMastodon: false,
-    mastodonHost: "",
-    publishRatings: true,
-    publishHashtags: "",
-    publishSpoilerDefault: true,
-    aiEnabled: false,
-    // Cheap, fast, and good enough to sort sixty one-line summaries by how well
-    // each answers a sentence, which is the whole of the job. A bigger model
-    // costs more per question without ranking a shortlist any better.
-    aiModel: "anthropic/claude-3.5-haiku",
-    aiShortlist: 60,
-    recentAsks: []
-  };
 
   // harness/audit.ts
   function luminance(colour) {
@@ -8578,6 +9711,24 @@ ${body}
       })
     },
     ai: { configured: true },
+    /*
+     * Enough of the credential store for the settings screen to render.
+     *
+     * Keys are reported present so the sections that unfold behind one are
+     * actually drawn — the collapsed screen is the easy case, and the long one
+     * is where the overflow and the touch targets live. `store` and `remove`
+     * exist because they are referenced in click handlers; nothing in the rig
+     * ever presses anything.
+     */
+    credentials: {
+      has: (name) => name !== "mastodon",
+      isUnlocked: true,
+      hasStoredKey: true,
+      store: async () => true,
+      remove: async () => void 0,
+      migrateTo: async () => void 0,
+      lock: () => void 0
+    },
     posters: {
       attach(parent, entry) {
         parent.addClass("reel-poster-loading");
@@ -9184,6 +10335,24 @@ ${body}
       )
     );
   }
+  function settings(root) {
+    root.addClass("reel-view-body");
+    const before = { ...plugin.settings };
+    Object.assign(plugin.settings, {
+      publishTrakt: true,
+      publishMastodon: true,
+      mastodonHost: "mastodon.social",
+      aiEnabled: true,
+      dismissedIds: [1, 2, 3]
+    });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+    } finally {
+      Object.assign(plugin.settings, before);
+    }
+  }
   var SCREENS = {
     library,
     libraryYear,
@@ -9213,6 +10382,7 @@ ${body}
     preview,
     publishsheet,
     asksheet,
+    settings,
     longshow,
     quick
   };

@@ -52,6 +52,41 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.3",
+		date: "2026-08-22",
+		headline: "The settings screen has been designed, and can finally be checked.",
+		changes: [
+			{
+				kind: "better",
+				text: "Settings is nine cards instead of one run of forty-nine rows, each section titled and separated.",
+				note: "Every section is its own element now. They used to be appended straight onto the container, so there was nothing a stylesheet could reach \u2014 which is why the settings screen was the one surface in Reel with no styling of its own at all.",
+			},
+			{
+				kind: "better",
+				text: "Every control in Settings is at least 44px tall, and fields take the full width on a narrow pane.",
+				note: "Their size used to be whatever the installed theme happened to give them. On a phone-first plugin that is not a decision anybody made.",
+			},
+			{
+				kind: "better",
+				text: "Maintenance looks like what it is. The actions that delete things no longer sit in identical chrome to a preference toggle.",
+			},
+			{
+				kind: "fixed",
+				text: "The service pills at the top of Settings could silently lose their colour on some themes, leaving \u201cworking\u201d and \u201cnot set\u201d looking identical.",
+				note: "They filled with a colour taken straight from the theme with no fallback, and in CSS a missing variable does not fall back \u2014 it voids the whole declaration. Seven such uses across the app are now guarded.",
+			},
+			{
+				kind: "fixed",
+				text: "The key storage description said \u201call three keys\u201d. There are seven, and two of them can post publicly as you \u2014 which it now says.",
+			},
+			{
+				kind: "fixed",
+				text: "The Remove buttons were unreadable: red text on a grey button, 3.87:1 in light and 2.43:1 in dark.",
+				note: "Found by the audit, which reached the settings screen for the first time in this release.",
+			},
+		],
+	},
+	{
 		version: "0.9.2",
 		date: "2026-08-21",
 		headline: "Turning off automatic enrichment now actually turns it off.",

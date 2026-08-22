@@ -21,6 +21,10 @@
 	--text-on-accent: #fff;
 	--interactive-accent: #7b6cd9;
 	--interactive-accent-hover: #6a5bc4;
+	--background-modifier-success: rgba(22, 163, 74, 0.2);
+	--background-modifier-error: rgba(229, 72, 77, 0.2);
+	--text-error: #b91c1c;
+	--text-success: #15803d;
 	--color-red: #e5484d;
 	--color-green: #16a34a;
 	--font-ui-smaller: 12px;
@@ -183,6 +187,10 @@ body.theme-dark {
 	--text-faint: #666;
 	--text-accent: #a68cf0;
 	--text-on-accent: #fff;
+	--background-modifier-success: rgba(22, 163, 74, 0.3);
+	--background-modifier-error: rgba(229, 72, 77, 0.3);
+	--text-error: #f87171;
+	--text-success: #4ade80;
 	--interactive-accent: #7b6cd9;
 	--interactive-accent-hover: #8a7ce0;
 }
@@ -194,4 +202,193 @@ body.theme-dark {
 .reel-modal-shell,
 .reel-modal {
 	z-index: 200;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Settings chrome                                                     */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Obsidian's own settings layout, approximated.
+ *
+ * The `Setting` shim builds Obsidian's real DOM; these are the styles that DOM
+ * arrives with. Without them the settings screen would render as a stack of
+ * unstyled divs and every measurement taken from it would be fiction — which
+ * is worse than not measuring, because it comes with a green tick.
+ *
+ * Approximate, and deliberately so. The question this screen is here to answer
+ * is relative: does Reel's own content overflow the pane, does a control fall
+ * under the 44px thumb target, does a description survive a warm palette. None
+ * of those turn on whether a padding matches Obsidian's to the pixel.
+ */
+.setting-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1em;
+	padding: 0.75em 0;
+	border-top: 1px solid var(--background-modifier-border);
+	/*
+	 * A narrow pane wraps the control below the label; it does not scroll
+	 * sideways. The first version of this file left the row unable to wrap and
+	 * the control unable to shrink, which reported the settings screen as
+	 * 582px wide inside a 351px pane — a fault of the rig, not of Reel, and
+	 * one that would have sent me looking through the plugin's stylesheet for
+	 * an overflow that was never there.
+	 */
+	flex-wrap: wrap;
+}
+
+.setting-item:first-child {
+	border-top: none;
+}
+
+/* A heading is a section break, not a row: no control, more air above it. */
+.setting-item-heading {
+	padding: 1.5em 0 0.5em;
+	border-top: none;
+	align-items: flex-end;
+}
+
+.setting-item-heading .setting-item-name {
+	font-size: 1.15em;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.setting-item-info {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin-right: 1em;
+}
+
+.setting-item-name {
+	color: var(--text-normal);
+}
+
+.setting-item-description {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.4;
+	color: var(--text-muted);
+	padding-top: 0.25em;
+}
+
+.setting-item-control {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	/* Shrinkable, and allowed to reach zero, so a long <select> cannot widen
+	   the pane. `min-width: 0` is the half everyone forgets. */
+	flex: 0 1 auto;
+	min-width: 0;
+	gap: 0.5em;
+	flex-wrap: wrap;
+}
+
+/*
+ * On a phone Obsidian stacks the row rather than squeezing the control.
+ *
+ * This is the case that matters most here and the one that has never been
+ * looked at: it is where a two-line description meets a full-width text field
+ * and the row grows to four times its desktop height.
+ */
+.is-phone .setting-item {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.5em;
+}
+
+.is-phone .setting-item-info {
+	margin-right: 0;
+}
+
+.is-phone .setting-item-control {
+	width: 100%;
+	justify-content: flex-start;
+}
+
+/* ---- the controls themselves ---- */
+
+.setting-item-control input[type="text"],
+.setting-item-control textarea {
+	font-family: inherit;
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	background: var(--background-modifier-form-field);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 5px;
+	padding: 0.4em 0.6em;
+	min-height: 30px;
+	max-width: 100%;
+}
+
+.setting-item-control select.dropdown {
+	font-family: inherit;
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	background: var(--background-modifier-form-field);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 5px;
+	padding: 0.4em 1.5em 0.4em 0.6em;
+	min-height: 30px;
+	max-width: 100%;
+}
+
+/* Obsidian's toggle is a 40x22 pill with a knob, not a checkbox. */
+.checkbox-container {
+	position: relative;
+	width: 40px;
+	height: 22px;
+	flex: 0 0 40px;
+	border-radius: 999px;
+	background: var(--background-modifier-border);
+	cursor: pointer;
+}
+
+.checkbox-container.is-enabled {
+	background: var(--interactive-accent);
+}
+
+.checkbox-container::after {
+	content: "";
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #fff;
+}
+
+.checkbox-container.is-enabled::after {
+	left: 21px;
+}
+
+.setting-item-control input.slider {
+	width: 150px;
+	max-width: 100%;
+}
+
+/*
+ * A button carries a text colour.
+ *
+ * Obsidian's does; this file's did not, and the omission reported a plain
+ * button at 1.79:1 in dark mode — black default text on the theme's dark fill.
+ * A rig that invents a contrast failure is worse than one that misses a real
+ * one, because the first thing it teaches is to stop reading the check.
+ */
+.setting-item-control button {
+	color: var(--text-normal);
+	font-family: inherit;
+	font-size: var(--font-ui-small);
+}
+
+.setting-item-control button.mod-cta {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.setting-item.is-disabled {
+	opacity: 0.5;
 }

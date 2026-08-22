@@ -361,7 +361,7 @@ body {
 
 .reel-error {
 	color: var(--text-error);
-	background: var(--background-modifier-error);
+	background: var(--background-modifier-error, rgba(229, 72, 77, 0.2));
 	border-radius: var(--reel-radius);
 	padding: var(--reel-space-3) var(--reel-space-3);
 	font-size: var(--font-ui-smaller);
@@ -760,7 +760,7 @@ body {
 }
 
 .reel-badge.in-library {
-	background: var(--background-modifier-success);
+	background: var(--background-modifier-success, rgba(22, 163, 74, 0.2));
 	color: var(--text-normal);
 }
 
@@ -1405,12 +1405,12 @@ input.reel-input {
 }
 
 .reel-pill.ok {
-	background: var(--background-modifier-success);
+	background: var(--background-modifier-success, rgba(22, 163, 74, 0.2));
 	color: var(--text-normal);
 }
 
 .reel-pill.warn {
-	background: var(--background-modifier-error);
+	background: var(--background-modifier-error, rgba(229, 72, 77, 0.2));
 	color: var(--text-normal);
 }
 
@@ -1422,7 +1422,7 @@ input.reel-input {
 }
 
 .reel-callout.warn {
-	background: var(--background-modifier-error);
+	background: var(--background-modifier-error, rgba(229, 72, 77, 0.2));
 	color: var(--text-normal);
 }
 
@@ -1761,7 +1761,7 @@ input.reel-input {
 }
 
 .reel-badge.flag {
-	background: var(--background-modifier-error);
+	background: var(--background-modifier-error, rgba(229, 72, 77, 0.2));
 	color: var(--text-normal);
 }
 
@@ -3358,9 +3358,43 @@ input.reel-input {
 }
 
 /* A destructive action shouldn't look like the three beside it. */
-.reel-btn-danger {
-	color: var(--text-error, #dc2626);
-	border-color: var(--background-modifier-border);
+/*
+ * Red text needs the background it was chosen against.
+ *
+ * This set a colour and no background, so the label sat on whatever fill the
+ * theme's own button rule supplied — and `--text-error` is picked to stand out
+ * against the *page*, not against a grey button. Measured 3.87:1 in light and
+ * 2.43:1 in dark, both under the 4.5:1 floor, on the one control in the app
+ * whose entire job is to be read carefully before it is pressed.
+ *
+ * The class is doubled because a theme's `button:not(button.clickable-icon)`
+ * is (0,1,2) and would otherwise win the background back on source order.
+ * Same arithmetic as the doubled classes further down this file.
+ */
+/*
+ * One red, resolved per theme.
+ *
+ * `var(--text-error, #b91c1c)` looked theme-aware and was not: a theme that
+ * defines `--text-error` is fine either way, and one that does not got a dark
+ * red designed for white paper, which on a dark background measured 2.58:1.
+ * A fallback is a second design decision, and it needs making twice.
+ *
+ * The token is always defined at `:root`, so the `var()` can never collapse
+ * the whole declaration the way an undefined custom property does.
+ */
+:root {
+	--reel-danger: var(--text-error, #b91c1c);
+}
+
+.theme-dark {
+	--reel-danger: var(--text-error, #f87171);
+}
+
+.reel-btn-danger.reel-btn-danger {
+	color: var(--reel-danger);
+	background: transparent;
+	border: 1px solid var(--reel-danger);
+	box-shadow: none;
 }
 
 .reel-btn-danger[data-confirming="true"] {
@@ -14685,4 +14719,207 @@ button.reel-facet-tab {
 .reel-chip.is-active .reel-chip-count {
 	color: inherit;
 	opacity: 0.75;
+}
+
+
+/* ==================================================================== */
+/* The settings screen                                                  */
+/* ==================================================================== */
+
+/*
+ * `.reel-settings` had no rules. None.
+ *
+ * Fourteen thousand lines of stylesheet, every other surface in the app
+ * designed to within an inch of its life, and the screen where you set the
+ * thing up was stock chrome — because `display()` appended forty-nine rows
+ * straight onto the container and there was no element to write a rule
+ * against. Sections are their own elements now, so this is possible at last.
+ *
+ * The shape: each section is a card, the heading belongs to the card rather
+ * than floating above the rows, and the rows inside a card are separated by
+ * hairlines rather than by the space between them. Nine cards is nine things
+ * to scroll past; forty-nine undifferentiated rows is a wall.
+ */
+
+.reel-settings {
+	padding-bottom: var(--reel-space-4);
+	/*
+	 * Declared so the `@container` rule below has something to measure.
+	 * Without this the query silently never matches — no error, no warning,
+	 * just a phone layout that never arrives, which is the same class of
+	 * silent failure as a `var()` naming a custom property nobody defined.
+	 */
+	container-type: inline-size;
+}
+
+.reel-settings-section {
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-radius);
+	padding: 0 var(--reel-space-3) var(--reel-space-2);
+	margin-bottom: var(--reel-space-3);
+}
+
+/*
+ * The heading is the card's title, so it loses the big top margin Obsidian
+ * gives it — that margin exists to separate a heading from the rows above it,
+ * and there are no rows above it any more.
+ */
+.reel-settings .setting-item-heading {
+	padding: var(--reel-space-3) 0 var(--reel-space-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: var(--reel-space-1);
+}
+
+.reel-settings .setting-item-heading .setting-item-name {
+	font-size: var(--font-ui-medium);
+	font-weight: var(--reel-weight-semibold, 600);
+	letter-spacing: 0.01em;
+}
+
+/* Hairlines between rows, not around them: the card already draws the edge. */
+.reel-settings .setting-item {
+	border-top: 1px solid var(--background-modifier-border);
+	padding: var(--reel-space-3) 0;
+}
+
+.reel-settings .setting-item-heading + .setting-item,
+.reel-settings .setting-item:first-child {
+	border-top: none;
+}
+
+.reel-settings .setting-item-description {
+	max-width: 62ch;
+}
+
+/*
+ * Controls sized for a thumb.
+ *
+ * Reel is a phone-first plugin whose settings controls were whatever height
+ * the installed theme happened to give them — which is to say, unowned. A
+ * 31px dropdown is not a decision anybody made; it is the absence of one.
+ *
+ * 44px is the floor the rest of the app already holds itself to, and the audit
+ * checks every other screen against it. This screen simply had no way to be
+ * checked until now.
+ *
+ * Two classes so this outranks a theme's `button:not(button.clickable-icon)`,
+ * which is (0,1,2) and would otherwise win on source order.
+ */
+.reel-settings .setting-item-control input[type="text"],
+.reel-settings .setting-item-control input[type="password"],
+.reel-settings .setting-item-control textarea,
+.reel-settings .setting-item-control select,
+.reel-settings .setting-item-control button {
+	min-height: 44px;
+	border-radius: var(--reel-radius-sm);
+}
+
+.reel-settings .setting-item-control button {
+	padding-inline: var(--reel-space-3);
+}
+
+/* The toggle is a fixed-size pill; the target around it is what grows. */
+.reel-settings .setting-item-control .checkbox-container {
+	margin: 11px 0;
+}
+
+/*
+ * On a phone the control gets the full width and sits under the label.
+ *
+ * Obsidian does this itself, but only from `is-phone` — and Reel is regularly
+ * used in a sidebar barely wider than a phone on a desktop, where that class
+ * never lands and a text field is squeezed to a stub beside its own name.
+ */
+@container (max-width: 480px) {
+	.reel-settings .setting-item {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.reel-settings .setting-item-control {
+		width: 100%;
+		justify-content: flex-start;
+	}
+
+	.reel-settings .setting-item-control input[type="text"],
+	.reel-settings .setting-item-control input[type="password"],
+	.reel-settings .setting-item-control select {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+}
+
+/*
+ * One note style, not two.
+ *
+ * `.reel-setting-note` and `.reel-settings-note` did the same job four
+ * characters apart and looked different — the second was added without
+ * noticing the first. They are one rule now, and the difference between them
+ * has become a modifier rather than a typo.
+ */
+.reel-settings-note,
+.reel-setting-note {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	padding: var(--reel-space-2) var(--reel-space-3);
+	margin: var(--reel-space-2) 0;
+	border-left: 2px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	border-radius: 0 var(--reel-radius-sm) var(--reel-radius-sm) 0;
+	max-width: 62ch;
+}
+
+/*
+ * Maintenance is not a preference section, and now it does not look like one.
+ *
+ * Everything else here remembers a choice. These run the moment you press
+ * them, and two of the three move files to the trash. That was previously
+ * conveyed by a heading and a paragraph asking to be believed, sitting in
+ * identical chrome to the toggle above it.
+ */
+.reel-settings-section.is-actions {
+	border-color: var(--reel-danger);
+	background: color-mix(in srgb, var(--reel-danger) 5%, var(--background-secondary));
+}
+
+@supports not (background: color-mix(in srgb, red 5%, blue)) {
+	.reel-settings-section.is-actions {
+		background: var(--background-secondary);
+	}
+}
+
+.reel-settings-section.is-actions .setting-item-heading {
+	border-bottom-color: var(--reel-danger);
+}
+
+.reel-settings-section.is-actions .setting-item-heading .setting-item-name {
+	color: var(--reel-danger);
+}
+
+/*
+ * The key pills, on a card that is the same colour they are.
+ *
+ * `.reel-pill` fills with `--background-secondary`, and the section card
+ * introduced above fills with `--background-secondary`. Seven pills promptly
+ * became seven runs of plain text with no shape at all — a status row that had
+ * silently stopped reading as status. Rendering it is the only way that shows
+ * up; it passes every check in the audit either way.
+ */
+.reel-settings .reel-key-status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--reel-space-2);
+	margin: var(--reel-space-2) 0;
+}
+
+.reel-settings .reel-key-status .reel-pill {
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+}
+
+.reel-settings .reel-key-status .reel-pill.ok {
+	background: var(--background-modifier-success, rgba(22, 163, 74, 0.2));
+	border-color: transparent;
 }

@@ -219,24 +219,58 @@ const MODE_LABELS: Record<KeyMode, string> = {
 	plain: "Plain text in vault (not recommended)",
 };
 
+
+/**
+ * A new section element beside the one given.
+ *
+ * Maintenance is drawn from inside `renderBehaviour` but is not part of it, so
+ * it needs a sibling rather than a child. Falls back to the element itself if
+ * there is no parent, which only happens in a test that mounts a section on
+ * its own — better a slightly wrong card than a thrown error on a screen made
+ * entirely of other people's settings.
+ */
+function sectionAfter(el: HTMLElement): HTMLElement {
+	const parent = el.parentElement ?? el;
+	return parent.createDiv({ cls: "reel-settings-section is-actions" });
+}
+
 export class ReelSettingTab extends PluginSettingTab {
 	constructor(app: App, private plugin: ReelPlugin) {
 		super(app, plugin);
 	}
 
+	/**
+	 * Nine sections, each in its own element.
+	 *
+	 * They all used to be appended straight onto `containerEl`, which made the
+	 * screen one flat run of forty-nine rows: the headings were the only thing
+	 * separating them, and a heading is a line of text, not a boundary. There
+	 * was no element a stylesheet could reach to say "this group is one thing",
+	 * which is why `.reel-settings` had no rules at all — there was nothing to
+	 * write them against.
+	 *
+	 * The order is by how often you touch it, not by when it was built:
+	 * credentials and folders are what a new install needs, publishing and Ask
+	 * are opt-in features, and the things that act rather than remember go
+	 * last.
+	 */
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 		containerEl.addClass("reel-settings");
 
-		this.renderCredentials(containerEl);
-		this.renderFolders(containerEl);
-		this.renderMetadata(containerEl);
-		this.renderReviews(containerEl);
-		this.renderPublishing(containerEl);
-		this.renderAsk(containerEl);
-		this.renderContent(containerEl);
-		this.renderBehaviour(containerEl);
+		const section = (render: (el: HTMLElement) => void): void => {
+			render(containerEl.createDiv({ cls: "reel-settings-section" }));
+		};
+
+		section((el) => this.renderCredentials(el));
+		section((el) => this.renderFolders(el));
+		section((el) => this.renderMetadata(el));
+		section((el) => this.renderReviews(el));
+		section((el) => this.renderPublishing(el));
+		section((el) => this.renderAsk(el));
+		section((el) => this.renderContent(el));
+		section((el) => this.renderBehaviour(el));
 	}
 
 	/** The live content policy, read by every surface that lists titles. */
@@ -285,8 +319,9 @@ export class ReelSettingTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Key storage")
 			.setDesc(
-				"All three keys share one encrypted blob and one passphrase — three unlock prompts for one library " +
-					"screen would be intolerable, and splitting them buys nothing, since whatever can read one can read the rest."
+				"Every key shares one encrypted blob and one passphrase — a prompt per service would be intolerable, " +
+					"and splitting them buys nothing, since whatever can read one can read the rest. Note that Trakt and " +
+					"Mastodon are different in kind from the others: those can post publicly as you."
 			)
 			.addDropdown((d) => {
 				(Object.keys(MODE_LABELS) as KeyMode[]).forEach((m) => d.addOption(m, MODE_LABELS[m]));
@@ -1104,13 +1139,23 @@ export class ReelSettingTab extends PluginSettingTab {
 		// They were interleaved with the toggles, so the control that deletes
 		// cached posters sat directly beneath the one choosing a poster size
 		// — same visual weight, entirely different consequence.
-		new Setting(el).setName("Maintenance").setHeading();
-		el.createDiv({
+		//
+		// The separation was a heading and a paragraph asking to be believed.
+		// Now it is structural: Maintenance is its own section element, so it
+		// can carry its own card and its own colouring, and the difference
+		// between "change a preference" and "delete forty files" is something
+		// you can see rather than something you have to read.
+		this.renderMaintenance(sectionAfter(el));
+	}
+
+	private renderMaintenance(maint: HTMLElement): void {
+		new Setting(maint).setName("Maintenance").setHeading();
+		maint.createDiv({
 			cls: "reel-setting-note",
 			text: "These run straight away rather than changing a preference. The ones that remove files move them to the trash, and ask first.",
 		});
 
-		new Setting(el)
+		new Setting(maint)
 			.setName("Dismissed suggestions")
 			.setDesc("Titles you marked 'not interested' in Discover. Clearing brings them back.")
 			.addButton((b) =>
@@ -1128,7 +1173,7 @@ export class ReelSettingTab extends PluginSettingTab {
 		// The command palette is a poor fit on a phone, and these are exactly
 		// the actions you reach for after deleting a few titles.
 		const posterCount = this.plugin.library.all().filter((e) => !!e.poster).length;
-		new Setting(el)
+		new Setting(maint)
 			.setName("Posters")
 			.setDesc(`${posterCount} title${posterCount === 1 ? "" : "s"} have a cached poster.`)
 			.addButton((b) =>
@@ -1149,7 +1194,7 @@ export class ReelSettingTab extends PluginSettingTab {
 				})
 			);
 
-		new Setting(el)
+		new Setting(maint)
 			.setName("Clear cached responses")
 			.setDesc("Metadata Reel has already fetched. Clearing costs requests, not data — everything refetches on demand.")
 			.addButton((b) =>
