@@ -57,10 +57,17 @@ function fakePlugin(opts: { keys?: string[]; host?: string; result?: unknown; th
 const bare = fakePlugin();
 
 /*
- * TMDB is the one Reel cannot work without and its key may be built in, so
- * there is always something to ask about.
+ * TMDB used to be excepted here, on the grounds that its key might be built
+ * in. It is not: with nothing saved, testing it raises a missing-key error and
+ * comes back a failure.
+ *
+ * That cost landed on the first screen of the product. A new install opening
+ * the one required guide was offered "Check now" under a line reading "Not
+ * checked yet", and pressing it reported a broken connection to somebody who
+ * had not been given the chance to set one up yet.
  */
-ok("TMDB is always checkable", checkable(bare as never, "tmdb"));
+ok("TMDB with no key is not checkable", !checkable(bare as never, "tmdb"));
+ok("and is once the key is there", checkable(fakePlugin({ keys: ["tmdb"] }) as never, "tmdb"));
 
 ok("a service with no key is not", !checkable(bare as never, "omdb"));
 ok("and is once the key is saved", checkable(fakePlugin({ keys: ["omdb"] }) as never, "omdb"));
@@ -92,8 +99,12 @@ ok("an unlistable feature is never checkable", !checkable(fakePlugin({ keys: ["l
 void (async () => {
 	// Nothing to check reads as silence, not as a result.
 	eq("an unchecked feature records nothing", await checkFeature(bare as never, "omdb", 1000), null);
+	// Including the required one, on the screen where it matters most.
+	eq("a fresh install records no TMDB failure", await checkFeature(bare as never, "tmdb", 1000), null);
 
-	const good = fakePlugin();
+	// Keyed, because these are about what `checkFeature` records rather than
+	// about whether TMDB is checkable — which is the section above.
+	const good = fakePlugin({ keys: ["tmdb"] });
 	const rec = await checkFeature(good as never, "tmdb", 1000);
 	ok("a pass is recorded", rec?.ok === true);
 	eq("stamped with the time it was given", rec?.at, 1000);
@@ -104,22 +115,22 @@ void (async () => {
 	 * would leave the row saying "not checked yet" forever, which is the one
 	 * thing a check must never do.
 	 */
-	const angry = fakePlugin({ throws: true });
+	const angry = fakePlugin({ keys: ["tmdb"], throws: true });
 	const thrown = await checkFeature(angry as never, "tmdb", 2000);
 	ok("a thrown error is still an answer", thrown?.ok === false);
 	ok("and carries something to read", Boolean(thrown && !thrown.ok && thrown.error));
 
 	// A returned failure keeps its reason.
-	const sad = fakePlugin({ result: { ok: false, error: "OMDb rejected the key." } });
+	const sad = fakePlugin({ keys: ["tmdb"], result: { ok: false, error: "OMDb rejected the key." } });
 	const bad = await checkFeature(sad as never, "tmdb", 3000);
 	ok("a refused check keeps its reason", Boolean(bad && !bad.ok && bad.error?.includes("rejected")));
 
 	// Extras only appear when there are any.
-	const plain = await checkFeature(fakePlugin() as never, "tmdb", 4000);
+	const plain = await checkFeature(fakePlugin({ keys: ["tmdb"] }) as never, "tmdb", 4000);
 	eq("a plain pass carries no qualification", plain?.proves, undefined);
 	eq("and no note", plain?.note, undefined);
 
-	const partial = fakePlugin({ result: { ok: true, proves: "Server answered.", note: "$1 used" } });
+	const partial = fakePlugin({ keys: ["tmdb"], result: { ok: true, proves: "Server answered.", note: "$1 used" } });
 	const qualified = await checkFeature(partial as never, "tmdb", 5000);
 	eq("a qualified pass keeps what it proved", qualified?.proves, "Server answered.");
 	eq("and its note", qualified?.note, "$1 used");

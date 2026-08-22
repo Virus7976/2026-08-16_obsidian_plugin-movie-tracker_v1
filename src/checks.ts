@@ -40,10 +40,23 @@ export type CheckOutcome = { ok: true; proves?: string; note?: string } | { ok: 
 export function checkable(plugin: ReelPlugin, id: FeatureId): boolean {
 	if (!TESTABLE.includes(id)) return false;
 	switch (id) {
-		// TMDB is the one Reel cannot work without, and its key may be built
-		// in, so there is always something to ask about.
-		case "tmdb":
-			return true;
+		/*
+		 * TMDB was excepted here on the grounds that its key "may be built in",
+		 * so there was always something to ask about. There is no built-in key.
+		 * `testCredentials` raises a missing-key error and returns a failure,
+		 * which is why the same install says Reel needs a key before it can do
+		 * anything.
+		 *
+		 * The cost of that landed on the first screen of the product. A brand
+		 * new install opening the one required guide was offered "Check now"
+		 * above a status line reading "Not checked yet", and pressing it
+		 * reported a broken connection to somebody who had not yet been given
+		 * the chance to set one up. Pressing Test connections on the settings
+		 * screen recorded the same failure.
+		 *
+		 * So TMDB is checkable on the same terms as everything else, and the
+		 * exception is gone rather than special-cased further.
+		 */
 		case "mastodon":
 			return Boolean(normaliseHost(plugin.settings.mastodonHost));
 		default:

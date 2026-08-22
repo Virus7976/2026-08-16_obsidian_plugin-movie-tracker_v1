@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.19",
+		date: "2026-08-22",
+		headline: "A brand new install is no longer offered a connection test it cannot pass.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The TMDB guide no longer shows “Not checked yet” and a Check now button before you have a key.",
+				note: "TMDB was excepted from the rule every other feature follows, on the grounds its key might be built in. There is no built-in key — which is why the same screen tells you Reel needs one. So the very first guide anybody opens offered to test a connection that could only fail, and pressing Test connections on a fresh install recorded that failure.",
+			},
+			{
+				kind: "better",
+				text: "Test connections skips what you have not set up yet, including TMDB.",
+			},
+		],
+	},
+	{
 		version: "0.9.18",
 		date: "2026-08-22",
 		headline: "A guide for something already working opens on the parts you came for.",

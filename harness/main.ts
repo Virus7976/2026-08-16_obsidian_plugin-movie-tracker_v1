@@ -1509,6 +1509,31 @@ function setupdone(root: HTMLElement): void {
 	}
 }
 
+/**
+ * The guide every single user works through, in the state they meet it in.
+ *
+ * TMDB is the one key Reel cannot run without, so this walkthrough is not one
+ * of six optional paths — it is the first screen of the product for everybody,
+ * and it had never been drawn here. Every setup scene so far has been a
+ * feature already half or wholly configured, which is the state you reach
+ * *after* the part that decides whether you stay.
+ *
+ * `noKeys` for the same reason: nothing ticked, nothing saved, no status line,
+ * every step ahead of you. That is the screen, and it is the one with the most
+ * riding on it.
+ */
+function setupfirst(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const spec = FEATURES.find((f) => f.id === "tmdb");
+	if (!spec) throw new Error("harness: no tmdb feature spec");
+	noKeys = true;
+	try {
+		mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+	} finally {
+		noKeys = false;
+	}
+}
+
 function settings(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const before = { ...plugin.settings };
@@ -1622,6 +1647,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	firstrun,
 	setupsheet,
 	setupdone,
+	setupfirst,
 	longshow,
 	quick,
 };

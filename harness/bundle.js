@@ -8091,8 +8091,6 @@ ${body}
     if (!TESTABLE.includes(id))
       return false;
     switch (id) {
-      case "tmdb":
-        return true;
       case "mastodon":
         return Boolean(normaliseHost(plugin2.settings.mastodonHost));
       default:
@@ -12005,6 +12003,18 @@ ${body}
       plugin.settings.mastodonHost = before;
     }
   }
+  function setupfirst(root) {
+    root.addClass("reel-view-body");
+    const spec = FEATURES.find((f) => f.id === "tmdb");
+    if (!spec)
+      throw new Error("harness: no tmdb feature spec");
+    noKeys = true;
+    try {
+      mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+    } finally {
+      noKeys = false;
+    }
+  }
   function settings(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12107,6 +12117,7 @@ ${body}
     firstrun,
     setupsheet,
     setupdone,
+    setupfirst,
     longshow,
     quick
   };
