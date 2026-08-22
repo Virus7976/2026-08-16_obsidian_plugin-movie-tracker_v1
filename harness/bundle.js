@@ -9150,7 +9150,7 @@ ${body}
         );
       }
       if (store.hasStoredKey) {
-        new Setting(el).setName("Remove all keys").addButton((b) => {
+        new Setting(el).setName("Remove all keys").setDesc("Deletes every saved key from your vault. Reel cannot recover them; you would need each original key again.").addButton((b) => {
           b.buttonEl.addClass("reel-btn-danger");
           return b.setButtonText("Remove all").onClick(async () => {
             const ok = await confirm(this.app, {
@@ -9321,7 +9321,9 @@ ${body}
             this.display();
         }).open();
       };
-      const trakt = new Setting(el).setName(dead ? "Trakt session expired" : signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
+      const trakt = new Setting(el).setName(
+        refused ? "Trakt refused this token" : dead ? "Trakt session expired" : signedIn ? "Signed in to Trakt" : "Sign in to Trakt"
+      ).setDesc(
         signedIn ? `${said.text}. Reel can post reviews and ratings as you; sign out to stop that immediately.` : "Trakt shows you a short code to type on any device. Nothing has to link back to this app."
       );
       if (dead || !signedIn) {
@@ -9836,7 +9838,7 @@ ${body}
           await this.plugin.saveSettings();
         })
       );
-      new Setting(el).setName("Open the note after adding").addToggle(
+      new Setting(el).setName("Open the note after adding").setDesc("Jump straight to a title's note once it is created, instead of staying where you are.").addToggle(
         (t) => t.setValue(this.plugin.settings.openNoteAfterCreate).onChange(async (v) => {
           this.plugin.settings.openNoteAfterCreate = v;
           await this.plugin.saveSettings();
@@ -10723,6 +10725,17 @@ ${body}
       }
     }
     check("contrastAA", lowContrast.length === 0, [...new Set(lowContrast)].slice(0, 4).join(", "));
+    const undescribed = [];
+    for (const item of Array.from(view.querySelectorAll(".setting-item"))) {
+      if (item.classList.contains("setting-item-heading"))
+        continue;
+      const desc = item.querySelector(".setting-item-description");
+      if (desc?.textContent?.trim())
+        continue;
+      const name = item.querySelector(".setting-item-name")?.textContent?.trim();
+      undescribed.push(name || "(unnamed row)");
+    }
+    check("settingsExplained", undescribed.length === 0, undescribed.slice(0, 4).join(", "));
     const targets = [...view.querySelectorAll('button, [role="button"], a, select, input')].filter((el) => {
       if (!shown(el))
         return false;

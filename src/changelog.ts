@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.15",
+		date: "2026-08-22",
+		headline: "Every control on the settings screen says what it does.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "A Trakt token that was refused no longer calls itself expired.",
+				note: "The row title said “Trakt session expired” while the status line under it said the token had been refused and the expiry was two months away. One state, two labels, disagreeing.",
+			},
+			{
+				kind: "fixed",
+				text: "Remove all keys and Open the note after adding now explain themselves.",
+				note: "Deleting every saved key was the most destructive control on the screen and the one with nothing written under it.",
+			},
+			{
+				kind: "better",
+				text: "A control with no explanation is now something the build refuses to ship.",
+				note: "A settings screen is where a plugin explains itself, and a row that is only a name and a switch makes you guess — the same hidden-information problem as a feature with no walkthrough, repeated forty-six times.",
+			},
+		],
+	},
+	{
 		version: "0.9.14",
 		date: "2026-08-22",
 		headline: "Every guide told you to paste the key below. Now there is a below.",

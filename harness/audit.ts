@@ -625,6 +625,35 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	}
 	check("contrastAA", lowContrast.length === 0, [...new Set(lowContrast)].slice(0, 4).join(", "));
 
+	/*
+	 * Every control says what it does.
+	 *
+	 * A settings screen is where a plugin explains itself, and a row that is
+	 * only a name and a switch makes you guess — which is the same "hidden
+	 * information" problem as a feature with no walkthrough, just smaller and
+	 * repeated forty-six times.
+	 *
+	 * All forty-six currently carry a description. That was true when measured
+	 * and nothing held it there, which is exactly the state a property is in
+	 * just before it stops being true: the next control anybody adds is one
+	 * `.setDesc` away from being the exception, and nothing would have said so.
+	 *
+	 * Deliberately not a length judgement. "Is this sentence any good" is not
+	 * something a checker can answer, and pretending otherwise would produce a
+	 * rule people satisfy with filler. The claim here is only that somebody
+	 * wrote something.
+	 */
+	const undescribed: string[] = [];
+	for (const item of Array.from(view.querySelectorAll<HTMLElement>(".setting-item"))) {
+		// Headings are `.setting-item-heading` and are not controls.
+		if (item.classList.contains("setting-item-heading")) continue;
+		const desc = item.querySelector<HTMLElement>(".setting-item-description");
+		if (desc?.textContent?.trim()) continue;
+		const name = item.querySelector<HTMLElement>(".setting-item-name")?.textContent?.trim();
+		undescribed.push(name || "(unnamed row)");
+	}
+	check("settingsExplained", undescribed.length === 0, undescribed.slice(0, 4).join(", "));
+
 	// Overlap. Two controls sharing pixels means one of them cannot be tapped,
 	// and it is invisible in a static read of the markup.
 	const targets = [...view.querySelectorAll<HTMLElement>('button, [role="button"], a, select, input')].filter((el) => {

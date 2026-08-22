@@ -951,6 +951,9 @@ export class ReelSettingTab extends PluginSettingTab {
 		if (store.hasStoredKey) {
 			new Setting(el)
 				.setName("Remove all keys")
+				// The most destructive control on the screen was the one with
+				// nothing written under it.
+				.setDesc("Deletes every saved key from your vault. Reel cannot recover them; you would need each original key again.")
 				.addButton((b) => {
 					// Not setDestructive(): that is @since 1.13.0, and raising
 					// minAppVersion from 1.7.2 would lock out five minor
@@ -1202,8 +1205,25 @@ export class ReelSettingTab extends PluginSettingTab {
 			}).open();
 		};
 
+		/*
+		 * Two ways to be dead, and they are not the same sentence.
+		 *
+		 * `dead` was widened to cover a refused token so the sign-in button
+		 * would appear — which was right, and left this title still saying
+		 * "expired" for a token whose expiry is months away. The status line
+		 * directly underneath it says "Token refused", so the row contradicted
+		 * itself: one state, two labels, disagreeing.
+		 */
 		const trakt = new Setting(el)
-			.setName(dead ? "Trakt session expired" : signedIn ? "Signed in to Trakt" : "Sign in to Trakt")
+			.setName(
+				refused
+					? "Trakt refused this token"
+					: dead
+						? "Trakt session expired"
+						: signedIn
+							? "Signed in to Trakt"
+							: "Sign in to Trakt"
+			)
 			.setDesc(
 				signedIn
 					? `${said.text}. Reel can post reviews and ratings as you; sign out to stop that immediately.`
@@ -1987,6 +2007,7 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		new Setting(el)
 			.setName("Open the note after adding")
+			.setDesc("Jump straight to a title's note once it is created, instead of staying where you are.")
 			.addToggle((t) =>
 				t.setValue(this.plugin.settings.openNoteAfterCreate).onChange(async (v) => {
 					this.plugin.settings.openNoteAfterCreate = v;

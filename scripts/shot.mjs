@@ -42,6 +42,13 @@ const expand = args.includes("--expand");
  * scale where nothing is legible.
  */
 const top = Number(flag("y", 0));
+/*
+ * How many matches to report. Twelve is plenty for "is this row laid out
+ * right" and far too few for "which rows exist at all" — a probe of the
+ * settings screen came back with exactly twelve names and looked, convincingly,
+ * like six sections had failed to render.
+ */
+const probeMax = Number(flag("max", 12));
 const out = flag("out", join(ROOT, "shots", `${screen}${dark ? "-dark" : ""}-${height}.png`));
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
@@ -118,7 +125,7 @@ if (args.includes("--console")) {
 // the whole point of the palette passes is that this differs.
 const palette = args.find((a) => a.startsWith("--palette="))?.slice(10) ?? "";
 const palArg = palette ? `&palette=${palette}` : "";
-await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}${palArg}`, {
+await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}${palArg}&probeMax=${probeMax}`, {
 	waitUntil: "networkidle0",
 });
 
