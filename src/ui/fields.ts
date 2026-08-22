@@ -268,6 +268,33 @@ export function mastodonHostField(el: HTMLElement, ctx: FieldContext): void {
 }
 
 /**
+ * The switch that decides whether Ask may make a request at all.
+ *
+ * The OpenRouter walkthrough ends "paste it below, press Save, then turn Ask
+ * on", and until now the guide contained the first half of that sentence and
+ * not the second — the same fault as pointing at a field that was on another
+ * screen, in an instruction the "below" check was never going to catch.
+ *
+ * It also closes a gap of its own. A saved key with this off reads as set up
+ * everywhere in the plugin, because being set up means having the key, and yet
+ * no question will run: `send` refuses before it reaches the network. Putting
+ * the switch beside the key makes the difference visible at the moment it is
+ * decided.
+ */
+export function askEnabledField(el: HTMLElement, ctx: FieldContext): void {
+	new Setting(el)
+		.setName("Enable Ask")
+		.setDesc("Off by default. With this off, no request is ever made, key or no key.")
+		.addToggle((t) =>
+			t.setValue(ctx.plugin.settings.aiEnabled).onChange(async (v) => {
+				ctx.plugin.settings.aiEnabled = v;
+				await ctx.plugin.saveSettings();
+				ctx.onChanged();
+			})
+		);
+}
+
+/**
  * Everything a given guide needs in order to be finishable, in step order.
  *
  * Per feature rather than derived from `spec.keys`, because the keys alone do
@@ -288,7 +315,10 @@ export function setupFields(el: HTMLElement, ctx: FieldContext, spec: FeatureSpe
 			keyField(el, ctx, "dtdd", "DoesTheDogDie key", "Pasted here, encrypted in your vault.");
 			return;
 		case "openrouter":
+			// Key first, then the switch, which is the order the last step
+			// gives them in.
 			keyField(el, ctx, "openrouter", "OpenRouter key", "Pasted here, encrypted in your vault.");
+			askEnabledField(el, ctx);
 			return;
 		case "trakt":
 			traktAppField(el, ctx);

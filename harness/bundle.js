@@ -8273,6 +8273,15 @@ ${body}
       )
     );
   }
+  function askEnabledField(el, ctx) {
+    new Setting(el).setName("Enable Ask").setDesc("Off by default. With this off, no request is ever made, key or no key.").addToggle(
+      (t) => t.setValue(ctx.plugin.settings.aiEnabled).onChange(async (v) => {
+        ctx.plugin.settings.aiEnabled = v;
+        await ctx.plugin.saveSettings();
+        ctx.onChanged();
+      })
+    );
+  }
   function setupFields(el, ctx, spec) {
     switch (spec.id) {
       case "tmdb":
@@ -8286,6 +8295,7 @@ ${body}
         return;
       case "openrouter":
         keyField(el, ctx, "openrouter", "OpenRouter key", "Pasted here, encrypted in your vault.");
+        askEnabledField(el, ctx);
         return;
       case "trakt":
         traktAppField(el, ctx);
@@ -12003,17 +12013,16 @@ ${body}
       plugin.settings.mastodonHost = before;
     }
   }
-  function setupfirst(root) {
-    root.addClass("reel-view-body");
-    const spec = FEATURES.find((f) => f.id === "tmdb");
-    if (!spec)
-      throw new Error("harness: no tmdb feature spec");
-    noKeys = true;
-    try {
-      mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
-    } finally {
-      noKeys = false;
-    }
+  function guide(spec) {
+    return (root) => {
+      root.addClass("reel-view-body");
+      noKeys = true;
+      try {
+        mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+      } finally {
+        noKeys = false;
+      }
+    };
   }
   function settings(root) {
     root.addClass("reel-view-body");
@@ -12117,7 +12126,9 @@ ${body}
     firstrun,
     setupsheet,
     setupdone,
-    setupfirst,
+    // Every feature's guide, in the state a new install meets it in. Derived
+    // from FEATURES so none can be left out and a seventh arrives covered.
+    ...Object.fromEntries(FEATURES.map((f) => [`guide_${f.id}`, guide(f)])),
     longshow,
     quick
   };

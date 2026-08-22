@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.20",
+		date: "2026-08-22",
+		headline: "The Ask guide now contains the switch its last step tells you to flip.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The OpenRouter guide ends “paste it below, press Save, then turn Ask on”, and now has the Enable Ask switch in it.",
+				note: "It contained the first half of that sentence and not the second. It also closes a gap of its own: a saved key with Ask off reads as set up everywhere, because being set up means having the key — and yet no question will run.",
+			},
+			{
+				kind: "better",
+				text: "Every feature's walkthrough is now checked on every build, including any added later.",
+				note: "Three guides had been added to the test harness by hand over three releases and each one turned up a real fault the first time it was drawn. Three more had never been rendered at all. Whether a guide gets checked is no longer something anybody has to remember.",
+			},
+		],
+	},
+	{
 		version: "0.9.19",
 		date: "2026-08-22",
 		headline: "A brand new install is no longer offered a connection test it cannot pass.",

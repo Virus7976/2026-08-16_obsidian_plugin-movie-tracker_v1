@@ -275,5 +275,34 @@ for (const f of FEATURES) {
 	}
 }
 
+/* ---- a guide has to be finishable inside itself ---------------------- */
+
+/*
+ * The "below" check above catches a step pointing at a field that is not
+ * there. It only catches the ones that say "below" — OpenRouter's last step
+ * says "paste it below, press Save, then turn Ask on", and the guide contained
+ * the first half of that sentence and not the second, which no amount of
+ * searching for the word "below" was ever going to find.
+ *
+ * This is the structural version: every credential a feature needs must have
+ * something in its guide that can produce it. Not a list of expected control
+ * names, which would decay the moment somebody adds a field, but a count —
+ * a feature wanting two credentials cannot be served by one control.
+ */
+for (const f of FEATURES) {
+	const marker = `case "${f.id}":`;
+	const at = fieldsSrc.indexOf(marker);
+	ok(`${f.id}: the guide renders something`, at >= 0, "setupFields has no branch for it, so its guide has no fields at all");
+	if (at < 0) continue;
+
+	const body = fieldsSrc.slice(at + marker.length, fieldsSrc.indexOf("return;", at));
+	const controls = (body.match(/Field\(/g) ?? []).length;
+	ok(
+		`${f.id}: a control for each credential it needs`,
+		controls >= f.keys.length,
+		`needs ${f.keys.length} credential(s), the guide renders ${controls} control(s)`
+	);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);
