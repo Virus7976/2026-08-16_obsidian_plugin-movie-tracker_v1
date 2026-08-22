@@ -1,6 +1,6 @@
 {
   "name": "obsidian-reel",
-  "version": "0.9.34",
+  "version": "0.9.35",
   "description": "Track films and series in your Obsidian vault with TMDB metadata. Mobile-first.",
   "main": "main.js",
   "scripts": {
@@ -56,7 +56,7 @@
     "test:dailynote": "esbuild tests/dailynote.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.dailynote.cjs --log-level=error && node tests/.dailynote.cjs",
     "test:danger": "esbuild tests/danger.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.danger.cjs --log-level=error && node tests/.danger.cjs",
     "test:contrast": "esbuild tests/contrast.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.contrast.cjs --log-level=error && node tests/.contrast.cjs",
-		"test:host": "esbuild tests/host.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.host.cjs --log-level=error && node tests/.host.cjs"
+    "test:host": "esbuild tests/host.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.host.cjs --log-level=error && node tests/.host.cjs"
   },
   "keywords": [
     "obsidian",
