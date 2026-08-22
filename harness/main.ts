@@ -48,6 +48,13 @@ let noKeys = false;
  * sign-in not yet done.
  */
 const missing = new Set<string>();
+/*
+ * ...and keys a scene wants present that the default stub withholds.
+ *
+ * Mastodon is reported absent by default so the settings screen has one
+ * unconfigured feature to draw. Its own guide needs the opposite.
+ */
+const present = new Set<string>();
 
 /*
  * A fixed clock for the health fixtures.
@@ -451,7 +458,7 @@ const plugin = {
 	 * ever presses anything.
 	 */
 	credentials: {
-		has: (name: string) => name !== "mastodon" && !missing.has(name) && !noKeys,
+		has: (name: string) => (present.has(name) || name !== "mastodon") && !missing.has(name) && !noKeys,
 		isUnlocked: true,
 		hasStoredKey: true,
 		store: async () => true,
@@ -1475,6 +1482,33 @@ function setupsheet(root: HTMLElement): void {
 	}
 }
 
+/**
+ * A guide with nothing left to do, for a feature that is not Trakt.
+ *
+ * Two gaps in one scene. Every guide rendered until now has been Trakt's, so
+ * five of the six had never been drawn at all — and Mastodon's is the one with
+ * a different shape underneath it, a server address that is not a credential
+ * sitting above a token that is.
+ *
+ * And it is finished, which is the state the new step ticks create and the one
+ * with the obvious risk: five ticked, dimmed rows in a column is exactly what a
+ * disabled screen looks like. Worth being able to see.
+ */
+function setupdone(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const spec = FEATURES.find((f) => f.id === "mastodon");
+	if (!spec) throw new Error("harness: no mastodon feature spec");
+	present.add("mastodon");
+	const before = plugin.settings.mastodonHost;
+	plugin.settings.mastodonHost = "mastodon.social";
+	try {
+		mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+	} finally {
+		present.delete("mastodon");
+		plugin.settings.mastodonHost = before;
+	}
+}
+
 function settings(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const before = { ...plugin.settings };
@@ -1587,6 +1621,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	settings,
 	firstrun,
 	setupsheet,
+	setupdone,
 	longshow,
 	quick,
 };

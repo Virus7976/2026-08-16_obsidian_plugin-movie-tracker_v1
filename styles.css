@@ -15367,6 +15367,24 @@ button.reel-facet-tab {
 	gap: var(--reel-space-3);
 }
 
+/*
+ * Instructions you have already followed, folded away but not removed.
+ *
+ * `align-self: flex-start` for the same reason as every other button on this
+ * screen: it is sized to its own words, and a column of full-width buttons is
+ * what this sheet looked like before the accent was rationed. Plain, not a
+ * call to action — on a finished guide the thing worth pressing is Check now.
+ */
+.reel-setup-steps-toggle {
+	align-self: flex-start;
+	flex: 0 0 auto;
+	margin-inline: var(--reel-space-3);
+}
+
+.reel-setup-steps.is-collapsed {
+	display: none;
+}
+
 .reel-setup-step {
 	padding: var(--reel-space-3);
 	border: 1px solid var(--background-modifier-border);

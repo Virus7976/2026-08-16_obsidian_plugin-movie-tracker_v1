@@ -240,8 +240,47 @@ export class SetupSheet extends Modal {
 		);
 	}
 
+	/**
+	 * The instructions, folded away once there is nothing left to follow.
+	 *
+	 * Opening a guide for a feature that is already working is a normal thing
+	 * to do — it is where the status lives, and the Check now button, and the
+	 * field you would use to replace a key. What you are not doing is reading
+	 * how to create the account, and five completed steps between you and the
+	 * three things you came for is a wall of settled questions.
+	 *
+	 * The settings list already reasons this way about its own descriptions: a
+	 * pitch is for something you have not bought yet. This is the same rule one
+	 * screen further in.
+	 *
+	 * Folded, never dropped. Making a second token a year from now means
+	 * reading them again, and a guide that has quietly stopped containing its
+	 * own guide would be a worse answer than a long screen.
+	 */
 	private renderSteps(root: HTMLElement): void {
-		const list = root.createEl("ol", { cls: "reel-setup-steps" });
+		const total = this.spec.steps.length;
+		const allDone = total > 0 && this.spec.steps.every((_, i) => this.ticked.has(i));
+
+		if (!allDone) {
+			const open = root.createEl("ol", { cls: "reel-setup-steps" });
+			this.spec.steps.forEach((step, i) => this.renderStep(open, step, i));
+			return;
+		}
+
+		const toggle = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
+		const list = root.createEl("ol", { cls: "reel-setup-steps is-collapsed" });
+
+		const label = (): void => {
+			const shown = !list.classList.contains("is-collapsed");
+			toggle.setText(shown ? "Hide the steps" : `All ${total} steps done — show them`);
+			toggle.setAttr("aria-expanded", String(shown));
+		};
+		toggle.addEventListener("click", () => {
+			list.classList.toggle("is-collapsed");
+			label();
+		});
+		label();
+
 		this.spec.steps.forEach((step, i) => this.renderStep(list, step, i));
 	}
 

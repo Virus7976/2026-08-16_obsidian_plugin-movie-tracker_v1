@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.18",
+		date: "2026-08-22",
+		headline: "A guide for something already working opens on the parts you came for.",
+		changes: [
+			{
+				kind: "better",
+				text: "Once every step of a guide is done, the steps fold away behind a line saying so.",
+				note: "Opening a guide for a working feature is normal — it is where the status lives, and the check button, and the field you would use to replace a key. What you are not doing is reading how to create the account. The whole thing now fits one screen instead of three thousand pixels of settled questions.",
+			},
+			{
+				kind: "better",
+				text: "Folded, never dropped. Making a second token a year from now means reading them again.",
+			},
+		],
+	},
+	{
 		version: "0.9.17",
 		date: "2026-08-22",
 		headline: "A guide you come back to knows which steps you already finished.",

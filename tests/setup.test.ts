@@ -256,6 +256,18 @@ ok("somebody else's key proves nothing", completedSteps(traktSpec, (k) => k === 
  */
 for (const f of FEATURES) {
 	ok(`${f.id}: at least one step produces something checkable`, f.steps.some((st) => st.key));
+
+	/*
+	 * And it has to be the *last* one, or a finished guide can never know it
+	 * is finished.
+	 *
+	 * The steps fold away once every one of them is done, which is decided by
+	 * whether the final index is accounted for. A guide whose last step is
+	 * "now go and turn it on" with no credential behind it would count as
+	 * permanently unfinished and keep showing five completed instructions
+	 * above the two things you actually opened it for.
+	 */
+	ok(`${f.id}: the last step is the one that proves it`, Boolean(f.steps[f.steps.length - 1]?.key));
 	// A step may only claim a key the feature actually uses.
 	for (const st of f.steps) {
 		if (!st.key) continue;

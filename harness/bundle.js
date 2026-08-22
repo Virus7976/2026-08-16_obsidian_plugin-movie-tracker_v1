@@ -8564,8 +8564,43 @@ ${body}
         Date.now()
       );
     }
+    /**
+     * The instructions, folded away once there is nothing left to follow.
+     *
+     * Opening a guide for a feature that is already working is a normal thing
+     * to do — it is where the status lives, and the Check now button, and the
+     * field you would use to replace a key. What you are not doing is reading
+     * how to create the account, and five completed steps between you and the
+     * three things you came for is a wall of settled questions.
+     *
+     * The settings list already reasons this way about its own descriptions: a
+     * pitch is for something you have not bought yet. This is the same rule one
+     * screen further in.
+     *
+     * Folded, never dropped. Making a second token a year from now means
+     * reading them again, and a guide that has quietly stopped containing its
+     * own guide would be a worse answer than a long screen.
+     */
     renderSteps(root) {
-      const list2 = root.createEl("ol", { cls: "reel-setup-steps" });
+      const total = this.spec.steps.length;
+      const allDone = total > 0 && this.spec.steps.every((_, i) => this.ticked.has(i));
+      if (!allDone) {
+        const open = root.createEl("ol", { cls: "reel-setup-steps" });
+        this.spec.steps.forEach((step, i) => this.renderStep(open, step, i));
+        return;
+      }
+      const toggle2 = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
+      const list2 = root.createEl("ol", { cls: "reel-setup-steps is-collapsed" });
+      const label = () => {
+        const shown2 = !list2.classList.contains("is-collapsed");
+        toggle2.setText(shown2 ? "Hide the steps" : `All ${total} steps done \u2014 show them`);
+        toggle2.setAttr("aria-expanded", String(shown2));
+      };
+      toggle2.addEventListener("click", () => {
+        list2.classList.toggle("is-collapsed");
+        label();
+      });
+      label();
       this.spec.steps.forEach((step, i) => this.renderStep(list2, step, i));
     }
     renderStep(list2, step, i) {
@@ -10995,6 +11030,7 @@ ${body}
   // harness/main.ts
   var noKeys = false;
   var missing = /* @__PURE__ */ new Set();
+  var present = /* @__PURE__ */ new Set();
   var FIXED_NOW = Date.now();
   function poster(title) {
     let h = 0;
@@ -11301,7 +11337,7 @@ ${body}
      * ever presses anything.
      */
     credentials: {
-      has: (name) => name !== "mastodon" && !missing.has(name) && !noKeys,
+      has: (name) => (present.has(name) || name !== "mastodon") && !missing.has(name) && !noKeys,
       isUnlocked: true,
       hasStoredKey: true,
       store: async () => true,
@@ -11954,6 +11990,21 @@ ${body}
       missing.delete("trakt");
     }
   }
+  function setupdone(root) {
+    root.addClass("reel-view-body");
+    const spec = FEATURES.find((f) => f.id === "mastodon");
+    if (!spec)
+      throw new Error("harness: no mastodon feature spec");
+    present.add("mastodon");
+    const before = plugin.settings.mastodonHost;
+    plugin.settings.mastodonHost = "mastodon.social";
+    try {
+      mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+    } finally {
+      present.delete("mastodon");
+      plugin.settings.mastodonHost = before;
+    }
+  }
   function settings(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12055,6 +12106,7 @@ ${body}
     settings,
     firstrun,
     setupsheet,
+    setupdone,
     longshow,
     quick
   };
