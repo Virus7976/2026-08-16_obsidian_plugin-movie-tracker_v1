@@ -20,6 +20,8 @@
  * for character carry no stray whitespace.
  */
 
+import { readFileSync } from "fs";
+import { join } from "path";
 import { FEATURES, isConfigured, isPartial, setupState } from "../src/setup";
 import { READ_KEYS, WRITE_KEYS, KeyName } from "../src/credentials";
 
@@ -169,6 +171,43 @@ ok("a half-configured feature is partial", some.partial.map((f) => f.id).join() 
 ok(
 	"every optional feature lands in exactly one bucket",
 	some.done.length + some.partial.length + some.todo.length === FEATURES.length - 1
+);
+
+/* ---- a guide that says "below" must have something below ------------- */
+
+/*
+ * Every one of the six guides ends by telling you to paste something below:
+ * the key, the client ID and secret, the server address. There was nothing
+ * below. A guide is a sheet opened on top of the settings screen, containing a
+ * title, numbered steps and a button that closes it — so the field each
+ * walkthrough pointed at was on the screen underneath the thing saying "look
+ * down".
+ *
+ * Right about what to do, wrong about where, which is the worst combination:
+ * it reads as correct, and following it means abandoning the walkthrough
+ * halfway to hunt for a control among forty-nine others.
+ *
+ * Checked against the source of `setupFields` rather than by rendering it,
+ * because the fault was never in the rendering — it was that no branch
+ * existed at all.
+ */
+const fieldsSrc = readFileSync(join(__dirname, "..", "src", "ui", "fields.ts"), "utf8");
+
+for (const spec of FEATURES) {
+	const pointsDown = spec.steps.some((s) => s.text.toLowerCase().includes("below"));
+	if (!pointsDown) continue;
+	ok(
+		`${spec.id}: the guide says "below" and has a field there`,
+		new RegExp(`case "${spec.id}":`).test(fieldsSrc),
+		`a step tells you to paste something below, and setupFields has no branch for ${spec.id}`
+	);
+}
+
+// If the wording ever stops saying "below", the loop above would pass by
+// checking nothing at all.
+ok(
+	"the guides do still say it",
+	FEATURES.filter((f) => f.steps.some((s) => s.text.toLowerCase().includes("below"))).length >= 5
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

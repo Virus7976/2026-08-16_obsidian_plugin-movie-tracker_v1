@@ -386,10 +386,41 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	 * whatever it opens with has to be on screen when it opens.
 	 */
 	if (opts.keyboard) {
+		/*
+		 * "Whatever it opens with" was implemented as "the first field in the
+		 * DOM", and those are the same thing only for a sheet short enough not
+		 * to scroll — which every sheet in Reel was, until the setup guides
+		 * started carrying the fields their steps had always pointed at.
+		 *
+		 * A guide is a document: five numbered steps, then the box you paste
+		 * into. Its field is 1,400px down by design, because you read the
+		 * instructions before you have anything to paste, and no arrangement
+		 * puts both on a 432px screen. Demanding it be visible at rest would
+		 * force the field above the instructions explaining how to get it.
+		 *
+		 * So the rule now applies to the sheet's opening screenful, which is
+		 * what the paragraph above always said. The four bugs this caught were
+		 * all short sheets whose single field was pushed under the keyboard;
+		 * those sheets do not scroll, so they are still checked exactly as
+		 * before.
+		 */
+		const opensWith = (el: HTMLElement, modal: HTMLElement): boolean => {
+			let box: HTMLElement | null = el.parentElement;
+			while (box && box !== modal.parentElement && box.scrollHeight <= box.clientHeight + 1) {
+				box = box.parentElement;
+			}
+			// Nothing scrolls: the sheet shows all it has, so all of it counts.
+			if (!box || box.scrollHeight <= box.clientHeight + 1) return true;
+			const offset = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+			return offset < box.clientHeight;
+		};
+
 		const unreachable: string[] = [];
+		const stranded: string[] = [];
 		for (const modal of Array.from(view.querySelectorAll<HTMLElement>(".reel-modal"))) {
 			const field = modal.querySelector<HTMLElement>("input, textarea");
 			const action = modal.querySelector<HTMLElement>(".mod-cta");
+			let scrolled = false;
 			for (const el of [field, action]) {
 				if (!el || !shown(el)) continue;
 				const r = el.getBoundingClientRect();
@@ -397,12 +428,31 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 				// Fully on screen, not merely overlapping it. Half a button is
 				// not a button you can be sure you pressed.
 				if (r.top >= 0 && r.bottom <= window.innerHeight) continue;
+				if (!opensWith(el, modal)) {
+					scrolled = true;
+					continue;
+				}
 				unreachable.push(
 					`${el.className.split(" ")[0] || el.tagName} at y ${Math.round(r.top)}..${Math.round(r.bottom)} of ${window.innerHeight}`
 				);
 			}
+
+			/*
+			 * Excusing the document sheet costs a guarantee, so it is replaced
+			 * rather than dropped: if the thing you act with is below the fold,
+			 * *something* you can act with has to be on screen anyway. That is
+			 * what the guides' sticky footer is for, and it is now checked
+			 * rather than assumed.
+			 */
+			if (!scrolled) continue;
+			const reachable = Array.from(modal.querySelectorAll<HTMLElement>(".mod-cta")).some((b) => {
+				const r = b.getBoundingClientRect();
+				return shown(b) && r.height >= 2 && r.top >= 0 && r.bottom <= window.innerHeight;
+			});
+			if (!reachable) stranded.push(modal.className.split(" ")[1] || modal.className.split(" ")[0] || "modal");
 		}
 		check("typingVisible", unreachable.length === 0, unreachable.slice(0, 3).join(", "));
+		check("scrollingSheetHasAction", stranded.length === 0, stranded.slice(0, 3).join(", "));
 	}
 
 	/*

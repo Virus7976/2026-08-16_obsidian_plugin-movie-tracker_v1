@@ -36,6 +36,12 @@ const flag = (name, fallback) => {
 const dark = args.includes("--dark") ? 1 : 0;
 const height = Number(flag("h", 812));
 const expand = args.includes("--expand");
+/*
+ * Where to start the capture. The setup guide is 2,700px tall and the thing
+ * worth looking at was 2,258px down it, which a full-height shot renders at a
+ * scale where nothing is legible.
+ */
+const top = Number(flag("y", 0));
 const out = flag("out", join(ROOT, "shots", `${screen}${dark ? "-dark" : ""}-${height}.png`));
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
@@ -91,7 +97,9 @@ const browser = await puppeteer.launch({ executablePath: exe, headless: "new", a
 const page = await browser.newPage();
 // deviceScaleFactor 2, because a phone is a retina screen and half the things
 // worth looking at here are one or two pixels wide.
-await page.setViewport({ width: 375, height, deviceScaleFactor: 2 });
+// The viewport has to reach the region being cropped, or the clip lands past
+// the bottom of the page and returns a blank image.
+await page.setViewport({ width: 375, height: top + height, deviceScaleFactor: 2 });
 /*
  * What the page said on the way up.
  *
@@ -172,7 +180,9 @@ if (probe) {
 }
 
 await mkdir(dirname(out), { recursive: true });
-await page.screenshot({ path: out });
+await page.screenshot(
+	top > 0 ? { path: out, clip: { x: 0, y: top, width: page.viewport().width, height } } : { path: out }
+);
 console.log(out);
 
 await browser.close();

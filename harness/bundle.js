@@ -8124,6 +8124,167 @@ ${body}
     return ids.filter((id) => plugin2.settings.connectionHealth[id]?.ok === false);
   }
 
+  // src/ui/fields.ts
+  function keyField(el, ctx, name, label, desc, opts = {}) {
+    const store = ctx.plugin.credentials;
+    let input = null;
+    const setting = new Setting(el).setName(label).setDesc(desc).addText((t) => {
+      t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
+      t.inputEl.type = "password";
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      input = t.inputEl;
+    }).addButton(
+      (b) => b.setButtonText("Save").setCta().onClick(async () => {
+        const value = input?.value ?? "";
+        if (!value.trim()) {
+          new Notice("Reel: nothing to save.");
+          return;
+        }
+        const ok = await ctx.plugin.credentials.store(name, value);
+        if (input)
+          input.value = "";
+        new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
+        ctx.onChanged();
+      })
+    );
+    if (opts.remove && store.has(name)) {
+      setting.addButton(
+        (b) => b.setButtonText("Remove").onClick(async () => {
+          const ok = await confirm(ctx.app, {
+            title: `Remove the ${KEY_LABELS[name]} key`,
+            body: "Reel cannot recover it. You would need the original key again to re-add it.",
+            confirmText: "Remove",
+            danger: true
+          });
+          if (!ok)
+            return;
+          await ctx.plugin.credentials.remove(name);
+          new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
+          ctx.onChanged();
+        })
+      );
+    }
+  }
+  function traktAppField(el, ctx, opts = {}) {
+    const hasApp = ctx.plugin.credentials.has("traktApp");
+    let idEl = null;
+    let secretEl = null;
+    const setting = new Setting(el).setName("Trakt application").setDesc(
+      hasApp ? "Saved. Paste both again to replace them." : "From trakt.tv/oauth/applications. Both are stored with your other keys."
+    ).addText((t) => {
+      t.setPlaceholder("Client ID");
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      idEl = t.inputEl;
+    }).addText((t) => {
+      t.setPlaceholder("Client secret");
+      t.inputEl.type = "password";
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      secretEl = t.inputEl;
+    }).addButton(
+      (b) => b.setButtonText("Save").setCta().onClick(async () => {
+        const clientId = (idEl?.value ?? "").trim();
+        const clientSecret = (secretEl?.value ?? "").trim();
+        if (!clientId || !clientSecret) {
+          new Notice("Reel: both the client ID and the secret are needed.");
+          return;
+        }
+        const ok = await ctx.plugin.credentials.store(
+          "traktApp",
+          JSON.stringify({ id: clientId, secret: clientSecret })
+        );
+        if (idEl)
+          idEl.value = "";
+        if (secretEl)
+          secretEl.value = "";
+        new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
+        ctx.onChanged();
+      })
+    );
+    if (opts.remove && hasApp) {
+      setting.addButton(
+        (b) => b.setButtonText("Remove").onClick(async () => {
+          const ok = await confirm(ctx.app, {
+            title: "Remove the Trakt application",
+            body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
+            confirmText: "Remove",
+            danger: true
+          });
+          if (!ok)
+            return;
+          await ctx.plugin.credentials.remove("traktApp");
+          await ctx.plugin.credentials.remove("trakt");
+          new Notice("Reel: Trakt application removed.");
+          ctx.onChanged();
+        })
+      );
+    }
+  }
+  function traktSignInField(el, ctx) {
+    const hasApp = ctx.plugin.credentials.has("traktApp");
+    const signedIn = ctx.plugin.credentials.has("trakt");
+    new Setting(el).setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
+      hasApp ? "Trakt shows a short code. Type it on any device \u2014 Reel waits." : "Save the application above first; the sign-in needs it."
+    ).addButton((b) => {
+      b.setButtonText(signedIn ? "Sign in again" : "Sign in");
+      if (!signedIn)
+        b.setCta();
+      b.setDisabled(!hasApp);
+      b.onClick(async () => {
+        const app2 = await ctx.plugin.publish.app();
+        if (!app2) {
+          new Notice("Reel: couldn't read the Trakt application.");
+          return;
+        }
+        new TraktSignIn(ctx.app, ctx.plugin, app2, (ok) => {
+          if (ok)
+            ctx.onChanged();
+        }).open();
+      });
+    });
+  }
+  function mastodonHostField(el, ctx) {
+    new Setting(el).setName("Instance").setDesc("The server you post from, e.g. mastodon.social. Not a secret, so it isn't encrypted.").addText(
+      (t) => t.setPlaceholder("mastodon.social").setValue(ctx.plugin.settings.mastodonHost).onChange(
+        debounce(async (v) => {
+          ctx.plugin.settings.mastodonHost = normaliseHost(v);
+          await ctx.plugin.saveSettings();
+        }, 500)
+      )
+    );
+  }
+  function setupFields(el, ctx, spec) {
+    switch (spec.id) {
+      case "tmdb":
+        keyField(el, ctx, "tmdb", "TMDB key", "Pasted here, encrypted in your vault.");
+        return;
+      case "omdb":
+        keyField(el, ctx, "omdb", "OMDb key", "Pasted here, encrypted in your vault.");
+        return;
+      case "dtdd":
+        keyField(el, ctx, "dtdd", "DoesTheDogDie key", "Pasted here, encrypted in your vault.");
+        return;
+      case "openrouter":
+        keyField(el, ctx, "openrouter", "OpenRouter key", "Pasted here, encrypted in your vault.");
+        return;
+      case "trakt":
+        traktAppField(el, ctx);
+        traktSignInField(el, ctx);
+        return;
+      case "mastodon":
+        mastodonHostField(el, ctx);
+        keyField(el, ctx, "mastodon", "Access token", "The token from step 4, encrypted in your vault.");
+        return;
+      default:
+        return;
+    }
+  }
+
   // src/ai/models.ts
   var SLUG = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*(:[a-z0-9][a-z0-9._-]*)?$/;
   function slugProblem(raw) {
@@ -8236,16 +8397,48 @@ ${body}
       this.ticked = /* @__PURE__ */ new Set();
     }
     onOpen() {
-      const { contentEl, modalEl } = this;
+      const { modalEl } = this;
       modalEl.addClass("reel-modal");
       modalEl.addClass("reel-setup-modal");
       if (Platform.isPhone)
         modalEl.addClass("reel-modal-phone");
+      this.draw();
+    }
+    /**
+     * Redrawn in place after anything that changes the answer.
+     *
+     * Saving a key changes the state pill, the status line and whether the
+     * sign-in button is offered, and a guide that still described the state
+     * before you acted would be the same lie this plugin keeps finding: a
+     * screen reporting what it was told rather than what is.
+     */
+    draw() {
+      const { contentEl } = this;
       contentEl.empty();
       contentEl.addClass("reel-setup");
       this.renderHead(contentEl);
       this.renderSteps(contentEl);
+      this.renderFields(contentEl);
       this.renderFoot(contentEl);
+    }
+    /**
+     * The fields the steps have been pointing at all along.
+     *
+     * Every guide ends by telling you to paste something "below" and there was
+     * nothing below — the field was on the settings screen underneath the sheet
+     * saying "look down". The instruction was right about what to do and wrong
+     * about where, so following it meant abandoning the walkthrough halfway to
+     * go and find a control among forty-nine others.
+     *
+     * The same controls as the settings screen, not a copy of them: they live
+     * in `ui/fields` and both screens call it, so a key saved here is saved
+     * there and there is no second implementation to drift.
+     */
+    renderFields(root) {
+      const box = root.createDiv({ cls: "reel-setup-fields" });
+      setupFields(box, { app: this.app, plugin: this.plugin, onChanged: () => this.draw() }, this.spec);
+      if (!box.childElementCount)
+        box.remove();
     }
     /* ------------------------------------------------------------------ */
     renderHead(root) {
@@ -8899,18 +9092,18 @@ ${body}
           this.display();
         });
       });
-      const keyField = (name, label, desc) => this.keyField(el, name, label, desc);
-      keyField(
+      const keyField2 = (name, label, desc) => this.keyField(el, name, label, desc);
+      keyField2(
         "tmdb",
         "TMDB key or read access token",
         "Required. A v4 read access token (starts with eyJ) is preferred \u2014 it travels in an Authorization header rather than the URL, so it can't end up in a log."
       );
-      keyField(
+      keyField2(
         "omdb",
         "OMDb key",
         "Optional. Adds IMDb rating, Rotten Tomatoes and Metacritic. Free tier is 1,000 requests a day, which the response cache makes ample. omdbapi.com/apikey.aspx"
       );
-      keyField(
+      keyField2(
         "dtdd",
         "DoesTheDogDie key",
         "Optional, and the best available answer to content filtering \u2014 community votes per topic, so you can tell one scene from constant. Request a free key at doesthedogdie.com/api."
@@ -8991,47 +9184,18 @@ ${body}
      * copy of it would be a second place for the Remove confirmation to go
      * missing, or for "paste to replace" to quietly stop being true.
      */
+    /**
+     * Delegated to `ui/fields`, which the setup guides also use.
+     *
+     * These were private methods here, which is why every guide could tell you
+     * to paste a key "below" and have nothing below it — the field could not
+     * be drawn anywhere but on this screen.
+     */
     keyField(el, name, label, desc) {
-      const store = this.plugin.credentials;
-      let input = null;
-      const setting = new Setting(el).setName(label).setDesc(desc).addText((t) => {
-        t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
-        t.inputEl.type = "password";
-        t.inputEl.autocomplete = "off";
-        t.inputEl.spellcheck = false;
-        t.inputEl.addClass("reel-input");
-        input = t.inputEl;
-      }).addButton(
-        (b) => b.setButtonText("Save").setCta().onClick(async () => {
-          const value = input?.value ?? "";
-          if (!value.trim()) {
-            new Notice("Reel: nothing to save.");
-            return;
-          }
-          const ok = await this.plugin.credentials.store(name, value);
-          if (input)
-            input.value = "";
-          new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
-          this.display();
-        })
-      );
-      if (store.has(name)) {
-        setting.addButton(
-          (b) => b.setButtonText("Remove").onClick(async () => {
-            const ok = await confirm(this.app, {
-              title: `Remove the ${KEY_LABELS[name]} key`,
-              body: "Reel cannot recover it. You would need the original key again to re-add it.",
-              confirmText: "Remove",
-              danger: true
-            });
-            if (!ok)
-              return;
-            await this.plugin.credentials.remove(name);
-            new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
-            this.display();
-          })
-        );
-      }
+      keyField(el, this.fieldCtx(), name, label, desc, { remove: true });
+    }
+    fieldCtx() {
+      return { app: this.app, plugin: this.plugin, onChanged: () => this.display() };
     }
     /* ---------------------------------------------------------------- */
     /**
@@ -9137,60 +9301,7 @@ ${body}
           text: "Trakt needs an application of your own: trakt.tv/oauth/applications \u2192 New Application. Any name will do, and set the redirect URI to urn:ietf:wg:oauth:2.0:oob. Then paste its client ID and secret below."
         });
       }
-      let idEl = null;
-      let secretEl = null;
-      const setting = new Setting(el).setName("Trakt application").setDesc(
-        hasApp ? "Saved. Paste both again to replace them." : "From trakt.tv/oauth/applications. Both are stored with your other keys."
-      ).addText((t) => {
-        t.setPlaceholder("Client ID");
-        t.inputEl.autocomplete = "off";
-        t.inputEl.spellcheck = false;
-        t.inputEl.addClass("reel-input");
-        idEl = t.inputEl;
-      }).addText((t) => {
-        t.setPlaceholder("Client secret");
-        t.inputEl.type = "password";
-        t.inputEl.autocomplete = "off";
-        t.inputEl.spellcheck = false;
-        t.inputEl.addClass("reel-input");
-        secretEl = t.inputEl;
-      }).addButton(
-        (b) => b.setButtonText("Save").setCta().onClick(async () => {
-          const clientId = (idEl?.value ?? "").trim();
-          const clientSecret = (secretEl?.value ?? "").trim();
-          if (!clientId || !clientSecret) {
-            new Notice("Reel: both the client ID and the secret are needed.");
-            return;
-          }
-          const ok = await this.plugin.credentials.store(
-            "traktApp",
-            JSON.stringify({ id: clientId, secret: clientSecret })
-          );
-          if (idEl)
-            idEl.value = "";
-          if (secretEl)
-            secretEl.value = "";
-          new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
-          this.display();
-        })
-      );
-      if (hasApp) {
-        setting.addButton(
-          (b) => b.setButtonText("Remove").onClick(async () => {
-            const ok = await confirm(this.app, {
-              title: "Remove the Trakt application",
-              body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
-              confirmText: "Remove",
-              danger: true
-            });
-            if (!ok)
-              return;
-            await this.plugin.credentials.remove("traktApp");
-            await this.plugin.credentials.remove("trakt");
-            this.display();
-          })
-        );
-      }
+      traktAppField(el, this.fieldCtx(), { remove: true });
       if (!hasApp)
         return;
       const now = Date.now();
@@ -10486,10 +10597,22 @@ ${body}
     }
     check("touchTargets44", small.length === 0, [...worst].map(([k, d]) => `${k} ${d}`).join(", "));
     if (opts.keyboard) {
+      const opensWith = (el, modal) => {
+        let box = el.parentElement;
+        while (box && box !== modal.parentElement && box.scrollHeight <= box.clientHeight + 1) {
+          box = box.parentElement;
+        }
+        if (!box || box.scrollHeight <= box.clientHeight + 1)
+          return true;
+        const offset = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+        return offset < box.clientHeight;
+      };
       const unreachable = [];
+      const stranded = [];
       for (const modal of Array.from(view.querySelectorAll(".reel-modal"))) {
         const field = modal.querySelector("input, textarea");
         const action = modal.querySelector(".mod-cta");
+        let scrolled = false;
         for (const el of [field, action]) {
           if (!el || !shown(el))
             continue;
@@ -10498,12 +10621,25 @@ ${body}
             continue;
           if (r.top >= 0 && r.bottom <= window.innerHeight)
             continue;
+          if (!opensWith(el, modal)) {
+            scrolled = true;
+            continue;
+          }
           unreachable.push(
             `${el.className.split(" ")[0] || el.tagName} at y ${Math.round(r.top)}..${Math.round(r.bottom)} of ${window.innerHeight}`
           );
         }
+        if (!scrolled)
+          continue;
+        const reachable = Array.from(modal.querySelectorAll(".mod-cta")).some((b) => {
+          const r = b.getBoundingClientRect();
+          return shown(b) && r.height >= 2 && r.top >= 0 && r.bottom <= window.innerHeight;
+        });
+        if (!reachable)
+          stranded.push(modal.className.split(" ")[1] || modal.className.split(" ")[0] || "modal");
       }
       check("typingVisible", unreachable.length === 0, unreachable.slice(0, 3).join(", "));
+      check("scrollingSheetHasAction", stranded.length === 0, stranded.slice(0, 3).join(", "));
     }
     const broken = [];
     for (const el of Array.from(view.querySelectorAll('[class*="error"], pre'))) {

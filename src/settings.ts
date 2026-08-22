@@ -8,6 +8,7 @@ import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
 import { checkAll } from "./checks";
+import { FieldContext, keyField, traktAppField } from "./ui/fields";
 import {
 	HealthMap,
 	HealthInputs,
@@ -996,52 +997,19 @@ export class ReelSettingTab extends PluginSettingTab {
 	 * copy of it would be a second place for the Remove confirmation to go
 	 * missing, or for "paste to replace" to quietly stop being true.
 	 */
+	/**
+	 * Delegated to `ui/fields`, which the setup guides also use.
+	 *
+	 * These were private methods here, which is why every guide could tell you
+	 * to paste a key "below" and have nothing below it — the field could not
+	 * be drawn anywhere but on this screen.
+	 */
 	private keyField(el: HTMLElement, name: KeyName, label: string, desc: string): void {
-		const store = this.plugin.credentials;
-		let input: HTMLInputElement | null = null;
-		const setting = new Setting(el)
-			.setName(label)
-			.setDesc(desc)
-			.addText((t) => {
-				t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
-				t.inputEl.type = "password";
-				t.inputEl.autocomplete = "off";
-				t.inputEl.spellcheck = false;
-				t.inputEl.addClass("reel-input");
-				input = t.inputEl;
-			})
-			.addButton((b) =>
-				b
-					.setButtonText("Save")
-					.setCta()
-					.onClick(async () => {
-						const value = input?.value ?? "";
-						if (!value.trim()) {
-							new Notice("Reel: nothing to save.");
-							return;
-						}
-						const ok = await this.plugin.credentials.store(name, value);
-						if (input) input.value = "";
-						new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
-						this.display();
-					})
-			);
-		if (store.has(name)) {
-			setting.addButton((b) =>
-				b.setButtonText("Remove").onClick(async () => {
-					const ok = await confirm(this.app, {
-						title: `Remove the ${KEY_LABELS[name]} key`,
-						body: "Reel cannot recover it. You would need the original key again to re-add it.",
-						confirmText: "Remove",
-						danger: true,
-					});
-					if (!ok) return;
-					await this.plugin.credentials.remove(name);
-					new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
-					this.display();
-				})
-			);
-		}
+		keyField(el, this.fieldCtx(), name, label, desc, { remove: true });
+	}
+
+	private fieldCtx(): FieldContext {
+		return { app: this.app, plugin: this.plugin, onChanged: () => this.display() };
 	}
 
 	/* ---------------------------------------------------------------- */
@@ -1194,69 +1162,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			});
 		}
 
-		let idEl: HTMLInputElement | null = null;
-		let secretEl: HTMLInputElement | null = null;
-
-		const setting = new Setting(el)
-			.setName("Trakt application")
-			.setDesc(
-				hasApp
-					? "Saved. Paste both again to replace them."
-					: "From trakt.tv/oauth/applications. Both are stored with your other keys."
-			)
-			.addText((t) => {
-				t.setPlaceholder("Client ID");
-				t.inputEl.autocomplete = "off";
-				t.inputEl.spellcheck = false;
-				t.inputEl.addClass("reel-input");
-				idEl = t.inputEl;
-			})
-			.addText((t) => {
-				t.setPlaceholder("Client secret");
-				t.inputEl.type = "password";
-				t.inputEl.autocomplete = "off";
-				t.inputEl.spellcheck = false;
-				t.inputEl.addClass("reel-input");
-				secretEl = t.inputEl;
-			})
-			.addButton((b) =>
-				b
-					.setButtonText("Save")
-					.setCta()
-					.onClick(async () => {
-						const clientId = (idEl?.value ?? "").trim();
-						const clientSecret = (secretEl?.value ?? "").trim();
-						if (!clientId || !clientSecret) {
-							new Notice("Reel: both the client ID and the secret are needed.");
-							return;
-						}
-						const ok = await this.plugin.credentials.store(
-							"traktApp",
-							JSON.stringify({ id: clientId, secret: clientSecret })
-						);
-						if (idEl) idEl.value = "";
-						if (secretEl) secretEl.value = "";
-						new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
-						this.display();
-					})
-			);
-
-		if (hasApp) {
-			setting.addButton((b) =>
-				b.setButtonText("Remove").onClick(async () => {
-					const ok = await confirm(this.app, {
-						title: "Remove the Trakt application",
-						body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
-						confirmText: "Remove",
-						danger: true,
-					});
-					if (!ok) return;
-					await this.plugin.credentials.remove("traktApp");
-					await this.plugin.credentials.remove("trakt");
-					this.display();
-				})
-			);
-		}
+		traktAppField(el, this.fieldCtx(), { remove: true });
 
 		if (!hasApp) return;
 

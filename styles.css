@@ -14884,21 +14884,34 @@ button.reel-facet-tab {
  * Two classes so this outranks a theme's `button:not(button.clickable-icon)`,
  * which is (0,1,2) and would otherwise win on source order.
  */
-.reel-settings .setting-item-control input[type="text"],
-.reel-settings .setting-item-control input[type="password"],
-.reel-settings .setting-item-control textarea,
-.reel-settings .setting-item-control select,
-.reel-settings .setting-item-control button {
+/*
+ * The same floor wherever these controls are drawn.
+ *
+ * This was written for `.reel-settings` and the guarantee lived on the screen
+ * rather than on the controls, so the moment the setup guides started
+ * rendering the same fields they silently lost it — 41px buttons, caught by
+ * the audit on six of eight passes, in a sheet whose whole job is to be the
+ * easy way to set something up on a phone.
+ *
+ * `:is()` takes the specificity of its most specific argument, so this is
+ * still (0,2,1) and still outranks a theme's `button:not(button.clickable-icon)`,
+ * which is what the two classes were for.
+ */
+:is(.reel-settings, .reel-setup) .setting-item-control input[type="text"],
+:is(.reel-settings, .reel-setup) .setting-item-control input[type="password"],
+:is(.reel-settings, .reel-setup) .setting-item-control textarea,
+:is(.reel-settings, .reel-setup) .setting-item-control select,
+:is(.reel-settings, .reel-setup) .setting-item-control button {
 	min-height: 44px;
 	border-radius: var(--reel-radius-sm);
 }
 
-.reel-settings .setting-item-control button {
+:is(.reel-settings, .reel-setup) .setting-item-control button {
 	padding-inline: var(--reel-space-3);
 }
 
 /* The toggle is a fixed-size pill; the target around it is what grows. */
-.reel-settings .setting-item-control .checkbox-container {
+:is(.reel-settings, .reel-setup) .setting-item-control .checkbox-container {
 	margin: 11px 0;
 }
 
@@ -14910,19 +14923,19 @@ button.reel-facet-tab {
  * never lands and a text field is squeezed to a stub beside its own name.
  */
 @container (max-width: 480px) {
-	.reel-settings .setting-item {
+	:is(.reel-settings, .reel-setup) .setting-item {
 		flex-direction: column;
 		align-items: stretch;
 	}
 
-	.reel-settings .setting-item-control {
+	:is(.reel-settings, .reel-setup) .setting-item-control {
 		width: 100%;
 		justify-content: flex-start;
 	}
 
-	.reel-settings .setting-item-control input[type="text"],
-	.reel-settings .setting-item-control input[type="password"],
-	.reel-settings .setting-item-control select {
+	:is(.reel-settings, .reel-setup) .setting-item-control input[type="text"],
+	:is(.reel-settings, .reel-setup) .setting-item-control input[type="password"],
+	:is(.reel-settings, .reel-setup) .setting-item-control select {
 		flex: 1 1 auto;
 		min-width: 0;
 	}
@@ -15239,6 +15252,12 @@ button.reel-facet-tab {
 	display: flex;
 	flex-direction: column;
 	gap: var(--reel-space-3);
+	/*
+	 * Declared so the control layout above can respond to *this sheet's* width
+	 * rather than the window's. Without it the container query silently never
+	 * matches here, and a field keeps its desktop layout in a 375px sheet.
+	 */
+	container-type: inline-size;
 }
 
 /*
@@ -15961,6 +15980,19 @@ button.reel-facet-tab {
  * accent was rationed, and "Check now" is not the primary action here; the way
  * out of the guide is.
  */
+/*
+ * The fields the steps point at, inset like everything else on the screen.
+ *
+ * Obsidian's `.setting-item` brings its own vertical padding and no horizontal
+ * padding at all, which is right on a settings tab that supplies its own and
+ * wrong here — dropped straight into a sheet it puts the label and both inputs
+ * flush against the edges of the phone. Exactly the fault just fixed in the
+ * head of this same screen, reintroduced by the block added underneath it.
+ */
+.reel-setup-fields {
+	padding-inline: var(--reel-space-3);
+}
+
 .reel-setup-check {
 	display: flex;
 	flex-direction: column;

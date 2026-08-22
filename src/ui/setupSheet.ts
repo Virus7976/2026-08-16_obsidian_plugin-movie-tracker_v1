@@ -44,6 +44,7 @@ import type { FeatureSpec, SetupStep } from "../setup";
 import { isConfigured, isPartial } from "../setup";
 import { featureHealth } from "../health";
 import { checkFeature, checkable } from "../checks";
+import { setupFields } from "./fields";
 
 export class SetupSheet extends Modal {
 	private ticked = new Set<number>();
@@ -58,16 +59,50 @@ export class SetupSheet extends Modal {
 	}
 
 	onOpen(): void {
-		const { contentEl, modalEl } = this;
+		const { modalEl } = this;
 		modalEl.addClass("reel-modal");
 		modalEl.addClass("reel-setup-modal");
 		if (Platform.isPhone) modalEl.addClass("reel-modal-phone");
+		this.draw();
+	}
+
+	/**
+	 * Redrawn in place after anything that changes the answer.
+	 *
+	 * Saving a key changes the state pill, the status line and whether the
+	 * sign-in button is offered, and a guide that still described the state
+	 * before you acted would be the same lie this plugin keeps finding: a
+	 * screen reporting what it was told rather than what is.
+	 */
+	private draw(): void {
+		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass("reel-setup");
 
 		this.renderHead(contentEl);
 		this.renderSteps(contentEl);
+		this.renderFields(contentEl);
 		this.renderFoot(contentEl);
+	}
+
+	/**
+	 * The fields the steps have been pointing at all along.
+	 *
+	 * Every guide ends by telling you to paste something "below" and there was
+	 * nothing below — the field was on the settings screen underneath the sheet
+	 * saying "look down". The instruction was right about what to do and wrong
+	 * about where, so following it meant abandoning the walkthrough halfway to
+	 * go and find a control among forty-nine others.
+	 *
+	 * The same controls as the settings screen, not a copy of them: they live
+	 * in `ui/fields` and both screens call it, so a key saved here is saved
+	 * there and there is no second implementation to drift.
+	 */
+	private renderFields(root: HTMLElement): void {
+		const box = root.createDiv({ cls: "reel-setup-fields" });
+		setupFields(box, { app: this.app, plugin: this.plugin, onChanged: () => this.draw() }, this.spec);
+		// Nothing to draw for a feature that needs no credential of its own.
+		if (!box.childElementCount) box.remove();
 	}
 
 	/* ------------------------------------------------------------------ */

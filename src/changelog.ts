@@ -52,6 +52,27 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.14",
+		date: "2026-08-22",
+		headline: "Every guide told you to paste the key below. Now there is a below.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Setup guides now contain the fields their steps point at, so a walkthrough can be finished without leaving it.",
+				note: "All six guides ended by telling you to paste something below — the key, the client ID and secret, the server address — and there was nothing below. The field was on the settings screen underneath the sheet saying “look down”, so following the instruction meant abandoning the guide halfway and hunting for a control among forty-nine others.",
+			},
+			{
+				kind: "new",
+				text: "Trakt's sign-in and Mastodon's server address are in their guides too, so both can be set up start to finish in one place.",
+			},
+			{
+				kind: "fixed",
+				text: "Buttons and inputs in a guide are a full 44px again, and no longer sit flush against the edges of the phone.",
+				note: "The 44px floor was written for the settings screen rather than for the controls, so the moment the guides drew the same fields they silently lost it.",
+			},
+		],
+	},
+	{
 		version: "0.9.13",
 		date: "2026-08-22",
 		headline: "Every setup guide can now check itself, on the spot.",
