@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.8",
+		date: "2026-08-22",
+		headline: "Ask's model setting is checked as you type, and suggests models that work.",
+		changes: [
+			{
+				kind: "new",
+				text: "The model box says whether the slug is the right shape \u2014 a missing vendor, a pasted URL, a stray space, capitals.",
+				note: "Reel already caught a bad slug, but only at question time: you typed a question, waited, and were refused. The screen where the string was typed said nothing.",
+			},
+			{
+				kind: "new",
+				text: "Models are suggested underneath, with what each costs. \u201cLoad list\u201d fetches the current list from OpenRouter.",
+				note: "Before you fetch anything it offers three that suit the job, with a line on why. The job is ranking sixty one-line summaries against a sentence, which a small fast model does as well as a large one and far more cheaply.",
+			},
+			{
+				kind: "fixed",
+				text: "Folder suggestions had no spacing between them when there was more than one.",
+				note: "The container was missing its class, so every rule written for it \u2014 the row, the wrapping, the gaps \u2014 had never applied to anything. With a single suggestion it looked exactly right, which is why last release's screenshot did not catch it.",
+			},
+		],
+	},
+	{
 		version: "0.9.7",
 		date: "2026-08-22",
 		headline: "Settings now knows the difference between set up and working.",

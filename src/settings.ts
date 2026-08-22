@@ -9,6 +9,7 @@ import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
 import { HealthMap, TESTABLE, describeHealth, describeTrakt, traktState } from "./health";
+import { CURATED, ModelInfo, formatPrice, rankModels, slugProblem } from "./ai/models";
 import { redact } from "./secrets";
 import { SetupSheet } from "./ui/setupSheet";
 
@@ -296,6 +297,15 @@ export class ReelSettingTab extends PluginSettingTab {
 	constructor(app: App, private plugin: ReelPlugin) {
 		super(app, plugin);
 	}
+
+	/**
+	 * OpenRouter's model list, once somebody has asked for it.
+	 *
+	 * Not persisted. Prices and availability change, and a cached list is
+	 * exactly the sort of thing that goes quietly wrong months later; fetching
+	 * it costs one request and only when the button is pressed.
+	 */
+	private models: ModelInfo[] | null = null;
 
 	/** What the search box currently holds. Not persisted; a search is a moment. */
 	private query = "";
@@ -1306,22 +1316,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			"From openrouter.ai/keys. You pay OpenRouter directly; Reel shows what each question cost in tokens."
 		);
 
-		new Setting(el)
-			.setName("Model")
-			.setDesc(
-				"An OpenRouter model slug. The job is ranking sixty one-line summaries, which a small fast model does as well as a large one and far more cheaply."
-			)
-			.addText((t) =>
-				t
-					.setPlaceholder("anthropic/claude-3.5-haiku")
-					.setValue(this.plugin.settings.aiModel)
-					.onChange(
-						debounce(async (v: string) => {
-							this.plugin.settings.aiModel = v.trim() || DEFAULT_SETTINGS.aiModel;
-							await this.plugin.saveSettings();
-						}, 500)
-					)
-			);
+		this.modelField(el);
 
 		new Setting(el)
 			.setName("Shortlist size")
@@ -1448,7 +1443,15 @@ export class ReelSettingTab extends PluginSettingTab {
 		);
 
 		const status = document.createElement("div");
+		/*
+		 * The class matters. It was missing until 0.9.7, which meant every rule
+		 * written for this container — the flex row, the wrapping, the gap
+		 * between chips, hiding it when empty — had never applied to anything.
+		 * With a single suggestion the result was indistinguishable from
+		 * correct, which is exactly why a screenshot did not catch it.
+		 */
 		const list = document.createElement("div");
+		list.className = "reel-folder-suggest";
 
 		const refresh = (raw: string): void => {
 			const state = folderState(raw, vault.folders, vault.files);
@@ -1587,6 +1590,137 @@ export class ReelSettingTab extends PluginSettingTab {
 		}
 		if (!TESTABLE.includes(spec.id)) return null;
 		return describeHealth(this.plugin.settings.connectionHealth[spec.id], true, now);
+	}
+
+
+	/**
+	 * The model slug, with something checking it.
+	 *
+	 * It was a free-text box. Reel does report a bad slug — the client turns
+	 * OpenRouter's 404 into "No such model, check it in Settings" — but only
+	 * once you have typed a question and waited to be refused. The screen where
+	 * the string was typed, and where the answer would have saved the trip,
+	 * said nothing at all.
+	 *
+	 * Most of what goes wrong is visible in the string: the vendor left off, a
+	 * pasted URL, a name copied with its capitals. None of that needs the
+	 * network, and it is checked as you type.
+	 *
+	 * What it never claims is that a model does not exist. That is OpenRouter's
+	 * to say, and a check that guessed would reject every model released after
+	 * this release.
+	 */
+	private modelField(el: HTMLElement): void {
+		const wrap = el.createDiv({ cls: "reel-model-field" });
+		let input: HTMLInputElement | null = null;
+
+		const save = debounce(async (v: string) => {
+			this.plugin.settings.aiModel = v.trim() || DEFAULT_SETTINGS.aiModel;
+			await this.plugin.saveSettings();
+		}, 500);
+
+		const status = document.createElement("div");
+		/*
+		 * The class matters. It was missing until 0.9.7, which meant every rule
+		 * written for this container — the flex row, the wrapping, the gap
+		 * between chips, hiding it when empty — had never applied to anything.
+		 * With a single suggestion the result was indistinguishable from
+		 * correct, which is exactly why a screenshot did not catch it.
+		 */
+		const list = document.createElement("div");
+		list.className = "reel-folder-suggest";
+
+		const refresh = (raw: string): void => {
+			const problem = slugProblem(raw);
+			status.setText(problem ?? "Looks like a model slug");
+			status.className = `reel-folder-status is-${problem ? "warn" : "ok"}`;
+
+			list.empty();
+			/*
+			 * Suggestions from the live list once it has been fetched, and from
+			 * the curated one before that. The curated list will age; it exists
+			 * for the person staring at an empty box with no idea what belongs
+			 * in it, which is a worse problem than a slightly dated hint.
+			 */
+			const pool = this.models ?? CURATED.map((c) => ({ id: c.id, name: c.why, prompt: null, completion: null }));
+			const here = raw.trim().toLowerCase();
+			const notMe = (m: ModelInfo): boolean => m.id.toLowerCase() !== here;
+
+			/*
+			 * Unlike a folder, a model is never known to be right.
+			 *
+			 * The folder field stops suggesting once the path resolves, because
+			 * at that point the question is settled. Nothing here can settle it:
+			 * all Reel knows is that the string is well *shaped*, and
+			 * `anthropic/claude-3-haiku` is beautifully shaped and not a model.
+			 * So the alternatives stay on screen, which is also the answer to
+			 * the other question people have in this section — what else could
+			 * I be using, and what would it cost.
+			 */
+			let hits = rankModels(pool, raw).filter(notMe);
+			if (!hits.length) hits = rankModels(pool, "").filter(notMe);
+
+			for (const m of hits) {
+				const price = formatPrice(m.prompt);
+				const b = list.createEl("button", { cls: "reel-folder-chip" });
+				const top = b.createDiv();
+				top.createSpan({ text: m.id });
+				if (price) top.createSpan({ cls: "reel-model-price", text: ` · ${price}` });
+
+				/*
+				 * The subtitle carries different things in the two modes, on
+				 * purpose. For a fetched model it is OpenRouter's human name
+				 * ("Claude 3.5 Haiku"); for a curated one it is why that model
+				 * is being recommended, which is the entire value of carrying a
+				 * curated list rather than an empty box. Shown only when it
+				 * says something the slug does not.
+				 */
+				if (m.name && m.name !== m.id) b.createDiv({ cls: "reel-model-why", text: m.name });
+				b.setAttr("aria-label", `Use ${m.id}${price ? `, ${price} prompt tokens` : ""}`);
+				b.addEventListener("click", () => {
+					if (input) input.value = m.id;
+					refresh(m.id);
+					save(m.id);
+				});
+			}
+		};
+
+		new Setting(wrap)
+			.setName("Model")
+			.setDesc(
+				"An OpenRouter model slug. The job is ranking sixty one-line summaries, which a small fast model does as well as a large one and far more cheaply."
+			)
+			.addText((t) => {
+				t.setPlaceholder(DEFAULT_SETTINGS.aiModel)
+					.setValue(this.plugin.settings.aiModel)
+					.onChange((v) => {
+						refresh(v);
+						save(v);
+					});
+				t.inputEl.addClass("reel-input");
+				t.inputEl.spellcheck = false;
+				input = t.inputEl;
+			})
+			.addButton((b) =>
+				b.setButtonText(this.models ? "Reload" : "Load list").onClick(async () => {
+					b.setDisabled(true).setButtonText("Loading…");
+					const got = await this.plugin.ai.models();
+					b.setDisabled(false).setButtonText("Reload");
+					if (!got.length) {
+						new Notice("Reel: couldn't reach OpenRouter's model list.");
+						return;
+					}
+					this.models = got;
+					new Notice(`Reel: ${got.length} models available.`);
+					refresh(input?.value ?? this.plugin.settings.aiModel);
+				})
+			);
+
+		const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+		extra.appendChild(status);
+		extra.appendChild(list);
+
+		refresh(this.plugin.settings.aiModel);
 	}
 
 	private renderMetadata(el: HTMLElement): void {

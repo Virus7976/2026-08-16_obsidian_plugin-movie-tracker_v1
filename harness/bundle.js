@@ -8053,6 +8053,61 @@ ${body}
     }
   }
 
+  // src/ai/models.ts
+  var SLUG = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*(:[a-z0-9][a-z0-9._-]*)?$/;
+  function slugProblem(raw) {
+    const slug = raw.trim();
+    if (!slug)
+      return "Empty \u2014 Reel will use its default model";
+    if (/\s/.test(slug))
+      return "A model slug has no spaces in it";
+    if (/^https?:/i.test(slug))
+      return "That looks like a URL. A slug is just vendor/model";
+    if (!slug.includes("/"))
+      return "Missing the vendor \u2014 slugs look like vendor/model";
+    if (slug !== slug.toLowerCase())
+      return "Model slugs are lowercase";
+    if (!SLUG.test(slug))
+      return "That is not the shape of a model slug";
+    return null;
+  }
+  var CURATED = [
+    { id: "anthropic/claude-3.5-haiku", why: "Fast, cheap, reliable at structured output" },
+    { id: "openai/gpt-4o-mini", why: "Comparable and widely available" },
+    { id: "google/gemini-2.0-flash-001", why: "Cheapest of the three" }
+  ];
+  function formatPrice(perM) {
+    if (perM === null)
+      return "";
+    if (perM === 0)
+      return "free";
+    const digits = perM < 1 ? 3 : 2;
+    return `$${perM.toFixed(digits)}/M`;
+  }
+  function rankModels(all2, query, limit = 8) {
+    const q = query.trim().toLowerCase();
+    const cost = (m) => m.prompt === null ? Number.MAX_SAFE_INTEGER : m.prompt;
+    const byCost = (a, b) => cost(a) - cost(b) || a.id.localeCompare(b.id);
+    if (!q)
+      return [...all2].sort(byCost).slice(0, limit);
+    const rank2 = (m) => {
+      const id = m.id.toLowerCase();
+      if (id === q)
+        return 0;
+      if (id.startsWith(q))
+        return 1;
+      const [vendor, rest = ""] = id.split("/");
+      if (rest.startsWith(q))
+        return 2;
+      if (vendor.startsWith(q))
+        return 3;
+      if (id.includes(q) || m.name.toLowerCase().includes(q))
+        return 4;
+      return 99;
+    };
+    return all2.map((m) => ({ m, r: rank2(m) })).filter((x) => x.r < 99).sort((a, b) => a.r - b.r || byCost(a.m, b.m)).map((x) => x.m).slice(0, limit);
+  }
+
   // src/ui/setupSheet.ts
   var SetupSheet = class extends Modal {
     constructor(app2, plugin2, spec, onDone) {
@@ -8256,6 +8311,14 @@ ${body}
     constructor(app2, plugin2) {
       super(app2, plugin2);
       this.plugin = plugin2;
+      /**
+       * OpenRouter's model list, once somebody has asked for it.
+       *
+       * Not persisted. Prices and availability change, and a cached list is
+       * exactly the sort of thing that goes quietly wrong months later; fetching
+       * it costs one request and only when the button is pressed.
+       */
+      this.models = null;
       /** What the search box currently holds. Not persisted; a search is a moment. */
       this.query = "";
       /** Set at render time so the filter can ask a card what it is. */
@@ -9015,16 +9078,7 @@ ${body}
         "OpenRouter key",
         "From openrouter.ai/keys. You pay OpenRouter directly; Reel shows what each question cost in tokens."
       );
-      new Setting(el).setName("Model").setDesc(
-        "An OpenRouter model slug. The job is ranking sixty one-line summaries, which a small fast model does as well as a large one and far more cheaply."
-      ).addText(
-        (t) => t.setPlaceholder("anthropic/claude-3.5-haiku").setValue(this.plugin.settings.aiModel).onChange(
-          debounce(async (v) => {
-            this.plugin.settings.aiModel = v.trim() || DEFAULT_SETTINGS.aiModel;
-            await this.plugin.saveSettings();
-          }, 500)
-        )
-      );
+      this.modelField(el);
       new Setting(el).setName("Shortlist size").setDesc(
         "How many titles get sent for ranking. Larger casts a wider net and costs more per question; the filtering that chooses them runs over your whole library either way."
       ).addSlider(
@@ -9117,6 +9171,7 @@ ${body}
       );
       const status = document.createElement("div");
       const list2 = document.createElement("div");
+      list2.className = "reel-folder-suggest";
       const refresh = (raw) => {
         const state = folderState(raw, vault.folders, vault.files);
         const said = describeFolder(state, DEFAULT_SETTINGS[key]);
@@ -9201,6 +9256,91 @@ ${body}
       if (!TESTABLE.includes(spec.id))
         return null;
       return describeHealth(this.plugin.settings.connectionHealth[spec.id], true, now);
+    }
+    /**
+     * The model slug, with something checking it.
+     *
+     * It was a free-text box. Reel does report a bad slug — the client turns
+     * OpenRouter's 404 into "No such model, check it in Settings" — but only
+     * once you have typed a question and waited to be refused. The screen where
+     * the string was typed, and where the answer would have saved the trip,
+     * said nothing at all.
+     *
+     * Most of what goes wrong is visible in the string: the vendor left off, a
+     * pasted URL, a name copied with its capitals. None of that needs the
+     * network, and it is checked as you type.
+     *
+     * What it never claims is that a model does not exist. That is OpenRouter's
+     * to say, and a check that guessed would reject every model released after
+     * this release.
+     */
+    modelField(el) {
+      const wrap = el.createDiv({ cls: "reel-model-field" });
+      let input = null;
+      const save = debounce(async (v) => {
+        this.plugin.settings.aiModel = v.trim() || DEFAULT_SETTINGS.aiModel;
+        await this.plugin.saveSettings();
+      }, 500);
+      const status = document.createElement("div");
+      const list2 = document.createElement("div");
+      list2.className = "reel-folder-suggest";
+      const refresh = (raw) => {
+        const problem = slugProblem(raw);
+        status.setText(problem ?? "Looks like a model slug");
+        status.className = `reel-folder-status is-${problem ? "warn" : "ok"}`;
+        list2.empty();
+        const pool2 = this.models ?? CURATED.map((c) => ({ id: c.id, name: c.why, prompt: null, completion: null }));
+        const here = raw.trim().toLowerCase();
+        const notMe = (m) => m.id.toLowerCase() !== here;
+        let hits = rankModels(pool2, raw).filter(notMe);
+        if (!hits.length)
+          hits = rankModels(pool2, "").filter(notMe);
+        for (const m of hits) {
+          const price = formatPrice(m.prompt);
+          const b = list2.createEl("button", { cls: "reel-folder-chip" });
+          const top = b.createDiv();
+          top.createSpan({ text: m.id });
+          if (price)
+            top.createSpan({ cls: "reel-model-price", text: ` \xB7 ${price}` });
+          if (m.name && m.name !== m.id)
+            b.createDiv({ cls: "reel-model-why", text: m.name });
+          b.setAttr("aria-label", `Use ${m.id}${price ? `, ${price} prompt tokens` : ""}`);
+          b.addEventListener("click", () => {
+            if (input)
+              input.value = m.id;
+            refresh(m.id);
+            save(m.id);
+          });
+        }
+      };
+      new Setting(wrap).setName("Model").setDesc(
+        "An OpenRouter model slug. The job is ranking sixty one-line summaries, which a small fast model does as well as a large one and far more cheaply."
+      ).addText((t) => {
+        t.setPlaceholder(DEFAULT_SETTINGS.aiModel).setValue(this.plugin.settings.aiModel).onChange((v) => {
+          refresh(v);
+          save(v);
+        });
+        t.inputEl.addClass("reel-input");
+        t.inputEl.spellcheck = false;
+        input = t.inputEl;
+      }).addButton(
+        (b) => b.setButtonText(this.models ? "Reload" : "Load list").onClick(async () => {
+          b.setDisabled(true).setButtonText("Loading\u2026");
+          const got = await this.plugin.ai.models();
+          b.setDisabled(false).setButtonText("Reload");
+          if (!got.length) {
+            new Notice("Reel: couldn't reach OpenRouter's model list.");
+            return;
+          }
+          this.models = got;
+          new Notice(`Reel: ${got.length} models available.`);
+          refresh(input?.value ?? this.plugin.settings.aiModel);
+        })
+      );
+      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra.appendChild(status);
+      extra.appendChild(list2);
+      refresh(this.plugin.settings.aiModel);
     }
     renderMetadata(el) {
       new Setting(el).setName("Link people and use wikilinks").setDesc(
@@ -10623,7 +10763,15 @@ ${body}
         truncated: true
       })
     },
-    ai: { configured: true },
+    ai: {
+      configured: true,
+      /*
+       * No live model list in the rig. The picker's job before a fetch is to
+       * show its curated suggestions, and that is the state a new install is
+       * in — so it is the one worth measuring.
+       */
+      models: async () => []
+    },
     /*
      * Flipped by the first-run scene.
      *

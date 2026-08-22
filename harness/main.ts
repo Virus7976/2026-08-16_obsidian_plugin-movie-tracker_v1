@@ -341,7 +341,15 @@ const plugin = {
 			truncated: true,
 		}),
 	},
-	ai: { configured: true },
+	ai: {
+		configured: true,
+		/*
+		 * No live model list in the rig. The picker's job before a fetch is to
+		 * show its curated suggestions, and that is the state a new install is
+		 * in — so it is the one worth measuring.
+		 */
+		models: async () => [],
+	},
 	/*
 	 * Flipped by the first-run scene.
 	 *

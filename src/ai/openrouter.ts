@@ -29,8 +29,10 @@
 import { requestUrl } from "obsidian";
 import type ReelPlugin from "../main";
 import { redact } from "../secrets";
+import { ModelInfo, parseModels } from "./models";
 
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+const MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models";
 
 export class AiError extends Error {
 	constructor(
@@ -93,6 +95,44 @@ export class OpenRouterClient {
 			promptTokens: numberOr(raw.usage?.prompt_tokens),
 			completionTokens: numberOr(raw.usage?.completion_tokens),
 		};
+	}
+
+	/**
+	 * The models OpenRouter currently offers.
+	 *
+	 * Deliberately not routed through `send`, for two reasons that both matter.
+	 *
+	 * It does not require `aiEnabled`. You fetch the list in order to *choose a
+	 * model*, which is something you do while setting Ask up — before turning
+	 * it on. Guarding it the way a question is guarded would mean the picker
+	 * only worked once you no longer needed it.
+	 *
+	 * And it tolerates having no key. The endpoint is public; the key is sent
+	 * when there is one, because a signed request gets the models that account
+	 * can actually reach, but its absence is not an error to report.
+	 *
+	 * Returns an empty list on any failure rather than throwing. A model picker
+	 * that cannot reach the network should fall back to its suggestions, not
+	 * take the settings screen down with it.
+	 */
+	async models(): Promise<ModelInfo[]> {
+		const key = await this.plugin.credentials.getOptional("openrouter");
+		try {
+			const res = await requestUrl({
+				url: MODELS_ENDPOINT,
+				method: "GET",
+				headers: {
+					...(key ? { Authorization: `Bearer ${key}` } : {}),
+					"X-Title": "Obsidian Reel",
+				},
+				throw: false,
+			});
+			if (res.status >= 400) return [];
+			return parseModels(res.json);
+		} catch {
+			// Never surfaced, so never a place a key could leak into a message.
+			return [];
+		}
 	}
 
 	private async send(body: unknown): Promise<RawResponse> {

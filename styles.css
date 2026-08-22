@@ -15875,3 +15875,68 @@ button.reel-facet-tab {
 	color: var(--reel-warn);
 	border-left-color: var(--reel-warn);
 }
+
+
+/* ==================================================================== */
+/* The model field                                                      */
+/* ==================================================================== */
+
+/*
+ * Same shape as the folder field, for the same reason: a free-text box whose
+ * mistakes are visible in the string, next to a list of things that are known
+ * to work. It reuses the folder chip and status styles rather than restating
+ * them, because two controls that behave identically should not drift apart
+ * over the next three releases.
+ *
+ * The one real difference is width. A folder is "Movies"; a model is
+ * "anthropic/claude-3.5-haiku · $0.800/M", which does not fit on a pill on a
+ * 375px screen — and a truncated slug is worse than no slug, since the part
+ * that identifies the model is the part that gets cut.
+ */
+
+.reel-model-field {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.reel-settings .reel-model-field .setting-item {
+	border-top: none;
+}
+
+.reel-model-field .reel-folder-suggest {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+/* Full width, wrapping, left-aligned: a slug has to be readable in full. */
+.reel-settings .reel-model-field .reel-folder-chip {
+	justify-content: flex-start;
+	width: 100%;
+	max-width: 100%;
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border-radius: var(--reel-radius-sm);
+	white-space: normal;
+	overflow: visible;
+	text-overflow: clip;
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+
+.reel-model-price {
+	color: var(--text-muted);
+	font-family: var(--font-interface);
+}
+
+/*
+ * The line under a suggested model.
+ *
+ * Carries OpenRouter's human name for a fetched model, and the reason for a
+ * recommendation for a curated one — which is the whole point of shipping a
+ * curated list instead of an empty box.
+ */
+.reel-model-why {
+	margin-top: 2px;
+	font-family: var(--font-interface);
+	font-size: var(--font-ui-smaller);
+	font-weight: normal;
+	color: var(--text-muted);
+}
