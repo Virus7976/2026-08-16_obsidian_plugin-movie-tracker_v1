@@ -52,6 +52,32 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.24",
+		date: "2026-08-22",
+		headline: "Finishing a walkthrough now leaves you with a working feature.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The Trakt and Mastodon guides now contain the switch that turns publishing on.",
+				note: "You could paste a Trakt client ID and secret, complete the sign-in, watch all five steps tick and the status line turn green, close the guide, and find no Publish button anywhere — because the destination switch lived on the settings tab and defaults to off.",
+			},
+			{
+				kind: "better",
+				text: "Ask and Publish now open the relevant guide instead of dropping you in the settings tab.",
+				note: "Both screens knew exactly which feature was missing and threw that away to leave you hunting for one section among forty-nine controls.",
+			},
+			{
+				kind: "fixed",
+				text: "Opening Ask with a saved key and the switch off no longer tells you to add a key.",
+				note: "Being set up means two things — a key and the switch — and that screen treated it as one, so it gave the wrong instruction to the one person it could actually help.",
+			},
+			{
+				kind: "better",
+				text: "The publish sheet with nothing set up says what Trakt and Mastodon each do with your review.",
+			},
+		],
+	},
+	{
 		version: "0.9.23",
 		date: "2026-08-22",
 		headline: "The key storage dropdown now explains the mode you picked, not the one it was written for.",

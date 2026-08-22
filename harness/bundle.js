@@ -5095,6 +5095,986 @@ ${body}
     return text.trim().split(/\s+/).filter(Boolean).length;
   }
 
+  // src/setup.ts
+  var FEATURES = [
+    {
+      id: "tmdb",
+      name: "TMDB",
+      gives: "Everything. Posters, cast, runtimes, episode lists \u2014 Reel cannot add a title without it.",
+      essential: true,
+      effort: "2 minutes, free",
+      sends: "The title you search for, or its TMDB id. Nothing about your library.",
+      keys: ["tmdb"],
+      steps: [
+        {
+          text: "Create a free TMDB account, if you don't have one.",
+          url: "https://www.themoviedb.org/signup"
+        },
+        {
+          text: "Open your API settings and request a key. Pick \u201CDeveloper\u201D, and answer the form \u2014 any personal or hobby use is fine.",
+          url: "https://www.themoviedb.org/settings/api"
+        },
+        {
+          text: "Copy the API Read Access Token \u2014 the long one starting eyJ, not the short v3 key.",
+          note: "The token travels in a request header; the v3 key has to go in the URL, and URLs end up in logs. Reel accepts either, but this one is safer."
+        },
+        {
+          text: "Paste it below and press Save. You'll be asked for a passphrase \u2014 that encrypts the key inside your vault.",
+          key: "tmdb"
+        }
+      ]
+    },
+    {
+      id: "omdb",
+      name: "OMDb",
+      gives: "IMDb ratings, Rotten Tomatoes and Metacritic scores on every title.",
+      essential: false,
+      effort: "1 minute, free",
+      sends: "A film's IMDb id, when a note is created or refreshed.",
+      keys: ["omdb"],
+      steps: [
+        {
+          text: "Request a free key. The FREE tier is 1,000 requests a day, which Reel's cache makes ample.",
+          url: "https://www.omdbapi.com/apikey.aspx"
+        },
+        {
+          text: "Check your email and click the activation link. The key does not work until you do.",
+          note: "This one catches people out \u2014 the key arrives before it is active."
+        },
+        { text: "Paste the key below and press Save.", key: "omdb" }
+      ]
+    },
+    {
+      id: "dtdd",
+      name: "DoesTheDogDie",
+      gives: "Content warnings voted on per topic, so you can tell one upsetting scene from a film full of them.",
+      essential: false,
+      effort: "A few minutes, free \u2014 they approve by hand",
+      sends: "A film's title and year.",
+      keys: ["dtdd"],
+      steps: [
+        {
+          text: "Request an API key. Say what it's for \u2014 a personal Obsidian film tracker is a fine answer.",
+          url: "https://www.doesthedogdie.com/api"
+        },
+        {
+          text: "Wait for the reply. A person reads these, so it is not instant.",
+          note: "Everything else in Reel works meanwhile. Content filtering falls back to TMDB keywords until the key arrives."
+        },
+        { text: "Paste the key below and press Save.", key: "dtdd" }
+      ]
+    },
+    {
+      id: "openrouter",
+      name: "OpenRouter",
+      gives: "Ask \u2014 describe what you feel like watching and Reel finds it in your own library.",
+      essential: false,
+      effort: "2 minutes, and you pay per question",
+      sends: "Your question, plus a shortlist of titles from your library \u2014 names, years, genres, runtimes and your ratings. Never your reviews, your watch dates or your file paths.",
+      keys: ["openrouter"],
+      steps: [
+        { text: "Create an OpenRouter account.", url: "https://openrouter.ai/" },
+        {
+          text: "Add some credit. Questions cost a fraction of a penny each on the default model.",
+          url: "https://openrouter.ai/credits",
+          note: "Reel shows what every question cost in tokens, so this is checkable rather than a mystery bill."
+        },
+        { text: "Create an API key and copy it.", url: "https://openrouter.ai/keys" },
+        { text: "Paste it below, press Save, then turn Ask on.", key: "openrouter" }
+      ]
+    },
+    {
+      id: "trakt",
+      name: "Trakt",
+      gives: "Publishing a review to a public film profile, with your star rating alongside.",
+      essential: false,
+      effort: "5 minutes, free",
+      sends: "Only what you explicitly publish: one review's text, your rating, and the title's id. Nothing automatic.",
+      keys: ["traktApp", "trakt"],
+      steps: [
+        { text: "Create a Trakt account, if you don't have one.", url: "https://trakt.tv/auth/join" },
+        {
+          text: "Create an application. Any name will do \u2014 it is yours and nobody else sees it.",
+          url: "https://trakt.tv/oauth/applications/new",
+          note: "Reel asks you to register your own rather than shipping one, because Trakt's sign-in needs a client secret, and a secret compiled into an open-source plugin is printed in the repository for anyone to read."
+        },
+        {
+          text: "Set the Redirect URI to exactly this:",
+          copy: "urn:ietf:wg:oauth:2.0:oob",
+          note: "This is the standard value for an app with no website to return to. Getting it wrong is the usual reason sign-in fails."
+        },
+        {
+          text: "Save the application, then copy its Client ID and Client Secret into the two fields below.",
+          key: "traktApp"
+        },
+        {
+          text: "Press Sign in. Trakt shows a short code \u2014 type it on any device, and Reel waits for you.",
+          key: "trakt",
+          note: "No redirect back to the app is needed, which is what makes this work on a phone at all."
+        }
+      ]
+    },
+    {
+      id: "mastodon",
+      name: "Mastodon",
+      gives: "Publishing a review as a public post, with the title, your stars and the text.",
+      essential: false,
+      effort: "3 minutes, free",
+      sends: "Only what you explicitly publish: one post. Nothing automatic.",
+      keys: ["mastodon"],
+      steps: [
+        {
+          text: "Open your instance's development settings \u2014 that's your own server, e.g. mastodon.social/settings/applications.",
+          note: "Reel needs the server you post from; there is no central Mastodon."
+        },
+        { text: "Create a new application. Any name and website will do." },
+        {
+          text: "Tick only this scope, and untick the rest:",
+          copy: "write:statuses",
+          note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post."
+        },
+        { text: "Submit, open the application, and copy \u201CYour access token\u201D." },
+        { text: "Enter your instance's address and paste the token below.", key: "mastodon" }
+      ]
+    }
+  ];
+  function completedSteps(spec, has) {
+    let done = 0;
+    spec.steps.forEach((step, i) => {
+      if (step.key && has(step.key))
+        done = i + 1;
+    });
+    return done;
+  }
+  function isConfigured(plugin2, spec) {
+    return spec.keys.every((k) => plugin2.credentials.has(k));
+  }
+  function isPartial(plugin2, spec) {
+    if (isConfigured(plugin2, spec))
+      return false;
+    return spec.keys.some((k) => plugin2.credentials.has(k));
+  }
+  function setupState(plugin2) {
+    const essential = FEATURES.find((f) => f.essential);
+    const done = [];
+    const partial = [];
+    const todo = [];
+    for (const f of FEATURES) {
+      if (f.essential)
+        continue;
+      if (isConfigured(plugin2, f))
+        done.push(f);
+      else if (isPartial(plugin2, f))
+        partial.push(f);
+      else
+        todo.push(f);
+    }
+    return { done, partial, todo, blocked: !isConfigured(plugin2, essential), essential };
+  }
+
+  // src/health.ts
+  var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
+  var NEEDS_KEY_TO_CHECK = ["tmdb", "omdb", "dtdd", "openrouter", "trakt"];
+  var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
+  function ago(then, now) {
+    const ms = Math.max(0, now - then);
+    const min = Math.floor(ms / 6e4);
+    if (min < 1)
+      return "just now";
+    if (min < 60)
+      return `${min} minute${min === 1 ? "" : "s"} ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24)
+      return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 30)
+      return `${day} day${day === 1 ? "" : "s"} ago`;
+    const mon = Math.floor(day / 30);
+    return `${mon} month${mon === 1 ? "" : "s"} ago`;
+  }
+  function extra(rec, withProves = true) {
+    const said = [withProves ? rec.proves : "", rec.note].filter((s) => s && s.trim());
+    return said.length ? `. ${said.join(" ")}` : "";
+  }
+  function describeHealth(rec, configured, now) {
+    if (!configured)
+      return { text: "Not set up", tone: "info" };
+    if (!rec)
+      return { text: "Not checked yet", tone: "info" };
+    const when = ago(rec.at, now);
+    if (!rec.ok)
+      return { text: `Failed ${when}${rec.error ? ` \u2014 ${rec.error}` : ""}`, tone: "warn" };
+    if (rec.proves)
+      return { text: `Checked ${when}. ${rec.proves}${extra(rec, false)}`, tone: "info" };
+    if (now - rec.at > STALE_AFTER)
+      return { text: `Worked ${when}${extra(rec)}`, tone: "info" };
+    return { text: `Working \u2014 checked ${when}${extra(rec)}`, tone: "ok" };
+  }
+  var SOON = 7 * 24 * 60 * 60 * 1e3;
+  function traktState(hasToken, expires, now) {
+    if (!hasToken)
+      return { kind: "out" };
+    if (!expires)
+      return { kind: "unknown" };
+    if (expires <= now)
+      return { kind: "expired", expires };
+    if (expires - now < SOON)
+      return { kind: "soon", expires };
+    return { kind: "in", expires };
+  }
+  function describeTrakt(state, now, rec) {
+    if (rec && !rec.ok && state.kind !== "out") {
+      return { text: `Token refused ${ago(rec.at, now)} \u2014 sign in again`, tone: "warn" };
+    }
+    switch (state.kind) {
+      case "out":
+        return { text: "Not signed in", tone: "info" };
+      case "unknown":
+        return { text: "Signed in \u2014 Reel cannot tell when this expires", tone: "info" };
+      case "expired":
+        return { text: `Session expired ${ago(state.expires, now)} \u2014 sign in again`, tone: "warn" };
+      case "soon":
+        return { text: `Signed in \u2014 renews automatically this week${checked(rec, now)}`, tone: "ok" };
+      case "in":
+        return { text: `Signed in${checked(rec, now)}`, tone: "ok" };
+    }
+  }
+  function checked(rec, now) {
+    return rec?.ok ? `, checked ${ago(rec.at, now)}` : "";
+  }
+  function featureHealth(id, inputs, now) {
+    if (id === "trakt") {
+      return describeTrakt(traktState(inputs.hasTrakt, inputs.traktExpires, now), now, inputs.records.trakt);
+    }
+    if (!TESTABLE.includes(id))
+      return null;
+    const rec = inputs.records[id];
+    if (!rec && inputs.locked && NEEDS_KEY_TO_CHECK.includes(id)) {
+      return { text: "Keys are locked \u2014 unlock to check", tone: "info" };
+    }
+    return describeHealth(rec, true, now);
+  }
+
+  // src/publish/mastodon.ts
+  function normaliseHost(raw) {
+    let host = (raw ?? "").trim();
+    if (!host)
+      return "";
+    host = host.replace(/^https?:\/\//i, "");
+    host = host.split("/")[0];
+    if (host.includes("@"))
+      host = host.slice(host.lastIndexOf("@") + 1);
+    return host.toLowerCase();
+  }
+
+  // src/checks.ts
+  function checkable(plugin2, id) {
+    if (!TESTABLE.includes(id))
+      return false;
+    if (NEEDS_KEY_TO_CHECK.includes(id) && plugin2.credentials.needsUnlock)
+      return false;
+    switch (id) {
+      case "mastodon":
+        return Boolean(normaliseHost(plugin2.settings.mastodonHost));
+      default:
+        return plugin2.credentials.has(id);
+    }
+  }
+  async function run(plugin2, id) {
+    switch (id) {
+      case "tmdb":
+        return plugin2.tmdb.testCredentials();
+      case "omdb":
+        return plugin2.omdb.test();
+      case "dtdd":
+        return plugin2.dtdd.test();
+      case "openrouter":
+        return plugin2.ai.test();
+      case "mastodon":
+        return plugin2.publish.mastodon.test();
+      case "trakt":
+        return plugin2.publish.trakt.test();
+      default:
+        return { ok: false, error: "Nothing to check." };
+    }
+  }
+  async function checkFeature(plugin2, id, now) {
+    if (!checkable(plugin2, id))
+      return null;
+    let out;
+    try {
+      out = await run(plugin2, id);
+    } catch (e) {
+      out = { ok: false, error: redact(e) };
+    }
+    const rec = out.ok ? { at: now, ok: true, ...out.proves ? { proves: out.proves } : {}, ...out.note ? { note: out.note } : {} } : { at: now, ok: false, error: redact(out.error) };
+    plugin2.settings.connectionHealth[id] = rec;
+    return rec;
+  }
+  async function checkAll(plugin2, now) {
+    const ids = TESTABLE.filter((id) => checkable(plugin2, id));
+    await Promise.all(ids.map((id) => checkFeature(plugin2, id, now)));
+    await plugin2.saveSettings();
+    return ids.filter((id) => plugin2.settings.connectionHealth[id]?.ok === false);
+  }
+
+  // src/ui/confirm.ts
+  function confirm(app2, opts) {
+    return new Promise((resolve) => new ConfirmModal(app2, opts, resolve).open());
+  }
+  var ConfirmModal = class extends Modal {
+    constructor(app2, opts, done) {
+      super(app2);
+      this.opts = opts;
+      this.done = done;
+      this.answered = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: this.opts.title });
+      contentEl.createDiv({ cls: "reel-log-sub", text: this.opts.body });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.finish(false));
+      const go = actions.createEl("button", {
+        cls: this.opts.danger ? "reel-btn reel-btn-danger" : "reel-btn mod-cta",
+        text: this.opts.confirmText
+      });
+      go.addEventListener("click", () => this.finish(true));
+      cancel.focus();
+    }
+    finish(ok) {
+      this.answered = true;
+      this.done(ok);
+      this.close();
+    }
+    onClose() {
+      this.contentEl.empty();
+      if (!this.answered)
+        this.done(false);
+    }
+  };
+
+  // src/publish/trakt.ts
+  var ACTIVATE_URL = "https://trakt.tv/activate";
+
+  // src/ui/traktSignIn.ts
+  var TraktSignIn = class extends Modal {
+    constructor(app2, plugin2, app_, onDone) {
+      super(app2);
+      this.plugin = plugin2;
+      this.app_ = app_;
+      this.onDone = onDone;
+      this.stop = false;
+      this.device = null;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-trakt");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
+      contentEl.createDiv({ cls: "reel-log-sub", text: "Asking Trakt for a code\u2026" });
+      void this.begin();
+    }
+    async begin() {
+      try {
+        this.device = await this.plugin.publish.trakt.requestDeviceCode(this.app_);
+      } catch (e) {
+        this.fail(redact(e));
+        return;
+      }
+      this.renderCode(this.device);
+      void this.poll(this.device);
+    }
+    renderCode(device) {
+      const { contentEl } = this;
+      contentEl.empty();
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
+      const steps = contentEl.createDiv({ cls: "reel-trakt-steps" });
+      steps.createDiv({ cls: "reel-trakt-step", text: "1. Open this page on any device:" });
+      const link = steps.createEl("a", {
+        cls: "reel-trakt-url",
+        text: device.verificationUrl || ACTIVATE_URL,
+        href: device.verificationUrl || ACTIVATE_URL
+      });
+      link.setAttr("target", "_blank");
+      link.setAttr("rel", "noopener");
+      steps.createDiv({ cls: "reel-trakt-step", text: "2. Enter this code:" });
+      const code = steps.createEl("button", { cls: "reel-trakt-code", text: device.userCode });
+      code.setAttr("aria-label", `Code ${device.userCode.split("").join(" ")}. Tap to copy.`);
+      code.addEventListener("click", () => {
+        navigator.clipboard?.writeText(device.userCode).then(() => new Notice("Reel: code copied.")).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
+      });
+      const status = contentEl.createDiv({ cls: "reel-trakt-status" });
+      status.createDiv({ cls: "reel-ask-spinner" });
+      status.createSpan({ text: "Waiting for you to approve it\u2026" });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+    }
+    /**
+     * Ask, wait, ask again, until Trakt says yes, no, or too late.
+     *
+     * The deadline is Trakt's own `expires_in` rather than a fixed number of
+     * attempts, because the interval can be raised mid-flow by a 429 and a loop
+     * counting attempts would then give up early — while the user is still
+     * typing, having done nothing wrong.
+     */
+    async poll(device) {
+      let wait = Math.max(1, device.interval) * 1e3;
+      const deadline = Date.now() + Math.max(60, device.expiresIn) * 1e3;
+      while (!this.stop && Date.now() < deadline) {
+        await sleep(wait);
+        if (this.stop)
+          return;
+        let token;
+        try {
+          token = await this.plugin.publish.trakt.pollDeviceToken(this.app_, device.deviceCode);
+        } catch (e) {
+          this.fail(redact(e));
+          return;
+        }
+        if (token) {
+          const saved = await this.plugin.publish.storeToken(JSON.stringify(token));
+          if (!saved) {
+            this.fail("Signed in, but the token wasn't saved \u2014 the passphrase prompt was cancelled.");
+            return;
+          }
+          this.succeed();
+          return;
+        }
+        wait = Math.min(wait + 500, 15e3);
+      }
+      if (!this.stop)
+        this.fail("The code expired before it was approved.");
+    }
+    succeed() {
+      const { contentEl } = this;
+      contentEl.empty();
+      const done = contentEl.createDiv({ cls: "reel-trakt-done" });
+      setIcon(done.createSpan({ cls: "reel-trakt-done-icon" }), "check");
+      done.createSpan({ text: "Signed in to Trakt." });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const ok = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
+      ok.addEventListener("click", () => this.close());
+      ok.focus();
+      this.stop = true;
+      this.onDone(true);
+      this.onDone = () => void 0;
+    }
+    fail(message) {
+      const { contentEl } = this;
+      contentEl.empty();
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Couldn't sign in" });
+      contentEl.createDiv({ cls: "reel-publish-warn", text: message });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const ok = actions.createEl("button", { cls: "reel-btn", text: "Close" });
+      ok.addEventListener("click", () => this.close());
+      this.stop = true;
+    }
+    onClose() {
+      this.stop = true;
+      this.contentEl.empty();
+      this.onDone(false);
+      this.onDone = () => void 0;
+    }
+  };
+  function sleep(ms) {
+    return new Promise((r) => window.setTimeout(r, ms));
+  }
+
+  // src/ui/fields.ts
+  function keyField(el, ctx, name, label, desc, opts = {}) {
+    const store = ctx.plugin.credentials;
+    let input = null;
+    const setting = new Setting(el).setName(label).setDesc(desc).addText((t) => {
+      t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
+      t.inputEl.type = "password";
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      input = t.inputEl;
+    }).addButton((b) => {
+      if (!store.has(name))
+        b.setCta();
+      return b.setButtonText("Save").onClick(async () => {
+        const value = input?.value ?? "";
+        if (!value.trim()) {
+          new Notice("Reel: nothing to save.");
+          return;
+        }
+        const ok = await ctx.plugin.credentials.store(name, value);
+        if (input)
+          input.value = "";
+        new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
+        ctx.onChanged();
+      });
+    });
+    if (opts.remove && store.has(name)) {
+      setting.addButton(
+        (b) => b.setButtonText("Remove").onClick(async () => {
+          const ok = await confirm(ctx.app, {
+            title: `Remove the ${KEY_LABELS[name]} key`,
+            body: "Reel cannot recover it. You would need the original key again to re-add it.",
+            confirmText: "Remove",
+            danger: true
+          });
+          if (!ok)
+            return;
+          await ctx.plugin.credentials.remove(name);
+          new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
+          ctx.onChanged();
+        })
+      );
+    }
+  }
+  function traktAppField(el, ctx, opts = {}) {
+    const hasApp = ctx.plugin.credentials.has("traktApp");
+    let idEl = null;
+    let secretEl = null;
+    const setting = new Setting(el).setName("Trakt application").setDesc(
+      hasApp ? "Saved. Paste both again to replace them." : "From trakt.tv/oauth/applications. Both are stored with your other keys."
+    ).addText((t) => {
+      t.setPlaceholder("Client ID");
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      idEl = t.inputEl;
+    }).addText((t) => {
+      t.setPlaceholder("Client secret");
+      t.inputEl.type = "password";
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      secretEl = t.inputEl;
+    }).addButton((b) => {
+      if (!hasApp)
+        b.setCta();
+      return b.setButtonText("Save").onClick(async () => {
+        const clientId = (idEl?.value ?? "").trim();
+        const clientSecret = (secretEl?.value ?? "").trim();
+        if (!clientId || !clientSecret) {
+          new Notice("Reel: both the client ID and the secret are needed.");
+          return;
+        }
+        const ok = await ctx.plugin.credentials.store(
+          "traktApp",
+          JSON.stringify({ id: clientId, secret: clientSecret })
+        );
+        if (idEl)
+          idEl.value = "";
+        if (secretEl)
+          secretEl.value = "";
+        new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
+        ctx.onChanged();
+      });
+    });
+    if (opts.remove && hasApp) {
+      setting.addButton(
+        (b) => b.setButtonText("Remove").onClick(async () => {
+          const ok = await confirm(ctx.app, {
+            title: "Remove the Trakt application",
+            body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
+            confirmText: "Remove",
+            danger: true
+          });
+          if (!ok)
+            return;
+          await ctx.plugin.credentials.remove("traktApp");
+          await ctx.plugin.credentials.remove("trakt");
+          new Notice("Reel: Trakt application removed.");
+          ctx.onChanged();
+        })
+      );
+    }
+  }
+  function traktSignInField(el, ctx) {
+    const hasApp = ctx.plugin.credentials.has("traktApp");
+    const signedIn = ctx.plugin.credentials.has("trakt");
+    new Setting(el).setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
+      hasApp ? "Trakt shows a short code. Type it on any device \u2014 Reel waits." : "Save the application above first; the sign-in needs it."
+    ).addButton((b) => {
+      b.setButtonText(signedIn ? "Sign in again" : "Sign in");
+      if (!signedIn)
+        b.setCta();
+      b.setDisabled(!hasApp);
+      b.onClick(async () => {
+        const app2 = await ctx.plugin.publish.app();
+        if (!app2) {
+          new Notice("Reel: couldn't read the Trakt application.");
+          return;
+        }
+        new TraktSignIn(ctx.app, ctx.plugin, app2, (ok) => {
+          if (ok)
+            ctx.onChanged();
+        }).open();
+      });
+    });
+  }
+  function mastodonHostField(el, ctx) {
+    new Setting(el).setName("Instance").setDesc("The server you post from, e.g. mastodon.social. Not a secret, so it isn't encrypted.").addText(
+      (t) => t.setPlaceholder("mastodon.social").setValue(ctx.plugin.settings.mastodonHost).onChange(
+        debounce(async (v) => {
+          ctx.plugin.settings.mastodonHost = normaliseHost(v);
+          await ctx.plugin.saveSettings();
+        }, 500)
+      )
+    );
+  }
+  function askEnabledField(el, ctx) {
+    new Setting(el).setName("Enable Ask").setDesc("Off by default. With this off, no request is ever made, key or no key.").addToggle(
+      (t) => t.setValue(ctx.plugin.settings.aiEnabled).onChange(async (v) => {
+        ctx.plugin.settings.aiEnabled = v;
+        await ctx.plugin.saveSettings();
+        ctx.onChanged();
+      })
+    );
+  }
+  function publishEnabledField(el, ctx, id, label) {
+    const key = id === "trakt" ? "publishTrakt" : "publishMastodon";
+    new Setting(el).setName(`Publish to ${label}`).setDesc("Off by default. With this off there is no Publish button, key or no key.").addToggle(
+      (t) => t.setValue(ctx.plugin.settings[key]).onChange(async (v) => {
+        ctx.plugin.settings[key] = v;
+        await ctx.plugin.saveSettings();
+        ctx.onChanged();
+      })
+    );
+  }
+  function setupFields(el, ctx, spec) {
+    switch (spec.id) {
+      case "tmdb":
+        keyField(el, ctx, "tmdb", "TMDB key", "Pasted here, encrypted in your vault.");
+        return;
+      case "omdb":
+        keyField(el, ctx, "omdb", "OMDb key", "Pasted here, encrypted in your vault.");
+        return;
+      case "dtdd":
+        keyField(el, ctx, "dtdd", "DoesTheDogDie key", "Pasted here, encrypted in your vault.");
+        return;
+      case "openrouter":
+        keyField(el, ctx, "openrouter", "OpenRouter key", "Pasted here, encrypted in your vault.");
+        askEnabledField(el, ctx);
+        return;
+      case "trakt":
+        traktAppField(el, ctx);
+        traktSignInField(el, ctx);
+        publishEnabledField(el, ctx, "trakt", "Trakt");
+        return;
+      case "mastodon":
+        mastodonHostField(el, ctx);
+        keyField(el, ctx, "mastodon", "Access token", "The token from step 4, encrypted in your vault.");
+        publishEnabledField(el, ctx, "mastodon", "Mastodon");
+        return;
+      default:
+        return;
+    }
+  }
+
+  // src/ui/setupSheet.ts
+  var SetupSheet = class extends Modal {
+    constructor(app2, plugin2, spec, onDone) {
+      super(app2);
+      this.plugin = plugin2;
+      this.spec = spec;
+      this.onDone = onDone;
+      this.ticked = /* @__PURE__ */ new Set();
+    }
+    onOpen() {
+      const { modalEl } = this;
+      modalEl.addClass("reel-modal");
+      modalEl.addClass("reel-setup-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-modal-phone");
+      this.draw();
+    }
+    /**
+     * Redrawn in place after anything that changes the answer.
+     *
+     * Saving a key changes the state pill, the status line and whether the
+     * sign-in button is offered, and a guide that still described the state
+     * before you acted would be the same lie this plugin keeps finding: a
+     * screen reporting what it was told rather than what is.
+     */
+    draw() {
+      const { contentEl } = this;
+      this.seedTicks();
+      contentEl.empty();
+      contentEl.addClass("reel-setup");
+      this.renderHead(contentEl);
+      this.renderSteps(contentEl);
+      this.renderFields(contentEl);
+      this.renderFoot(contentEl);
+    }
+    /**
+     * Steps the vault can prove you have already done.
+     *
+     * Ticking was there and was purely manual, which means it only ever
+     * survived one sitting: come back tomorrow to a guide you half finished
+     * and the marks are gone, along with the answer to the only question you
+     * have. A saved credential is durable, and it settles the question
+     * directly — no new state to store, and nothing to go stale.
+     *
+     * Only ever adds. A tick you put there by hand is a statement about
+     * something Reel cannot see, and taking it away because the plugin has no
+     * evidence of it would be the screen overruling you about your own
+     * afternoon.
+     */
+    seedTicks() {
+      const done = completedSteps(this.spec, (k) => this.plugin.credentials.has(k));
+      for (let i = 0; i < done; i++)
+        this.ticked.add(i);
+    }
+    /**
+     * The fields the steps have been pointing at all along.
+     *
+     * Every guide ends by telling you to paste something "below" and there was
+     * nothing below — the field was on the settings screen underneath the sheet
+     * saying "look down". The instruction was right about what to do and wrong
+     * about where, so following it meant abandoning the walkthrough halfway to
+     * go and find a control among forty-nine others.
+     *
+     * The same controls as the settings screen, not a copy of them: they live
+     * in `ui/fields` and both screens call it, so a key saved here is saved
+     * there and there is no second implementation to drift.
+     */
+    renderFields(root) {
+      const box = root.createDiv({ cls: "reel-setup-fields" });
+      setupFields(box, { app: this.app, plugin: this.plugin, onChanged: () => this.draw() }, this.spec);
+      if (!box.childElementCount)
+        box.remove();
+    }
+    /* ------------------------------------------------------------------ */
+    renderHead(root) {
+      const head = root.createDiv({ cls: "reel-setup-head" });
+      const title = head.createDiv({ cls: "reel-setup-title" });
+      title.createSpan({ cls: "reel-setup-name", text: this.spec.name });
+      const done = isConfigured(this.plugin, this.spec);
+      const part = isPartial(this.plugin, this.spec);
+      title.createSpan({
+        cls: done ? "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
+        text: done ? "Set up" : part ? "Half done" : this.spec.essential ? "Required" : "Not set up"
+      });
+      head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
+      head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
+      this.renderHealth(head, done);
+      const sends = root.createDiv({ cls: "reel-setup-sends" });
+      sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
+      sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
+    }
+    /**
+     * What this connection last did, and a way to find out now.
+     *
+     * Opening a guide for something already set up is almost always because it
+     * has stopped working, and the guide used to answer only the question you
+     * were not asking — how to set it up, which you already did.
+     *
+     * The button is the other half of that. Verification lived on a different
+     * screen from configuration, behind one control that tested all six
+     * services at once, so finishing this walkthrough meant closing it and
+     * going to look for something else in order to learn whether the key you
+     * had just pasted was right.
+     *
+     * Shown when the feature is set up *or* merely checkable, which are not the
+     * same thing and the difference is the point. Mastodon is checked by its
+     * server address rather than its token, so somebody who has typed a server
+     * and not yet made a token can find out the address is wrong — which is
+     * both the commonest mistake and the cheapest moment to fix it.
+     */
+    renderHealth(head, done) {
+      const can = checkable(this.plugin, this.spec.id);
+      if (!done && !can)
+        return;
+      const said = this.healthLine();
+      if (!said && !can)
+        return;
+      const wrap = head.createDiv({ cls: "reel-setup-check" });
+      const line = wrap.createDiv({ cls: "reel-setup-health" });
+      const draw2 = () => {
+        const now = this.healthLine();
+        line.setText(now?.text ?? "");
+        line.className = `reel-setup-health is-${now?.tone ?? "info"}`;
+      };
+      draw2();
+      if (!can) {
+        if (!this.locked())
+          return;
+        const open = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
+        open.addEventListener("click", async () => {
+          open.disabled = true;
+          open.setText("Unlocking\u2026");
+          const opened = await this.plugin.credentials.unlock();
+          if (!opened) {
+            open.disabled = false;
+            open.setText("Unlock");
+            return;
+          }
+          this.draw();
+        });
+        return;
+      }
+      const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.setText("Checking\u2026");
+        try {
+          await checkFeature(this.plugin, this.spec.id, Date.now());
+          await this.plugin.saveSettings();
+        } finally {
+          btn.disabled = false;
+          btn.setText("Check now");
+          draw2();
+        }
+      });
+    }
+    /**
+     * Null for the features nothing can honestly report on.
+     *
+     * The routing lives in `health.ts` and is shared with the settings rows and
+     * the health table. It was written out here as well, which is how a guide
+     * and a row come to disagree about the same feature.
+     */
+    /** Sealed keys, and this feature is one of the ones that needs them. */
+    locked() {
+      return NEEDS_KEY_TO_CHECK.includes(this.spec.id) && this.plugin.credentials.needsUnlock && this.plugin.credentials.hasStoredKey;
+    }
+    healthLine() {
+      const s = this.plugin.settings;
+      return featureHealth(
+        this.spec.id,
+        {
+          records: s.connectionHealth,
+          hasTrakt: this.plugin.credentials.has("trakt"),
+          traktExpires: s.traktExpires,
+          locked: this.plugin.credentials.needsUnlock
+        },
+        Date.now()
+      );
+    }
+    /**
+     * The instructions, folded away once there is nothing left to follow.
+     *
+     * Opening a guide for a feature that is already working is a normal thing
+     * to do — it is where the status lives, and the Check now button, and the
+     * field you would use to replace a key. What you are not doing is reading
+     * how to create the account, and five completed steps between you and the
+     * three things you came for is a wall of settled questions.
+     *
+     * The settings list already reasons this way about its own descriptions: a
+     * pitch is for something you have not bought yet. This is the same rule one
+     * screen further in.
+     *
+     * Folded, never dropped. Making a second token a year from now means
+     * reading them again, and a guide that has quietly stopped containing its
+     * own guide would be a worse answer than a long screen.
+     */
+    renderSteps(root) {
+      const total = this.spec.steps.length;
+      const allDone = total > 0 && this.spec.steps.every((_, i) => this.ticked.has(i));
+      if (!allDone) {
+        const open = root.createEl("ol", { cls: "reel-setup-steps" });
+        this.spec.steps.forEach((step, i) => this.renderStep(open, step, i));
+        return;
+      }
+      const toggle2 = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
+      const list2 = root.createEl("ol", { cls: "reel-setup-steps is-collapsed" });
+      const label = () => {
+        const shown2 = !list2.classList.contains("is-collapsed");
+        toggle2.setText(shown2 ? "Hide the steps" : `All ${total} steps done \u2014 show them`);
+        toggle2.setAttr("aria-expanded", String(shown2));
+      };
+      toggle2.addEventListener("click", () => {
+        list2.classList.toggle("is-collapsed");
+        label();
+      });
+      label();
+      this.spec.steps.forEach((step, i) => this.renderStep(list2, step, i));
+    }
+    renderStep(list2, step, i) {
+      const li = list2.createEl("li", { cls: "reel-setup-step" });
+      const row = li.createDiv({ cls: "reel-setup-step-row" });
+      const done = this.ticked.has(i);
+      if (done)
+        li.addClass("is-done");
+      const tick = row.createEl("button", { cls: "reel-setup-tick", text: done ? "\u2713" : String(i + 1) });
+      tick.setAttr("aria-label", `Step ${i + 1}. Tap to mark done.`);
+      tick.setAttr("aria-pressed", String(done));
+      row.createSpan({ cls: "reel-setup-step-text", text: step.text });
+      const mark = () => {
+        const on = this.ticked.has(i);
+        if (on)
+          this.ticked.delete(i);
+        else
+          this.ticked.add(i);
+        li.toggleClass("is-done", !on);
+        tick.setAttr("aria-pressed", String(!on));
+        tick.setText(!on ? "\u2713" : String(i + 1));
+      };
+      tick.addEventListener("click", mark);
+      if (step.copy)
+        this.renderCopy(li, step.copy);
+      if (step.url) {
+        const a = li.createEl("a", {
+          cls: "reel-btn reel-setup-go",
+          text: this.hostOf(step.url),
+          href: step.url
+        });
+        a.setAttr("target", "_blank");
+        a.setAttr("rel", "noopener");
+        a.addEventListener("click", () => {
+          if (!this.ticked.has(i))
+            mark();
+        });
+      }
+      if (step.note)
+        li.createDiv({ cls: "reel-setup-note", text: step.note });
+    }
+    /**
+     * A literal to be typed exactly, with a button that copies it.
+     *
+     * The two values in Reel's entire setup that must match character for
+     * character are Trakt's redirect URI and Mastodon's scope, and both are
+     * strings of punctuation that mean nothing to read. Copying either by eye
+     * is how a setup fails five minutes later with somebody else's error
+     * message attached.
+     */
+    renderCopy(li, value) {
+      const btn = li.createEl("button", { cls: "reel-setup-copy" });
+      btn.createSpan({ cls: "reel-setup-copy-value", text: value });
+      btn.createSpan({ cls: "reel-setup-copy-hint", text: "Copy" });
+      btn.setAttr("aria-label", `Copy ${value}`);
+      btn.addEventListener("click", () => {
+        navigator.clipboard?.writeText(value).then(() => {
+          new Notice("Reel: copied.");
+          btn.addClass("is-copied");
+        }).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
+      });
+    }
+    renderFoot(root) {
+      const foot = root.createDiv({ cls: "reel-setup-foot" });
+      const close = foot.createEl("button", { cls: "reel-btn mod-cta", text: "Back to settings" });
+      close.addEventListener("click", () => {
+        this.close();
+        this.onDone?.();
+      });
+    }
+    /** "Open themoviedb.org" reads better on a button than the whole URL does. */
+    hostOf(url) {
+      try {
+        return `Open ${new URL(url).hostname.replace(/^www\./, "")}`;
+      } catch {
+        return "Open";
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/ui/publishSheet.ts
   var PublishSheet = class extends Modal {
     constructor(app2, plugin2, opts) {
@@ -5144,19 +6124,39 @@ ${body}
       cancel.focus();
       void this.repaint();
     }
-    /** Publishing is on but nothing is configured — say what to do, not "error". */
+    /**
+     * Publishing is on but nothing is configured.
+     *
+     * This said "Settings → Reel → Publishing has Trakt and Mastodon" and
+     * offered one button that opened the settings tab, which is the fault the
+     * walkthroughs exist to fix: the screen knows exactly which two features are
+     * missing and it threw that away to drop you at the top of a tab holding
+     * forty-nine controls.
+     *
+     * Two buttons rather than one, because there genuinely are two answers and
+     * they differ in kind — Trakt is a film profile, Mastodon is a public
+     * post. Choosing between them is the first real decision, and each guide
+     * says what leaves your vault before you commit to anything.
+     */
     renderNowhere(el) {
       el.createDiv({
         cls: "reel-publish-empty",
-        text: "No publishing destination is switched on yet. Settings \u2192 Reel \u2192 Publishing has Trakt and Mastodon."
+        text: "No publishing destination is set up yet. Trakt puts the review on your film profile; Mastodon posts it publicly. Either takes a few minutes, and neither sends anything until you press Publish."
       });
       const actions = el.createDiv({ cls: "reel-log-actions" });
-      const go = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open settings" });
-      go.addEventListener("click", () => {
-        this.close();
-        this.app.setting.open();
-        this.app.setting.openTabById("reel");
-      });
+      for (const id of ["trakt", "mastodon"]) {
+        const spec = FEATURES.find((f) => f.id === id);
+        if (!spec)
+          continue;
+        const go = actions.createEl("button", {
+          cls: `reel-btn${id === "trakt" ? " mod-cta" : ""}`,
+          text: `Set up ${spec.name}`
+        });
+        go.addEventListener("click", () => {
+          this.close();
+          new SetupSheet(this.app, this.plugin, spec).open();
+        });
+      }
     }
     renderTargets(el, targets) {
       const row = el.createDiv({ cls: "reel-publish-targets" });
@@ -7584,353 +8584,6 @@ ${body}
     }
   };
 
-  // src/ui/confirm.ts
-  function confirm(app2, opts) {
-    return new Promise((resolve) => new ConfirmModal(app2, opts, resolve).open());
-  }
-  var ConfirmModal = class extends Modal {
-    constructor(app2, opts, done) {
-      super(app2);
-      this.opts = opts;
-      this.done = done;
-      this.answered = false;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.createEl("h3", { cls: "reel-log-title", text: this.opts.title });
-      contentEl.createDiv({ cls: "reel-log-sub", text: this.opts.body });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
-      cancel.addEventListener("click", () => this.finish(false));
-      const go = actions.createEl("button", {
-        cls: this.opts.danger ? "reel-btn reel-btn-danger" : "reel-btn mod-cta",
-        text: this.opts.confirmText
-      });
-      go.addEventListener("click", () => this.finish(true));
-      cancel.focus();
-    }
-    finish(ok) {
-      this.answered = true;
-      this.done(ok);
-      this.close();
-    }
-    onClose() {
-      this.contentEl.empty();
-      if (!this.answered)
-        this.done(false);
-    }
-  };
-
-  // src/publish/trakt.ts
-  var ACTIVATE_URL = "https://trakt.tv/activate";
-
-  // src/ui/traktSignIn.ts
-  var TraktSignIn = class extends Modal {
-    constructor(app2, plugin2, app_, onDone) {
-      super(app2);
-      this.plugin = plugin2;
-      this.app_ = app_;
-      this.onDone = onDone;
-      this.stop = false;
-      this.device = null;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.addClass("reel-trakt");
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
-      contentEl.createDiv({ cls: "reel-log-sub", text: "Asking Trakt for a code\u2026" });
-      void this.begin();
-    }
-    async begin() {
-      try {
-        this.device = await this.plugin.publish.trakt.requestDeviceCode(this.app_);
-      } catch (e) {
-        this.fail(redact(e));
-        return;
-      }
-      this.renderCode(this.device);
-      void this.poll(this.device);
-    }
-    renderCode(device) {
-      const { contentEl } = this;
-      contentEl.empty();
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
-      const steps = contentEl.createDiv({ cls: "reel-trakt-steps" });
-      steps.createDiv({ cls: "reel-trakt-step", text: "1. Open this page on any device:" });
-      const link = steps.createEl("a", {
-        cls: "reel-trakt-url",
-        text: device.verificationUrl || ACTIVATE_URL,
-        href: device.verificationUrl || ACTIVATE_URL
-      });
-      link.setAttr("target", "_blank");
-      link.setAttr("rel", "noopener");
-      steps.createDiv({ cls: "reel-trakt-step", text: "2. Enter this code:" });
-      const code = steps.createEl("button", { cls: "reel-trakt-code", text: device.userCode });
-      code.setAttr("aria-label", `Code ${device.userCode.split("").join(" ")}. Tap to copy.`);
-      code.addEventListener("click", () => {
-        navigator.clipboard?.writeText(device.userCode).then(() => new Notice("Reel: code copied.")).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
-      });
-      const status = contentEl.createDiv({ cls: "reel-trakt-status" });
-      status.createDiv({ cls: "reel-ask-spinner" });
-      status.createSpan({ text: "Waiting for you to approve it\u2026" });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
-      cancel.addEventListener("click", () => this.close());
-    }
-    /**
-     * Ask, wait, ask again, until Trakt says yes, no, or too late.
-     *
-     * The deadline is Trakt's own `expires_in` rather than a fixed number of
-     * attempts, because the interval can be raised mid-flow by a 429 and a loop
-     * counting attempts would then give up early — while the user is still
-     * typing, having done nothing wrong.
-     */
-    async poll(device) {
-      let wait = Math.max(1, device.interval) * 1e3;
-      const deadline = Date.now() + Math.max(60, device.expiresIn) * 1e3;
-      while (!this.stop && Date.now() < deadline) {
-        await sleep(wait);
-        if (this.stop)
-          return;
-        let token;
-        try {
-          token = await this.plugin.publish.trakt.pollDeviceToken(this.app_, device.deviceCode);
-        } catch (e) {
-          this.fail(redact(e));
-          return;
-        }
-        if (token) {
-          const saved = await this.plugin.publish.storeToken(JSON.stringify(token));
-          if (!saved) {
-            this.fail("Signed in, but the token wasn't saved \u2014 the passphrase prompt was cancelled.");
-            return;
-          }
-          this.succeed();
-          return;
-        }
-        wait = Math.min(wait + 500, 15e3);
-      }
-      if (!this.stop)
-        this.fail("The code expired before it was approved.");
-    }
-    succeed() {
-      const { contentEl } = this;
-      contentEl.empty();
-      const done = contentEl.createDiv({ cls: "reel-trakt-done" });
-      setIcon(done.createSpan({ cls: "reel-trakt-done-icon" }), "check");
-      done.createSpan({ text: "Signed in to Trakt." });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const ok = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
-      ok.addEventListener("click", () => this.close());
-      ok.focus();
-      this.stop = true;
-      this.onDone(true);
-      this.onDone = () => void 0;
-    }
-    fail(message) {
-      const { contentEl } = this;
-      contentEl.empty();
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Couldn't sign in" });
-      contentEl.createDiv({ cls: "reel-publish-warn", text: message });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const ok = actions.createEl("button", { cls: "reel-btn", text: "Close" });
-      ok.addEventListener("click", () => this.close());
-      this.stop = true;
-    }
-    onClose() {
-      this.stop = true;
-      this.contentEl.empty();
-      this.onDone(false);
-      this.onDone = () => void 0;
-    }
-  };
-  function sleep(ms) {
-    return new Promise((r) => window.setTimeout(r, ms));
-  }
-
-  // src/setup.ts
-  var FEATURES = [
-    {
-      id: "tmdb",
-      name: "TMDB",
-      gives: "Everything. Posters, cast, runtimes, episode lists \u2014 Reel cannot add a title without it.",
-      essential: true,
-      effort: "2 minutes, free",
-      sends: "The title you search for, or its TMDB id. Nothing about your library.",
-      keys: ["tmdb"],
-      steps: [
-        {
-          text: "Create a free TMDB account, if you don't have one.",
-          url: "https://www.themoviedb.org/signup"
-        },
-        {
-          text: "Open your API settings and request a key. Pick \u201CDeveloper\u201D, and answer the form \u2014 any personal or hobby use is fine.",
-          url: "https://www.themoviedb.org/settings/api"
-        },
-        {
-          text: "Copy the API Read Access Token \u2014 the long one starting eyJ, not the short v3 key.",
-          note: "The token travels in a request header; the v3 key has to go in the URL, and URLs end up in logs. Reel accepts either, but this one is safer."
-        },
-        {
-          text: "Paste it below and press Save. You'll be asked for a passphrase \u2014 that encrypts the key inside your vault.",
-          key: "tmdb"
-        }
-      ]
-    },
-    {
-      id: "omdb",
-      name: "OMDb",
-      gives: "IMDb ratings, Rotten Tomatoes and Metacritic scores on every title.",
-      essential: false,
-      effort: "1 minute, free",
-      sends: "A film's IMDb id, when a note is created or refreshed.",
-      keys: ["omdb"],
-      steps: [
-        {
-          text: "Request a free key. The FREE tier is 1,000 requests a day, which Reel's cache makes ample.",
-          url: "https://www.omdbapi.com/apikey.aspx"
-        },
-        {
-          text: "Check your email and click the activation link. The key does not work until you do.",
-          note: "This one catches people out \u2014 the key arrives before it is active."
-        },
-        { text: "Paste the key below and press Save.", key: "omdb" }
-      ]
-    },
-    {
-      id: "dtdd",
-      name: "DoesTheDogDie",
-      gives: "Content warnings voted on per topic, so you can tell one upsetting scene from a film full of them.",
-      essential: false,
-      effort: "A few minutes, free \u2014 they approve by hand",
-      sends: "A film's title and year.",
-      keys: ["dtdd"],
-      steps: [
-        {
-          text: "Request an API key. Say what it's for \u2014 a personal Obsidian film tracker is a fine answer.",
-          url: "https://www.doesthedogdie.com/api"
-        },
-        {
-          text: "Wait for the reply. A person reads these, so it is not instant.",
-          note: "Everything else in Reel works meanwhile. Content filtering falls back to TMDB keywords until the key arrives."
-        },
-        { text: "Paste the key below and press Save.", key: "dtdd" }
-      ]
-    },
-    {
-      id: "openrouter",
-      name: "OpenRouter",
-      gives: "Ask \u2014 describe what you feel like watching and Reel finds it in your own library.",
-      essential: false,
-      effort: "2 minutes, and you pay per question",
-      sends: "Your question, plus a shortlist of titles from your library \u2014 names, years, genres, runtimes and your ratings. Never your reviews, your watch dates or your file paths.",
-      keys: ["openrouter"],
-      steps: [
-        { text: "Create an OpenRouter account.", url: "https://openrouter.ai/" },
-        {
-          text: "Add some credit. Questions cost a fraction of a penny each on the default model.",
-          url: "https://openrouter.ai/credits",
-          note: "Reel shows what every question cost in tokens, so this is checkable rather than a mystery bill."
-        },
-        { text: "Create an API key and copy it.", url: "https://openrouter.ai/keys" },
-        { text: "Paste it below, press Save, then turn Ask on.", key: "openrouter" }
-      ]
-    },
-    {
-      id: "trakt",
-      name: "Trakt",
-      gives: "Publishing a review to a public film profile, with your star rating alongside.",
-      essential: false,
-      effort: "5 minutes, free",
-      sends: "Only what you explicitly publish: one review's text, your rating, and the title's id. Nothing automatic.",
-      keys: ["traktApp", "trakt"],
-      steps: [
-        { text: "Create a Trakt account, if you don't have one.", url: "https://trakt.tv/auth/join" },
-        {
-          text: "Create an application. Any name will do \u2014 it is yours and nobody else sees it.",
-          url: "https://trakt.tv/oauth/applications/new",
-          note: "Reel asks you to register your own rather than shipping one, because Trakt's sign-in needs a client secret, and a secret compiled into an open-source plugin is printed in the repository for anyone to read."
-        },
-        {
-          text: "Set the Redirect URI to exactly this:",
-          copy: "urn:ietf:wg:oauth:2.0:oob",
-          note: "This is the standard value for an app with no website to return to. Getting it wrong is the usual reason sign-in fails."
-        },
-        {
-          text: "Save the application, then copy its Client ID and Client Secret into the two fields below.",
-          key: "traktApp"
-        },
-        {
-          text: "Press Sign in. Trakt shows a short code \u2014 type it on any device, and Reel waits for you.",
-          key: "trakt",
-          note: "No redirect back to the app is needed, which is what makes this work on a phone at all."
-        }
-      ]
-    },
-    {
-      id: "mastodon",
-      name: "Mastodon",
-      gives: "Publishing a review as a public post, with the title, your stars and the text.",
-      essential: false,
-      effort: "3 minutes, free",
-      sends: "Only what you explicitly publish: one post. Nothing automatic.",
-      keys: ["mastodon"],
-      steps: [
-        {
-          text: "Open your instance's development settings \u2014 that's your own server, e.g. mastodon.social/settings/applications.",
-          note: "Reel needs the server you post from; there is no central Mastodon."
-        },
-        { text: "Create a new application. Any name and website will do." },
-        {
-          text: "Tick only this scope, and untick the rest:",
-          copy: "write:statuses",
-          note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post."
-        },
-        { text: "Submit, open the application, and copy \u201CYour access token\u201D." },
-        { text: "Enter your instance's address and paste the token below.", key: "mastodon" }
-      ]
-    }
-  ];
-  function completedSteps(spec, has) {
-    let done = 0;
-    spec.steps.forEach((step, i) => {
-      if (step.key && has(step.key))
-        done = i + 1;
-    });
-    return done;
-  }
-  function isConfigured(plugin2, spec) {
-    return spec.keys.every((k) => plugin2.credentials.has(k));
-  }
-  function isPartial(plugin2, spec) {
-    if (isConfigured(plugin2, spec))
-      return false;
-    return spec.keys.some((k) => plugin2.credentials.has(k));
-  }
-  function setupState(plugin2) {
-    const essential = FEATURES.find((f) => f.essential);
-    const done = [];
-    const partial = [];
-    const todo = [];
-    for (const f of FEATURES) {
-      if (f.essential)
-        continue;
-      if (isConfigured(plugin2, f))
-        done.push(f);
-      else if (isPartial(plugin2, f))
-        partial.push(f);
-      else
-        todo.push(f);
-    }
-    return { done, partial, todo, blocked: !isConfigured(plugin2, essential), essential };
-  }
-
   // src/util/folders.ts
   var ILLEGAL = /[*"\\<>:|?]/;
   function normaliseFolder(raw) {
@@ -7994,327 +8647,6 @@ ${body}
       return 99;
     };
     return all2.map((path) => ({ path, r: rank2(path) })).filter((x) => x.r < 99).sort((a, b) => a.r - b.r || a.path.length - b.path.length || a.path.localeCompare(b.path)).map((x) => x.path).slice(0, limit);
-  }
-
-  // src/health.ts
-  var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
-  var NEEDS_KEY_TO_CHECK = ["tmdb", "omdb", "dtdd", "openrouter", "trakt"];
-  var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
-  function ago(then, now) {
-    const ms = Math.max(0, now - then);
-    const min = Math.floor(ms / 6e4);
-    if (min < 1)
-      return "just now";
-    if (min < 60)
-      return `${min} minute${min === 1 ? "" : "s"} ago`;
-    const hr = Math.floor(min / 60);
-    if (hr < 24)
-      return `${hr} hour${hr === 1 ? "" : "s"} ago`;
-    const day = Math.floor(hr / 24);
-    if (day < 30)
-      return `${day} day${day === 1 ? "" : "s"} ago`;
-    const mon = Math.floor(day / 30);
-    return `${mon} month${mon === 1 ? "" : "s"} ago`;
-  }
-  function extra(rec, withProves = true) {
-    const said = [withProves ? rec.proves : "", rec.note].filter((s) => s && s.trim());
-    return said.length ? `. ${said.join(" ")}` : "";
-  }
-  function describeHealth(rec, configured, now) {
-    if (!configured)
-      return { text: "Not set up", tone: "info" };
-    if (!rec)
-      return { text: "Not checked yet", tone: "info" };
-    const when = ago(rec.at, now);
-    if (!rec.ok)
-      return { text: `Failed ${when}${rec.error ? ` \u2014 ${rec.error}` : ""}`, tone: "warn" };
-    if (rec.proves)
-      return { text: `Checked ${when}. ${rec.proves}${extra(rec, false)}`, tone: "info" };
-    if (now - rec.at > STALE_AFTER)
-      return { text: `Worked ${when}${extra(rec)}`, tone: "info" };
-    return { text: `Working \u2014 checked ${when}${extra(rec)}`, tone: "ok" };
-  }
-  var SOON = 7 * 24 * 60 * 60 * 1e3;
-  function traktState(hasToken, expires, now) {
-    if (!hasToken)
-      return { kind: "out" };
-    if (!expires)
-      return { kind: "unknown" };
-    if (expires <= now)
-      return { kind: "expired", expires };
-    if (expires - now < SOON)
-      return { kind: "soon", expires };
-    return { kind: "in", expires };
-  }
-  function describeTrakt(state, now, rec) {
-    if (rec && !rec.ok && state.kind !== "out") {
-      return { text: `Token refused ${ago(rec.at, now)} \u2014 sign in again`, tone: "warn" };
-    }
-    switch (state.kind) {
-      case "out":
-        return { text: "Not signed in", tone: "info" };
-      case "unknown":
-        return { text: "Signed in \u2014 Reel cannot tell when this expires", tone: "info" };
-      case "expired":
-        return { text: `Session expired ${ago(state.expires, now)} \u2014 sign in again`, tone: "warn" };
-      case "soon":
-        return { text: `Signed in \u2014 renews automatically this week${checked(rec, now)}`, tone: "ok" };
-      case "in":
-        return { text: `Signed in${checked(rec, now)}`, tone: "ok" };
-    }
-  }
-  function checked(rec, now) {
-    return rec?.ok ? `, checked ${ago(rec.at, now)}` : "";
-  }
-  function featureHealth(id, inputs, now) {
-    if (id === "trakt") {
-      return describeTrakt(traktState(inputs.hasTrakt, inputs.traktExpires, now), now, inputs.records.trakt);
-    }
-    if (!TESTABLE.includes(id))
-      return null;
-    const rec = inputs.records[id];
-    if (!rec && inputs.locked && NEEDS_KEY_TO_CHECK.includes(id)) {
-      return { text: "Keys are locked \u2014 unlock to check", tone: "info" };
-    }
-    return describeHealth(rec, true, now);
-  }
-
-  // src/publish/mastodon.ts
-  function normaliseHost(raw) {
-    let host = (raw ?? "").trim();
-    if (!host)
-      return "";
-    host = host.replace(/^https?:\/\//i, "");
-    host = host.split("/")[0];
-    if (host.includes("@"))
-      host = host.slice(host.lastIndexOf("@") + 1);
-    return host.toLowerCase();
-  }
-
-  // src/checks.ts
-  function checkable(plugin2, id) {
-    if (!TESTABLE.includes(id))
-      return false;
-    if (NEEDS_KEY_TO_CHECK.includes(id) && plugin2.credentials.needsUnlock)
-      return false;
-    switch (id) {
-      case "mastodon":
-        return Boolean(normaliseHost(plugin2.settings.mastodonHost));
-      default:
-        return plugin2.credentials.has(id);
-    }
-  }
-  async function run(plugin2, id) {
-    switch (id) {
-      case "tmdb":
-        return plugin2.tmdb.testCredentials();
-      case "omdb":
-        return plugin2.omdb.test();
-      case "dtdd":
-        return plugin2.dtdd.test();
-      case "openrouter":
-        return plugin2.ai.test();
-      case "mastodon":
-        return plugin2.publish.mastodon.test();
-      case "trakt":
-        return plugin2.publish.trakt.test();
-      default:
-        return { ok: false, error: "Nothing to check." };
-    }
-  }
-  async function checkFeature(plugin2, id, now) {
-    if (!checkable(plugin2, id))
-      return null;
-    let out;
-    try {
-      out = await run(plugin2, id);
-    } catch (e) {
-      out = { ok: false, error: redact(e) };
-    }
-    const rec = out.ok ? { at: now, ok: true, ...out.proves ? { proves: out.proves } : {}, ...out.note ? { note: out.note } : {} } : { at: now, ok: false, error: redact(out.error) };
-    plugin2.settings.connectionHealth[id] = rec;
-    return rec;
-  }
-  async function checkAll(plugin2, now) {
-    const ids = TESTABLE.filter((id) => checkable(plugin2, id));
-    await Promise.all(ids.map((id) => checkFeature(plugin2, id, now)));
-    await plugin2.saveSettings();
-    return ids.filter((id) => plugin2.settings.connectionHealth[id]?.ok === false);
-  }
-
-  // src/ui/fields.ts
-  function keyField(el, ctx, name, label, desc, opts = {}) {
-    const store = ctx.plugin.credentials;
-    let input = null;
-    const setting = new Setting(el).setName(label).setDesc(desc).addText((t) => {
-      t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
-      t.inputEl.type = "password";
-      t.inputEl.autocomplete = "off";
-      t.inputEl.spellcheck = false;
-      t.inputEl.addClass("reel-input");
-      input = t.inputEl;
-    }).addButton((b) => {
-      if (!store.has(name))
-        b.setCta();
-      return b.setButtonText("Save").onClick(async () => {
-        const value = input?.value ?? "";
-        if (!value.trim()) {
-          new Notice("Reel: nothing to save.");
-          return;
-        }
-        const ok = await ctx.plugin.credentials.store(name, value);
-        if (input)
-          input.value = "";
-        new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
-        ctx.onChanged();
-      });
-    });
-    if (opts.remove && store.has(name)) {
-      setting.addButton(
-        (b) => b.setButtonText("Remove").onClick(async () => {
-          const ok = await confirm(ctx.app, {
-            title: `Remove the ${KEY_LABELS[name]} key`,
-            body: "Reel cannot recover it. You would need the original key again to re-add it.",
-            confirmText: "Remove",
-            danger: true
-          });
-          if (!ok)
-            return;
-          await ctx.plugin.credentials.remove(name);
-          new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
-          ctx.onChanged();
-        })
-      );
-    }
-  }
-  function traktAppField(el, ctx, opts = {}) {
-    const hasApp = ctx.plugin.credentials.has("traktApp");
-    let idEl = null;
-    let secretEl = null;
-    const setting = new Setting(el).setName("Trakt application").setDesc(
-      hasApp ? "Saved. Paste both again to replace them." : "From trakt.tv/oauth/applications. Both are stored with your other keys."
-    ).addText((t) => {
-      t.setPlaceholder("Client ID");
-      t.inputEl.autocomplete = "off";
-      t.inputEl.spellcheck = false;
-      t.inputEl.addClass("reel-input");
-      idEl = t.inputEl;
-    }).addText((t) => {
-      t.setPlaceholder("Client secret");
-      t.inputEl.type = "password";
-      t.inputEl.autocomplete = "off";
-      t.inputEl.spellcheck = false;
-      t.inputEl.addClass("reel-input");
-      secretEl = t.inputEl;
-    }).addButton((b) => {
-      if (!hasApp)
-        b.setCta();
-      return b.setButtonText("Save").onClick(async () => {
-        const clientId = (idEl?.value ?? "").trim();
-        const clientSecret = (secretEl?.value ?? "").trim();
-        if (!clientId || !clientSecret) {
-          new Notice("Reel: both the client ID and the secret are needed.");
-          return;
-        }
-        const ok = await ctx.plugin.credentials.store(
-          "traktApp",
-          JSON.stringify({ id: clientId, secret: clientSecret })
-        );
-        if (idEl)
-          idEl.value = "";
-        if (secretEl)
-          secretEl.value = "";
-        new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
-        ctx.onChanged();
-      });
-    });
-    if (opts.remove && hasApp) {
-      setting.addButton(
-        (b) => b.setButtonText("Remove").onClick(async () => {
-          const ok = await confirm(ctx.app, {
-            title: "Remove the Trakt application",
-            body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
-            confirmText: "Remove",
-            danger: true
-          });
-          if (!ok)
-            return;
-          await ctx.plugin.credentials.remove("traktApp");
-          await ctx.plugin.credentials.remove("trakt");
-          new Notice("Reel: Trakt application removed.");
-          ctx.onChanged();
-        })
-      );
-    }
-  }
-  function traktSignInField(el, ctx) {
-    const hasApp = ctx.plugin.credentials.has("traktApp");
-    const signedIn = ctx.plugin.credentials.has("trakt");
-    new Setting(el).setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
-      hasApp ? "Trakt shows a short code. Type it on any device \u2014 Reel waits." : "Save the application above first; the sign-in needs it."
-    ).addButton((b) => {
-      b.setButtonText(signedIn ? "Sign in again" : "Sign in");
-      if (!signedIn)
-        b.setCta();
-      b.setDisabled(!hasApp);
-      b.onClick(async () => {
-        const app2 = await ctx.plugin.publish.app();
-        if (!app2) {
-          new Notice("Reel: couldn't read the Trakt application.");
-          return;
-        }
-        new TraktSignIn(ctx.app, ctx.plugin, app2, (ok) => {
-          if (ok)
-            ctx.onChanged();
-        }).open();
-      });
-    });
-  }
-  function mastodonHostField(el, ctx) {
-    new Setting(el).setName("Instance").setDesc("The server you post from, e.g. mastodon.social. Not a secret, so it isn't encrypted.").addText(
-      (t) => t.setPlaceholder("mastodon.social").setValue(ctx.plugin.settings.mastodonHost).onChange(
-        debounce(async (v) => {
-          ctx.plugin.settings.mastodonHost = normaliseHost(v);
-          await ctx.plugin.saveSettings();
-        }, 500)
-      )
-    );
-  }
-  function askEnabledField(el, ctx) {
-    new Setting(el).setName("Enable Ask").setDesc("Off by default. With this off, no request is ever made, key or no key.").addToggle(
-      (t) => t.setValue(ctx.plugin.settings.aiEnabled).onChange(async (v) => {
-        ctx.plugin.settings.aiEnabled = v;
-        await ctx.plugin.saveSettings();
-        ctx.onChanged();
-      })
-    );
-  }
-  function setupFields(el, ctx, spec) {
-    switch (spec.id) {
-      case "tmdb":
-        keyField(el, ctx, "tmdb", "TMDB key", "Pasted here, encrypted in your vault.");
-        return;
-      case "omdb":
-        keyField(el, ctx, "omdb", "OMDb key", "Pasted here, encrypted in your vault.");
-        return;
-      case "dtdd":
-        keyField(el, ctx, "dtdd", "DoesTheDogDie key", "Pasted here, encrypted in your vault.");
-        return;
-      case "openrouter":
-        keyField(el, ctx, "openrouter", "OpenRouter key", "Pasted here, encrypted in your vault.");
-        askEnabledField(el, ctx);
-        return;
-      case "trakt":
-        traktAppField(el, ctx);
-        traktSignInField(el, ctx);
-        return;
-      case "mastodon":
-        mastodonHostField(el, ctx);
-        keyField(el, ctx, "mastodon", "Access token", "The token from step 4, encrypted in your vault.");
-        return;
-      default:
-        return;
-    }
   }
 
   // src/ai/models.ts
@@ -8418,306 +8750,6 @@ ${body}
   function previewLine(prefix, example = "Heat (1995)") {
     return `${prefix.trim() || "- Watched"} [[${example}]]`;
   }
-
-  // src/ui/setupSheet.ts
-  var SetupSheet = class extends Modal {
-    constructor(app2, plugin2, spec, onDone) {
-      super(app2);
-      this.plugin = plugin2;
-      this.spec = spec;
-      this.onDone = onDone;
-      this.ticked = /* @__PURE__ */ new Set();
-    }
-    onOpen() {
-      const { modalEl } = this;
-      modalEl.addClass("reel-modal");
-      modalEl.addClass("reel-setup-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-modal-phone");
-      this.draw();
-    }
-    /**
-     * Redrawn in place after anything that changes the answer.
-     *
-     * Saving a key changes the state pill, the status line and whether the
-     * sign-in button is offered, and a guide that still described the state
-     * before you acted would be the same lie this plugin keeps finding: a
-     * screen reporting what it was told rather than what is.
-     */
-    draw() {
-      const { contentEl } = this;
-      this.seedTicks();
-      contentEl.empty();
-      contentEl.addClass("reel-setup");
-      this.renderHead(contentEl);
-      this.renderSteps(contentEl);
-      this.renderFields(contentEl);
-      this.renderFoot(contentEl);
-    }
-    /**
-     * Steps the vault can prove you have already done.
-     *
-     * Ticking was there and was purely manual, which means it only ever
-     * survived one sitting: come back tomorrow to a guide you half finished
-     * and the marks are gone, along with the answer to the only question you
-     * have. A saved credential is durable, and it settles the question
-     * directly — no new state to store, and nothing to go stale.
-     *
-     * Only ever adds. A tick you put there by hand is a statement about
-     * something Reel cannot see, and taking it away because the plugin has no
-     * evidence of it would be the screen overruling you about your own
-     * afternoon.
-     */
-    seedTicks() {
-      const done = completedSteps(this.spec, (k) => this.plugin.credentials.has(k));
-      for (let i = 0; i < done; i++)
-        this.ticked.add(i);
-    }
-    /**
-     * The fields the steps have been pointing at all along.
-     *
-     * Every guide ends by telling you to paste something "below" and there was
-     * nothing below — the field was on the settings screen underneath the sheet
-     * saying "look down". The instruction was right about what to do and wrong
-     * about where, so following it meant abandoning the walkthrough halfway to
-     * go and find a control among forty-nine others.
-     *
-     * The same controls as the settings screen, not a copy of them: they live
-     * in `ui/fields` and both screens call it, so a key saved here is saved
-     * there and there is no second implementation to drift.
-     */
-    renderFields(root) {
-      const box = root.createDiv({ cls: "reel-setup-fields" });
-      setupFields(box, { app: this.app, plugin: this.plugin, onChanged: () => this.draw() }, this.spec);
-      if (!box.childElementCount)
-        box.remove();
-    }
-    /* ------------------------------------------------------------------ */
-    renderHead(root) {
-      const head = root.createDiv({ cls: "reel-setup-head" });
-      const title = head.createDiv({ cls: "reel-setup-title" });
-      title.createSpan({ cls: "reel-setup-name", text: this.spec.name });
-      const done = isConfigured(this.plugin, this.spec);
-      const part = isPartial(this.plugin, this.spec);
-      title.createSpan({
-        cls: done ? "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
-        text: done ? "Set up" : part ? "Half done" : this.spec.essential ? "Required" : "Not set up"
-      });
-      head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
-      head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
-      this.renderHealth(head, done);
-      const sends = root.createDiv({ cls: "reel-setup-sends" });
-      sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
-      sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
-    }
-    /**
-     * What this connection last did, and a way to find out now.
-     *
-     * Opening a guide for something already set up is almost always because it
-     * has stopped working, and the guide used to answer only the question you
-     * were not asking — how to set it up, which you already did.
-     *
-     * The button is the other half of that. Verification lived on a different
-     * screen from configuration, behind one control that tested all six
-     * services at once, so finishing this walkthrough meant closing it and
-     * going to look for something else in order to learn whether the key you
-     * had just pasted was right.
-     *
-     * Shown when the feature is set up *or* merely checkable, which are not the
-     * same thing and the difference is the point. Mastodon is checked by its
-     * server address rather than its token, so somebody who has typed a server
-     * and not yet made a token can find out the address is wrong — which is
-     * both the commonest mistake and the cheapest moment to fix it.
-     */
-    renderHealth(head, done) {
-      const can = checkable(this.plugin, this.spec.id);
-      if (!done && !can)
-        return;
-      const said = this.healthLine();
-      if (!said && !can)
-        return;
-      const wrap = head.createDiv({ cls: "reel-setup-check" });
-      const line = wrap.createDiv({ cls: "reel-setup-health" });
-      const draw2 = () => {
-        const now = this.healthLine();
-        line.setText(now?.text ?? "");
-        line.className = `reel-setup-health is-${now?.tone ?? "info"}`;
-      };
-      draw2();
-      if (!can) {
-        if (!this.locked())
-          return;
-        const open = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
-        open.addEventListener("click", async () => {
-          open.disabled = true;
-          open.setText("Unlocking\u2026");
-          const opened = await this.plugin.credentials.unlock();
-          if (!opened) {
-            open.disabled = false;
-            open.setText("Unlock");
-            return;
-          }
-          this.draw();
-        });
-        return;
-      }
-      const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        btn.setText("Checking\u2026");
-        try {
-          await checkFeature(this.plugin, this.spec.id, Date.now());
-          await this.plugin.saveSettings();
-        } finally {
-          btn.disabled = false;
-          btn.setText("Check now");
-          draw2();
-        }
-      });
-    }
-    /**
-     * Null for the features nothing can honestly report on.
-     *
-     * The routing lives in `health.ts` and is shared with the settings rows and
-     * the health table. It was written out here as well, which is how a guide
-     * and a row come to disagree about the same feature.
-     */
-    /** Sealed keys, and this feature is one of the ones that needs them. */
-    locked() {
-      return NEEDS_KEY_TO_CHECK.includes(this.spec.id) && this.plugin.credentials.needsUnlock && this.plugin.credentials.hasStoredKey;
-    }
-    healthLine() {
-      const s = this.plugin.settings;
-      return featureHealth(
-        this.spec.id,
-        {
-          records: s.connectionHealth,
-          hasTrakt: this.plugin.credentials.has("trakt"),
-          traktExpires: s.traktExpires,
-          locked: this.plugin.credentials.needsUnlock
-        },
-        Date.now()
-      );
-    }
-    /**
-     * The instructions, folded away once there is nothing left to follow.
-     *
-     * Opening a guide for a feature that is already working is a normal thing
-     * to do — it is where the status lives, and the Check now button, and the
-     * field you would use to replace a key. What you are not doing is reading
-     * how to create the account, and five completed steps between you and the
-     * three things you came for is a wall of settled questions.
-     *
-     * The settings list already reasons this way about its own descriptions: a
-     * pitch is for something you have not bought yet. This is the same rule one
-     * screen further in.
-     *
-     * Folded, never dropped. Making a second token a year from now means
-     * reading them again, and a guide that has quietly stopped containing its
-     * own guide would be a worse answer than a long screen.
-     */
-    renderSteps(root) {
-      const total = this.spec.steps.length;
-      const allDone = total > 0 && this.spec.steps.every((_, i) => this.ticked.has(i));
-      if (!allDone) {
-        const open = root.createEl("ol", { cls: "reel-setup-steps" });
-        this.spec.steps.forEach((step, i) => this.renderStep(open, step, i));
-        return;
-      }
-      const toggle2 = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
-      const list2 = root.createEl("ol", { cls: "reel-setup-steps is-collapsed" });
-      const label = () => {
-        const shown2 = !list2.classList.contains("is-collapsed");
-        toggle2.setText(shown2 ? "Hide the steps" : `All ${total} steps done \u2014 show them`);
-        toggle2.setAttr("aria-expanded", String(shown2));
-      };
-      toggle2.addEventListener("click", () => {
-        list2.classList.toggle("is-collapsed");
-        label();
-      });
-      label();
-      this.spec.steps.forEach((step, i) => this.renderStep(list2, step, i));
-    }
-    renderStep(list2, step, i) {
-      const li = list2.createEl("li", { cls: "reel-setup-step" });
-      const row = li.createDiv({ cls: "reel-setup-step-row" });
-      const done = this.ticked.has(i);
-      if (done)
-        li.addClass("is-done");
-      const tick = row.createEl("button", { cls: "reel-setup-tick", text: done ? "\u2713" : String(i + 1) });
-      tick.setAttr("aria-label", `Step ${i + 1}. Tap to mark done.`);
-      tick.setAttr("aria-pressed", String(done));
-      row.createSpan({ cls: "reel-setup-step-text", text: step.text });
-      const mark = () => {
-        const on = this.ticked.has(i);
-        if (on)
-          this.ticked.delete(i);
-        else
-          this.ticked.add(i);
-        li.toggleClass("is-done", !on);
-        tick.setAttr("aria-pressed", String(!on));
-        tick.setText(!on ? "\u2713" : String(i + 1));
-      };
-      tick.addEventListener("click", mark);
-      if (step.copy)
-        this.renderCopy(li, step.copy);
-      if (step.url) {
-        const a = li.createEl("a", {
-          cls: "reel-btn reel-setup-go",
-          text: this.hostOf(step.url),
-          href: step.url
-        });
-        a.setAttr("target", "_blank");
-        a.setAttr("rel", "noopener");
-        a.addEventListener("click", () => {
-          if (!this.ticked.has(i))
-            mark();
-        });
-      }
-      if (step.note)
-        li.createDiv({ cls: "reel-setup-note", text: step.note });
-    }
-    /**
-     * A literal to be typed exactly, with a button that copies it.
-     *
-     * The two values in Reel's entire setup that must match character for
-     * character are Trakt's redirect URI and Mastodon's scope, and both are
-     * strings of punctuation that mean nothing to read. Copying either by eye
-     * is how a setup fails five minutes later with somebody else's error
-     * message attached.
-     */
-    renderCopy(li, value) {
-      const btn = li.createEl("button", { cls: "reel-setup-copy" });
-      btn.createSpan({ cls: "reel-setup-copy-value", text: value });
-      btn.createSpan({ cls: "reel-setup-copy-hint", text: "Copy" });
-      btn.setAttr("aria-label", `Copy ${value}`);
-      btn.addEventListener("click", () => {
-        navigator.clipboard?.writeText(value).then(() => {
-          new Notice("Reel: copied.");
-          btn.addClass("is-copied");
-        }).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
-      });
-    }
-    renderFoot(root) {
-      const foot = root.createDiv({ cls: "reel-setup-foot" });
-      const close = foot.createEl("button", { cls: "reel-btn mod-cta", text: "Back to settings" });
-      close.addEventListener("click", () => {
-        this.close();
-        this.onDone?.();
-      });
-    }
-    /** "Open themoviedb.org" reads better on a button than the whole URL does. */
-    hostOf(url) {
-      try {
-        return `Open ${new URL(url).hostname.replace(/^www\./, "")}`;
-      } catch {
-        return "Open";
-      }
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
 
   // src/settings.ts
   var DEFAULT_SETTINGS = {
@@ -10396,7 +10428,7 @@ ${body}
 
   // src/ui/askSheet.ts
   var RECENT_LIMIT = 6;
-  var AskSheet = class extends Modal {
+  var AskSheet = class _AskSheet extends Modal {
     constructor(app2, plugin2, onOpenEntry, seed = "") {
       super(app2);
       this.plugin = plugin2;
@@ -10444,18 +10476,46 @@ ${body}
       if (this.seed)
         void this.run();
     }
+    /**
+     * The screen every new install meets when it opens Ask.
+     *
+     * Two faults lived here, both invisible until it was rendered for the first
+     * time, because `configured` was pinned true in the test rig.
+     *
+     * The first: `configured` is two conditions — a saved key *and* the switch
+     * — and this treated it as one. Somebody who had pasted a key and never
+     * found the toggle was told Ask needs a key. They had one. That is the
+     * 0.9.20 gap arriving one screen later: a saved key reads as set up
+     * everywhere in the plugin, and the one screen positioned to catch the
+     * difference repeated the wrong half of it.
+     *
+     * The second: it opened the settings tab. That is the exact fault the
+     * walkthroughs were built to fix — the guide has the key field, the switch
+     * beside it, the three steps for getting a key, and a check that proves it
+     * works before you leave. Sending somebody to hunt for one section among
+     * forty-nine controls, from a screen that knows precisely which feature is
+     * missing, is losing information on purpose.
+     */
     renderUnconfigured(el) {
+      const hasKey = this.plugin.credentials.has("openrouter");
       el.createDiv({
         cls: "reel-ask-empty",
-        text: "Ask needs an OpenRouter key, and it's off until you add one. When it's on, a question sends a short list of titles from your library \u2014 names, years, genres, runtimes and your ratings \u2014 to OpenRouter. No review text, no dates, no file paths."
+        text: hasKey ? "Your OpenRouter key is saved, but Ask is switched off, so no question is ever sent. Turning it on is one toggle \u2014 and while it is on, a question sends a short list of titles from your library: names, years, genres, runtimes and your ratings. No review text, no dates, no file paths." : "Ask needs an OpenRouter key, and it stays off until you add one. When it is on, a question sends a short list of titles from your library \u2014 names, years, genres, runtimes and your ratings \u2014 to OpenRouter. No review text, no dates, no file paths."
       });
       const actions = el.createDiv({ cls: "reel-log-actions" });
-      const go = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open settings" });
+      const spec = FEATURES.find((f) => f.id === "openrouter");
+      if (!spec)
+        return;
+      const go = actions.createEl("button", {
+        cls: "reel-btn mod-cta",
+        text: hasKey ? "Turn Ask on" : "Set up Ask"
+      });
       go.addEventListener("click", () => {
         this.close();
-        const setting = this.app.setting;
-        setting.open();
-        setting.openTabById("reel");
+        new SetupSheet(this.app, this.plugin, spec, () => {
+          if (this.plugin.ai.configured)
+            new _AskSheet(this.app, this.plugin, this.onOpenEntry, "").open();
+        }).open();
       });
     }
     /**
@@ -11111,6 +11171,8 @@ ${body}
   // harness/main.ts
   var noKeys = false;
   var locked = false;
+  var aiOff = false;
+  var noTargets = false;
   var missing = /* @__PURE__ */ new Set();
   var present = /* @__PURE__ */ new Set();
   var FIXED_NOW = Date.now();
@@ -11319,7 +11381,15 @@ ${body}
      */
     publish: {
       anyEnabled: true,
-      targets: () => [
+      /*
+       * Two targets by default, one ready and one blocked; none at all for
+       * the scene that models an install which has set up neither.
+       *
+       * That empty case renders a different screen entirely — the one telling
+       * you publishing exists and offering to set it up — and it had never been
+       * drawn, because this list was a constant.
+       */
+      targets: () => noTargets ? [] : [
         { id: "trakt", label: "Trakt", enabled: true, blocker: null },
         {
           id: "mastodon",
@@ -11338,7 +11408,9 @@ ${body}
     // Ask records the question you asked; the rig has nothing to save it to.
     saveSettings: async () => void 0,
     ai: {
-      configured: true,
+      get configured() {
+        return !aiOff && plugin.settings.aiEnabled && !noKeys;
+      },
       /*
        * No live model list in the rig. The picker's job before a fetch is to
        * show its curated suggestions, and that is the state a new install is
@@ -12045,6 +12117,46 @@ ${body}
     );
     root.querySelector(".reel-publish-target")?.click();
   }
+  function askoff(root) {
+    root.addClass("reel-view-body");
+    aiOff = true;
+    noKeys = true;
+    try {
+      mountSheet(root, new AskSheet(plugin.app, plugin, () => {
+      }, ""));
+    } finally {
+      aiOff = false;
+      noKeys = false;
+    }
+  }
+  function askdisabled(root) {
+    root.addClass("reel-view-body");
+    const before = plugin.settings.aiEnabled;
+    plugin.settings.aiEnabled = false;
+    try {
+      mountSheet(root, new AskSheet(plugin.app, plugin, () => {
+      }, ""));
+    } finally {
+      plugin.settings.aiEnabled = before;
+    }
+  }
+  function publishnowhere(root) {
+    root.addClass("reel-view-body");
+    noTargets = true;
+    try {
+      mountSheet(
+        root,
+        new PublishSheet(plugin.app, plugin, {
+          entry: LIBRARY[0],
+          date: "2026-08-20",
+          rating: 4.5,
+          text: "A review that has nowhere to go yet."
+        })
+      );
+    } finally {
+      noTargets = false;
+    }
+  }
   function asksheet(root) {
     root.addClass("reel-view-body");
     mountSheet(
@@ -12320,6 +12432,9 @@ ${body}
     publishsheet,
     asksheet,
     askresult,
+    askoff,
+    askdisabled,
+    publishnowhere,
     settings,
     settingsLocked,
     settingsPlain,

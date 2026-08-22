@@ -295,6 +295,33 @@ export function askEnabledField(el: HTMLElement, ctx: FieldContext): void {
 }
 
 /**
+ * The switch that decides whether a destination exists at all.
+ *
+ * The same fault as the Ask toggle, in two more places and worse. Publishing
+ * targets are gated on `publishTrakt` and `publishMastodon`, and neither guide
+ * contained either switch — so you could paste a Trakt client ID and secret,
+ * complete the device sign-in, watch all five steps tick and the status line
+ * turn green, close the guide, and find no Publish button anywhere in the app.
+ * Everything the walkthrough asked for was done and the feature was still off.
+ *
+ * A guide that cannot leave you with a working feature is not a walkthrough,
+ * it is a list of prerequisites.
+ */
+export function publishEnabledField(el: HTMLElement, ctx: FieldContext, id: "trakt" | "mastodon", label: string): void {
+	const key = id === "trakt" ? "publishTrakt" : "publishMastodon";
+	new Setting(el)
+		.setName(`Publish to ${label}`)
+		.setDesc("Off by default. With this off there is no Publish button, key or no key.")
+		.addToggle((t) =>
+			t.setValue(ctx.plugin.settings[key]).onChange(async (v) => {
+				ctx.plugin.settings[key] = v;
+				await ctx.plugin.saveSettings();
+				ctx.onChanged();
+			})
+		);
+}
+
+/**
  * Everything a given guide needs in order to be finishable, in step order.
  *
  * Per feature rather than derived from `spec.keys`, because the keys alone do
@@ -323,10 +350,14 @@ export function setupFields(el: HTMLElement, ctx: FieldContext, spec: FeatureSpe
 		case "trakt":
 			traktAppField(el, ctx);
 			traktSignInField(el, ctx);
+			// Last, because it is the control with any effect and it has
+			// nothing to switch on until the two above are done.
+			publishEnabledField(el, ctx, "trakt", "Trakt");
 			return;
 		case "mastodon":
 			mastodonHostField(el, ctx);
 			keyField(el, ctx, "mastodon", "Access token", "The token from step 4, encrypted in your vault.");
+			publishEnabledField(el, ctx, "mastodon", "Mastodon");
 			return;
 		default:
 			return;

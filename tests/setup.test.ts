@@ -20,7 +20,7 @@
  * for character carry no stray whitespace.
  */
 
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { completedSteps, FEATURES, isConfigured, isPartial, setupState } from "../src/setup";
 import { READ_KEYS, WRITE_KEYS, KeyName } from "../src/credentials";
@@ -303,6 +303,59 @@ for (const f of FEATURES) {
 		`needs ${f.keys.length} credential(s), the guide renders ${controls} control(s)`
 	);
 }
+
+/* ---- a guide has to leave you with a working feature ------------------ */
+
+/*
+ * Three features are gated on a settings flag as well as on a credential, and
+ * the flag defaults to off. Until now none of the three guides contained its
+ * own switch.
+ *
+ * Trakt was the clearest case. You could paste a client ID and secret,
+ * complete the device sign-in, watch all five steps tick and the status line
+ * turn green, close the guide, and find no Publish button anywhere in the app
+ * — because `targets()` reads `publishTrakt`, which lives on the settings tab
+ * and defaults to false. Everything the walkthrough asked for was done and the
+ * feature was still off.
+ *
+ * That is not a missing control, it is a walkthrough that does not walk you
+ * through. The count test above cannot see it, because the flag is not a
+ * credential and never will be.
+ */
+const GATED: Array<{ id: string; flag: string; control: string }> = [
+	{ id: "openrouter", flag: "aiEnabled", control: "askEnabledField" },
+	{ id: "trakt", flag: "publishTrakt", control: "publishEnabledField" },
+	{ id: "mastodon", flag: "publishMastodon", control: "publishEnabledField" },
+];
+
+for (const g of GATED) {
+	const at = fieldsSrc.indexOf(`case "${g.id}":`);
+	const body = at < 0 ? "" : fieldsSrc.slice(at, fieldsSrc.indexOf("return;", at));
+	ok(
+		`${g.id}: its guide contains the switch that turns it on`,
+		body.includes(g.control),
+		`${g.flag} defaults to off, so finishing this guide leaves the feature doing nothing`
+	);
+}
+
+/* ---- and a dead end is not a destination ------------------------------ */
+
+/*
+ * Two screens told you a feature was not set up and then opened the settings
+ * tab: Ask's empty state and the publish sheet's. Both knew exactly which
+ * feature was missing and threw that away to drop you at the top of a tab with
+ * forty-nine controls in it — which is the fault the walkthroughs were built
+ * to fix, committed by the two screens best placed to avoid it.
+ */
+const uiDir = join(__dirname, "..", "src", "ui");
+const jumps = readdirSync(uiDir)
+	.filter((n) => n.endsWith(".ts"))
+	.filter((n) => readFileSync(join(uiDir, n), "utf8").includes("openTabById"));
+ok(
+	"no screen answers 'not set up yet' by opening the settings tab",
+	jumps.length === 0,
+	jumps.length ? `these send you to hunt for the section instead of opening its guide: ${jumps.join(", ")}` : ""
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

@@ -31,6 +31,8 @@ import type { PublishOutcome, TargetId, TargetInfo } from "../publish";
 import { redact } from "../secrets";
 import { prettyDate } from "../util/dates";
 import { renderStarsStatic } from "./stars";
+import { FEATURES } from "../setup";
+import { SetupSheet } from "./setupSheet";
 
 interface Options {
 	entry: Entry;
@@ -103,20 +105,40 @@ export class PublishSheet extends Modal {
 		void this.repaint();
 	}
 
-	/** Publishing is on but nothing is configured — say what to do, not "error". */
+	/**
+	 * Publishing is on but nothing is configured.
+	 *
+	 * This said "Settings → Reel → Publishing has Trakt and Mastodon" and
+	 * offered one button that opened the settings tab, which is the fault the
+	 * walkthroughs exist to fix: the screen knows exactly which two features are
+	 * missing and it threw that away to drop you at the top of a tab holding
+	 * forty-nine controls.
+	 *
+	 * Two buttons rather than one, because there genuinely are two answers and
+	 * they differ in kind — Trakt is a film profile, Mastodon is a public
+	 * post. Choosing between them is the first real decision, and each guide
+	 * says what leaves your vault before you commit to anything.
+	 */
 	private renderNowhere(el: HTMLElement): void {
 		el.createDiv({
 			cls: "reel-publish-empty",
-			text: "No publishing destination is switched on yet. Settings → Reel → Publishing has Trakt and Mastodon.",
+			text:
+				"No publishing destination is set up yet. Trakt puts the review on your film profile; Mastodon " +
+				"posts it publicly. Either takes a few minutes, and neither sends anything until you press Publish.",
 		});
 		const actions = el.createDiv({ cls: "reel-log-actions" });
-		const go = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open settings" });
-		go.addEventListener("click", () => {
-			this.close();
-			// Obsidian's own settings opener; the section is the plugin's tab.
-			(this.app as unknown as { setting: { open(): void; openTabById(id: string): void } }).setting.open();
-			(this.app as unknown as { setting: { openTabById(id: string): void } }).setting.openTabById("reel");
-		});
+		for (const id of ["trakt", "mastodon"] as const) {
+			const spec = FEATURES.find((f) => f.id === id);
+			if (!spec) continue;
+			const go = actions.createEl("button", {
+				cls: `reel-btn${id === "trakt" ? " mod-cta" : ""}`,
+				text: `Set up ${spec.name}`,
+			});
+			go.addEventListener("click", () => {
+				this.close();
+				new SetupSheet(this.app, this.plugin, spec).open();
+			});
+		}
 	}
 
 	private renderTargets(el: HTMLElement, targets: TargetInfo[]): void {

@@ -29,6 +29,8 @@ import { ask, type AskResult } from "../ai/find";
 import { redact } from "../secrets";
 import { renderStarsStatic } from "./stars";
 import { formatMinutes } from "../util/dates";
+import { FEATURES } from "../setup";
+import { SetupSheet } from "./setupSheet";
 
 /** Kept short. A list of twenty past questions is not a memory, it is clutter. */
 const RECENT_LIMIT = 6;
@@ -112,21 +114,55 @@ export class AskSheet extends Modal {
 		if (this.seed) void this.run();
 	}
 
+	/**
+	 * The screen every new install meets when it opens Ask.
+	 *
+	 * Two faults lived here, both invisible until it was rendered for the first
+	 * time, because `configured` was pinned true in the test rig.
+	 *
+	 * The first: `configured` is two conditions — a saved key *and* the switch
+	 * — and this treated it as one. Somebody who had pasted a key and never
+	 * found the toggle was told Ask needs a key. They had one. That is the
+	 * 0.9.20 gap arriving one screen later: a saved key reads as set up
+	 * everywhere in the plugin, and the one screen positioned to catch the
+	 * difference repeated the wrong half of it.
+	 *
+	 * The second: it opened the settings tab. That is the exact fault the
+	 * walkthroughs were built to fix — the guide has the key field, the switch
+	 * beside it, the three steps for getting a key, and a check that proves it
+	 * works before you leave. Sending somebody to hunt for one section among
+	 * forty-nine controls, from a screen that knows precisely which feature is
+	 * missing, is losing information on purpose.
+	 */
 	private renderUnconfigured(el: HTMLElement): void {
+		const hasKey = this.plugin.credentials.has("openrouter");
+
 		el.createDiv({
 			cls: "reel-ask-empty",
-			text:
-				"Ask needs an OpenRouter key, and it's off until you add one. " +
-				"When it's on, a question sends a short list of titles from your library — names, years, genres, " +
-				"runtimes and your ratings — to OpenRouter. No review text, no dates, no file paths.",
+			text: hasKey
+				? "Your OpenRouter key is saved, but Ask is switched off, so no question is ever sent. " +
+					"Turning it on is one toggle — and while it is on, a question sends a short list of titles from " +
+					"your library: names, years, genres, runtimes and your ratings. No review text, no dates, no " +
+					"file paths."
+				: "Ask needs an OpenRouter key, and it stays off until you add one. " +
+					"When it is on, a question sends a short list of titles from your library — names, years, genres, " +
+					"runtimes and your ratings — to OpenRouter. No review text, no dates, no file paths.",
 		});
+
 		const actions = el.createDiv({ cls: "reel-log-actions" });
-		const go = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open settings" });
+		const spec = FEATURES.find((f) => f.id === "openrouter");
+		if (!spec) return;
+		const go = actions.createEl("button", {
+			cls: "reel-btn mod-cta",
+			text: hasKey ? "Turn Ask on" : "Set up Ask",
+		});
 		go.addEventListener("click", () => {
 			this.close();
-			const setting = (this.app as unknown as { setting: { open(): void; openTabById(id: string): void } }).setting;
-			setting.open();
-			setting.openTabById("reel");
+			// The guide redraws itself as you finish steps, so `onDone` only has
+			// to reopen Ask once it can actually run.
+			new SetupSheet(this.app, this.plugin, spec, () => {
+				if (this.plugin.ai.configured) new AskSheet(this.app, this.plugin, this.onOpenEntry, "").open();
+			}).open();
 		});
 	}
 

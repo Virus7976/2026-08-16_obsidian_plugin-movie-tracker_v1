@@ -48,6 +48,16 @@ let noKeys = false;
  */
 let locked = false;
 /*
+ * Set by the Ask scenes so `ai.configured` can be false.
+ *
+ * Pinned true, the one screen a person meets when they open Ask before setting
+ * it up could not be drawn at all — and `configured` is two conditions, not
+ * one, so there are two ways to be in it and they want different sentences.
+ */
+let aiOff = false;
+/* Set by the publish scene that models an install with no destination set up. */
+let noTargets = false;
+/*
  * Keys a scene wants to be *missing* while the rest are present.
  *
  * Everything-or-nothing was enough while a guide could only be shown from the
@@ -364,15 +374,26 @@ const plugin = {
 	 */
 	publish: {
 		anyEnabled: true,
-		targets: () => [
-			{ id: "trakt", label: "Trakt", enabled: true, blocker: null },
-			{
-				id: "mastodon",
-				label: "Mastodon",
-				enabled: true,
-				blocker: "No Mastodon access token — add one in Settings → Reel.",
-			},
-		],
+		/*
+		 * Two targets by default, one ready and one blocked; none at all for
+		 * the scene that models an install which has set up neither.
+		 *
+		 * That empty case renders a different screen entirely — the one telling
+		 * you publishing exists and offering to set it up — and it had never been
+		 * drawn, because this list was a constant.
+		 */
+		targets: () =>
+			noTargets
+				? []
+				: [
+						{ id: "trakt", label: "Trakt", enabled: true, blocker: null },
+						{
+							id: "mastodon",
+							label: "Mastodon",
+							enabled: true,
+							blocker: "No Mastodon access token — add one in Settings → Reel.",
+						},
+					],
 		publishedTo: () => ({}),
 		complaint: () => null,
 		preview: async () => ({
@@ -386,7 +407,9 @@ const plugin = {
 	// Ask records the question you asked; the rig has nothing to save it to.
 	saveSettings: async () => undefined,
 	ai: {
-		configured: true,
+		get configured() {
+			return !aiOff && plugin.settings.aiEnabled && !noKeys;
+		},
 		/*
 		 * No live model list in the rig. The picker's job before a fetch is to
 		 * show its curated suggestions, and that is the state a new install is
@@ -1420,6 +1443,71 @@ function publishsheet(root: HTMLElement): void {
  * What that leaves uncovered is the result list, and it is listed in the
  * audit's own skip line rather than left to be discovered.
  */
+/**
+ * Ask, opened before it has been set up — the screen every new install meets.
+ *
+ * `configured` was pinned true in this rig, so the branch that draws when it is
+ * false had never been rendered. That branch is the entire first-run experience
+ * of the feature: what Ask says for itself, what it promises about your data,
+ * and where it sends you next.
+ */
+function askoff(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	aiOff = true;
+	noKeys = true;
+	try {
+		mountSheet(root, new AskSheet(plugin.app, plugin as never, () => {}, "") as never);
+	} finally {
+		aiOff = false;
+		noKeys = false;
+	}
+}
+
+/**
+ * The other way to be unconfigured: the key is saved and the switch is off.
+ *
+ * `configured` is two conditions and this screen treated it as one. Somebody
+ * who pasted a key and never found the toggle — which is exactly what the
+ * 0.9.20 note is about, since a saved key reads as set up everywhere else in
+ * the plugin — was told Ask needs a key, which they have.
+ */
+function askdisabled(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const before = plugin.settings.aiEnabled;
+	plugin.settings.aiEnabled = false;
+	try {
+		mountSheet(root, new AskSheet(plugin.app, plugin as never, () => {}, "") as never);
+	} finally {
+		plugin.settings.aiEnabled = before;
+	}
+}
+
+/**
+ * Publishing, on an install that has set up neither destination.
+ *
+ * `targets()` was a constant in this rig, so the branch that draws when it is
+ * empty had never been rendered. That branch is the whole first-run experience
+ * of publishing: what the two destinations are, what each one does with your
+ * review, and how you get one working.
+ */
+function publishnowhere(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	noTargets = true;
+	try {
+		mountSheet(
+			root,
+			new PublishSheet(plugin.app, plugin as never, {
+				entry: LIBRARY[0],
+				date: "2026-08-20",
+				rating: 4.5,
+				text: "A review that has nowhere to go yet.",
+			}) as never
+		);
+	} finally {
+		noTargets = false;
+	}
+}
+
 function asksheet(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	mountSheet(
@@ -1838,6 +1926,9 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	publishsheet,
 	asksheet,
 	askresult,
+	askoff,
+	askdisabled,
+	publishnowhere,
 	settings,
 	settingsLocked,
 	settingsPlain,
