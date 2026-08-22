@@ -258,7 +258,33 @@ const PERSON_META = {
 
 const plugin = {
 	settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
-	app: { vault: { getAbstractFileByPath: () => null }, workspace: { getLeaf: () => null } },
+	app: {
+		vault: {
+			getAbstractFileByPath: () => null,
+			/*
+			 * A vault with a shape, so the folder fields have something to
+			 * check themselves against.
+			 *
+			 * Chosen so the screen shows both answers at once: `Movies` and
+			 * `Series` exist, and the default people folder `Movies/People`
+			 * does not — which is the real default, and the state a new
+			 * install is actually in. A fixture where every path resolves
+			 * would only ever exercise the half of the feature that says
+			 * "fine".
+			 */
+			getAllLoadedFiles: () => [
+				{ path: "Movies", children: [] },
+				{ path: "Movies/_posters", children: [] },
+				{ path: "Series", children: [] },
+				{ path: "People", children: [] },
+				{ path: "Archive/Old Movies", children: [] },
+				{ path: "Music", children: [] },
+				{ path: "Movies/Heat.md" },
+				{ path: "Inbox.md" },
+			],
+		},
+		workspace: { getLeaf: () => null },
+	},
 	library: {
 		all: () => pool,
 		films: () => pool.filter((e) => e.type === "film"),

@@ -7930,6 +7930,71 @@ ${body}
     return { done, partial, todo, blocked: !isConfigured(plugin2, essential), essential };
   }
 
+  // src/util/folders.ts
+  var ILLEGAL = /[*"\\<>:|?]/;
+  function normaliseFolder(raw) {
+    return raw.trim().replace(/\\/g, "/").split("/").map((seg) => seg.trim()).filter(Boolean).join("/");
+  }
+  function folderState(raw, folders, files) {
+    const path = normaliseFolder(raw);
+    if (!path)
+      return { kind: "root" };
+    if (ILLEGAL.test(path)) {
+      return { kind: "invalid", path, reason: 'A folder name cannot contain * " \\ < > : | or ?' };
+    }
+    if (path.split("/").some((seg) => seg.startsWith("."))) {
+      return { kind: "invalid", path, reason: "Folders starting with a dot are hidden and reserved by Obsidian" };
+    }
+    if (folders.has(path))
+      return { kind: "exists", path };
+    if (files.has(path) || files.has(`${path}.md`))
+      return { kind: "collides", path };
+    return { kind: "new", path };
+  }
+  function describeFolder(state, fallback) {
+    switch (state.kind) {
+      case "root":
+        return fallback ? { text: `Empty \u2014 Reel will use \u201C${fallback}\u201D`, tone: "info" } : { text: "Empty \u2014 Reel will write to your vault root", tone: "warn" };
+      case "exists":
+        return { text: "Folder exists", tone: "ok" };
+      case "new":
+        return { text: "Does not exist yet \u2014 Reel will create it", tone: "info" };
+      case "collides":
+        return { text: "A note already has this exact name", tone: "warn" };
+      case "invalid":
+        return { text: state.reason, tone: "warn" };
+    }
+  }
+  function matchFolders(all2, query, limit = 6) {
+    const q = normaliseFolder(query).toLowerCase();
+    if (!q) {
+      return [...all2].sort((a, b) => a.length - b.length || a.localeCompare(b)).slice(0, limit);
+    }
+    const hits = rankAgainst(all2, q, limit);
+    if (hits.length)
+      return hits;
+    const tail = q.split("/").pop() ?? "";
+    return tail && tail !== q ? rankAgainst(all2, tail, limit) : [];
+  }
+  function rankAgainst(all2, q, limit) {
+    const rank2 = (path) => {
+      const p = path.toLowerCase();
+      if (p === q)
+        return 0;
+      if (p.startsWith(q))
+        return 1;
+      const segs = p.split("/");
+      if ((segs[segs.length - 1] ?? "").startsWith(q))
+        return 2;
+      if (segs.some((s) => s.startsWith(q)))
+        return 3;
+      if (p.includes(q))
+        return 4;
+      return 99;
+    };
+    return all2.map((path) => ({ path, r: rank2(path) })).filter((x) => x.r < 99).sort((a, b) => a.r - b.r || a.path.length - b.path.length || a.path.localeCompare(b.path)).map((x) => x.path).slice(0, limit);
+  }
+
   // src/ui/setupSheet.ts
   var SetupSheet = class extends Modal {
     constructor(app2, plugin2, spec, onDone) {
@@ -8881,30 +8946,111 @@ ${body}
         cls: "reel-key-status",
         text: films + shows === 0 ? "No titles indexed yet." : `Indexing ${films} film${films === 1 ? "" : "s"} and ${shows} series.`
       });
-      const folder = (name, desc, key) => new Setting(el).setName(name).setDesc(desc).addText((t) => {
-        const apply = debounce(
-          async (v) => {
-            this.plugin.settings[key] = v.replace(/^\/+|\/+$/g, "") || DEFAULT_SETTINGS[key];
-            await this.plugin.saveSettings();
-            this.plugin.library.rebuild();
-          },
-          600,
-          true
-        );
-        t.setValue(this.plugin.settings[key]).onChange((v) => apply(v));
-      });
-      folder("Films folder", "One note per film.", "filmFolder");
-      folder("Series folder", "One note per show \u2014 not per season or episode.", "seriesFolder");
-      folder("Poster folder", "Shared by films and series.", "posterFolder");
-      folder(
+      this.folderField(el, "filmFolder", "Films folder", "One note per film.");
+      this.folderField(el, "seriesFolder", "Series folder", "One note per show \u2014 not per season or episode.");
+      this.folderField(el, "posterFolder", "Poster folder", "Shared by films and series.");
+      this.folderField(
+        el,
+        "peopleFolder",
         "People folder",
-        "Where director and cast links point. Naming the folder explicitly is what stops person notes appearing in your vault root when you tap an unresolved link.",
-        "peopleFolder"
+        "Where director and cast links point. Naming the folder explicitly is what stops person notes appearing in your vault root when you tap an unresolved link."
       );
       el.createDiv({
         cls: "reel-callout",
         text: "Everything Reel writes lives under these four folders and its own plugin folder. It never creates notes anywhere else \u2014 the daily-note link, if you turn it on, only appends to a note you already have."
       });
+    }
+    /**
+     * Every folder in the vault, and every file, as two sets.
+     *
+     * Read once per render rather than per keystroke. A vault of ten thousand
+     * notes is a list of ten thousand strings, and rebuilding it on every
+     * character typed into a folder box is the kind of cost that does not show
+     * up until somebody with a real vault tries it.
+     */
+    vaultIndex() {
+      const folders = /* @__PURE__ */ new Set();
+      const files = /* @__PURE__ */ new Set();
+      const loaded = this.app.vault.getAllLoadedFiles();
+      for (const f of loaded ?? []) {
+        if (!f?.path || f.path === "/")
+          continue;
+        if ("children" in f)
+          folders.add(f.path);
+        else
+          files.add(f.path);
+      }
+      return { folders, files, all: [...folders] };
+    }
+    /**
+     * A folder setting that says what it is looking at.
+     *
+     * These four fields are the only place on this screen where being wrong is
+     * silent. A bad API key errors the moment it is used; a bad folder simply
+     * becomes a folder, and Reel goes on working perfectly while writing
+     * somewhere you are not looking. The symptom surfaces weeks later as "my
+     * films have stopped appearing", reported as a bug in the library.
+     *
+     * It cannot be validated away, because "I mistyped Movies" and "I want a
+     * folder that does not exist yet" are the same keystrokes, and the second
+     * is a legitimate thing to do. So the field does the two things it honestly
+     * can: say which of those two situations it is in, and offer the folders
+     * you already have, so the typo never has to be typed.
+     */
+    folderField(el, key, name, desc) {
+      const vault = this.vaultIndex();
+      const wrap = el.createDiv({ cls: "reel-folder-field" });
+      let input = null;
+      const apply = debounce(
+        async (v) => {
+          this.plugin.settings[key] = normaliseFolder(v) || DEFAULT_SETTINGS[key];
+          await this.plugin.saveSettings();
+          this.plugin.library.rebuild();
+        },
+        600,
+        true
+      );
+      const status = document.createElement("div");
+      const list2 = document.createElement("div");
+      const refresh = (raw) => {
+        const state = folderState(raw, vault.folders, vault.files);
+        const said = describeFolder(state, DEFAULT_SETTINGS[key]);
+        status.setText(said.text);
+        status.className = `reel-folder-status is-${said.tone}`;
+        list2.empty();
+        const offer = state.kind === "new" || state.kind === "root" || state.kind === "collides";
+        const here = normaliseFolder(raw);
+        let hits = offer ? matchFolders(vault.all, raw).filter((path) => path !== here) : [];
+        if (offer && !hits.length) {
+          hits = matchFolders(vault.all, "").filter((path) => path !== here);
+          const preferred = DEFAULT_SETTINGS[key];
+          if (hits.includes(preferred))
+            hits = [preferred, ...hits.filter((path) => path !== preferred)];
+        }
+        for (const path of hits) {
+          const b = list2.createEl("button", { cls: "reel-folder-chip", text: path });
+          b.setAttr("aria-label", `Use folder ${path}`);
+          b.addEventListener("click", () => {
+            if (input)
+              input.value = path;
+            refresh(path);
+            apply(path);
+          });
+        }
+      };
+      new Setting(wrap).setName(name).setDesc(desc).addText((t) => {
+        t.setValue(this.plugin.settings[key]).onChange((v) => {
+          refresh(v);
+          apply(v);
+        });
+        t.inputEl.addClass("reel-input");
+        t.inputEl.spellcheck = false;
+        input = t.inputEl;
+      });
+      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra.appendChild(status);
+      extra.appendChild(list2);
+      refresh(this.plugin.settings[key]);
     }
     renderMetadata(el) {
       new Setting(el).setName("Link people and use wikilinks").setDesc(
@@ -10256,7 +10402,33 @@ ${body}
   };
   var plugin = {
     settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
-    app: { vault: { getAbstractFileByPath: () => null }, workspace: { getLeaf: () => null } },
+    app: {
+      vault: {
+        getAbstractFileByPath: () => null,
+        /*
+         * A vault with a shape, so the folder fields have something to
+         * check themselves against.
+         *
+         * Chosen so the screen shows both answers at once: `Movies` and
+         * `Series` exist, and the default people folder `Movies/People`
+         * does not — which is the real default, and the state a new
+         * install is actually in. A fixture where every path resolves
+         * would only ever exercise the half of the feature that says
+         * "fine".
+         */
+        getAllLoadedFiles: () => [
+          { path: "Movies", children: [] },
+          { path: "Movies/_posters", children: [] },
+          { path: "Series", children: [] },
+          { path: "People", children: [] },
+          { path: "Archive/Old Movies", children: [] },
+          { path: "Music", children: [] },
+          { path: "Movies/Heat.md" },
+          { path: "Inbox.md" }
+        ]
+      },
+      workspace: { getLeaf: () => null }
+    },
     library: {
       all: () => pool,
       films: () => pool.filter((e) => e.type === "film"),

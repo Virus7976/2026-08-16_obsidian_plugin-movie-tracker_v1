@@ -15633,3 +15633,124 @@ button.reel-facet-tab {
  * hides it. Handled in `applyFilter` rather than here, because "did the
  * section name match" is not a question CSS can ask.
  */
+
+
+/* ==================================================================== */
+/* Folder fields                                                        */
+/* ==================================================================== */
+
+/*
+ * The four settings where being wrong is silent.
+ *
+ * Everywhere else on this screen a mistake announces itself: a bad key gets an
+ * error the first time it is used, a bad model slug comes back as a refusal.
+ * A mistyped folder just becomes a folder. Reel carries on working perfectly,
+ * writing notes somewhere you are not looking, and the symptom arrives weeks
+ * later as "my films have stopped appearing".
+ *
+ * The status line under each field is the whole fix. It cannot say "wrong",
+ * because a path that does not exist yet is a legitimate thing to type — but
+ * it can say which of the two situations you are in, which is all anybody
+ * needed.
+ */
+
+.reel-folder-field {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* The row inside already draws the hairline; two of them is a rule. */
+.reel-settings .reel-folder-field .setting-item {
+	border-top: none;
+}
+
+.reel-folder-extra {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2);
+	padding: 0 0 var(--reel-space-3);
+}
+
+/* Search hides the row; without this its status line stays behind. */
+.reel-settings .setting-item.is-filtered-out ~ .reel-folder-extra {
+	display: none;
+}
+
+.reel-folder-status {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	padding-left: var(--reel-space-3);
+	border-left: 2px solid var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+/*
+ * Three tones, and the distinction between the middle one and the last one is
+ * the point of the feature.
+ *
+ * "Does not exist yet" is not a warning. It is the correct and common answer
+ * on a fresh install, where none of the four folders exist and all four are
+ * about to be created. Colouring it as a problem would make the entire Folders
+ * section look broken to every new user — and would teach them to ignore the
+ * colour by the time it means something.
+ */
+.reel-folder-status.is-ok {
+	color: var(--reel-ok);
+	border-left-color: var(--reel-ok);
+}
+
+.reel-folder-status.is-info {
+	color: var(--text-muted);
+	border-left-color: var(--interactive-accent, #5b6cff);
+}
+
+.reel-folder-status.is-warn {
+	color: var(--reel-warn);
+	border-left-color: var(--reel-warn);
+}
+
+/* ---- Suggestions ---------------------------------------------------- */
+
+.reel-folder-suggest {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--reel-space-2);
+}
+
+.reel-folder-suggest:empty {
+	display: none;
+}
+
+/*
+ * Two classes to outrank a theme's `button:not(button.clickable-icon)`.
+ *
+ * 44px, like everything else you tap in this plugin. A suggestion chip is
+ * exactly the kind of control that gets made 28px because it is "just a hint"
+ * — and it is the control whose entire purpose is to be hit instead of typing
+ * a path on a phone keyboard.
+ */
+.reel-settings .reel-folder-chip {
+	min-height: 44px;
+	padding: 0 var(--reel-space-3);
+	border-radius: var(--reel-radius-full);
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	box-shadow: none;
+	cursor: pointer;
+	font-size: var(--font-ui-smaller);
+	font-family: var(--font-monospace);
+	white-space: nowrap;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-settings .reel-folder-chip:hover {
+	background: var(--background-modifier-hover);
+	border-color: var(--background-modifier-border-hover);
+}
+
+.reel-settings .reel-folder-chip:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}

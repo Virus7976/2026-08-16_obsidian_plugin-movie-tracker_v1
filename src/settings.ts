@@ -7,6 +7,7 @@ import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credent
 import { normaliseHost } from "./publish/mastodon";
 import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
+import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
 import { SetupSheet } from "./ui/setupSheet";
 
 /** What you think of a person, used to weight what gets recommended. */
@@ -245,6 +246,8 @@ const MODE_LABELS: Record<KeyMode, string> = {
  * consecutive method calls, the answer to "what sections are there" existed
  * only in the order of the statements.
  */
+type FolderKey = "filmFolder" | "seriesFolder" | "posterFolder" | "peopleFolder";
+
 interface SectionSpec {
 	/** Stable across releases: it is persisted in the open set. */
 	id: string;
@@ -1277,34 +1280,14 @@ export class ReelSettingTab extends PluginSettingTab {
 					: `Indexing ${films} film${films === 1 ? "" : "s"} and ${shows} series.`,
 		});
 
-		type FolderKey = "filmFolder" | "seriesFolder" | "posterFolder" | "peopleFolder";
-		const folder = (name: string, desc: string, key: FolderKey) =>
-			new Setting(el)
-				.setName(name)
-				.setDesc(desc)
-				.addText((t) => {
-					// Typing "Movies" fired six saves and six full vault scans,
-					// each briefly pointing the library at a folder named "M",
-					// then "Mo". Settle first, then rebuild once.
-					const apply = debounce(
-						async (v: string) => {
-							this.plugin.settings[key] = v.replace(/^\/+|\/+$/g, "") || DEFAULT_SETTINGS[key];
-							await this.plugin.saveSettings();
-							this.plugin.library.rebuild();
-						},
-						600,
-						true
-					);
-					t.setValue(this.plugin.settings[key]).onChange((v) => apply(v));
-				});
-
-		folder("Films folder", "One note per film.", "filmFolder");
-		folder("Series folder", "One note per show — not per season or episode.", "seriesFolder");
-		folder("Poster folder", "Shared by films and series.", "posterFolder");
-		folder(
+		this.folderField(el, "filmFolder", "Films folder", "One note per film.");
+		this.folderField(el, "seriesFolder", "Series folder", "One note per show — not per season or episode.");
+		this.folderField(el, "posterFolder", "Poster folder", "Shared by films and series.");
+		this.folderField(
+			el,
+			"peopleFolder",
 			"People folder",
-			"Where director and cast links point. Naming the folder explicitly is what stops person notes appearing in your vault root when you tap an unresolved link.",
-			"peopleFolder"
+			"Where director and cast links point. Naming the folder explicitly is what stops person notes appearing in your vault root when you tap an unresolved link."
 		);
 
 		el.createDiv({
@@ -1313,6 +1296,160 @@ export class ReelSettingTab extends PluginSettingTab {
 				"Everything Reel writes lives under these four folders and its own plugin folder. " +
 				"It never creates notes anywhere else — the daily-note link, if you turn it on, only appends to a note you already have.",
 		});
+	}
+
+
+	/**
+	 * Every folder in the vault, and every file, as two sets.
+	 *
+	 * Read once per render rather than per keystroke. A vault of ten thousand
+	 * notes is a list of ten thousand strings, and rebuilding it on every
+	 * character typed into a folder box is the kind of cost that does not show
+	 * up until somebody with a real vault tries it.
+	 */
+	private vaultIndex(): { folders: Set<string>; files: Set<string>; all: string[] } {
+		const folders = new Set<string>();
+		const files = new Set<string>();
+		/*
+		 * Duck-typed rather than `instanceof TFolder`.
+		 *
+		 * The layout harness supplies its own vault, and making it construct
+		 * real Obsidian classes in order to be recognised here would be the rig
+		 * dictating the shape of the app. A folder is the thing with children.
+		 */
+		const loaded = this.app.vault.getAllLoadedFiles() as Array<{ path?: string; children?: unknown }>;
+		for (const f of loaded ?? []) {
+			if (!f?.path || f.path === "/") continue;
+			if ("children" in f) folders.add(f.path);
+			else files.add(f.path);
+		}
+		return { folders, files, all: [...folders] };
+	}
+
+	/**
+	 * A folder setting that says what it is looking at.
+	 *
+	 * These four fields are the only place on this screen where being wrong is
+	 * silent. A bad API key errors the moment it is used; a bad folder simply
+	 * becomes a folder, and Reel goes on working perfectly while writing
+	 * somewhere you are not looking. The symptom surfaces weeks later as "my
+	 * films have stopped appearing", reported as a bug in the library.
+	 *
+	 * It cannot be validated away, because "I mistyped Movies" and "I want a
+	 * folder that does not exist yet" are the same keystrokes, and the second
+	 * is a legitimate thing to do. So the field does the two things it honestly
+	 * can: say which of those two situations it is in, and offer the folders
+	 * you already have, so the typo never has to be typed.
+	 */
+	private folderField(el: HTMLElement, key: FolderKey, name: string, desc: string): void {
+		const vault = this.vaultIndex();
+		const wrap = el.createDiv({ cls: "reel-folder-field" });
+		let input: HTMLInputElement | null = null;
+
+		// Typing "Movies" fired six saves and six full vault scans, each
+		// briefly pointing the library at a folder named "M", then "Mo".
+		// Settle first, then rebuild once.
+		const apply = debounce(
+			async (v: string) => {
+				this.plugin.settings[key] = normaliseFolder(v) || DEFAULT_SETTINGS[key];
+				await this.plugin.saveSettings();
+				this.plugin.library.rebuild();
+			},
+			600,
+			true
+		);
+
+		const status = document.createElement("div");
+		const list = document.createElement("div");
+
+		const refresh = (raw: string): void => {
+			const state = folderState(raw, vault.folders, vault.files);
+			const said = describeFolder(state, DEFAULT_SETTINGS[key]);
+			status.setText(said.text);
+			status.className = `reel-folder-status is-${said.tone}`;
+
+			list.empty();
+			/*
+			 * Who gets suggestions, and it is not everybody.
+			 *
+			 * Once the folder exists the question is answered, and offering
+			 * five neighbours underneath it spends a row of screen on a
+			 * decision already made — four fields each doing that is most of
+			 * the section. And an illegal character is fixed by deleting the
+			 * character, so a list of folders there is an answer to a question
+			 * nobody asked.
+			 *
+			 * That leaves the three states where you are looking for a folder
+			 * and have not got one: it does not exist, it is empty, or a note
+			 * is sitting on the name.
+			 */
+			const offer = state.kind === "new" || state.kind === "root" || state.kind === "collides";
+			const here = normaliseFolder(raw);
+			let hits = offer ? matchFolders(vault.all, raw).filter((path) => path !== here) : [];
+
+			/*
+			 * Never leave them with nothing.
+			 *
+			 * "Films" when the folder is called "Movies" is the case this whole
+			 * feature was written for, and it matched nothing at all — quite
+			 * correctly, since the two words share no letters in an order any
+			 * matcher would care about. Correct and useless: the field said the
+			 * folder would be created and offered no hint that the one you
+			 * meant was sitting right there.
+			 *
+			 * So when the query finds nothing, fall back to showing what the
+			 * vault actually has. This is a decision about not stranding
+			 * somebody rather than a ranking rule, which is why it lives here
+			 * and not inside `matchFolders` — that function should go on
+			 * answering "what matches this" honestly, including "nothing".
+			 */
+			if (offer && !hits.length) {
+				hits = matchFolders(vault.all, "").filter((path) => path !== here);
+				/*
+				 * This field's own default goes first, if the vault has it.
+				 *
+				 * The list is otherwise ordered shortest-path-first, which is
+				 * a fine neutral order for browsing and a poor one to tap
+				 * without reading: typing "Films" offered Music at the front,
+				 * and the first chip is the one people take. The default for
+				 * this particular setting is the best guess available, and it
+				 * costs nothing to put it where the thumb already is.
+				 */
+				const preferred = DEFAULT_SETTINGS[key];
+				if (hits.includes(preferred)) hits = [preferred, ...hits.filter((path) => path !== preferred)];
+			}
+			for (const path of hits) {
+				const b = list.createEl("button", { cls: "reel-folder-chip", text: path });
+				b.setAttr("aria-label", `Use folder ${path}`);
+				b.addEventListener("click", () => {
+					if (input) input.value = path;
+					refresh(path);
+					apply(path);
+				});
+			}
+		};
+
+		new Setting(wrap)
+			.setName(name)
+			.setDesc(desc)
+			.addText((t) => {
+				t.setValue(this.plugin.settings[key]).onChange((v) => {
+					// Feedback is immediate; the save is not. Waiting 600ms to
+					// be told whether the folder exists would make the answer
+					// feel like it belonged to the previous keystroke.
+					refresh(v);
+					apply(v);
+				});
+				t.inputEl.addClass("reel-input");
+				t.inputEl.spellcheck = false;
+				input = t.inputEl;
+			});
+
+		const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+		extra.appendChild(status);
+		extra.appendChild(list);
+
+		refresh(this.plugin.settings[key]);
 	}
 
 	private renderMetadata(el: HTMLElement): void {

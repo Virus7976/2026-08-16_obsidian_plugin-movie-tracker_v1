@@ -52,6 +52,31 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.6",
+		date: "2026-08-22",
+		headline: "The folder settings now tell you whether the folder is actually there.",
+		changes: [
+			{
+				kind: "new",
+				text: "Each folder field says what it is looking at: \u201cFolder exists\u201d, \u201cDoes not exist yet \u2014 Reel will create it\u201d, or that a note is already sitting on the name.",
+				note: "These four fields were the only place in Settings where being wrong was silent. A bad API key errors the first time it is used; a mistyped folder just becomes a folder, and Reel carries on working perfectly while writing notes somewhere you are not looking. It surfaces weeks later as \u201cmy films have stopped appearing\u201d.",
+			},
+			{
+				kind: "new",
+				text: "Folders you already have are offered underneath, as buttons. Tap one instead of typing a path on a phone keyboard.",
+				note: "They appear only while the path does not resolve \u2014 once the folder exists the question is answered, and four fields each showing five suggestions would be most of the section.",
+			},
+			{
+				kind: "better",
+				text: "\u201cDoes not exist yet\u201d is deliberately not styled as a problem. On a fresh install none of the four folders exist and all four are about to be created.",
+			},
+			{
+				kind: "fixed",
+				text: "Paths pasted with backslashes, doubled slashes or stray spaces are now understood rather than saved as-is.",
+			},
+		],
+	},
+	{
 		version: "0.9.5",
 		date: "2026-08-22",
 		headline: "Settings folds up, says what is inside each section, and can be searched.",
