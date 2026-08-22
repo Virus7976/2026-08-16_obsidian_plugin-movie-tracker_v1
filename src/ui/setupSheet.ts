@@ -42,6 +42,7 @@ import { App, Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
 import type { FeatureSpec, SetupStep } from "../setup";
 import { isConfigured, isPartial } from "../setup";
+import { TESTABLE, describeHealth, describeTrakt, traktState } from "../health";
 
 export class SetupSheet extends Modal {
 	private ticked = new Set<number>();
@@ -89,12 +90,36 @@ export class SetupSheet extends Modal {
 		head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
 		head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
 
+		/*
+		 * What this connection last did, for the features that can say.
+		 *
+		 * Opening a guide for something already set up is almost always
+		 * because it has stopped working, and until now the guide answered
+		 * only the question you were not asking — how to set it up, which you
+		 * already did.
+		 */
+		if (done) {
+			const said = this.healthLine();
+			if (said) head.createDiv({ cls: `reel-setup-health is-${said.tone}`, text: said.text });
+		}
+
 		// Not a disclosure buried behind a link. If a feature sends something
 		// out of the vault, the sentence saying so is on the screen where you
 		// decide to turn it on.
 		const sends = root.createDiv({ cls: "reel-setup-sends" });
 		sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
 		sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
+	}
+
+	/** Null for the features nothing can honestly report on. */
+	private healthLine(): { text: string; tone: "ok" | "warn" | "info" } | null {
+		const now = Date.now();
+		const s = this.plugin.settings;
+		if (this.spec.id === "trakt") {
+			return describeTrakt(traktState(this.plugin.credentials.has("trakt"), s.traktExpires, now), now);
+		}
+		if (!TESTABLE.includes(this.spec.id)) return null;
+		return describeHealth(s.connectionHealth[this.spec.id], true, now);
 	}
 
 	private renderSteps(root: HTMLElement): void {

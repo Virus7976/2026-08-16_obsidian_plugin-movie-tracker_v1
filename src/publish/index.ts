@@ -182,10 +182,30 @@ export class PublishService {
 	/** Both credentials that can act as you, dropped. */
 	async signOut(): Promise<void> {
 		await this.plugin.credentials.remove("trakt");
+		this.plugin.settings.traktExpires = 0;
+		await this.plugin.saveSettings();
 	}
 
+	/**
+	 * Store the token, and record its expiry where the screen can see it.
+	 *
+	 * The expiry lives beside the credential rather than only inside it. It is
+	 * not a secret — it is a date, and anybody could infer it by watching the
+	 * plugin stop working — and the settings screen has to answer "are you
+	 * signed in" while the vault is locked. Reading it out of the encrypted
+	 * token would mean demanding a passphrase in order to draw one row.
+	 *
+	 * Until this existed, "Signed in to Trakt" meant "a token is stored", which
+	 * stays true forever, including long after the session it refers to has
+	 * expired.
+	 */
 	async storeToken(json: string): Promise<boolean> {
-		return this.plugin.credentials.store("trakt", json);
+		const ok = await this.plugin.credentials.store("trakt", json);
+		if (ok) {
+			this.plugin.settings.traktExpires = parseToken(json)?.expires ?? 0;
+			await this.plugin.saveSettings();
+		}
+		return ok;
 	}
 
 	appConfigured(): boolean {

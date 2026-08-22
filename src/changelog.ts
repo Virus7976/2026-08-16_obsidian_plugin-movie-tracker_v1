@@ -52,6 +52,32 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.7",
+		date: "2026-08-22",
+		headline: "Settings now knows the difference between set up and working.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "\u201cSigned in to Trakt\u201d meant \u201ca token is stored\u201d, which stays true forever \u2014 including long after the session expired.",
+				note: "The first you heard about it was a review that would not publish. The expiry was inside the token the whole time, unread. The row now says whether the session is live, and offers a way back in when it is not.",
+			},
+			{
+				kind: "better",
+				text: "Test connections keeps its answer. Each service shows what it did and how long ago, until you test again.",
+				note: "It used to report into a Notice that vanished after eight seconds, so a screen that had just proved every key worked looked exactly like one that had never been tested.",
+			},
+			{
+				kind: "new",
+				text: "A feature that has stopped working says so in Getting started, where you look when something has stopped working.",
+				note: "That section could previously only answer \u201cis this set up\u201d \u2014 a question a revoked key and an expired session both answer yes to.",
+			},
+			{
+				kind: "fixed",
+				text: "A failing service no longer shows a green tick beside the words explaining that it failed.",
+			},
+		],
+	},
+	{
 		version: "0.9.6",
 		date: "2026-08-22",
 		headline: "The folder settings now tell you whether the folder is actually there.",

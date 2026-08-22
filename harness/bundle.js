@@ -7995,6 +7995,64 @@ ${body}
     return all2.map((path) => ({ path, r: rank2(path) })).filter((x) => x.r < 99).sort((a, b) => a.r - b.r || a.path.length - b.path.length || a.path.localeCompare(b.path)).map((x) => x.path).slice(0, limit);
   }
 
+  // src/health.ts
+  var TESTABLE = ["tmdb", "omdb", "dtdd"];
+  var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
+  function ago(then, now) {
+    const ms = Math.max(0, now - then);
+    const min = Math.floor(ms / 6e4);
+    if (min < 1)
+      return "just now";
+    if (min < 60)
+      return `${min} minute${min === 1 ? "" : "s"} ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24)
+      return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 30)
+      return `${day} day${day === 1 ? "" : "s"} ago`;
+    const mon = Math.floor(day / 30);
+    return `${mon} month${mon === 1 ? "" : "s"} ago`;
+  }
+  function describeHealth(rec, configured, now) {
+    if (!configured)
+      return { text: "Not set up", tone: "info" };
+    if (!rec)
+      return { text: "Not checked yet", tone: "info" };
+    const when = ago(rec.at, now);
+    if (!rec.ok)
+      return { text: `Failed ${when}${rec.error ? ` \u2014 ${rec.error}` : ""}`, tone: "warn" };
+    if (now - rec.at > STALE_AFTER)
+      return { text: `Worked ${when}`, tone: "info" };
+    return { text: `Working \u2014 checked ${when}`, tone: "ok" };
+  }
+  var SOON = 7 * 24 * 60 * 60 * 1e3;
+  function traktState(hasToken, expires, now) {
+    if (!hasToken)
+      return { kind: "out" };
+    if (!expires)
+      return { kind: "unknown" };
+    if (expires <= now)
+      return { kind: "expired", expires };
+    if (expires - now < SOON)
+      return { kind: "soon", expires };
+    return { kind: "in", expires };
+  }
+  function describeTrakt(state, now) {
+    switch (state.kind) {
+      case "out":
+        return { text: "Not signed in", tone: "info" };
+      case "unknown":
+        return { text: "Signed in \u2014 Reel cannot tell when this expires", tone: "info" };
+      case "expired":
+        return { text: `Session expired ${ago(state.expires, now)} \u2014 sign in again`, tone: "warn" };
+      case "soon":
+        return { text: "Signed in \u2014 renews automatically this week", tone: "ok" };
+      case "in":
+        return { text: "Signed in", tone: "ok" };
+    }
+  }
+
   // src/ui/setupSheet.ts
   var SetupSheet = class extends Modal {
     constructor(app2, plugin2, spec, onDone) {
@@ -8029,9 +8087,25 @@ ${body}
       });
       head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
       head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
+      if (done) {
+        const said = this.healthLine();
+        if (said)
+          head.createDiv({ cls: `reel-setup-health is-${said.tone}`, text: said.text });
+      }
       const sends = root.createDiv({ cls: "reel-setup-sends" });
       sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
       sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
+    }
+    /** Null for the features nothing can honestly report on. */
+    healthLine() {
+      const now = Date.now();
+      const s = this.plugin.settings;
+      if (this.spec.id === "trakt") {
+        return describeTrakt(traktState(this.plugin.credentials.has("trakt"), s.traktExpires, now), now);
+      }
+      if (!TESTABLE.includes(this.spec.id))
+        return null;
+      return describeHealth(s.connectionHealth[this.spec.id], true, now);
     }
     renderSteps(root) {
       const list2 = root.createEl("ol", { cls: "reel-setup-steps" });
@@ -8138,6 +8212,8 @@ ${body}
     dismissedIds: [],
     people: {},
     lastTab: "library",
+    connectionHealth: {},
+    traktExpires: 0,
     // Only Getting started. Everything else is one tap away and, on a fresh
     // install, none of it is what you came for.
     settingsOpen: ["setup"],
@@ -8228,7 +8304,11 @@ ${body}
           summary: () => {
             const n2 = [...READ_KEYS, ...WRITE_KEYS].filter((k) => this.plugin.credentials.has(k)).length;
             const mode = MODE_LABELS[s.keyMode] ?? s.keyMode;
-            return n2 ? `${mode} \xB7 ${n2} ${n2 === 1 ? "service" : "services"}` : "None saved";
+            if (!n2)
+              return "None saved";
+            const bad = TESTABLE.filter((id) => s.connectionHealth[id]?.ok === false).length;
+            const tail = bad ? ` \xB7 ${bad} failing` : "";
+            return `${mode} \xB7 ${n2} ${n2 === 1 ? "service" : "services"}${tail}`;
           },
           render: (el) => this.renderCredentials(el)
         },
@@ -8503,16 +8583,23 @@ ${body}
     renderSetupRow(list2, spec) {
       const done = isConfigured(this.plugin, spec);
       const part = isPartial(this.plugin, spec);
+      const health = this.featureHealth(spec);
+      const sick = done && health?.tone === "warn";
       const row = list2.createEl("button", { cls: "reel-setup-row" });
       if (done)
         row.addClass("is-done");
       if (part)
         row.addClass("is-partial");
+      if (sick)
+        row.addClass("is-unhealthy");
       if (spec.essential)
         row.addClass("is-essential");
-      row.setAttr("aria-label", `${spec.name}. ${done ? "Set up." : part ? "Half done." : "Not set up."} Open the guide.`);
+      row.setAttr(
+        "aria-label",
+        `${spec.name}. ${sick ? health?.text : done ? "Set up." : part ? "Half done." : "Not set up."} Open the guide.`
+      );
       const mark = row.createSpan({ cls: "reel-setup-mark" });
-      mark.setText(done ? "\u2713" : part ? "!" : "");
+      mark.setText(sick ? "!" : done ? "\u2713" : part ? "!" : "");
       mark.setAttr("aria-hidden", "true");
       const body = row.createDiv({ cls: "reel-setup-row-body" });
       const top = body.createDiv({ cls: "reel-setup-row-top" });
@@ -8523,6 +8610,8 @@ ${body}
         top.createSpan({ cls: "reel-pill warn", text: "Required" });
       if (!done)
         body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+      if (sick && health)
+        body.createDiv({ cls: "reel-setup-row-warn", text: health.text });
       const chev = row.createSpan({ cls: "reel-setup-chev", text: "\u203A" });
       chev.setAttr("aria-hidden", "true");
       row.addEventListener("click", () => this.openGuide(spec));
@@ -8597,25 +8686,30 @@ ${body}
           await this.plugin.saveSettings();
         })
       );
+      const health = el.createDiv({ cls: "reel-health" });
+      const drawHealth = () => {
+        health.empty();
+        const now = Date.now();
+        for (const id of TESTABLE) {
+          if (!store.has(id))
+            continue;
+          const said = describeHealth(this.plugin.settings.connectionHealth[id], true, now);
+          const row = health.createDiv({ cls: `reel-health-row is-${said.tone}` });
+          row.createSpan({ cls: "reel-health-name", text: KEY_LABELS[id] ?? id });
+          row.createSpan({ cls: "reel-health-said", text: said.text });
+        }
+      };
       new Setting(el).setName("Test connections").setDesc("One small request per configured service, so a mistyped key fails here rather than silently.").addButton(
         (b) => b.setButtonText("Test").onClick(async () => {
           b.setDisabled(true).setButtonText("Testing\u2026");
-          const lines = [];
-          const tmdb = await this.plugin.tmdb.testCredentials();
-          lines.push(tmdb.ok ? "TMDB works" : `TMDB: ${tmdb.error}`);
-          if (store.has("omdb")) {
-            const omdb = await this.plugin.omdb.test();
-            lines.push(omdb.ok ? "OMDb works" : `OMDb: ${omdb.error}`);
-          }
-          if (store.has("dtdd")) {
-            const dtdd = await this.plugin.dtdd.test();
-            lines.push(dtdd.ok ? "DoesTheDogDie works" : `DoesTheDogDie: ${dtdd.error}`);
-          }
+          await this.runTests();
           b.setDisabled(false).setButtonText("Test");
-          new Notice(`Reel: ${lines.join(" \xB7 ")}`, 8e3);
+          drawHealth();
           describe2();
         })
       );
+      el.appendChild(health);
+      drawHealth();
       if (this.plugin.settings.keyMode === "encrypted" && store.isUnlocked) {
         new Setting(el).setName("Lock now").setDesc("Forget the decrypted keys until the next unlock.").addButton(
           (b) => b.setButtonText("Lock").onClick(() => {
@@ -8862,25 +8956,36 @@ ${body}
       }
       if (!hasApp)
         return;
-      new Setting(el).setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
-        signedIn ? "Reel can post reviews and ratings as you. Sign out to stop that immediately." : "Trakt shows you a short code to type on any device. Nothing has to link back to this app."
-      ).addButton(
-        (b) => signedIn ? b.setButtonText("Sign out").onClick(async () => {
-          await this.plugin.publish.signOut();
-          new Notice("Reel: signed out of Trakt.");
-          this.display();
-        }) : b.setButtonText("Sign in").setCta().onClick(async () => {
-          const app2 = await this.plugin.publish.app();
-          if (!app2) {
-            new Notice("Reel: couldn't read the Trakt application.");
-            return;
-          }
-          new TraktSignIn(this.app, this.plugin, app2, (ok) => {
-            if (ok)
-              this.display();
-          }).open();
-        })
+      const now = Date.now();
+      const session = traktState(signedIn, this.plugin.settings.traktExpires, now);
+      const said = describeTrakt(session, now);
+      const dead = session.kind === "expired";
+      const signIn = async () => {
+        const app2 = await this.plugin.publish.app();
+        if (!app2) {
+          new Notice("Reel: couldn't read the Trakt application.");
+          return;
+        }
+        new TraktSignIn(this.app, this.plugin, app2, (ok) => {
+          if (ok)
+            this.display();
+        }).open();
+      };
+      const trakt = new Setting(el).setName(dead ? "Trakt session expired" : signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
+        signedIn ? `${said.text}. Reel can post reviews and ratings as you; sign out to stop that immediately.` : "Trakt shows you a short code to type on any device. Nothing has to link back to this app."
       );
+      if (dead || !signedIn) {
+        trakt.addButton((b) => b.setButtonText(dead ? "Sign in again" : "Sign in").setCta().onClick(signIn));
+      }
+      if (signedIn) {
+        trakt.addButton(
+          (b) => b.setButtonText("Sign out").onClick(async () => {
+            await this.plugin.publish.signOut();
+            new Notice("Reel: signed out of Trakt.");
+            this.display();
+          })
+        );
+      }
     }
     /**
      * Ask \u2014 the one feature that sends your library somewhere else.
@@ -9051,6 +9156,51 @@ ${body}
       extra.appendChild(status);
       extra.appendChild(list2);
       refresh(this.plugin.settings[key]);
+    }
+    /**
+     * Check every configured service and write down what happened.
+     *
+     * Only the three that have a real test. OpenRouter, Trakt and Mastodon are
+     * deliberately absent rather than faked: reporting "not checked" about them
+     * is true, and inventing a request per service so the row has something to
+     * say would be three new network calls written to make a screen look
+     * complete.
+     *
+     * Errors go through `redact` even though the clients redact their own,
+     * because an error message can carry a request URL and a request URL can
+     * carry the key — and this one gets *persisted*, which is a longer life
+     * than a Notice ever had.
+     */
+    async runTests() {
+      const store = this.plugin.credentials;
+      const at = Date.now();
+      const record = (id, r) => {
+        this.plugin.settings.connectionHealth[id] = r.ok ? { at, ok: true } : { at, ok: false, error: redact(r.error) };
+      };
+      record("tmdb", await this.plugin.tmdb.testCredentials());
+      if (store.has("omdb"))
+        record("omdb", await this.plugin.omdb.test());
+      if (store.has("dtdd"))
+        record("dtdd", await this.plugin.dtdd.test());
+      await this.plugin.saveSettings();
+      const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);
+      new Notice(failed.length ? `Reel: ${failed.length} connection check failed.` : "Reel: all connections working.");
+    }
+    /**
+     * What this feature's connection is currently doing, if anything knows.
+     *
+     * Trakt is answered from its token's expiry rather than from a test,
+     * because that is a question the stored data can answer exactly and a
+     * network call could only approximate.
+     */
+    featureHealth(spec) {
+      const now = Date.now();
+      if (spec.id === "trakt") {
+        return describeTrakt(traktState(this.plugin.credentials.has("trakt"), this.plugin.settings.traktExpires, now), now);
+      }
+      if (!TESTABLE.includes(spec.id))
+        return null;
+      return describeHealth(this.plugin.settings.connectionHealth[spec.id], true, now);
     }
     renderMetadata(el) {
       new Setting(el).setName("Link people and use wikilinks").setDesc(
@@ -10267,6 +10417,7 @@ ${body}
 
   // harness/main.ts
   var noKeys = false;
+  var FIXED_NOW = Date.now();
   function poster(title) {
     let h = 0;
     for (let i = 0; i < title.length; i++)
@@ -11144,7 +11295,24 @@ ${body}
        * measuring too and the firstrun scene does it; this one has to show
        * every control there is.
        */
-      settingsOpen: ["setup", "keys", "folders", "metadata", "reviews", "publishing", "ask", "content", "behaviour", "maintenance"]
+      settingsOpen: ["setup", "keys", "folders", "metadata", "reviews", "publishing", "ask", "content", "behaviour", "maintenance"],
+      /*
+       * One passing check, one failing one, and a dead Trakt session.
+       *
+       * The warning states are the ones worth measuring: they are the only
+       * place on this screen that paints text in a colour of its own, and
+       * every contrast fault this rig has ever caught has been in exactly
+       * that kind of rule. A fixture where everything is healthy would
+       * exercise the half that cannot fail.
+       *
+       * Timestamps are fixed offsets from a literal rather than from
+       * Date.now(), so the rendered words do not change between runs.
+       */
+      connectionHealth: {
+        tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1e3, ok: true },
+        omdb: { at: FIXED_NOW - 2 * 24 * 60 * 60 * 1e3, ok: false, error: "401 Unauthorized" }
+      },
+      traktExpires: FIXED_NOW - 9 * 24 * 60 * 60 * 1e3
     });
     try {
       const tab = new ReelSettingTab(plugin.app, plugin);

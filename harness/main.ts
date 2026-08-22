@@ -38,6 +38,16 @@ import { FEATURES } from "../src/setup";
 
 /** Set by the first-run scene so the credential stub reports an empty vault. */
 let noKeys = false;
+
+/*
+ * A fixed clock for the health fixtures.
+ *
+ * The screen renders "checked 3 hours ago", which is a phrase computed from
+ * the real clock against this. Anchoring the fixtures to a literal would drift
+ * a little every run and eventually cross a unit boundary mid-audit; anchoring
+ * them to now keeps the words stable and the layout with them.
+ */
+const FIXED_NOW = Date.now();
 import { PublishSheet } from "../src/ui/publishSheet";
 import { AskSheet } from "../src/ui/askSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
@@ -1361,6 +1371,23 @@ function settings(root: HTMLElement): void {
 		 * every control there is.
 		 */
 		settingsOpen: ["setup", "keys", "folders", "metadata", "reviews", "publishing", "ask", "content", "behaviour", "maintenance"],
+		/*
+		 * One passing check, one failing one, and a dead Trakt session.
+		 *
+		 * The warning states are the ones worth measuring: they are the only
+		 * place on this screen that paints text in a colour of its own, and
+		 * every contrast fault this rig has ever caught has been in exactly
+		 * that kind of rule. A fixture where everything is healthy would
+		 * exercise the half that cannot fail.
+		 *
+		 * Timestamps are fixed offsets from a literal rather than from
+		 * Date.now(), so the rendered words do not change between runs.
+		 */
+		connectionHealth: {
+			tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1000, ok: true },
+			omdb: { at: FIXED_NOW - 2 * 24 * 60 * 60 * 1000, ok: false, error: "401 Unauthorized" },
+		},
+		traktExpires: FIXED_NOW - 9 * 24 * 60 * 60 * 1000,
 	});
 	try {
 		const tab = new ReelSettingTab(plugin.app as never, plugin as never);

@@ -6,8 +6,10 @@ import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertificat
 import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credentials";
 import { normaliseHost } from "./publish/mastodon";
 import { TraktSignIn } from "./ui/traktSignIn";
-import { FEATURES, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
+import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
+import { HealthMap, TESTABLE, describeHealth, describeTrakt, traktState } from "./health";
+import { redact } from "./secrets";
 import { SetupSheet } from "./ui/setupSheet";
 
 /** What you think of a person, used to weight what gets recommended. */
@@ -64,6 +66,23 @@ export interface ReelSettings {
 	people: Record<string, PersonOpinion>;
 	/** The Reel view reopens where you left it. */
 	lastTab: string;
+	/**
+	 * What each connection did the last time anybody checked.
+	 *
+	 * Kept because the answer used to live in an eight-second Notice, which
+	 * meant the screen could not tell "tested and working" from "never
+	 * tested" — the two rendered identically, which is to say the test told
+	 * you something once and the settings screen never did.
+	 */
+	connectionHealth: HealthMap;
+	/**
+	 * When the Trakt session expires. Epoch milliseconds, 0 if unknown.
+	 *
+	 * Deliberately outside the encrypted blob: it is a date rather than a
+	 * secret, and the screen must be able to say whether you are signed in
+	 * without asking for a passphrase first.
+	 */
+	traktExpires: number;
 	/**
 	 * Which settings sections are expanded, by id.
 	 *
@@ -191,6 +210,8 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dismissedIds: [],
 	people: {},
 	lastTab: "library",
+	connectionHealth: {},
+	traktExpires: 0,
 	// Only Getting started. Everything else is one tap away and, on a fresh
 	// install, none of it is what you came for.
 	settingsOpen: ["setup"],
@@ -323,7 +344,12 @@ export class ReelSettingTab extends PluginSettingTab {
 				summary: () => {
 					const n = [...READ_KEYS, ...WRITE_KEYS].filter((k) => this.plugin.credentials.has(k)).length;
 					const mode = MODE_LABELS[s.keyMode] ?? s.keyMode;
-					return n ? `${mode} · ${n} ${n === 1 ? "service" : "services"}` : "None saved";
+					if (!n) return "None saved";
+					// A failure is the only thing worth interrupting the summary
+					// for, and it is worth interrupting it every time.
+					const bad = TESTABLE.filter((id) => s.connectionHealth[id]?.ok === false).length;
+					const tail = bad ? ` · ${bad} failing` : "";
+					return `${mode} · ${n} ${n === 1 ? "service" : "services"}${tail}`;
 				},
 				render: (el) => this.renderCredentials(el),
 			},
@@ -666,14 +692,35 @@ export class ReelSettingTab extends PluginSettingTab {
 		const done = isConfigured(this.plugin, spec);
 		const part = isPartial(this.plugin, spec);
 
+		/*
+		 * The tick has to answer the same question the row does.
+		 *
+		 * It first shipped meaning "configured", which is what `done` is — and
+		 * then the health line arrived underneath it and the result was a green
+		 * check mark sitting beside the words "Session expired 9 days ago". Both
+		 * statements were true and the pair of them was a lie, which is exactly
+		 * the confusion between *present* and *working* that this whole release
+		 * is about. Having fixed it in the model, I had reproduced it in the
+		 * one glyph most people will actually read.
+		 *
+		 * So a configured feature known to be failing gets the warning mark. It
+		 * is still set up; it is not fine, and fine is what a tick means.
+		 */
+		const health = this.featureHealth(spec);
+		const sick = done && health?.tone === "warn";
+
 		const row = list.createEl("button", { cls: "reel-setup-row" });
 		if (done) row.addClass("is-done");
 		if (part) row.addClass("is-partial");
+		if (sick) row.addClass("is-unhealthy");
 		if (spec.essential) row.addClass("is-essential");
-		row.setAttr("aria-label", `${spec.name}. ${done ? "Set up." : part ? "Half done." : "Not set up."} Open the guide.`);
+		row.setAttr(
+			"aria-label",
+			`${spec.name}. ${sick ? health?.text : done ? "Set up." : part ? "Half done." : "Not set up."} Open the guide.`
+		);
 
 		const mark = row.createSpan({ cls: "reel-setup-mark" });
-		mark.setText(done ? "✓" : part ? "!" : "");
+		mark.setText(sick ? "!" : done ? "✓" : part ? "!" : "");
 		// Decoration. The state is already in the row's own label, and a
 		// screen reader announcing "check mark" before the name is noise.
 		mark.setAttr("aria-hidden", "true");
@@ -706,6 +753,18 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * change. Done rows are one line; the guide is still a tap away.
 		 */
 		if (!done) body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+
+		/*
+		 * A configured feature that is failing says so here.
+		 *
+		 * Getting started is where you look when something has stopped
+		 * working, and until now it answered a different question — is this
+		 * set up — which an expired Trakt session and a revoked API key both
+		 * answer "yes" to. Only warnings appear: a healthy row reading
+		 * "Working, checked 2 days ago" on all six would be the same wall of
+		 * green the ticks already are.
+		 */
+		if (sick && health) body.createDiv({ cls: "reel-setup-row-warn", text: health.text });
 
 		const chev = row.createSpan({ cls: "reel-setup-chev", text: "›" });
 		chev.setAttr("aria-hidden", "true");
@@ -799,31 +858,43 @@ export class ReelSettingTab extends PluginSettingTab {
 				})
 			);
 
+		const health = el.createDiv({ cls: "reel-health" });
+
+		/*
+		 * The result of the last test, kept on screen.
+		 *
+		 * It used to be a Notice that disappeared after eight seconds, which
+		 * meant a screen that had just proved every key worked looked exactly
+		 * like one that had never been tested. The answer existed, briefly,
+		 * and then the only place it lived was your memory.
+		 */
+		const drawHealth = (): void => {
+			health.empty();
+			const now = Date.now();
+			for (const id of TESTABLE) {
+				if (!store.has(id)) continue;
+				const said = describeHealth(this.plugin.settings.connectionHealth[id], true, now);
+				const row = health.createDiv({ cls: `reel-health-row is-${said.tone}` });
+				row.createSpan({ cls: "reel-health-name", text: KEY_LABELS[id] ?? id });
+				row.createSpan({ cls: "reel-health-said", text: said.text });
+			}
+		};
+
 		new Setting(el)
 			.setName("Test connections")
 			.setDesc("One small request per configured service, so a mistyped key fails here rather than silently.")
 			.addButton((b) =>
 				b.setButtonText("Test").onClick(async () => {
 					b.setDisabled(true).setButtonText("Testing…");
-					const lines: string[] = [];
-
-					const tmdb = await this.plugin.tmdb.testCredentials();
-					lines.push(tmdb.ok ? "TMDB works" : `TMDB: ${tmdb.error}`);
-
-					if (store.has("omdb")) {
-						const omdb = await this.plugin.omdb.test();
-						lines.push(omdb.ok ? "OMDb works" : `OMDb: ${omdb.error}`);
-					}
-					if (store.has("dtdd")) {
-						const dtdd = await this.plugin.dtdd.test();
-						lines.push(dtdd.ok ? "DoesTheDogDie works" : `DoesTheDogDie: ${dtdd.error}`);
-					}
-
+					await this.runTests();
 					b.setDisabled(false).setButtonText("Test");
-					new Notice(`Reel: ${lines.join(" · ")}`, 8000);
+					drawHealth();
 					describe();
 				})
 			);
+
+		el.appendChild(health);
+		drawHealth();
 
 		if (this.plugin.settings.keyMode === "encrypted" && store.isUnlocked) {
 			new Setting(el)
@@ -1151,34 +1222,51 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		if (!hasApp) return;
 
-		new Setting(el)
-			.setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt")
+		/*
+		 * "Signed in" used to mean "a token is stored", which stays true long
+		 * after the session it refers to has expired — so the row cheerfully
+		 * claimed you were connected and the first you heard otherwise was a
+		 * review that would not post. The expiry was inside the token the
+		 * whole time, unread.
+		 */
+		const now = Date.now();
+		const session = traktState(signedIn, this.plugin.settings.traktExpires, now);
+		const said = describeTrakt(session, now);
+		const dead = session.kind === "expired";
+
+		const signIn = async (): Promise<void> => {
+			const app = await this.plugin.publish.app();
+			if (!app) {
+				new Notice("Reel: couldn't read the Trakt application.");
+				return;
+			}
+			new TraktSignIn(this.app, this.plugin, app, (ok) => {
+				if (ok) this.display();
+			}).open();
+		};
+
+		const trakt = new Setting(el)
+			.setName(dead ? "Trakt session expired" : signedIn ? "Signed in to Trakt" : "Sign in to Trakt")
 			.setDesc(
 				signedIn
-					? "Reel can post reviews and ratings as you. Sign out to stop that immediately."
+					? `${said.text}. Reel can post reviews and ratings as you; sign out to stop that immediately.`
 					: "Trakt shows you a short code to type on any device. Nothing has to link back to this app."
-			)
-			.addButton((b) =>
-				signedIn
-					? b.setButtonText("Sign out").onClick(async () => {
-							await this.plugin.publish.signOut();
-							new Notice("Reel: signed out of Trakt.");
-							this.display();
-						})
-					: b
-							.setButtonText("Sign in")
-							.setCta()
-							.onClick(async () => {
-								const app = await this.plugin.publish.app();
-								if (!app) {
-									new Notice("Reel: couldn't read the Trakt application.");
-									return;
-								}
-								new TraktSignIn(this.app, this.plugin, app, (ok) => {
-									if (ok) this.display();
-								}).open();
-							})
 			);
+
+		// An expired session needs the way back in *and* the way out. Offering
+		// only "Sign out" would make the fix be "break it further, then fix it".
+		if (dead || !signedIn) {
+			trakt.addButton((b) => b.setButtonText(dead ? "Sign in again" : "Sign in").setCta().onClick(signIn));
+		}
+		if (signedIn) {
+			trakt.addButton((b) =>
+				b.setButtonText("Sign out").onClick(async () => {
+					await this.plugin.publish.signOut();
+					new Notice("Reel: signed out of Trakt.");
+					this.display();
+				})
+			);
+		}
 	}
 
 	/**
@@ -1450,6 +1538,55 @@ export class ReelSettingTab extends PluginSettingTab {
 		extra.appendChild(list);
 
 		refresh(this.plugin.settings[key]);
+	}
+
+
+	/**
+	 * Check every configured service and write down what happened.
+	 *
+	 * Only the three that have a real test. OpenRouter, Trakt and Mastodon are
+	 * deliberately absent rather than faked: reporting "not checked" about them
+	 * is true, and inventing a request per service so the row has something to
+	 * say would be three new network calls written to make a screen look
+	 * complete.
+	 *
+	 * Errors go through `redact` even though the clients redact their own,
+	 * because an error message can carry a request URL and a request URL can
+	 * carry the key — and this one gets *persisted*, which is a longer life
+	 * than a Notice ever had.
+	 */
+	private async runTests(): Promise<void> {
+		const store = this.plugin.credentials;
+		const at = Date.now();
+		const record = (id: FeatureId, r: { ok: true } | { ok: false; error: string }): void => {
+			this.plugin.settings.connectionHealth[id] = r.ok
+				? { at, ok: true }
+				: { at, ok: false, error: redact(r.error) };
+		};
+
+		record("tmdb", await this.plugin.tmdb.testCredentials());
+		if (store.has("omdb")) record("omdb", await this.plugin.omdb.test());
+		if (store.has("dtdd")) record("dtdd", await this.plugin.dtdd.test());
+
+		await this.plugin.saveSettings();
+		const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);
+		new Notice(failed.length ? `Reel: ${failed.length} connection check failed.` : "Reel: all connections working.");
+	}
+
+	/**
+	 * What this feature's connection is currently doing, if anything knows.
+	 *
+	 * Trakt is answered from its token's expiry rather than from a test,
+	 * because that is a question the stored data can answer exactly and a
+	 * network call could only approximate.
+	 */
+	private featureHealth(spec: FeatureSpec): { text: string; tone: "ok" | "warn" | "info" } | null {
+		const now = Date.now();
+		if (spec.id === "trakt") {
+			return describeTrakt(traktState(this.plugin.credentials.has("trakt"), this.plugin.settings.traktExpires, now), now);
+		}
+		if (!TESTABLE.includes(spec.id)) return null;
+		return describeHealth(this.plugin.settings.connectionHealth[spec.id], true, now);
 	}
 
 	private renderMetadata(el: HTMLElement): void {

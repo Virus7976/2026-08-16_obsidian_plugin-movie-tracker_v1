@@ -15092,9 +15092,18 @@ button.reel-facet-tab {
 .reel-settings .reel-setup-row.is-done {
 	background: transparent;
 	border-color: transparent;
-	/* One line now, so top-alignment has nothing left to align to. */
-	align-items: center;
 	padding-block: var(--reel-space-2);
+}
+
+/*
+ * A done row was one line, so it centred its tick. Then a failing connection
+ * grew a second line underneath and the tick slid down to sit beside the error
+ * instead of beside the name it belonged to. Top alignment is the base rule
+ * for every other row and works for one line as well as two.
+ */
+.reel-settings .reel-setup-row.is-unhealthy .reel-setup-mark {
+	color: var(--reel-warn);
+	font-weight: var(--reel-weight-semibold, 600);
 }
 
 .reel-settings .reel-setup-row.is-essential {
@@ -15753,4 +15762,116 @@ button.reel-facet-tab {
 .reel-settings .reel-folder-chip:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: 2px;
+}
+
+
+/* ==================================================================== */
+/* Connection health                                                    */
+/* ==================================================================== */
+
+/*
+ * The result of the last connection test, kept on screen.
+ *
+ * It used to be a Notice that vanished after eight seconds, which meant a
+ * screen that had just proved every key worked looked exactly like one that
+ * had never been tested. The answer existed briefly and then the only place it
+ * lived was your memory.
+ */
+
+.reel-health {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-1);
+	margin: var(--reel-space-2) 0 var(--reel-space-3);
+}
+
+.reel-health:empty {
+	display: none;
+}
+
+.reel-health-row {
+	display: flex;
+	align-items: baseline;
+	gap: var(--reel-space-2);
+	flex-wrap: wrap;
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border-left: 2px solid var(--background-modifier-border);
+	border-radius: 0 var(--reel-radius-sm) var(--reel-radius-sm) 0;
+	background: var(--background-primary);
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+}
+
+.reel-health-name {
+	font-weight: var(--reel-weight-semibold, 600);
+	color: var(--text-normal);
+}
+
+.reel-health-said {
+	color: var(--text-muted);
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/*
+ * Three tones, and only one of them is a problem.
+ *
+ * "Not checked yet" is the state every fresh install is in and is not a
+ * complaint about anything. Colouring it as one would put a standing warning
+ * on a screen where nothing is wrong, which is how a screen ends up with no
+ * warnings at all.
+ */
+.reel-health-row.is-ok {
+	border-left-color: var(--reel-ok);
+}
+
+.reel-health-row.is-ok .reel-health-said {
+	color: var(--reel-ok);
+}
+
+.reel-health-row.is-warn {
+	border-left-color: var(--reel-warn);
+}
+
+.reel-health-row.is-warn .reel-health-said {
+	color: var(--reel-warn);
+}
+
+/* ---- Broken connections, surfaced in Getting started ---------------- */
+
+/*
+ * Getting started is where you look when something has stopped working, and
+ * it used to answer only "is this set up" — a question an expired Trakt
+ * session and a revoked API key both answer yes to.
+ *
+ * Warnings only. A healthy line on all six rows would be the same wall of
+ * green the ticks already are, and would bury the one row that matters.
+ */
+.reel-setup-row-warn {
+	margin-top: 2px;
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--reel-warn);
+}
+
+/* ---- And inside the guide ------------------------------------------- */
+
+.reel-setup-health {
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border-left: 2px solid var(--background-modifier-border);
+	border-radius: 0 var(--reel-radius-sm) var(--reel-radius-sm) 0;
+	background: var(--background-secondary);
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+}
+
+.reel-setup-health.is-ok {
+	color: var(--reel-ok);
+	border-left-color: var(--reel-ok);
+}
+
+.reel-setup-health.is-warn {
+	color: var(--reel-warn);
+	border-left-color: var(--reel-warn);
 }
