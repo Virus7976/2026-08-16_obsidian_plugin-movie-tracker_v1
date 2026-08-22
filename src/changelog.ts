@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.26",
+		date: "2026-08-22",
+		headline: "The model picker now says whether the prices in front of you are real.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The list of models says whether it came from OpenRouter or from Reel's own suggestions.",
+				note: "The two render identically, and they are not the same thing: one is four names Reel carries and will eventually get wrong, the other is the live catalogue with today's prices. Fetching said so in a notice that then took the count away, so a screen that had just pulled the real list looked exactly like one that never had.",
+			},
+		],
+	},
+	{
 		version: "0.9.25",
 		date: "2026-08-22",
 		headline: "A destination you haven't set up is now something you can tap, not just something you're told about.",

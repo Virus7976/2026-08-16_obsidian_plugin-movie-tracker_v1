@@ -9777,8 +9777,13 @@ ${body}
       const status = document.createElement("div");
       const list2 = document.createElement("div");
       list2.className = "reel-folder-suggest";
+      const source = document.createElement("div");
+      source.className = "reel-model-source";
       const refresh = (raw) => {
         const problem = slugProblem(raw);
+        source.setText(
+          this.models ? `${this.models.length} models from OpenRouter, priced as of this fetch.` : "Reel's own suggestions. Load the list for OpenRouter's full catalogue and current prices."
+        );
         status.setText(problem ?? "Looks like a model slug");
         status.className = `reel-folder-status is-${problem ? "warn" : "ok"}`;
         list2.empty();
@@ -9832,6 +9837,7 @@ ${body}
       );
       const extra2 = wrap.createDiv({ cls: "reel-folder-extra" });
       extra2.appendChild(status);
+      extra2.appendChild(source);
       extra2.appendChild(list2);
       refresh(this.plugin.settings.aiModel);
     }
@@ -11460,11 +11466,27 @@ ${body}
         return !aiOff && plugin.settings.aiEnabled && !noKeys;
       },
       /*
-       * No live model list in the rig. The picker's job before a fetch is to
-       * show its curated suggestions, and that is the state a new install is
-       * in — so it is the one worth measuring.
+       * A live model list, for the scene that presses Load list.
+       *
+       * The curated branch — what the picker shows before any fetch — is
+       * still the state a new install is in and is still measured by the
+       * ordinary settings scenes, which never press the button. What was
+       * never drawn is the other half: chips carrying OpenRouter's own names
+       * and a price, which is a taller two-line control with a suffix that
+       * the curated list has no equivalent of.
+       *
+       * The prices are chosen to cover every branch of `formatPrice` at once:
+       * one over a dollar (two decimals), one under (three, because two would
+       * render "$0.00" and that is a different claim from "cheap"), one at
+       * zero (the word "free"), and one unpriced (nothing at all).
        */
-      models: async () => [],
+      models: async () => [
+        { id: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku", prompt: 0.8, completion: 4 },
+        { id: "openai/gpt-4o-mini", name: "GPT-4o mini", prompt: 0.15, completion: 0.6 },
+        { id: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash Experimental (free)", prompt: 0, completion: 0 },
+        { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B Instruct", prompt: 1.2, completion: 1.2 },
+        { id: "mistralai/mistral-small", name: "Mistral Small", prompt: null, completion: null }
+      ],
       /*
        * A fake network client, not a fake Ask.
        *
@@ -12434,6 +12456,24 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function settingsModels(root) {
+    root.addClass("reel-view-body");
+    const before = { ...plugin.settings };
+    Object.assign(plugin.settings, { aiEnabled: true, settingsOpen: ["ask"] });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+      for (const b of Array.from(root.querySelectorAll("button"))) {
+        if (b.textContent === "Load list") {
+          b.click();
+          break;
+        }
+      }
+    } finally {
+      Object.assign(plugin.settings, before);
+    }
+  }
   function settingsLocked(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12505,6 +12545,7 @@ ${body}
     publishrefused,
     settings,
     settingsLocked,
+    settingsModels,
     settingsPlain,
     settingsSession,
     guideLocked,

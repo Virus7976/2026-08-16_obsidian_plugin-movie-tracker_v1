@@ -15840,6 +15840,14 @@ button.reel-facet-tab {
 
 /* ---- Suggestions ---------------------------------------------------- */
 
+/* Which list the chips below came from. Muted, because it is a caption for
+   them rather than a thing to read on its own. */
+.reel-model-source {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-block: 4px 2px;
+}
+
 .reel-folder-suggest {
 	display: flex;
 	flex-wrap: wrap;

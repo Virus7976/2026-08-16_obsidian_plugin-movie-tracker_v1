@@ -330,5 +330,30 @@ ok(
 	"the description and the button disagree about whether there is anything to do"
 );
 
+/* ---- two lists that look identical ------------------------------------ */
+
+/*
+ * The model picker draws chips from one of two pools and they render the same.
+ * One is four names Reel carries in its own source and will eventually get
+ * wrong; the other is OpenRouter's live catalogue with today's prices.
+ *
+ * Fetching announced the difference in a Notice — "5 models available" — which
+ * takes the count away again after a few seconds, so a screen that had just
+ * pulled the real list looked exactly like one that never had. That is the
+ * same fault the connection results had before they were kept on screen, and
+ * it costs more here, because the price is the entire reason to fetch and a
+ * number you cannot trust is worse than no number.
+ */
+ok(
+	"the picker says which list the chips came from",
+	/reel-model-source/.test(settingsCode),
+	"the curated suggestions and the live catalogue render identically, so neither can be trusted"
+);
+ok(
+	"and the two captions differ",
+	/from OpenRouter/.test(settingsCode) && /own suggestions/.test(settingsCode),
+	"one caption for two different pools says nothing"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

@@ -432,11 +432,27 @@ const plugin = {
 			return !aiOff && plugin.settings.aiEnabled && !noKeys;
 		},
 		/*
-		 * No live model list in the rig. The picker's job before a fetch is to
-		 * show its curated suggestions, and that is the state a new install is
-		 * in — so it is the one worth measuring.
+		 * A live model list, for the scene that presses Load list.
+		 *
+		 * The curated branch — what the picker shows before any fetch — is
+		 * still the state a new install is in and is still measured by the
+		 * ordinary settings scenes, which never press the button. What was
+		 * never drawn is the other half: chips carrying OpenRouter's own names
+		 * and a price, which is a taller two-line control with a suffix that
+		 * the curated list has no equivalent of.
+		 *
+		 * The prices are chosen to cover every branch of `formatPrice` at once:
+		 * one over a dollar (two decimals), one under (three, because two would
+		 * render "$0.00" and that is a different claim from "cheap"), one at
+		 * zero (the word "free"), and one unpriced (nothing at all).
 		 */
-		models: async () => [],
+		models: async () => [
+			{ id: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku", prompt: 0.8, completion: 4 },
+			{ id: "openai/gpt-4o-mini", name: "GPT-4o mini", prompt: 0.15, completion: 0.6 },
+			{ id: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash Experimental (free)", prompt: 0, completion: 0 },
+			{ id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B Instruct", prompt: 1.2, completion: 1.2 },
+			{ id: "mistralai/mistral-small", name: "Mistral Small", prompt: null, completion: null },
+		],
 		/*
 		 * A fake network client, not a fake Ask.
 		 *
@@ -1902,6 +1918,39 @@ function guideLocked(root: HTMLElement): void {
 	}
 }
 
+/**
+ * The model picker after the list has been fetched.
+ *
+ * `models()` returned an empty array in this rig, so the only branch of the
+ * picker ever drawn was the curated one. The fetched branch is a different
+ * control: OpenRouter's own name on a second line, and a price appended to the
+ * slug on the first — so a chip is taller, wider, and carries text nothing in
+ * the curated list has an equivalent of.
+ *
+ * Pressing the button rather than reaching for the private field, because the
+ * button is the only thing that sets it and a rig that sets it directly would
+ * be measuring a state the app cannot get into.
+ */
+function settingsModels(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const before = { ...plugin.settings };
+	Object.assign(plugin.settings, { aiEnabled: true, settingsOpen: ["ask"] });
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+		// The audit's settled() waits for the fetch, so one click is enough.
+		for (const b of Array.from(root.querySelectorAll("button"))) {
+			if (b.textContent === "Load list") {
+				b.click();
+				break;
+			}
+		}
+	} finally {
+		Object.assign(plugin.settings, before);
+	}
+}
+
 function settingsLocked(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const before = { ...plugin.settings };
@@ -1984,6 +2033,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	publishrefused,
 	settings,
 	settingsLocked,
+	settingsModels,
 	settingsPlain,
 	settingsSession,
 	guideLocked,

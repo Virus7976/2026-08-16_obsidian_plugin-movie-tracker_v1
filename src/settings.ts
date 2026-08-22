@@ -1805,8 +1805,30 @@ export class ReelSettingTab extends PluginSettingTab {
 		const list = document.createElement("div");
 		list.className = "reel-folder-suggest";
 
+		/*
+		 * Which of the two lists you are looking at.
+		 *
+		 * The chips render identically either way, and they are not the same
+		 * thing at all: one is four names Reel carries and will eventually get
+		 * wrong, the other is OpenRouter's live catalogue with today's prices.
+		 * Fetching said so in a Notice that names the count and then takes it
+		 * away, so a screen that had just pulled the real list looked exactly
+		 * like one that never had — which is the same fault the connection
+		 * results had before they were kept on screen.
+		 *
+		 * And the price is the whole reason to fetch. Not knowing whether the
+		 * numbers in front of you are real is worse than having no numbers.
+		 */
+		const source = document.createElement("div");
+		source.className = "reel-model-source";
+
 		const refresh = (raw: string): void => {
 			const problem = slugProblem(raw);
+			source.setText(
+				this.models
+					? `${this.models.length} models from OpenRouter, priced as of this fetch.`
+					: "Reel's own suggestions. Load the list for OpenRouter's full catalogue and current prices."
+			);
 			status.setText(problem ?? "Looks like a model slug");
 			status.className = `reel-folder-status is-${problem ? "warn" : "ok"}`;
 
@@ -1893,6 +1915,7 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		const extra = wrap.createDiv({ cls: "reel-folder-extra" });
 		extra.appendChild(status);
+		extra.appendChild(source);
 		extra.appendChild(list);
 
 		refresh(this.plugin.settings.aiModel);
