@@ -144,6 +144,7 @@ if (probe) {
 			const cs = getComputedStyle(el);
 			return {
 				cls: el.className,
+				text: (el.textContent ?? "").trim().slice(0, 200),
 				box: `${Math.round(r.width)}x${Math.round(r.height)} @ ${Math.round(r.left)},${Math.round(r.top)}`,
 				display: cs.display,
 				position: cs.position,

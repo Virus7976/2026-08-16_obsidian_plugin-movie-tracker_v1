@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.10",
+		date: "2026-08-22",
+		headline: "Ask shows its answer above the buttons, and the reasons read as writing rather than as links.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Asking a question no longer leaves Close and Ask stranded in the middle of the sheet with the recommendations underneath them.",
+				note: "The answer is the reason the screen exists and it was rendering behind the buttons that produced it. They sit at the bottom now and stay there while a long list scrolls.",
+			},
+			{
+				kind: "fixed",
+				text: "The reason a film was picked is no longer painted in the accent colour.",
+				note: "In this plugin the accent means you can tap something — it is the Ask button, it is a link, it is the stars sitting right underneath. Three lines of prose wearing it looked tappable and did nothing when tapped. It still leads the runtime and the genre; it does it by rank now instead of by hue.",
+			},
+			{
+				kind: "fixed",
+				text: "The line reporting how much of your library was searched, and what the question cost in tokens, was too faint to read on warm themes.",
+				note: "It was set in the most de-emphasised colour a theme has, which is meant for chrome you look past. It is the only place either number is reported, and one of them is money.",
+			},
+		],
+	},
+	{
 		version: "0.9.9",
 		date: "2026-08-22",
 		headline: "The daily note setting now checks itself against your actual daily notes.",

@@ -14673,12 +14673,22 @@ button.reel-facet-tab {
 /*
  * The reason this one is here.
  *
- * In the accent and above the facts, because it is the answer to the question
- * you actually asked — the runtime and the genre are what every other screen
- * already tells you.
+ * Above the facts, because it is the answer to the question you actually asked
+ * — the runtime and the genre are what every other screen already tells you.
+ * That ranking is right and it is why this sits where it sits.
+ *
+ * It used to be in the accent as well, which was the same idea applied twice.
+ * The accent is how this plugin says "you can tap this": it is the Ask button,
+ * it is a link, it is the stars sitting directly underneath. Three lines of
+ * prose wearing it looked tappable, did nothing when tapped, and competed with
+ * the stars on the same card for the same reason.
+ *
+ * The ranking survives without it. Position and size already put the reason
+ * ahead of the facts, so normal-against-muted is all the emphasis it needs
+ * — and emphasis is what was wanted, not interactivity.
  */
 .reel-ask-why {
-	color: var(--text-accent, var(--interactive-accent));
+	color: var(--text-normal);
 	font-size: var(--font-ui-small);
 	line-height: 1.4;
 }
@@ -14692,6 +14702,31 @@ button.reel-facet-tab {
 	color: var(--text-muted);
 }
 
+/*
+ * Ask keeps its buttons at the bottom of the sheet.
+ *
+ * Putting the answer above them fixed the reading order and created the
+ * problem the setup guide already had: three picks with two-line reasons is
+ * taller than the sheet, so Close and Ask scrolled away off the bottom and the
+ * way out of the screen depended on scrolling to the end of a list you had not
+ * finished reading.
+ *
+ * Scoped to Ask on purpose. `.reel-log-actions` is shared with every other
+ * sheet in the plugin, all of which are short enough that this never arises,
+ * and none of which should move because this one grew.
+ *
+ * Sticky, not fixed: it sits at the bottom of the sheet rather than the bottom
+ * of the screen, and stops being sticky once it really is the end.
+ */
+.reel-ask-actions {
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	/* Opaque, or the cost line reads through the buttons as it scrolls under. */
+	background: var(--background-primary);
+	padding-bottom: var(--reel-space-2);
+}
+
 .reel-ask-cost {
 	display: flex;
 	flex-wrap: wrap;
@@ -14701,7 +14736,19 @@ button.reel-facet-tab {
 	padding-top: var(--reel-space-2);
 	border-top: 1px solid var(--background-modifier-border);
 	font-size: var(--font-ui-smaller);
-	color: var(--text-faint);
+	/*
+	 * Muted, not faint.
+	 *
+	 * This line says how much of your library was actually searched and what
+	 * the call cost in tokens — the two things you would want to check
+	 * before asking again, and the only place either is reported. `--text-faint`
+	 * is the most de-emphasised token a theme has, meant for chrome you are
+	 * supposed to look past, and it dropped this to 4.26:1 on a warm palette.
+	 *
+	 * Failing the contrast check is how it was found, but it would be the
+	 * wrong token here at any ratio.
+	 */
+	color: var(--text-muted);
 }
 
 /* ---- the explanatory paragraphs in settings ------------------------- */

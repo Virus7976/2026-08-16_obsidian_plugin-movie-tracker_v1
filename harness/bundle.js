@@ -10043,12 +10043,12 @@ ${body}
         }
       });
       this.renderRecent(contentEl);
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      this.body = contentEl.createDiv({ cls: "reel-ask-body" });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions reel-ask-actions" });
       const cancel = actions.createEl("button", { cls: "reel-btn", text: "Close" });
       cancel.addEventListener("click", () => this.close());
       this.goBtn = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Ask" });
       this.goBtn.addEventListener("click", () => void this.run());
-      this.body = contentEl.createDiv({ cls: "reel-ask-body" });
       window.setTimeout(() => this.input.focus(), 40);
       if (this.seed)
         void this.run();
@@ -10386,7 +10386,7 @@ ${body}
       check("typingVisible", unreachable.length === 0, unreachable.slice(0, 3).join(", "));
     }
     const broken = [];
-    for (const el of Array.from(view.querySelectorAll(".reel-error, .reel-error-state, pre"))) {
+    for (const el of Array.from(view.querySelectorAll('[class*="error"], pre'))) {
       if (!shown(el))
         continue;
       const text = (el.textContent ?? "").trim();
@@ -10427,6 +10427,14 @@ ${body}
     }
     check("textAtLeast12px", tiny.size === 0, [...tiny].slice(0, 4).join(", "));
     const lowContrast = [];
+    const nameOf = (el) => {
+      const own = el.className.split(" ")[0];
+      if (own)
+        return own;
+      const parent = el.parentElement?.closest('[class*="reel-"]');
+      const owner = parent?.className.split(" ")[0];
+      return owner ? `${el.tagName} in ${owner}` : el.tagName;
+    };
     const probe = document.createElement("div");
     probe.style.background = "var(--interactive-accent)";
     document.body.appendChild(probe);
@@ -10444,7 +10452,7 @@ ${body}
       if (el.closest(".reel-heart, .reel-cell-heart, .reel-reaction-icon")) {
         const iconRatio = contrastRatio(cs.color, bgHere);
         if (iconRatio != null && iconRatio < 3) {
-          lowContrast.push(`${el.className.split(" ")[0]} ${iconRatio.toFixed(2)}:1 (icon)`);
+          lowContrast.push(`${nameOf(el)} ${iconRatio.toFixed(2)}:1 (icon)`);
         }
         continue;
       }
@@ -10455,7 +10463,7 @@ ${body}
       const large = size >= 24 || bold && size >= 18.66;
       const ratio = contrastRatio(cs.color, backdropOf(el));
       if (ratio != null && ratio < (large ? 3 : 4.5)) {
-        lowContrast.push(`${el.className.split(" ")[0] || el.tagName} ${ratio.toFixed(2)}:1`);
+        lowContrast.push(`${nameOf(el)} ${ratio.toFixed(2)}:1`);
       }
     }
     check("contrastAA", lowContrast.length === 0, [...new Set(lowContrast)].slice(0, 4).join(", "));
@@ -10893,6 +10901,8 @@ ${body}
         truncated: true
       })
     },
+    // Ask records the question you asked; the rig has nothing to save it to.
+    saveSettings: async () => void 0,
     ai: {
       configured: true,
       /*
@@ -10900,7 +10910,67 @@ ${body}
        * show its curated suggestions, and that is the state a new install is
        * in — so it is the one worth measuring.
        */
-      models: async () => []
+      models: async () => [],
+      /*
+       * A fake network client, not a fake Ask.
+       *
+       * The result list has never been measured, and the reason it never was
+       * is that `renderResult` is private and I would not widen it for the
+       * rig — changing the thing being measured to suit the measurement
+       * is not coverage.
+       *
+       * It turns out none of that was necessary. `ask()` takes the client as
+       * an argument and the only thing it asks of it is `json`, so replacing
+       * *that* runs the entire real path: the criteria are sanitised for
+       * real, the shortlist is computed for real against the real library,
+       * the out-of-range pick below is rejected by the real guard, and the
+       * real `renderResult` draws the real markup. The seam was already
+       * there and it belongs to the app, not to the harness.
+       *
+       * Keyed on the schema name because `ask` makes two calls that want
+       * entirely different answers.
+       */
+      json: async (_messages, _schema, name) => {
+        if (name === "criteria") {
+          return {
+            value: {
+              pool: "any",
+              type: "any",
+              genres: [],
+              excludeGenres: [],
+              yearFrom: null,
+              yearTo: null,
+              minRuntime: null,
+              maxRuntime: null,
+              minRating: null,
+              keywords: [],
+              restated: "Something short and funny you haven't seen, nothing too bleak."
+            },
+            promptTokens: 412,
+            completionTokens: 96
+          };
+        }
+        return {
+          value: {
+            picks: [
+              {
+                index: 0,
+                why: "Ninety minutes, genuinely funny, and about as far from bleak as the library gets."
+              },
+              { index: 1, why: "Short, warm, and you rated the director's other one highly." },
+              {
+                index: 2,
+                why: "A comedy you added months ago and never got to. Long-ish, but it earns it \u2014 and this reason is deliberately wordy, because a two-line explanation is the one that finds the layout bugs."
+              },
+              // Out of range on purpose: the real guard drops it, and
+              // a rig that only ever sends valid data never proves that.
+              { index: 9999, why: "A film you do not own." }
+            ]
+          },
+          promptTokens: 1180,
+          completionTokens: 143
+        };
+      }
     },
     /*
      * Flipped by the first-run scene.
@@ -11533,6 +11603,19 @@ ${body}
       )
     );
   }
+  function askresult(root) {
+    root.addClass("reel-view-body");
+    mountSheet(
+      root,
+      new AskSheet(
+        plugin.app,
+        plugin,
+        () => {
+        },
+        "something short and funny I haven't seen, nothing too bleak"
+      )
+    );
+  }
   function firstrun(root) {
     root.addClass("reel-view-body");
     noKeys = true;
@@ -11629,6 +11712,7 @@ ${body}
     preview,
     publishsheet,
     asksheet,
+    askresult,
     settings,
     firstrun,
     setupsheet,

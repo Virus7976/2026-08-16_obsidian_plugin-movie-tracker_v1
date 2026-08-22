@@ -353,6 +353,8 @@ const plugin = {
 			truncated: true,
 		}),
 	},
+	// Ask records the question you asked; the rig has nothing to save it to.
+	saveSettings: async () => undefined,
 	ai: {
 		configured: true,
 		/*
@@ -361,6 +363,66 @@ const plugin = {
 		 * in — so it is the one worth measuring.
 		 */
 		models: async () => [],
+		/*
+		 * A fake network client, not a fake Ask.
+		 *
+		 * The result list has never been measured, and the reason it never was
+		 * is that `renderResult` is private and I would not widen it for the
+		 * rig — changing the thing being measured to suit the measurement
+		 * is not coverage.
+		 *
+		 * It turns out none of that was necessary. `ask()` takes the client as
+		 * an argument and the only thing it asks of it is `json`, so replacing
+		 * *that* runs the entire real path: the criteria are sanitised for
+		 * real, the shortlist is computed for real against the real library,
+		 * the out-of-range pick below is rejected by the real guard, and the
+		 * real `renderResult` draws the real markup. The seam was already
+		 * there and it belongs to the app, not to the harness.
+		 *
+		 * Keyed on the schema name because `ask` makes two calls that want
+		 * entirely different answers.
+		 */
+		json: async (_messages: unknown, _schema: unknown, name: string) => {
+			if (name === "criteria") {
+				return {
+					value: {
+						pool: "any",
+						type: "any",
+						genres: [],
+						excludeGenres: [],
+						yearFrom: null,
+						yearTo: null,
+						minRuntime: null,
+						maxRuntime: null,
+						minRating: null,
+						keywords: [],
+						restated: "Something short and funny you haven't seen, nothing too bleak.",
+					},
+					promptTokens: 412,
+					completionTokens: 96,
+				};
+			}
+			return {
+				value: {
+					picks: [
+						{
+							index: 0,
+							why: "Ninety minutes, genuinely funny, and about as far from bleak as the library gets.",
+						},
+						{ index: 1, why: "Short, warm, and you rated the director's other one highly." },
+						{
+							index: 2,
+							why: "A comedy you added months ago and never got to. Long-ish, but it earns it — and this reason is deliberately wordy, because a two-line explanation is the one that finds the layout bugs.",
+						},
+						// Out of range on purpose: the real guard drops it, and
+						// a rig that only ever sends valid data never proves that.
+						{ index: 9999, why: "A film you do not own." },
+					],
+				},
+				promptTokens: 1180,
+				completionTokens: 143,
+			};
+		},
 	},
 	/*
 	 * Flipped by the first-run scene.
@@ -1321,6 +1383,32 @@ function asksheet(root: HTMLElement): void {
 }
 
 /**
+ * Ask, having answered — the last unmeasured surface in Reel.
+ *
+ * Every other screen has been checked eight ways on every release since the
+ * harness existed. This one never had been, because drawing results meant
+ * reaching a private method, and the note above `SCREENS` about the Diary is
+ * the same judgement: a seam that exists for the rig and nothing else is not
+ * coverage of anything.
+ *
+ * A seed question is all it takes. `onOpen` runs the search itself when given
+ * one, so this is the ordinary path a person takes — every line of it real
+ * except the network.
+ */
+function askresult(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(
+		root,
+		new AskSheet(
+			plugin.app,
+			plugin as never,
+			() => {},
+			"something short and funny I haven't seen, nothing too bleak"
+		) as never
+	);
+}
+
+/**
  * The settings screen — forty-nine controls, never once measured.
  *
  * This is the screen the audit could not reach, because `Setting` in the shim
@@ -1457,6 +1545,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	preview,
 	publishsheet,
 	asksheet,
+	askresult,
 	settings,
 	firstrun,
 	setupsheet,

@@ -424,7 +424,20 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	 * erroring in the real code fails here too.
 	 */
 	const broken: string[] = [];
-	for (const el of Array.from(view.querySelectorAll<HTMLElement>(".reel-error, .reel-error-state, pre"))) {
+	/*
+	 * Matched by shape, not by a list of names — and the list is why.
+	 *
+	 * This check was written after two screens audited green for weeks while
+	 * showing an error message. It then did the same thing itself: the Ask
+	 * result screen rendered nothing but "saveSettings is not a function",
+	 * fifteen new checks passed, and this line looked straight through it,
+	 * because the class is `reel-ask-error` and the list said `reel-error`.
+	 *
+	 * There are four such classes in the app today and the list knew two. A
+	 * list of names decays every time somebody adds a screen, silently, in the
+	 * one check whose entire job is to notice silence.
+	 */
+	for (const el of Array.from(view.querySelectorAll<HTMLElement>('[class*="error"], pre'))) {
 		if (!shown(el)) continue;
 		const text = (el.textContent ?? "").trim();
 		if (!text) continue;
@@ -504,6 +517,22 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	// passing every other check. WCAG AA is 4.5:1 for normal text and 3:1 for
 	// large text, and "large" is 18.66px bold or 24px plain.
 	const lowContrast: string[] = [];
+	/*
+	 * Name it by the nearest thing a person can search for.
+	 *
+	 * A failure reported as "SPAN 4.26:1" says a span somewhere on a screen of
+	 * six hundred elements is too faint, which is barely more use than saying
+	 * nothing. Most leaf text in this app is an unclassed span inside a classed
+	 * parent — the parent is where the colour is set and where the fix goes, so
+	 * the parent is what the message should say.
+	 */
+	const nameOf = (el: HTMLElement): string => {
+		const own = el.className.split(" ")[0];
+		if (own) return own;
+		const parent = el.parentElement?.closest<HTMLElement>('[class*="reel-"]');
+		const owner = parent?.className.split(" ")[0];
+		return owner ? `${el.tagName} in ${owner}` : el.tagName;
+	};
 	// Resolved once: reading a custom property per element is the slowest
 	// thing in this function and the answer never changes.
 	const probe = document.createElement("div");
@@ -531,7 +560,7 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 		if (el.closest(".reel-heart, .reel-cell-heart, .reel-reaction-icon")) {
 			const iconRatio = contrastRatio(cs.color, bgHere);
 			if (iconRatio != null && iconRatio < 3) {
-				lowContrast.push(`${el.className.split(" ")[0]} ${iconRatio.toFixed(2)}:1 (icon)`);
+				lowContrast.push(`${nameOf(el)} ${iconRatio.toFixed(2)}:1 (icon)`);
 			}
 			continue;
 		}
@@ -541,7 +570,7 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 		const large = size >= 24 || (bold && size >= 18.66);
 		const ratio = contrastRatio(cs.color, backdropOf(el));
 		if (ratio != null && ratio < (large ? 3 : 4.5)) {
-			lowContrast.push(`${el.className.split(" ")[0] || el.tagName} ${ratio.toFixed(2)}:1`);
+			lowContrast.push(`${nameOf(el)} ${ratio.toFixed(2)}:1`);
 		}
 	}
 	check("contrastAA", lowContrast.length === 0, [...new Set(lowContrast)].slice(0, 4).join(", "));

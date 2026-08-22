@@ -87,13 +87,26 @@ export class AskSheet extends Modal {
 
 		this.renderRecent(contentEl);
 
-		const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+		/*
+		 * The answer goes above the buttons, not below them.
+		 *
+		 * This was the other way round, which nobody could see until the result
+		 * list was first rendered in the harness: asking a question left the
+		 * Close and Ask buttons stranded in the middle of the sheet with the
+		 * three recommendations underneath them. The buttons are the least
+		 * important thing on the screen once an answer exists, and they were
+		 * sitting in front of it.
+		 *
+		 * Nothing moves in the resting state — the body is empty before you
+		 * ask, so this is the same sheet until there is something to read.
+		 */
+		this.body = contentEl.createDiv({ cls: "reel-ask-body" });
+
+		const actions = contentEl.createDiv({ cls: "reel-log-actions reel-ask-actions" });
 		const cancel = actions.createEl("button", { cls: "reel-btn", text: "Close" });
 		cancel.addEventListener("click", () => this.close());
 		this.goBtn = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Ask" });
 		this.goBtn.addEventListener("click", () => void this.run());
-
-		this.body = contentEl.createDiv({ cls: "reel-ask-body" });
 
 		window.setTimeout(() => this.input.focus(), 40);
 		if (this.seed) void this.run();
