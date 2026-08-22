@@ -834,6 +834,17 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * not mention locks at all.
 		 */
 		const sealed = store.needsUnlock && store.hasStoredKey;
+		/*
+		 * Where plain text actually puts them.
+		 *
+		 * The fallback is not defensive tidiness. This string is the one
+		 * sentence on the screen that says where your keys land in the clear,
+		 * and with `configDir` missing it read "undefined/plugins/reel/
+		 * data.json" — a security warning naming a path that does not exist,
+		 * which is worse than no warning, because it reads as a bug and
+		 * invites you to disbelieve the rest of the sentence.
+		 */
+		const dataPath = `${this.app.vault.configDir ?? ".obsidian"}/plugins/reel/data.json`;
 
 		const status = el.createDiv({ cls: "reel-key-status" });
 		const describe = () => {
@@ -850,8 +861,17 @@ export class ReelSettingTab extends PluginSettingTab {
 					text: store.isUnlocked ? "Unlocked" : "Encrypted — locked",
 				});
 			} else if (s.keysPlain && Object.keys(s.keysPlain).length) {
-				const names = Object.keys(s.keysPlain).map((n) => KEY_LABELS[n as KeyName] ?? n);
-				status.createSpan({ cls: "reel-pill warn", text: `Plain text · ${names.join(", ")}` });
+				/*
+				 * Not the list of names.
+				 *
+				 * The loop below already prints one pill per configured
+				 * service, so naming them here printed every key twice — once
+				 * in an amber pill and once in a green one, side by side, the
+				 * same word in two colours that mean opposite things. This is
+				 * the only mode that did it, because it is the only mode whose
+				 * summary knew the names.
+				 */
+				status.createSpan({ cls: "reel-pill warn", text: "Plain text on disk" });
 			} else {
 				status.createSpan({ cls: "reel-pill warn", text: "No keys set" });
 			}
@@ -911,10 +931,66 @@ export class ReelSettingTab extends PluginSettingTab {
 			.addDropdown((d) => {
 				(Object.keys(MODE_LABELS) as KeyMode[]).forEach((m) => d.addOption(m, MODE_LABELS[m]));
 				d.setValue(this.plugin.settings.keyMode).onChange(async (value) => {
-					await this.plugin.credentials.migrateTo(value as KeyMode);
+					const next = value as KeyMode;
+					/*
+					 * One tap of a dropdown used to take every key out of an
+					 * encrypted blob and write it readably to disk.
+					 *
+					 * The other two directions are recoverable in the ordinary
+					 * sense — you can always encrypt again, or re-enter a key.
+					 * This one is not, because what it changes is not where the
+					 * key is stored but who has already read it: once a secret
+					 * has sat in cleartext in a folder that syncs, moving it
+					 * back does not un-sync it.
+					 *
+					 * The label said "(not recommended)" and the explanation
+					 * lived at the bottom of the section, several hundred
+					 * pixels below on a phone. Removing one key has asked for
+					 * confirmation since it was written; exposing all of them
+					 * asked for nothing.
+					 */
+					if (next === "plain" && this.plugin.settings.keyMode !== "plain") {
+						const ok = await confirm(this.app, {
+							title: "Write your keys in plain text?",
+							body:
+								`Every saved key is written readably into ${dataPath}. Anything that can read the vault ` +
+								"can read them: sync, backups, another plugin, anyone you share the folder with. Reel can " +
+								"encrypt them again later, but a key that has been on disk in the clear is best treated as " +
+								"exposed and replaced at the service that issued it.",
+							confirmText: "Write in plain text",
+							danger: true,
+						});
+						if (!ok) {
+							// The dropdown has already moved. Leaving it
+							// showing a mode the vault is not in is the same
+							// lie as a switch that controls nothing.
+							d.setValue(this.plugin.settings.keyMode);
+							return;
+						}
+					}
+					await this.plugin.credentials.migrateTo(next);
 					this.display();
 				});
 			});
+
+		/*
+		 * The warning, at the point of decision rather than at the foot of the
+		 * section.
+		 *
+		 * It used to render last, after three key fields, a toggle, the health
+		 * table and two buttons — so on a phone the sentence explaining what
+		 * plain text does was most of a screen below the control that chose it,
+		 * and you would only meet it by scrolling past everything you had come
+		 * for. A caution you have to go looking for is decoration.
+		 */
+		if (this.plugin.settings.keyMode === "plain") {
+			el.createDiv({
+				cls: "reel-callout warn",
+				text:
+					`Plain text mode writes your keys readably into ${dataPath}. ` +
+					"If this vault is synced to git or a shared drive, treat them as public.",
+			});
+		}
 
 		const keyField = (name: KeyName, label: string, desc: string) => this.keyField(el, name, label, desc);
 
@@ -1067,14 +1143,6 @@ export class ReelSettingTab extends PluginSettingTab {
 				});
 		}
 
-		if (this.plugin.settings.keyMode === "plain") {
-			el.createDiv({
-				cls: "reel-callout warn",
-				text:
-					`Plain text mode writes your keys readably into ${this.app.vault.configDir}/plugins/reel/data.json. ` +
-					"If this vault is synced to git or a shared drive, treat them as public.",
-			});
-		}
 	}
 
 	private pendingKeyInput: HTMLInputElement | null = null;

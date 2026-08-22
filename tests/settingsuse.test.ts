@@ -233,5 +233,50 @@ ok(
 	"the test button springs a passphrase prompt without saying so"
 );
 
+/* ---- exposing every key is at least as serious as deleting one -------- */
+
+/*
+ * Switching storage to plain text used to happen on one tap of a dropdown.
+ *
+ * The other two directions are recoverable in the ordinary sense: you can
+ * always encrypt again, or re-enter a key. This one is not, because what it
+ * changes is not where the key is kept but who has already read it — once a
+ * secret has sat in cleartext in a folder that syncs, moving it back does not
+ * un-sync it.
+ *
+ * Removing a single key has asked for confirmation since it was written.
+ * Exposing all of them asked for nothing, and the sentence explaining what it
+ * did rendered at the bottom of the section, most of a phone screen below the
+ * control that chose it.
+ */
+ok(
+	"switching to plain text is confirmed",
+	/next === "plain"/.test(settingsCode) && /confirm\(/.test(settingsCode),
+	"the dropdown writes every key to disk in the clear without asking"
+);
+ok(
+	"and a declined confirmation puts the dropdown back",
+	/d\.setValue\(this\.plugin\.settings\.keyMode\)/.test(settingsCode),
+	"the control would keep showing a mode the vault is not in"
+);
+
+/*
+ * And the warning names a real path.
+ *
+ * `app.vault.configDir` interpolated bare renders "undefined/plugins/reel/
+ * data.json" wherever it is missing — a security notice pointing at a path
+ * that does not exist, which is worse than none, because it reads as a bug and
+ * invites you to disbelieve the rest of the sentence.
+ */
+ok(
+	"the plain-text warning cannot name an undefined folder",
+	!/\$\{this\.app\.vault\.configDir\}/.test(settingsCode),
+	"configDir is interpolated with no fallback"
+);
+ok(
+	"and there is a warning to name it in",
+	/Plain text mode writes your keys readably/.test(settingsCode)
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

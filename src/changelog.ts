@@ -52,6 +52,31 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.22",
+		date: "2026-08-22",
+		headline: "Switching your keys to plain text now asks first, and says where they will land.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Choosing “Plain text in vault” from the storage dropdown now asks you to confirm.",
+				note: "One tap used to take every key out of the encrypted blob and write it readably to disk. Removing a single key has always asked; exposing all of them asked nothing. Encrypting again afterwards does not un-sync a secret that has already been copied out in the clear.",
+			},
+			{
+				kind: "better",
+				text: "The plain-text warning now sits directly under the dropdown that chose it.",
+				note: "It used to render at the foot of the section, below three key fields, a toggle, the connection table and two buttons — most of a phone screen away from the control it was about.",
+			},
+			{
+				kind: "fixed",
+				text: "That warning names the real file path instead of “undefined/plugins/reel/data.json”.",
+			},
+			{
+				kind: "fixed",
+				text: "Plain-text mode no longer prints each key name twice, once in amber and once in green.",
+			},
+		],
+	},
+	{
 		version: "0.9.21",
 		date: "2026-08-22",
 		headline: "Settings can now unlock your keys, instead of waiting for something else to demand the passphrase.",

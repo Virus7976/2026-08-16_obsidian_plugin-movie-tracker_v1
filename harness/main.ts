@@ -296,6 +296,10 @@ const plugin = {
 	settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
 	app: {
 		vault: {
+			// The real default. Without it the one sentence on the settings
+			// screen that says where plain-text keys land rendered as
+			// "undefined/plugins/reel/data.json", and every check passed.
+			configDir: ".obsidian",
 			getAbstractFileByPath: () => null,
 			/*
 			 * A vault with a shape, so the folder fields have something to
@@ -1645,6 +1649,46 @@ function settings(root: HTMLElement): void {
  * vault is open, and be wrong about all of it.
  */
 /**
+ * The third storage mode, which had never been drawn.
+ *
+ * Plain text is the mode with the most to say and the least screen time. It is
+ * the only one that writes readable secrets into a file that syncs, so it is
+ * the only one carrying a warning — and the warning sits at the bottom of the
+ * section, several hundred pixels below the dropdown that chose it, on a phone.
+ *
+ * It also inverts the question the last two scenes asked. Encrypted and locked
+ * is "configured but unreadable"; plain is "readable by anything, including
+ * whatever else opens your vault", and the screen has to make the difference
+ * between those two feel like a choice rather than a preference.
+ */
+function settingsPlain(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const before = { ...plugin.settings };
+	Object.assign(plugin.settings, {
+		keyMode: "plain",
+		keyBlob: null,
+		/*
+		 * Obvious fakes. The rig renders a real settings screen and the screen
+		 * lists the names of whatever is in here, so anything that looked like
+		 * a key would be a key-shaped string committed to a public repository.
+		 */
+		keysPlain: { tmdb: "not-a-real-key", omdb: "not-a-real-key" },
+		keyNames: ["tmdb", "omdb"],
+		settingsOpen: ["setup", "keys"],
+		connectionHealth: {
+			tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1000, ok: true },
+		},
+	});
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+	} finally {
+		Object.assign(plugin.settings, before);
+	}
+}
+
+/**
  * A finished guide, opened on a vault that is still sealed.
  *
  * The commonest reason to reopen a walkthrough you already completed is that
@@ -1747,6 +1791,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	askresult,
 	settings,
 	settingsLocked,
+	settingsPlain,
 	guideLocked,
 	firstrun,
 	setupsheet,

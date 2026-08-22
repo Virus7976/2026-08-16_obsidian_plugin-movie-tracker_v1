@@ -9170,6 +9170,7 @@ ${body}
     renderCredentials(el) {
       const store = this.plugin.credentials;
       const sealed = store.needsUnlock && store.hasStoredKey;
+      const dataPath = `${this.app.vault.configDir ?? ".obsidian"}/plugins/reel/data.json`;
       const status = el.createDiv({ cls: "reel-key-status" });
       const describe2 = () => {
         status.empty();
@@ -9185,8 +9186,7 @@ ${body}
             text: store.isUnlocked ? "Unlocked" : "Encrypted \u2014 locked"
           });
         } else if (s.keysPlain && Object.keys(s.keysPlain).length) {
-          const names = Object.keys(s.keysPlain).map((n2) => KEY_LABELS[n2] ?? n2);
-          status.createSpan({ cls: "reel-pill warn", text: `Plain text \xB7 ${names.join(", ")}` });
+          status.createSpan({ cls: "reel-pill warn", text: "Plain text on disk" });
         } else {
           status.createSpan({ cls: "reel-pill warn", text: "No keys set" });
         }
@@ -9213,10 +9213,29 @@ ${body}
       ).addDropdown((d) => {
         Object.keys(MODE_LABELS).forEach((m) => d.addOption(m, MODE_LABELS[m]));
         d.setValue(this.plugin.settings.keyMode).onChange(async (value) => {
-          await this.plugin.credentials.migrateTo(value);
+          const next = value;
+          if (next === "plain" && this.plugin.settings.keyMode !== "plain") {
+            const ok = await confirm(this.app, {
+              title: "Write your keys in plain text?",
+              body: `Every saved key is written readably into ${dataPath}. Anything that can read the vault can read them: sync, backups, another plugin, anyone you share the folder with. Reel can encrypt them again later, but a key that has been on disk in the clear is best treated as exposed and replaced at the service that issued it.`,
+              confirmText: "Write in plain text",
+              danger: true
+            });
+            if (!ok) {
+              d.setValue(this.plugin.settings.keyMode);
+              return;
+            }
+          }
+          await this.plugin.credentials.migrateTo(next);
           this.display();
         });
       });
+      if (this.plugin.settings.keyMode === "plain") {
+        el.createDiv({
+          cls: "reel-callout warn",
+          text: `Plain text mode writes your keys readably into ${dataPath}. If this vault is synced to git or a shared drive, treat them as public.`
+        });
+      }
       const keyField2 = (name, label, desc) => this.keyField(el, name, label, desc);
       keyField2(
         "tmdb",
@@ -9314,12 +9333,6 @@ ${body}
             new Notice("Reel: keys removed.");
             this.display();
           });
-        });
-      }
-      if (this.plugin.settings.keyMode === "plain") {
-        el.createDiv({
-          cls: "reel-callout warn",
-          text: `Plain text mode writes your keys readably into ${this.app.vault.configDir}/plugins/reel/data.json. If this vault is synced to git or a shared drive, treat them as public.`
         });
       }
     }
@@ -11243,6 +11256,10 @@ ${body}
     settings: { ...DEFAULT_SETTINGS, recentSearches: ["Inside Man"] },
     app: {
       vault: {
+        // The real default. Without it the one sentence on the settings
+        // screen that says where plain-text keys land rendered as
+        // "undefined/plugins/reel/data.json", and every check passed.
+        configDir: ".obsidian",
         getAbstractFileByPath: () => null,
         /*
          * A vault with a shape, so the folder fields have something to
@@ -12167,6 +12184,32 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function settingsPlain(root) {
+    root.addClass("reel-view-body");
+    const before = { ...plugin.settings };
+    Object.assign(plugin.settings, {
+      keyMode: "plain",
+      keyBlob: null,
+      /*
+       * Obvious fakes. The rig renders a real settings screen and the screen
+       * lists the names of whatever is in here, so anything that looked like
+       * a key would be a key-shaped string committed to a public repository.
+       */
+      keysPlain: { tmdb: "not-a-real-key", omdb: "not-a-real-key" },
+      keyNames: ["tmdb", "omdb"],
+      settingsOpen: ["setup", "keys"],
+      connectionHealth: {
+        tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1e3, ok: true }
+      }
+    });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+    } finally {
+      Object.assign(plugin.settings, before);
+    }
+  }
   function guideLocked(root) {
     root.addClass("reel-view-body");
     const spec = FEATURES.find((f) => f.id === "omdb");
@@ -12249,6 +12292,7 @@ ${body}
     askresult,
     settings,
     settingsLocked,
+    settingsPlain,
     guideLocked,
     firstrun,
     setupsheet,
