@@ -291,6 +291,18 @@ const plugin = {
 				{ path: "Music", children: [] },
 				{ path: "Movies/Heat.md" },
 				{ path: "Inbox.md" },
+				/*
+				 * Daily notes, in a folder Reel is not pointed at.
+				 *
+				 * The default `dailyNoteFolder` is the vault root, which holds
+				 * none of these — so the scene renders the mismatch state and
+				 * its suggestion, which is the half of the feature that can
+				 * actually be wrong. A fixture where the setting already
+				 * matched would only exercise the sentence saying "fine".
+				 */
+				{ path: "Journal/2026-08-20.md" },
+				{ path: "Journal/2026-08-21.md" },
+				{ path: "Journal/2026-08-22.md" },
 			],
 		},
 		workspace: { getLeaf: () => null },

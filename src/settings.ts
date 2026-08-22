@@ -10,6 +10,8 @@ import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState }
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
 import { HealthMap, TESTABLE, describeHealth, describeTrakt, traktState } from "./health";
 import { CURATED, ModelInfo, formatPrice, rankModels, slugProblem } from "./ai/models";
+import { dailyStatus, previewLine, scanDaily, suggestDailyFolders } from "./util/dailynote";
+import { todayISO } from "./util/dates";
 import { redact } from "./secrets";
 import { SetupSheet } from "./ui/setupSheet";
 
@@ -1723,6 +1725,126 @@ export class ReelSettingTab extends PluginSettingTab {
 		refresh(this.plugin.settings.aiModel);
 	}
 
+
+	/**
+	 * The daily note folder, checked against where the daily notes are.
+	 *
+	 * Reel appends to today's daily note if there is one and never creates it,
+	 * which is deliberate and stays. The gap this closes is one level down:
+	 * every part of that behaviour hangs on a folder path typed into a box,
+	 * and nothing checked it against the vault. Point it at "Journal" when
+	 * yours live in "Daily" and the toggle stays on, nothing errors, and the
+	 * feature simply never fires — because "no daily note today" and "wrong
+	 * folder" produce exactly the same silence.
+	 *
+	 * They are different situations and the vault knows which one you are in.
+	 */
+	private dailyFolderField(el: HTMLElement): void {
+		// One scan per render, off the same vault index the folder fields use.
+		const scan = scanDaily([...this.vaultIndex().files]);
+		const today = todayISO();
+		const wrap = el.createDiv({ cls: "reel-folder-field" });
+		let input: HTMLInputElement | null = null;
+
+		const apply = debounce(
+			async (v: string) => {
+				this.plugin.settings.dailyNoteFolder = normaliseFolder(v);
+				await this.plugin.saveSettings();
+			},
+			600,
+			true
+		);
+
+		const status = document.createElement("div");
+		const list = document.createElement("div");
+		list.className = "reel-folder-suggest";
+
+		const refresh = (raw: string): void => {
+			const said = dailyStatus(raw, scan, today);
+			status.setText(said.text);
+			status.className = `reel-folder-status is-${said.tone}`;
+
+			list.empty();
+			// Only worth offering when the current answer is wrong. Once the
+			// folder holds dated notes, the question is settled.
+			const here = normaliseFolder(raw);
+			const hits = said.tone === "warn" ? suggestDailyFolders(scan).filter((f) => f !== here) : [];
+			for (const folder of hits) {
+				const b = list.createEl("button", { cls: "reel-folder-chip", text: folder || "(vault root)" });
+				b.setAttr("aria-label", `Use ${folder || "the vault root"}`);
+				b.addEventListener("click", () => {
+					if (input) input.value = folder;
+					refresh(folder);
+					apply(folder);
+				});
+			}
+		};
+
+		new Setting(wrap)
+			.setName("Daily note folder")
+			.setDesc(
+				"Where your daily notes live — leave empty for the vault root. Files must be named YYYY-MM-DD.md. " +
+					"Reel asks rather than reading the Daily Notes plugin's configuration, which is undocumented API."
+			)
+			.addText((t) => {
+				// Cheaper than the folder inputs — no rescan — but it still
+				// rewrote data.json, which holds your encrypted keys, once per
+				// keypress.
+				t.setPlaceholder("e.g. Journal/Daily")
+					.setValue(this.plugin.settings.dailyNoteFolder)
+					.onChange((v) => {
+						refresh(v);
+						apply(v);
+					});
+				t.inputEl.addClass("reel-input");
+				t.inputEl.spellcheck = false;
+				input = t.inputEl;
+			});
+
+		const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+		extra.appendChild(status);
+		extra.appendChild(list);
+
+		refresh(this.plugin.settings.dailyNoteFolder);
+	}
+
+	/**
+	 * The prefix, with the line it produces shown underneath.
+	 *
+	 * Its effect was invisible until the next time you happened to log a film
+	 * and then went and opened a different note. A preview costs nothing and
+	 * answers "what will this do" at the moment somebody is asking it.
+	 */
+	private dailyPrefixField(el: HTMLElement): void {
+		const wrap = el.createDiv({ cls: "reel-folder-field" });
+		const preview = document.createElement("div");
+		preview.className = "reel-daily-preview";
+
+		const apply = debounce(
+			async (v: string) => {
+				this.plugin.settings.dailyNotePrefix = v || "- Watched";
+				await this.plugin.saveSettings();
+			},
+			600,
+			true
+		);
+
+		new Setting(wrap)
+			.setName("Daily note line prefix")
+			.setDesc("What Reel writes in front of the link.")
+			.addText((t) => {
+				t.setValue(this.plugin.settings.dailyNotePrefix).onChange((v) => {
+					preview.setText(previewLine(v));
+					apply(v);
+				});
+				t.inputEl.addClass("reel-input");
+			});
+
+		const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+		extra.appendChild(preview);
+		preview.setText(previewLine(this.plugin.settings.dailyNotePrefix));
+	}
+
 	private renderMetadata(el: HTMLElement): void {
 		new Setting(el)
 			.setName("Link people and use wikilinks")
@@ -1800,42 +1922,8 @@ export class ReelSettingTab extends PluginSettingTab {
 				})
 			);
 
-		new Setting(el)
-			.setName("Daily note folder")
-			.setDesc(
-				"Where your daily notes live — leave empty for the vault root. Files must be named YYYY-MM-DD.md. " +
-					"Reel asks rather than reading the Daily Notes plugin's configuration, which is undocumented API."
-			)
-			.addText((t) => {
-				// Cheaper than the folder inputs — no rescan — but it still
-				// rewrote data.json, which holds your encrypted keys, once per
-				// keypress.
-				const apply = debounce(
-					async (v: string) => {
-						this.plugin.settings.dailyNoteFolder = v.replace(/^\/+|\/+$/g, "");
-						await this.plugin.saveSettings();
-					},
-					600,
-					true
-				);
-				t.setPlaceholder("e.g. Journal/Daily")
-					.setValue(this.plugin.settings.dailyNoteFolder)
-					.onChange((v) => apply(v));
-			});
-
-		new Setting(el)
-			.setName("Daily note line prefix")
-			.addText((t) => {
-				const apply = debounce(
-					async (v: string) => {
-						this.plugin.settings.dailyNotePrefix = v || "- Watched";
-						await this.plugin.saveSettings();
-					},
-					600,
-					true
-				);
-				t.setValue(this.plugin.settings.dailyNotePrefix).onChange((v) => apply(v));
-			});
+		this.dailyFolderField(el);
+		this.dailyPrefixField(el);
 	}
 
 	private renderContent(el: HTMLElement): void {

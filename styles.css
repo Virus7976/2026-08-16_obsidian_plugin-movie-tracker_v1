@@ -15940,3 +15940,22 @@ button.reel-facet-tab {
 	font-weight: normal;
 	color: var(--text-muted);
 }
+
+/*
+ * The line Reel would write in your daily note.
+ *
+ * The prefix setting's effect used to be invisible until the next time you
+ * happened to log a film and then went and opened a different note. Shown as
+ * the literal text it produces, in the vault's monospace, because that is what
+ * it is — a line of markdown, not a description of one.
+ */
+.reel-daily-preview {
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border-left: 2px solid var(--background-modifier-border);
+	border-radius: 0 var(--reel-radius-sm) var(--reel-radius-sm) 0;
+	background: var(--background-primary);
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}

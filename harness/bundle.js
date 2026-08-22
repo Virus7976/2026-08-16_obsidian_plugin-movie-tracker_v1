@@ -8108,6 +8108,53 @@ ${body}
     return all2.map((m) => ({ m, r: rank2(m) })).filter((x) => x.r < 99).sort((a, b) => a.r - b.r || byCost(a.m, b.m)).map((x) => x.m).slice(0, limit);
   }
 
+  // src/util/dailynote.ts
+  var ISO_NOTE = /^(\d{4}-\d{2}-\d{2})\.md$/;
+  function isoDateOf(path) {
+    const name = path.slice(path.lastIndexOf("/") + 1);
+    const m = ISO_NOTE.exec(name);
+    if (!m)
+      return null;
+    const [y, mo, d] = m[1].split("-").map(Number);
+    if (mo < 1 || mo > 12 || d < 1 || d > 31)
+      return null;
+    return m[1];
+  }
+  function scanDaily(paths) {
+    const out = /* @__PURE__ */ new Map();
+    for (const path of paths) {
+      const date = isoDateOf(path);
+      if (!date)
+        continue;
+      const cut = path.lastIndexOf("/");
+      const folder = cut === -1 ? "" : path.slice(0, cut);
+      const prev = out.get(folder);
+      if (!prev)
+        out.set(folder, { count: 1, latest: date });
+      else
+        out.set(folder, { count: prev.count + 1, latest: date > prev.latest ? date : prev.latest });
+    }
+    return out;
+  }
+  function dailyStatus(folder, scan, today) {
+    const clean = folder.replace(/^\/+|\/+$/g, "");
+    const tally2 = scan.get(clean);
+    const where = clean || "your vault root";
+    if (!tally2) {
+      return scan.size ? { text: `No notes named YYYY-MM-DD in ${where} \u2014 Reel will never find one`, tone: "warn" } : { text: "No dated notes anywhere in this vault yet", tone: "info" };
+    }
+    const noun = `${tally2.count} dated note${tally2.count === 1 ? "" : "s"}`;
+    if (tally2.latest === today)
+      return { text: `${noun} in ${where}, including today's`, tone: "ok" };
+    return { text: `${noun} in ${where}, most recent ${tally2.latest}`, tone: "ok" };
+  }
+  function suggestDailyFolders(scan, limit = 4) {
+    return [...scan.entries()].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0])).map(([folder]) => folder).slice(0, limit);
+  }
+  function previewLine(prefix, example = "Heat (1995)") {
+    return `${prefix.trim() || "- Watched"} [[${example}]]`;
+  }
+
   // src/ui/setupSheet.ts
   var SetupSheet = class extends Modal {
     constructor(app2, plugin2, spec, onDone) {
@@ -9342,6 +9389,99 @@ ${body}
       extra.appendChild(list2);
       refresh(this.plugin.settings.aiModel);
     }
+    /**
+     * The daily note folder, checked against where the daily notes are.
+     *
+     * Reel appends to today's daily note if there is one and never creates it,
+     * which is deliberate and stays. The gap this closes is one level down:
+     * every part of that behaviour hangs on a folder path typed into a box,
+     * and nothing checked it against the vault. Point it at "Journal" when
+     * yours live in "Daily" and the toggle stays on, nothing errors, and the
+     * feature simply never fires — because "no daily note today" and "wrong
+     * folder" produce exactly the same silence.
+     *
+     * They are different situations and the vault knows which one you are in.
+     */
+    dailyFolderField(el) {
+      const scan = scanDaily([...this.vaultIndex().files]);
+      const today = todayISO();
+      const wrap = el.createDiv({ cls: "reel-folder-field" });
+      let input = null;
+      const apply = debounce(
+        async (v) => {
+          this.plugin.settings.dailyNoteFolder = normaliseFolder(v);
+          await this.plugin.saveSettings();
+        },
+        600,
+        true
+      );
+      const status = document.createElement("div");
+      const list2 = document.createElement("div");
+      list2.className = "reel-folder-suggest";
+      const refresh = (raw) => {
+        const said = dailyStatus(raw, scan, today);
+        status.setText(said.text);
+        status.className = `reel-folder-status is-${said.tone}`;
+        list2.empty();
+        const here = normaliseFolder(raw);
+        const hits = said.tone === "warn" ? suggestDailyFolders(scan).filter((f) => f !== here) : [];
+        for (const folder of hits) {
+          const b = list2.createEl("button", { cls: "reel-folder-chip", text: folder || "(vault root)" });
+          b.setAttr("aria-label", `Use ${folder || "the vault root"}`);
+          b.addEventListener("click", () => {
+            if (input)
+              input.value = folder;
+            refresh(folder);
+            apply(folder);
+          });
+        }
+      };
+      new Setting(wrap).setName("Daily note folder").setDesc(
+        "Where your daily notes live \u2014 leave empty for the vault root. Files must be named YYYY-MM-DD.md. Reel asks rather than reading the Daily Notes plugin's configuration, which is undocumented API."
+      ).addText((t) => {
+        t.setPlaceholder("e.g. Journal/Daily").setValue(this.plugin.settings.dailyNoteFolder).onChange((v) => {
+          refresh(v);
+          apply(v);
+        });
+        t.inputEl.addClass("reel-input");
+        t.inputEl.spellcheck = false;
+        input = t.inputEl;
+      });
+      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra.appendChild(status);
+      extra.appendChild(list2);
+      refresh(this.plugin.settings.dailyNoteFolder);
+    }
+    /**
+     * The prefix, with the line it produces shown underneath.
+     *
+     * Its effect was invisible until the next time you happened to log a film
+     * and then went and opened a different note. A preview costs nothing and
+     * answers "what will this do" at the moment somebody is asking it.
+     */
+    dailyPrefixField(el) {
+      const wrap = el.createDiv({ cls: "reel-folder-field" });
+      const preview2 = document.createElement("div");
+      preview2.className = "reel-daily-preview";
+      const apply = debounce(
+        async (v) => {
+          this.plugin.settings.dailyNotePrefix = v || "- Watched";
+          await this.plugin.saveSettings();
+        },
+        600,
+        true
+      );
+      new Setting(wrap).setName("Daily note line prefix").setDesc("What Reel writes in front of the link.").addText((t) => {
+        t.setValue(this.plugin.settings.dailyNotePrefix).onChange((v) => {
+          preview2.setText(previewLine(v));
+          apply(v);
+        });
+        t.inputEl.addClass("reel-input");
+      });
+      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra.appendChild(preview2);
+      preview2.setText(previewLine(this.plugin.settings.dailyNotePrefix));
+    }
     renderMetadata(el) {
       new Setting(el).setName("Link people and use wikilinks").setDesc(
         "Store directors and cast as [[People/Name|Name]] rather than plain text, so they appear in the graph and get backlinks. This is the thing Letterboxd cannot do."
@@ -9389,30 +9529,8 @@ ${body}
           await this.plugin.saveSettings();
         })
       );
-      new Setting(el).setName("Daily note folder").setDesc(
-        "Where your daily notes live \u2014 leave empty for the vault root. Files must be named YYYY-MM-DD.md. Reel asks rather than reading the Daily Notes plugin's configuration, which is undocumented API."
-      ).addText((t) => {
-        const apply = debounce(
-          async (v) => {
-            this.plugin.settings.dailyNoteFolder = v.replace(/^\/+|\/+$/g, "");
-            await this.plugin.saveSettings();
-          },
-          600,
-          true
-        );
-        t.setPlaceholder("e.g. Journal/Daily").setValue(this.plugin.settings.dailyNoteFolder).onChange((v) => apply(v));
-      });
-      new Setting(el).setName("Daily note line prefix").addText((t) => {
-        const apply = debounce(
-          async (v) => {
-            this.plugin.settings.dailyNotePrefix = v || "- Watched";
-            await this.plugin.saveSettings();
-          },
-          600,
-          true
-        );
-        t.setValue(this.plugin.settings.dailyNotePrefix).onChange((v) => apply(v));
-      });
+      this.dailyFolderField(el);
+      this.dailyPrefixField(el);
     }
     renderContent(el) {
       el.createDiv({
@@ -10715,7 +10833,19 @@ ${body}
           { path: "Archive/Old Movies", children: [] },
           { path: "Music", children: [] },
           { path: "Movies/Heat.md" },
-          { path: "Inbox.md" }
+          { path: "Inbox.md" },
+          /*
+           * Daily notes, in a folder Reel is not pointed at.
+           *
+           * The default `dailyNoteFolder` is the vault root, which holds
+           * none of these — so the scene renders the mismatch state and
+           * its suggestion, which is the half of the feature that can
+           * actually be wrong. A fixture where the setting already
+           * matched would only exercise the sentence saying "fine".
+           */
+          { path: "Journal/2026-08-20.md" },
+          { path: "Journal/2026-08-21.md" },
+          { path: "Journal/2026-08-22.md" }
         ]
       },
       workspace: { getLeaf: () => null }

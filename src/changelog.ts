@@ -52,6 +52,31 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.9",
+		date: "2026-08-22",
+		headline: "The daily note setting now checks itself against your actual daily notes.",
+		changes: [
+			{
+				kind: "new",
+				text: "The daily note folder says how many dated notes it holds \u2014 and warns when it holds none, because then nothing will ever be found there on any day.",
+				note: "Linking is unchanged: Reel appends to today's note if it exists and never creates one. The problem was one level down. \u201cNo daily note today\u201d and \u201cyou typed the wrong folder\u201d produced exactly the same silence, and only one of them is fine.",
+			},
+			{
+				kind: "new",
+				text: "When the folder is wrong, the folders that do hold dated notes are offered underneath. Usually there is exactly one, so it is a single tap.",
+			},
+			{
+				kind: "new",
+				text: "The line prefix shows the line it produces, as it will appear in the note.",
+				note: "Its effect used to be invisible until the next time you happened to log a film and then went and opened a different note.",
+			},
+			{
+				kind: "better",
+				text: "Having no note for today is not reported as a problem. That is the ordinary state of a morning, and Reel is designed to do nothing in it.",
+			},
+		],
+	},
+	{
 		version: "0.9.8",
 		date: "2026-08-22",
 		headline: "Ask's model setting is checked as you type, and suggests models that work.",
