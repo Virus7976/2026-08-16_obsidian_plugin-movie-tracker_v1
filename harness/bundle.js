@@ -5295,6 +5295,15 @@ ${body}
       return false;
     return spec.steps.some((s) => s.key && proves(plugin2, s.key));
   }
+  function partialPhrase(partial) {
+    if (!partial.length)
+      return "";
+    if (partial.length === 1)
+      return `${partial[0].name} is half set up`;
+    if (partial.length === 2)
+      return `${partial[0].name} and ${partial[1].name} are half set up`;
+    return `${partial.length} are half set up`;
+  }
   function setupState(plugin2) {
     const essential = FEATURES.find((f) => f.essential);
     const done = [];
@@ -8937,7 +8946,9 @@ ${body}
             const st = setupState(this.plugin);
             if (st.blocked)
               return "Reel needs a TMDB key";
-            return `Ready \u2014 ${st.done.length} of ${FEATURES.length - 1} optional features on`;
+            const half = partialPhrase(st.partial);
+            const on = `${st.done.length} of ${FEATURES.length - 1} on`;
+            return half ? `Ready \u2014 ${on} \xB7 ${half}` : `Ready \u2014 ${on}`;
           },
           render: (el) => this.renderSetup(el)
         },
@@ -9194,9 +9205,13 @@ ${body}
         const total = FEATURES.length - 1;
         const line = el.createDiv({ cls: "reel-setup-ready" });
         line.createSpan({ cls: "reel-pill ok", text: "Ready" });
+        const half = partialPhrase(state.partial);
         line.createSpan({
           cls: "reel-setup-ready-text",
-          text: on === 0 ? `Reel works. ${total} optional features are available below.` : `Reel works, with ${on} of ${total} optional features on.`
+          text: (on === 0 ? `Reel works. ${total} optional features are available below.` : `Reel works, with ${on} of ${total} optional features on.`) + // Said second because it is the exception, and said at all
+          // because a feature a few minutes from working is not the
+          // same as one nobody has touched.
+          (half ? ` ${half}.` : "")
         });
       }
       const anyMark = FEATURES.some((f) => isConfigured(this.plugin, f) || isPartial(this.plugin, f));
@@ -12533,6 +12548,25 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function settingsFolded(root) {
+    root.addClass("reel-view-body");
+    const before = { ...plugin.settings };
+    Object.assign(plugin.settings, {
+      settingsOpen: [],
+      // Server typed, token not yet made: half done, and the summary has to
+      // say so from the one line it has.
+      mastodonHost: "mastodon.social",
+      publishTrakt: true,
+      aiEnabled: true
+    });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+    } finally {
+      Object.assign(plugin.settings, before);
+    }
+  }
   function settingsLocked(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12604,6 +12638,7 @@ ${body}
     publishrefused,
     settings,
     settingsLocked,
+    settingsFolded,
     settingsModels,
     settingsPlain,
     settingsSession,

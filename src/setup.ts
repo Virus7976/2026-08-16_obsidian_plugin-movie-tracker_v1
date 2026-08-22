@@ -340,6 +340,29 @@ export function isPartial(plugin: ReelPlugin, spec: FeatureSpec): boolean {
 	return spec.steps.some((s) => s.key && proves(plugin, s.key));
 }
 
+/**
+ * The half-finished features, as a phrase you can read.
+ *
+ * `setupState` has computed `partial` since it was written and nothing ever
+ * rendered it in aggregate. The rows showed it one at a time; both summaries
+ * counted only what was finished, so a vault two minutes from having Mastodon
+ * working said "4 of 5 optional features on" and stopped there.
+ *
+ * Which loses the most actionable fact on the screen. "Not on" and "nearly on"
+ * ask completely different things of you, and the line you read when the
+ * section is folded — which is every time, once TMDB is in — could not tell
+ * them apart.
+ *
+ * Named rather than counted while there are few enough to name: "Mastodon is
+ * half set up" is something you can act on, "1 half set up" is a puzzle.
+ */
+export function partialPhrase(partial: FeatureSpec[]): string {
+	if (!partial.length) return "";
+	if (partial.length === 1) return `${partial[0].name} is half set up`;
+	if (partial.length === 2) return `${partial[0].name} and ${partial[1].name} are half set up`;
+	return `${partial.length} are half set up`;
+}
+
 export interface SetupState {
 	/** Optional features that are ready. */
 	done: FeatureSpec[];

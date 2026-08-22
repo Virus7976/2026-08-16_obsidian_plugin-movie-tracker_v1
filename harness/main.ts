@@ -1973,6 +1973,35 @@ function settingsModels(root: HTMLElement): void {
 	}
 }
 
+/**
+ * Every section folded, with one feature half finished.
+ *
+ * The state most people are actually in: setup collapses the moment TMDB is
+ * saved, so the summary beside its title is the only thing about setup you see
+ * on an ordinary visit. It had never been drawn carrying the half-done phrase,
+ * which is several times longer than the count it sits next to — a summary row
+ * on a 375px phone is exactly where a longer string goes wrong.
+ */
+function settingsFolded(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const before = { ...plugin.settings };
+	Object.assign(plugin.settings, {
+		settingsOpen: [],
+		// Server typed, token not yet made: half done, and the summary has to
+		// say so from the one line it has.
+		mastodonHost: "mastodon.social",
+		publishTrakt: true,
+		aiEnabled: true,
+	});
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+	} finally {
+		Object.assign(plugin.settings, before);
+	}
+}
+
 function settingsLocked(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const before = { ...plugin.settings };
@@ -2055,6 +2084,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	publishrefused,
 	settings,
 	settingsLocked,
+	settingsFolded,
 	settingsModels,
 	settingsPlain,
 	settingsSession,

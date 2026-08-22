@@ -22,7 +22,7 @@
 
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { completedSteps, FEATURES, isConfigured, isPartial, setupState } from "../src/setup";
+import { completedSteps, FEATURES, isConfigured, isPartial, partialPhrase, setupState } from "../src/setup";
 import { READ_KEYS, WRITE_KEYS, KeyName } from "../src/credentials";
 
 let passed = 0;
@@ -475,6 +475,40 @@ for (const f of FEATURES) {
 // Trakt still behaves exactly as it did; this was never meant to change it.
 ok("the Trakt application alone is still half done", isPartial(fake(["traktApp"]), trakt));
 ok("and Trakt with nothing is still untouched", !isPartial(fake([]), trakt));
+
+/* ---- the summary has to carry the actionable half -------------------- */
+
+/*
+ * `setupState` has computed `partial` since it was written and nothing ever
+ * rendered it in aggregate. The rows said it one at a time; both summaries
+ * counted only what was finished, so a vault two minutes away from having
+ * Mastodon working read "4 of 5 optional features on" and stopped there.
+ *
+ * That drops the most actionable fact on the screen. "Not on" and "nearly on"
+ * ask completely different things of you, and the line you read when the
+ * section is folded — which is every visit, once TMDB is in — could not tell
+ * them apart.
+ */
+ok("nothing half done says nothing", partialPhrase([]) === "");
+ok("one is named", partialPhrase([mastoSpec]) === "Mastodon is half set up");
+ok("two are both named", partialPhrase([mastoSpec, trakt]).includes("and"));
+ok("and it agrees in number", partialPhrase([mastoSpec, trakt]).includes("are"));
+/*
+ * Counted rather than listed past two. A name is something you can act on and
+ * a count is not, which is why the first two are named at all — but four names
+ * in a folded summary row on a 375px phone is a worse answer than a number.
+ */
+const many = partialPhrase([mastoSpec, trakt, mastoSpec, trakt]);
+ok("more than two is a count", many === "4 are half set up");
+ok("and names nobody", !many.includes("Mastodon"));
+
+// Both places that summarise setup go through it, so they cannot drift apart.
+const settingsSrc2 = readFileSync(join(__dirname, "..", "src", "settings.ts"), "utf8");
+ok(
+	"the summary line uses it",
+	(settingsSrc2.match(/partialPhrase\(/g) ?? []).length >= 2,
+	"the folded summary and the open one count different things"
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

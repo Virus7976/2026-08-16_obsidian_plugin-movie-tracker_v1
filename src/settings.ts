@@ -5,7 +5,7 @@ import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
 import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credentials";
 import { TraktSignIn } from "./ui/traktSignIn";
-import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
+import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, partialPhrase, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
 import { checkAll, checkable } from "./checks";
 import { FieldContext, keyField, traktAppField } from "./ui/fields";
@@ -399,7 +399,11 @@ export class ReelSettingTab extends PluginSettingTab {
 				summary: () => {
 					const st = setupState(this.plugin);
 					if (st.blocked) return "Reel needs a TMDB key";
-					return `Ready — ${st.done.length} of ${FEATURES.length - 1} optional features on`;
+					const half = partialPhrase(st.partial);
+					// The unfinished one first when there is one: it is the only
+					// part of this line anybody can act on.
+					const on = `${st.done.length} of ${FEATURES.length - 1} on`;
+					return half ? `Ready — ${on} · ${half}` : `Ready — ${on}`;
 				},
 				render: (el) => this.renderSetup(el),
 			},
@@ -702,12 +706,17 @@ export class ReelSettingTab extends PluginSettingTab {
 			const total = FEATURES.length - 1;
 			const line = el.createDiv({ cls: "reel-setup-ready" });
 			line.createSpan({ cls: "reel-pill ok", text: "Ready" });
+			const half = partialPhrase(state.partial);
 			line.createSpan({
 				cls: "reel-setup-ready-text",
 				text:
-					on === 0
+					(on === 0
 						? `Reel works. ${total} optional features are available below.`
-						: `Reel works, with ${on} of ${total} optional features on.`,
+						: `Reel works, with ${on} of ${total} optional features on.`) +
+					// Said second because it is the exception, and said at all
+					// because a feature a few minutes from working is not the
+					// same as one nobody has touched.
+					(half ? ` ${half}.` : ""),
 			});
 		}
 

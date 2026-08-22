@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.29",
+		date: "2026-08-22",
+		headline: "The setup summary now mentions anything you started and haven't finished.",
+		changes: [
+			{
+				kind: "better",
+				text: "A half-finished feature is named in the setup line, not silently counted as off.",
+				note: "It read \"4 of 5 optional features on\" while a row below said Mastodon was half done. A feature two minutes from working and one nobody has touched ask completely different things of you, and the line you read when the section is folded — which is every visit, once TMDB is in — could not tell them apart.",
+			},
+		],
+	},
+	{
 		version: "0.9.28",
 		date: "2026-08-22",
 		headline: "The settings list and the guide it opens now agree about how far in you are.",
