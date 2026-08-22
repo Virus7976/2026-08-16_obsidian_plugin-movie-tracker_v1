@@ -39,6 +39,15 @@ import { FEATURES } from "../src/setup";
 /** Set by the first-run scene so the credential stub reports an empty vault. */
 let noKeys = false;
 /*
+ * Set by the locked scene: keys stored, none of them readable.
+ *
+ * Distinct from `noKeys` on purpose, because the two states differ in exactly
+ * the way that matters. Nothing configured and everything configured but sealed
+ * look the same to any code that asks whether a key can be read, and they are
+ * opposite answers to the only question a person has.
+ */
+let locked = false;
+/*
  * Keys a scene wants to be *missing* while the rest are present.
  *
  * Everything-or-nothing was enough while a guide could only be shown from the
@@ -459,7 +468,16 @@ const plugin = {
 	 */
 	credentials: {
 		has: (name: string) => (present.has(name) || name !== "mastodon") && !missing.has(name) && !noKeys,
-		isUnlocked: true,
+		// A getter, not a value. The stub is built once at load, so a plain
+		// `!locked` freezes whatever the flag was then, which is false, and the
+		// locked scene renders an unlocked screen while reporting success.
+		get isUnlocked() {
+			return !locked;
+		},
+		get needsUnlock() {
+			return locked;
+		},
+		unlock: async () => true,
 		hasStoredKey: true,
 		store: async () => true,
 		remove: async () => undefined,
@@ -1609,6 +1627,84 @@ function settings(root: HTMLElement): void {
 	}
 }
 
+/**
+ * The same screen with the keys encrypted and the vault locked.
+ *
+ * Every settings scene in this rig has been drawn unlocked, which is the state
+ * the screen is in for about a second per session. Encrypted is the default
+ * mode, and the default mode spends most of its life sealed: you open Reel,
+ * you have not been asked for the passphrase yet because nothing has needed a
+ * key yet, and this is the screen you get.
+ *
+ * It is a different screen, not a dimmer one. Health cannot be read because
+ * nothing can talk to a service without a key; the fields cannot show you what
+ * is saved; and `has()` still answers yes for every service, because the names
+ * are stored beside the blob and names are not secret. That last part is what
+ * makes this worth measuring — everything on the screen that decides what to
+ * draw by asking whether a key exists will draw exactly what it draws when the
+ * vault is open, and be wrong about all of it.
+ */
+/**
+ * A finished guide, opened on a vault that is still sealed.
+ *
+ * The commonest reason to reopen a walkthrough you already completed is that
+ * the thing has stopped working, and the guide answers that with a status line
+ * and a Check now button. Neither is available while the keys are locked, so
+ * the version of this screen a person actually meets — default storage mode,
+ * Obsidian just opened, nothing has needed a key yet — is the one where the
+ * help it offers is the help it cannot give.
+ */
+function guideLocked(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const spec = FEATURES.find((f) => f.id === "omdb");
+	if (!spec) throw new Error("harness: no omdb feature spec");
+	const before = { ...plugin.settings };
+	locked = true;
+	Object.assign(plugin.settings, { keyMode: "encrypted", keyBlob: "v1:sealed", keysPlain: null, keyNames: ["omdb"] });
+	try {
+		mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+	} finally {
+		locked = false;
+		Object.assign(plugin.settings, before);
+	}
+}
+
+function settingsLocked(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const before = { ...plugin.settings };
+	locked = true;
+	Object.assign(plugin.settings, {
+		keyMode: "encrypted",
+		// Enough of a blob for the screen to know one exists. Nothing reads it.
+		keyBlob: "v1:sealed",
+		keysPlain: null,
+		keyNames: ["tmdb", "omdb", "dtdd", "openrouter", "trakt"],
+		mastodonHost: "mastodon.social",
+		aiEnabled: true,
+		publishTrakt: true,
+		settingsOpen: ["setup", "keys", "publishing", "ask"],
+		/*
+		 * One old result, kept deliberately.
+		 *
+		 * A record written while unlocked outlives the unlock, so the screen has
+		 * to hold a truthful past answer next to a present it cannot test. That
+		 * pairing is the whole difficulty of this state and a fixture with an
+		 * empty health map would skip it.
+		 */
+		connectionHealth: {
+			tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1000, ok: true },
+		},
+	});
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+	} finally {
+		locked = false;
+		Object.assign(plugin.settings, before);
+	}
+}
+
 /*
  * No diary screen.
  *
@@ -1650,6 +1746,8 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	asksheet,
 	askresult,
 	settings,
+	settingsLocked,
+	guideLocked,
 	firstrun,
 	setupsheet,
 	setupdone,

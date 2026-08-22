@@ -52,6 +52,33 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.21",
+		date: "2026-08-22",
+		headline: "Settings can now unlock your keys, instead of waiting for something else to demand the passphrase.",
+		changes: [
+			{
+				kind: "new",
+				text: "An Unlock button, on the settings screen, beside the line that says the keys are locked.",
+				note: "There has always been a Lock now button and never an unlock. Locking was a decision you could make; unlocking was something that happened to you later, when some unrelated action reached for a key and a passphrase box appeared for a reason you had to work out. Encrypted storage is the default, so that is the state the screen is in every time Obsidian starts.",
+			},
+			{
+				kind: "fixed",
+				text: "Test connections no longer reports five broken services because you declined a passphrase prompt.",
+				note: "Locked keys are still listed as configured, correctly — their names are stored beside the encrypted blob. Testing reached for five of them anyway, put a passphrase box over a screen you had not asked anything of, and wrote down five failures if you cancelled it. It now says “Unlock and test” and asks first.",
+			},
+			{
+				kind: "better",
+				text: "Locked services say so, rather than saying they have not been checked yet.",
+				note: "A key nobody has tried and a key nobody can try are different problems with different answers, and they used to read identically.",
+			},
+			{
+				kind: "better",
+				text: "A finished walkthrough opened on a locked vault offers to unlock it.",
+				note: "Reopening a guide for something already set up almost always means it has stopped working. The status line said the keys were locked and left you to go elsewhere to do something about it.",
+			},
+		],
+	},
+	{
 		version: "0.9.20",
 		date: "2026-08-22",
 		headline: "The Ask guide now contains the switch its last step tells you to flip.",

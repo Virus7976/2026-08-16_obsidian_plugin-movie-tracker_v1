@@ -69,6 +69,47 @@ export class CredentialStore {
 		return !!this.plaintext;
 	}
 
+	/**
+	 * Would reading a key right now mean interrupting you?
+	 *
+	 * `has()` answers whether a service is configured and stays true while the
+	 * vault is sealed, which is correct and is also the trap: anything deciding
+	 * what it can *do* by asking what exists will act as though the keys are in
+	 * hand, reach for one, and summon a passphrase prompt out of a screen the
+	 * person was only reading.
+	 *
+	 * Plain text is never locked, and session mode counts as locked before its
+	 * first key is entered, because the interruption is the same either way —
+	 * a modal in front of whatever you were doing.
+	 */
+	get needsUnlock(): boolean {
+		if (this.plaintext) return false;
+		if (this.mode === "plain") return false;
+		// Nothing stored is not the same as sealed. A fresh install has no blob
+		// and no passphrase, and offering to unlock it would be offering a door
+		// where there is no wall.
+		if (this.mode === "encrypted") return !!this.plugin.settings.keyBlob;
+		return true;
+	}
+
+	/**
+	 * Ask for the passphrase on purpose.
+	 *
+	 * The prompt already existed but only as a side effect of needing a key, so
+	 * unlocking was something you achieved by trying to do something else and
+	 * waiting to be stopped. Returns whether the keys are readable afterwards;
+	 * a cancelled prompt is a false, not an error, because deciding not to
+	 * unlock is an ordinary answer.
+	 */
+	async unlock(): Promise<boolean> {
+		try {
+			await this.bundle();
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	get hasStoredKey(): boolean {
 		const s = this.plugin.settings;
 		return !!(s.keyBlob || (s.keysPlain && Object.keys(s.keysPlain).length));

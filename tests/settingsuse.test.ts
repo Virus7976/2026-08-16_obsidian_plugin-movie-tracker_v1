@@ -190,5 +190,48 @@ ok(
 	strayHeadings.length ? `these would render twice: ${strayHeadings.join(", ")}` : ""
 );
 
+/* ---- a state you can enter must be one you can leave ------------------ */
+
+/*
+ * There was a "Lock now" button and no unlock.
+ *
+ * Locking was a decision the screen let you make; unlocking was something that
+ * happened *to* you, later, when some unrelated action reached for a key and a
+ * passphrase modal arrived to demand a password for a reason you had to infer
+ * from whatever you had last tapped. And encrypted is the default storage
+ * mode, so this was not a corner of the app: it is the state the settings
+ * screen is in every time Obsidian starts.
+ *
+ * The general fault is a one-way switch — a control that moves the app into a
+ * state and no control that moves it back — which is invisible in exactly the
+ * way a dead setting is. Everything renders, nothing errors, and the way out
+ * is somewhere else or nowhere.
+ */
+const settingsCode = code(settingsSrc);
+ok(
+	"the screen can lock the keys",
+	/setName\("Lock now"\)/.test(settingsCode),
+	"if this button was renamed, rename its counterpart below with it"
+);
+ok(
+	"and can unlock them again",
+	/setName\("Unlock keys"\)/.test(settingsCode),
+	"locking is offered on the screen and unlocking is not, so the only way back is to trip a passphrase prompt by accident"
+);
+
+/*
+ * And the check knows about the lock.
+ *
+ * Test connections used to reach for five keys it could not read, which threw
+ * a modal over a screen nobody had asked it to and recorded five failures if
+ * you declined it. Whatever else changes, the button has to name the unlock it
+ * is about to ask for.
+ */
+ok(
+	"Test connections says when it will ask for the passphrase",
+	/Unlock and test/.test(settingsCode),
+	"the test button springs a passphrase prompt without saying so"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

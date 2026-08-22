@@ -13,7 +13,7 @@
  * timezone, and not reading the clock is the only real defence.
  */
 
-import { ago, describeHealth, describeTrakt, featureHealth, traktState, STALE_AFTER, TESTABLE } from "../src/health";
+import { ago, describeHealth, describeTrakt, featureHealth, traktState, STALE_AFTER, TESTABLE, NEEDS_KEY_TO_CHECK } from "../src/health";
 
 let passed = 0;
 let failed = 0;
@@ -203,7 +203,7 @@ ok("Trakt can be verified too", TESTABLE.includes("trakt"));
 // The passive answer still comes from the token, with no check recorded.
 ok(
 	"and still answers from its token when nothing has been checked",
-	featureHealth("trakt", { records: {}, hasTrakt: true, traktExpires: NOW + 60 * 24 * 60 * 60 * 1000 }, NOW)?.text ===
+	featureHealth("trakt", { records: {}, hasTrakt: true, traktExpires: NOW + 60 * 24 * 60 * 60 * 1000, locked: false }, NOW)?.text ===
 		"Signed in"
 );
 
@@ -250,16 +250,76 @@ ok("and is still fine", describeTrakt(LIVE, NOW, accepted).tone === "ok");
  * refused — in a plugin whose recurring bug is two screens disagreeing about
  * whether something works.
  */
-const INPUTS = { records: { trakt: refused }, hasTrakt: true, traktExpires: NOW + 60 * 24 * 60 * 60 * 1000 };
+const INPUTS = { records: { trakt: refused }, hasTrakt: true, traktExpires: NOW + 60 * 24 * 60 * 60 * 1000, locked: false };
 
 ok("the router routes Trakt through its own description", featureHealth("trakt", INPUTS, NOW)?.tone === "warn");
 ok("and agrees with calling it directly", featureHealth("trakt", INPUTS, NOW)?.text === describeTrakt(LIVE, NOW, refused).text);
-eq("a feature nothing can report on says nothing", featureHealth("letterboxd" as never, { records: {}, hasTrakt: false, traktExpires: 0 }, NOW), null);
+eq("a feature nothing can report on says nothing", featureHealth("letterboxd" as never, { records: {}, hasTrakt: false, traktExpires: 0, locked: false }, NOW), null);
 ok(
 	"an ordinary feature describes its record",
-	featureHealth("tmdb", { records: { tmdb: { at: NOW, ok: true } }, hasTrakt: false, traktExpires: 0 }, NOW)?.tone === "ok"
+	featureHealth("tmdb", { records: { tmdb: { at: NOW, ok: true } }, hasTrakt: false, traktExpires: 0, locked: false }, NOW)?.tone === "ok"
 );
 ok("Trakt is testable now", TESTABLE.includes("trakt"));
+
+/* ---- sealed keys are not failed keys --------------------------------- */
+
+/*
+ * Encrypted is the default storage mode, so for most of the time this plugin
+ * is open its keys are unreadable. Everything else on the screen goes on
+ * reporting them as configured, correctly: the names are stored beside the
+ * blob and names are not secret.
+ *
+ * That leaves one line to carry the difference. "Not checked yet" is the right
+ * answer for a key nobody has tried and the wrong one for a key nobody *can*
+ * try, and from the outside the two states look identical.
+ */
+const SEALED = { records: {}, hasTrakt: false, traktExpires: 0, locked: true };
+
+ok("a locked key says it is locked", featureHealth("tmdb", SEALED, NOW)?.text.includes("locked") === true);
+ok("and offers the way out", featureHealth("tmdb", SEALED, NOW)?.text.includes("unlock") === true);
+// Not a fault: nothing has gone wrong, you have simply not opened the vault.
+ok("and is not painted as a problem", featureHealth("tmdb", SEALED, NOW)?.tone === "info");
+/*
+ * Every key-backed check says so, with one deliberate exception.
+ *
+ * Trakt is described by its expiry rather than by a request, and the expiry is
+ * stored outside the blob precisely so that a settings row never costs a
+ * passphrase. So a sealed vault changes what Trakt can *verify* and not what it
+ * can *say*, and overwriting "Signed in" with a lock notice would be losing a
+ * true answer to report an irrelevant obstacle.
+ */
+ok(
+	"every other key-backed check says it is locked",
+	NEEDS_KEY_TO_CHECK.filter((id) => id !== "trakt").every((id) => featureHealth(id, SEALED, NOW)?.text.includes("locked"))
+);
+ok("and Trakt answers from its token instead", featureHealth("trakt", SEALED, NOW)?.text === "Not signed in");
+
+/*
+ * Mastodon is the exception, and it is the exception it has always been: its
+ * check asks the server whether it exists, which needs the address and not the
+ * token. A sealed vault stops five checks, not six.
+ */
+ok("Mastodon is checkable while locked", !NEEDS_KEY_TO_CHECK.includes("mastodon"));
+ok("so it says what it always says", featureHealth("mastodon", SEALED, NOW)?.text === "Not checked yet");
+
+/*
+ * A result recorded before the lock is still true about the moment it was
+ * taken. Replacing it with the lock notice would throw away the only evidence
+ * the screen has, in the one state where it can gather no more.
+ */
+const WAS_FINE = { records: { tmdb: { at: NOW - 60 * 1000, ok: true } }, hasTrakt: false, traktExpires: 0, locked: true };
+ok("an earlier pass survives the lock", featureHealth("tmdb", WAS_FINE, NOW)?.text.includes("Working") === true);
+ok("and is still reported as a pass", featureHealth("tmdb", WAS_FINE, NOW)?.tone === "ok");
+
+/*
+ * Trakt keeps answering from its expiry, which is stored outside the blob for
+ * exactly this reason: a settings row should not cost a passphrase.
+ */
+ok(
+	"Trakt still answers while locked",
+	featureHealth("trakt", { records: {}, hasTrakt: true, traktExpires: NOW + 60 * 24 * 60 * 60 * 1000, locked: true }, NOW)?.text ===
+		"Signed in"
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

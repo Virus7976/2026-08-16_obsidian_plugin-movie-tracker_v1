@@ -21,7 +21,7 @@
 
 import type ReelPlugin from "./main";
 import type { HealthRecord } from "./health";
-import { TESTABLE } from "./health";
+import { NEEDS_KEY_TO_CHECK, TESTABLE } from "./health";
 import { normaliseHost } from "./publish/mastodon";
 import { redact } from "./secrets";
 import type { FeatureId } from "./setup";
@@ -39,6 +39,21 @@ export type CheckOutcome = { ok: true; proves?: string; note?: string } | { ok: 
  */
 export function checkable(plugin: ReelPlugin, id: FeatureId): boolean {
 	if (!TESTABLE.includes(id)) return false;
+	/*
+	 * A sealed vault is not a broken connection.
+	 *
+	 * Encrypted is the default mode, so for most of the time this screen is
+	 * open the keys are unreadable — and every one of them still reports as
+	 * stored, because the names live beside the blob and names are not secret.
+	 * Left alone, Test connections reached for five keys it could not have,
+	 * threw a passphrase modal over a screen nobody had asked it to, and, if
+	 * you declined, wrote down five failures reading "Cancelled — keys stay
+	 * locked". Five services described as broken on the strength of you not
+	 * typing a password into a prompt you never asked for.
+	 *
+	 * The unlock is offered deliberately instead, on the screen, as itself.
+	 */
+	if (NEEDS_KEY_TO_CHECK.includes(id) && plugin.credentials.needsUnlock) return false;
 	switch (id) {
 		/*
 		 * TMDB was excepted here on the grounds that its key "may be built in",

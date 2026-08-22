@@ -42,7 +42,7 @@ import { App, Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
 import type { FeatureSpec, SetupStep } from "../setup";
 import { isConfigured, isPartial } from "../setup";
-import { featureHealth } from "../health";
+import { NEEDS_KEY_TO_CHECK, featureHealth } from "../health";
 import { checkFeature, checkable } from "../checks";
 import { setupFields } from "./fields";
 import { completedSteps } from "../setup";
@@ -201,7 +201,34 @@ export class SetupSheet extends Modal {
 		};
 		draw();
 
-		if (!can) return;
+		/*
+		 * A sealed vault is the one reason a set-up feature cannot be checked
+		 * that the person can do something about from here.
+		 *
+		 * Without this the guide states the problem and offers nothing: "Keys
+		 * are locked — unlock to check", above empty space, on the screen you
+		 * opened precisely because the thing had stopped working. The settings
+		 * tab grew an Unlock button for the same reason; a guide that sent you
+		 * there to press it would be the old fault in a new place.
+		 */
+		if (!can) {
+			if (!this.locked()) return;
+			const open = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
+			open.addEventListener("click", async () => {
+				open.disabled = true;
+				open.setText("Unlocking…");
+				const opened = await this.plugin.credentials.unlock();
+				if (!opened) {
+					open.disabled = false;
+					open.setText("Unlock");
+					return;
+				}
+				// Unlocking changes what can be checked, so the guide is
+				// rebuilt rather than left holding a button it has outgrown.
+				this.draw();
+			});
+			return;
+		}
 
 		const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
 		btn.addEventListener("click", async () => {
@@ -227,6 +254,15 @@ export class SetupSheet extends Modal {
 	 * the health table. It was written out here as well, which is how a guide
 	 * and a row come to disagree about the same feature.
 	 */
+	/** Sealed keys, and this feature is one of the ones that needs them. */
+	private locked(): boolean {
+		return (
+			NEEDS_KEY_TO_CHECK.includes(this.spec.id) &&
+			this.plugin.credentials.needsUnlock &&
+			this.plugin.credentials.hasStoredKey
+		);
+	}
+
 	private healthLine(): { text: string; tone: "ok" | "warn" | "info" } | null {
 		const s = this.plugin.settings;
 		return featureHealth(
@@ -235,6 +271,7 @@ export class SetupSheet extends Modal {
 				records: s.connectionHealth,
 				hasTrakt: this.plugin.credentials.has("trakt"),
 				traktExpires: s.traktExpires,
+				locked: this.plugin.credentials.needsUnlock,
 			},
 			Date.now()
 		);

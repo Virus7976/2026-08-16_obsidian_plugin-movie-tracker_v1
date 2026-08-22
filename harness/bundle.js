@@ -7998,6 +7998,7 @@ ${body}
 
   // src/health.ts
   var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
+  var NEEDS_KEY_TO_CHECK = ["tmdb", "omdb", "dtdd", "openrouter", "trakt"];
   var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
   function ago(then, now) {
     const ms = Math.max(0, now - then);
@@ -8071,7 +8072,11 @@ ${body}
     }
     if (!TESTABLE.includes(id))
       return null;
-    return describeHealth(inputs.records[id], true, now);
+    const rec = inputs.records[id];
+    if (!rec && inputs.locked && NEEDS_KEY_TO_CHECK.includes(id)) {
+      return { text: "Keys are locked \u2014 unlock to check", tone: "info" };
+    }
+    return describeHealth(rec, true, now);
   }
 
   // src/publish/mastodon.ts
@@ -8089,6 +8094,8 @@ ${body}
   // src/checks.ts
   function checkable(plugin2, id) {
     if (!TESTABLE.includes(id))
+      return false;
+    if (NEEDS_KEY_TO_CHECK.includes(id) && plugin2.credentials.needsUnlock)
       return false;
     switch (id) {
       case "mastodon":
@@ -8537,8 +8544,23 @@ ${body}
         line.className = `reel-setup-health is-${now?.tone ?? "info"}`;
       };
       draw2();
-      if (!can)
+      if (!can) {
+        if (!this.locked())
+          return;
+        const open = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
+        open.addEventListener("click", async () => {
+          open.disabled = true;
+          open.setText("Unlocking\u2026");
+          const opened = await this.plugin.credentials.unlock();
+          if (!opened) {
+            open.disabled = false;
+            open.setText("Unlock");
+            return;
+          }
+          this.draw();
+        });
         return;
+      }
       const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
       btn.addEventListener("click", async () => {
         btn.disabled = true;
@@ -8560,6 +8582,10 @@ ${body}
      * the health table. It was written out here as well, which is how a guide
      * and a row come to disagree about the same feature.
      */
+    /** Sealed keys, and this feature is one of the ones that needs them. */
+    locked() {
+      return NEEDS_KEY_TO_CHECK.includes(this.spec.id) && this.plugin.credentials.needsUnlock && this.plugin.credentials.hasStoredKey;
+    }
     healthLine() {
       const s = this.plugin.settings;
       return featureHealth(
@@ -8567,7 +8593,8 @@ ${body}
         {
           records: s.connectionHealth,
           hasTrakt: this.plugin.credentials.has("trakt"),
-          traktExpires: s.traktExpires
+          traktExpires: s.traktExpires,
+          locked: this.plugin.credentials.needsUnlock
         },
         Date.now()
       );
@@ -9142,6 +9169,7 @@ ${body}
     /* ---------------------------------------------------------------- */
     renderCredentials(el) {
       const store = this.plugin.credentials;
+      const sealed = store.needsUnlock && store.hasStoredKey;
       const status = el.createDiv({ cls: "reel-key-status" });
       const describe2 = () => {
         status.empty();
@@ -9168,6 +9196,18 @@ ${body}
         }
       };
       describe2();
+      if (sealed) {
+        new Setting(el).setName("Unlock keys").setDesc(
+          "Nothing can be tested or fetched until the keys are readable. One passphrase unlocks all of them, and Reel holds them until you quit Obsidian or press Lock."
+        ).addButton(
+          (b) => b.setButtonText("Unlock").setCta().onClick(async () => {
+            b.setDisabled(true).setButtonText("Unlocking\u2026");
+            const opened = await this.plugin.credentials.unlock();
+            new Notice(opened ? "Reel: keys unlocked." : "Reel: keys stay locked.");
+            this.display();
+          })
+        );
+      }
       new Setting(el).setName("Key storage").setDesc(
         "Every key shares one encrypted blob and one passphrase \u2014 a prompt per service would be intolerable, and splitting them buys nothing, since whatever can read one can read the rest. Note that Trakt and Mastodon are different in kind from the others: those can post publicly as you."
       ).addDropdown((d) => {
@@ -9214,14 +9254,38 @@ ${body}
           row.createSpan({ cls: "reel-health-said", text: said.text });
         }
       };
-      new Setting(el).setName("Test connections").setDesc("One small request per configured service, so a mistyped key fails here rather than silently.").addButton(
-        (b) => b.setButtonText("Test").onClick(async () => {
-          b.setDisabled(true).setButtonText("Testing\u2026");
-          await this.runTests();
-          b.setDisabled(false).setButtonText("Test");
-          drawHealth();
-          describe2();
-        })
+      new Setting(el).setName("Test connections").setDesc(
+        sealed ? "One small request per configured service. The keys are locked, so this asks for the passphrase first." : "One small request per configured service, so a mistyped key fails here rather than silently."
+      ).addButton(
+        (b) => (
+          /*
+           * The unlock is named on the button rather than sprung by it.
+           *
+           * Pressing Test while sealed used to reach for five keys it
+           * could not read, which put a passphrase modal over a screen
+           * nobody had asked it to and recorded five failures if you
+           * declined. The checks now decline to run instead, so the
+           * button has to say what it is going to do and then do it.
+           */
+          b.setButtonText(sealed ? "Unlock and test" : "Test").onClick(async () => {
+            const label = sealed ? "Unlock and test" : "Test";
+            b.setDisabled(true).setButtonText(sealed ? "Unlocking\u2026" : "Testing\u2026");
+            if (sealed && !await this.plugin.credentials.unlock()) {
+              new Notice("Reel: keys stay locked, so nothing was tested.");
+              b.setDisabled(false).setButtonText(label);
+              return;
+            }
+            b.setButtonText("Testing\u2026");
+            await this.runTests();
+            if (sealed) {
+              this.display();
+              return;
+            }
+            b.setDisabled(false).setButtonText(label);
+            drawHealth();
+            describe2();
+          })
+        )
       );
       el.appendChild(health);
       drawHealth();
@@ -9619,7 +9683,8 @@ ${body}
       return {
         records: this.plugin.settings.connectionHealth,
         hasTrakt: this.plugin.credentials.has("trakt"),
-        traktExpires: this.plugin.settings.traktExpires
+        traktExpires: this.plugin.settings.traktExpires,
+        locked: this.plugin.credentials.needsUnlock
       };
     }
     /**
@@ -11037,6 +11102,7 @@ ${body}
 
   // harness/main.ts
   var noKeys = false;
+  var locked = false;
   var missing = /* @__PURE__ */ new Set();
   var present = /* @__PURE__ */ new Set();
   var FIXED_NOW = Date.now();
@@ -11346,7 +11412,16 @@ ${body}
      */
     credentials: {
       has: (name) => (present.has(name) || name !== "mastodon") && !missing.has(name) && !noKeys,
-      isUnlocked: true,
+      // A getter, not a value. The stub is built once at load, so a plain
+      // `!locked` freezes whatever the flag was then, which is false, and the
+      // locked scene renders an unlocked screen while reporting success.
+      get isUnlocked() {
+        return !locked;
+      },
+      get needsUnlock() {
+        return locked;
+      },
+      unlock: async () => true,
       hasStoredKey: true,
       store: async () => true,
       remove: async () => void 0,
@@ -12092,6 +12167,56 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function guideLocked(root) {
+    root.addClass("reel-view-body");
+    const spec = FEATURES.find((f) => f.id === "omdb");
+    if (!spec)
+      throw new Error("harness: no omdb feature spec");
+    const before = { ...plugin.settings };
+    locked = true;
+    Object.assign(plugin.settings, { keyMode: "encrypted", keyBlob: "v1:sealed", keysPlain: null, keyNames: ["omdb"] });
+    try {
+      mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+    } finally {
+      locked = false;
+      Object.assign(plugin.settings, before);
+    }
+  }
+  function settingsLocked(root) {
+    root.addClass("reel-view-body");
+    const before = { ...plugin.settings };
+    locked = true;
+    Object.assign(plugin.settings, {
+      keyMode: "encrypted",
+      // Enough of a blob for the screen to know one exists. Nothing reads it.
+      keyBlob: "v1:sealed",
+      keysPlain: null,
+      keyNames: ["tmdb", "omdb", "dtdd", "openrouter", "trakt"],
+      mastodonHost: "mastodon.social",
+      aiEnabled: true,
+      publishTrakt: true,
+      settingsOpen: ["setup", "keys", "publishing", "ask"],
+      /*
+       * One old result, kept deliberately.
+       *
+       * A record written while unlocked outlives the unlock, so the screen has
+       * to hold a truthful past answer next to a present it cannot test. That
+       * pairing is the whole difficulty of this state and a fixture with an
+       * empty health map would skip it.
+       */
+      connectionHealth: {
+        tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1e3, ok: true }
+      }
+    });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+    } finally {
+      locked = false;
+      Object.assign(plugin.settings, before);
+    }
+  }
   var SCREENS = {
     library,
     libraryYear,
@@ -12123,6 +12248,8 @@ ${body}
     asksheet,
     askresult,
     settings,
+    settingsLocked,
+    guideLocked,
     firstrun,
     setupsheet,
     setupdone,

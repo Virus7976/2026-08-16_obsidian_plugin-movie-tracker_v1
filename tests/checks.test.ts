@@ -38,11 +38,13 @@ function eq(name: string, got: unknown, want: unknown): void {
 }
 
 /** Only the parts `checkable` and `checkFeature` actually reach for. */
-function fakePlugin(opts: { keys?: string[]; host?: string; result?: unknown; throws?: boolean } = {}) {
+function fakePlugin(
+	opts: { keys?: string[]; host?: string; result?: unknown; throws?: boolean; locked?: boolean } = {}
+) {
 	const keys = new Set(opts.keys ?? []);
 	return {
 		settings: { mastodonHost: opts.host ?? "", connectionHealth: {} as Record<string, unknown> },
-		credentials: { has: (k: string) => keys.has(k) },
+		credentials: { has: (k: string) => keys.has(k), needsUnlock: opts.locked ?? false },
 		tmdb: {
 			testCredentials: async () => {
 				if (opts.throws) throw new Error("network fell over");
@@ -94,6 +96,39 @@ ok("and has one once signed in", checkable(fakePlugin({ keys: ["trakt"] }) as ne
 // A feature with no check at all is never checkable, whatever is stored.
 ok("an unlistable feature is never checkable", !checkable(fakePlugin({ keys: ["letterboxd"] }) as never, "letterboxd" as never));
 
+/* ---- sealed keys ------------------------------------------------------ */
+
+/*
+ * The state the settings screen spends most of its life in, since encrypted is
+ * the default: every key stored, none of them readable, and `has()` truthfully
+ * reporting all of them as configured because the names live beside the blob.
+ *
+ * What made that dangerous is that being configured was the only question
+ * anything asked. Test connections reached for five keys it could not have,
+ * threw a passphrase modal over a screen nobody had asked it to, and wrote
+ * down five failures reading "Cancelled" if you declined it. Declining to type
+ * a password is not a broken connection to five services.
+ */
+const sealed = fakePlugin({ keys: ["tmdb", "omdb", "dtdd", "openrouter", "trakt"], locked: true });
+
+ok("a locked TMDB key is not checkable", !checkable(sealed as never, "tmdb"));
+ok("nor a locked OMDb key", !checkable(sealed as never, "omdb"));
+ok("nor a locked OpenRouter key", !checkable(sealed as never, "openrouter"));
+ok("nor a Trakt session whose token cannot be read", !checkable(sealed as never, "trakt"));
+
+/*
+ * Mastodon is the exception and it is the same exception as always: the check
+ * asks whether the server exists, which needs the address, not the token. A
+ * sealed vault stops five checks, not six.
+ */
+ok(
+	"Mastodon is still checkable while locked",
+	checkable(fakePlugin({ host: "mastodon.social", locked: true }) as never, "mastodon")
+);
+
+// And unlocking is all it takes: nothing else about the fixture changes.
+ok("unlocking makes the same keys checkable", checkable(fakePlugin({ keys: ["tmdb"], locked: false }) as never, "tmdb"));
+
 /* ---- running one ------------------------------------------------------ */
 
 void (async () => {
@@ -101,6 +136,10 @@ void (async () => {
 	eq("an unchecked feature records nothing", await checkFeature(bare as never, "omdb", 1000), null);
 	// Including the required one, on the screen where it matters most.
 	eq("a fresh install records no TMDB failure", await checkFeature(bare as never, "tmdb", 1000), null);
+	// And a sealed vault records nothing rather than a row of failures about a
+	// passphrase prompt you declined.
+	eq("a locked vault records nothing", await checkFeature(sealed as never, "tmdb", 1000), null);
+	ok("and leaves the health map alone", sealed.settings.connectionHealth.tmdb === undefined);
 
 	// Keyed, because these are about what `checkFeature` records rather than
 	// about whether TMDB is checkable — which is the section above.

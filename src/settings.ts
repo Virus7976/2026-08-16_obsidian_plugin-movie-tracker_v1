@@ -825,6 +825,15 @@ export class ReelSettingTab extends PluginSettingTab {
 
 	private renderCredentials(el: HTMLElement): void {
 		const store = this.plugin.credentials;
+		/*
+		 * Keys stored, none of them readable.
+		 *
+		 * Both halves matter. `needsUnlock` alone is true on a brand new
+		 * install in the default mode, where there is nothing to unlock, and a
+		 * screen offering to unlock an empty vault is worse than one that does
+		 * not mention locks at all.
+		 */
+		const sealed = store.needsUnlock && store.hasStoredKey;
 
 		const status = el.createDiv({ cls: "reel-key-status" });
 		const describe = () => {
@@ -852,6 +861,45 @@ export class ReelSettingTab extends PluginSettingTab {
 			}
 		};
 		describe();
+
+		/*
+		 * The half of the pair that did not exist.
+		 *
+		 * There has always been a "Lock now" button and never an unlock. Locking
+		 * was a decision you could make; unlocking was something that happened
+		 * to you, when some other action needed a key and a modal arrived to
+		 * demand a passphrase for a reason you had to infer.
+		 *
+		 * And encrypted is the default mode, so this is not a corner: it is the
+		 * state the settings screen is in every time you open Obsidian and come
+		 * here before doing anything else. The pill above says "Encrypted —
+		 * locked" and, until now, nothing on the screen would do anything about
+		 * that.
+		 *
+		 * It sits under the status rather than beside the lock, because the line
+		 * it answers is the one directly above it.
+		 */
+		if (sealed) {
+			new Setting(el)
+				.setName("Unlock keys")
+				.setDesc(
+					"Nothing can be tested or fetched until the keys are readable. One passphrase unlocks all of them, " +
+						"and Reel holds them until you quit Obsidian or press Lock."
+				)
+				.addButton((b) =>
+					b
+						.setButtonText("Unlock")
+						.setCta()
+						.onClick(async () => {
+							b.setDisabled(true).setButtonText("Unlocking…");
+							const opened = await this.plugin.credentials.unlock();
+							new Notice(opened ? "Reel: keys unlocked." : "Reel: keys stay locked.");
+							// Redrawn either way: the pills, this row and every
+							// health line are all decided by the answer.
+							this.display();
+						})
+				);
+		}
 
 		new Setting(el)
 			.setName("Key storage")
@@ -937,12 +985,38 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		new Setting(el)
 			.setName("Test connections")
-			.setDesc("One small request per configured service, so a mistyped key fails here rather than silently.")
+			.setDesc(
+				sealed
+					? "One small request per configured service. The keys are locked, so this asks for the passphrase first."
+					: "One small request per configured service, so a mistyped key fails here rather than silently."
+			)
 			.addButton((b) =>
-				b.setButtonText("Test").onClick(async () => {
-					b.setDisabled(true).setButtonText("Testing…");
+				/*
+				 * The unlock is named on the button rather than sprung by it.
+				 *
+				 * Pressing Test while sealed used to reach for five keys it
+				 * could not read, which put a passphrase modal over a screen
+				 * nobody had asked it to and recorded five failures if you
+				 * declined. The checks now decline to run instead, so the
+				 * button has to say what it is going to do and then do it.
+				 */
+				b.setButtonText(sealed ? "Unlock and test" : "Test").onClick(async () => {
+					const label = sealed ? "Unlock and test" : "Test";
+					b.setDisabled(true).setButtonText(sealed ? "Unlocking…" : "Testing…");
+					if (sealed && !(await this.plugin.credentials.unlock())) {
+						new Notice("Reel: keys stay locked, so nothing was tested.");
+						b.setDisabled(false).setButtonText(label);
+						return;
+					}
+					b.setButtonText("Testing…");
 					await this.runTests();
-					b.setDisabled(false).setButtonText("Test");
+					// A successful unlock changes the pills, the rows and this
+					// button, so the whole tab is redrawn rather than patched.
+					if (sealed) {
+						this.display();
+						return;
+					}
+					b.setDisabled(false).setButtonText(label);
 					drawHealth();
 					describe();
 				})
@@ -1569,6 +1643,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			records: this.plugin.settings.connectionHealth,
 			hasTrakt: this.plugin.credentials.has("trakt"),
 			traktExpires: this.plugin.settings.traktExpires,
+			locked: this.plugin.credentials.needsUnlock,
 		};
 	}
 

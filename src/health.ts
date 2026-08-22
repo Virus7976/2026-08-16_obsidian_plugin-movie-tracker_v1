@@ -51,6 +51,17 @@ import type { FeatureId } from "./setup";
  */
 export const TESTABLE: FeatureId[] = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
 
+/**
+ * Of those, the ones whose check has to read a key.
+ *
+ * Mastodon is the exception, and it is the same exception it always was: its
+ * check asks the server whether it exists, which needs the address and nothing
+ * else. So a sealed vault stops five checks and not the sixth, and saying that
+ * once is what keeps the settings screen and the six guides agreeing about
+ * which button is worth offering.
+ */
+export const NEEDS_KEY_TO_CHECK: FeatureId[] = ["tmdb", "omdb", "dtdd", "openrouter", "trakt"];
+
 export interface HealthRecord {
 	/** When the check ran. Epoch milliseconds. */
 	at: number;
@@ -251,6 +262,15 @@ export interface HealthInputs {
 	records: HealthMap;
 	hasTrakt: boolean;
 	traktExpires: number | undefined;
+	/**
+	 * Are the keys sealed?
+	 *
+	 * Not cosmetic. "Not checked yet" is the right line for a key that has
+	 * never been tried and the wrong one for a key that cannot be tried, and
+	 * the two are indistinguishable to everything else on the screen, because
+	 * the names of the stored keys stay readable while their values do not.
+	 */
+	locked: boolean;
 }
 
 /**
@@ -270,5 +290,15 @@ export function featureHealth(id: FeatureId, inputs: HealthInputs, now: number):
 		return describeTrakt(traktState(inputs.hasTrakt, inputs.traktExpires, now), now, inputs.records.trakt);
 	}
 	if (!TESTABLE.includes(id)) return null;
-	return describeHealth(inputs.records[id], true, now);
+	const rec = inputs.records[id];
+	/*
+	 * Only where there is nothing to report. A result recorded before the lock
+	 * is still true about the moment it was taken, and hiding it would throw
+	 * away the one piece of evidence the screen has in the one state where it
+	 * can gather no more.
+	 */
+	if (!rec && inputs.locked && NEEDS_KEY_TO_CHECK.includes(id)) {
+		return { text: "Keys are locked — unlock to check", tone: "info" };
+	}
+	return describeHealth(rec, true, now);
 }
