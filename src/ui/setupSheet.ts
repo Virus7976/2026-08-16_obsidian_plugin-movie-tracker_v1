@@ -42,7 +42,7 @@ import { App, Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
 import type { FeatureSpec, SetupStep } from "../setup";
 import { isConfigured, isPartial, proves } from "../setup";
-import { NEEDS_KEY_TO_CHECK, featureHealth } from "../health";
+import { NEEDS_KEY_TO_CHECK, featureHealth, lastCheckFailed } from "../health";
 import { checkFeature, checkable } from "../checks";
 import { setupFields } from "./fields";
 import { completedSteps } from "../setup";
@@ -165,13 +165,28 @@ export class SetupSheet extends Modal {
 		const title = head.createDiv({ cls: "reel-setup-title" });
 		title.createSpan({ cls: "reel-setup-name", text: this.spec.name });
 
-		// The state pill answers "did I already do this?", which is a
-		// surprisingly hard question to answer from a settings screen where a
-		// saved key renders as an empty password field.
+		/*
+		 * The state pill answers "did I already do this?", which is a
+		 * surprisingly hard question to answer from a settings screen where a
+		 * saved key renders as an empty password field.
+		 *
+		 * It keeps answering exactly that when the last check failed — you did
+		 * do it, and saying otherwise would swap one overstatement for the
+		 * opposite one — but it does not get to answer it in green. A success
+		 * badge sitting directly above "Failed 4 minutes ago — Invalid API
+		 * key!" is the first thing on the screen and it contradicts the second.
+		 *
+		 * `describeHealth` already reasons this way about its own wording: a
+		 * half-checked pass keeps its true text and drops out of the confident
+		 * register rather than being reworded into a warning. This is that
+		 * rule applied to the badge above it, which is where a person's eye
+		 * lands first.
+		 */
 		const done = isConfigured(this.plugin, this.spec);
 		const part = isPartial(this.plugin, this.spec);
+		const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
 		title.createSpan({
-			cls: done ? "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
+			cls: done ? (failed ? "reel-pill" : "reel-pill ok") : part ? "reel-pill warn" : "reel-pill",
 			text: done ? "Set up" : part ? "Half done" : this.spec.essential ? "Required" : "Not set up",
 		});
 
@@ -335,8 +350,23 @@ export class SetupSheet extends Modal {
 			return;
 		}
 
+		/*
+		 * Folded because they are settled — unless the last check says they are
+		 * not.
+		 *
+		 * The argument above holds for a connection that works: you did not
+		 * open this to re-read how to make an account. A failed check is the
+		 * case that inverts it. "Invalid API key" means step two is the live
+		 * question again, and the guide had answered by hiding it behind a
+		 * button reading "All 3 steps done" on the one screen where that
+		 * sentence is no longer the useful thing to say.
+		 *
+		 * Still the same toggle, so it can be folded straight back. Opening it
+		 * is a default, not a decision taken away.
+		 */
 		const toggle = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
-		const list = root.createEl("ol", { cls: "reel-setup-steps is-collapsed" });
+		const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
+		const list = root.createEl("ol", { cls: failed ? "reel-setup-steps" : "reel-setup-steps is-collapsed" });
 
 		const label = (): void => {
 			const shown = !list.classList.contains("is-collapsed");

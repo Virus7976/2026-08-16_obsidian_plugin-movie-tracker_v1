@@ -9827,8 +9827,17 @@ input.reel-input {
 	font-size: var(--reel-text-caption);
 	font-weight: 600;
 	font-variant-numeric: tabular-nums;
+	/*
+	 * Muted, and only muted. It was muted *and* 0.7, which composited the
+	 * rank down to 3.95:1 on the default theme and 2.99:1 on a warm one.
+	 *
+	 * This argument is already settled elsewhere in this file: faint-plus-
+	 * opacity was replaced by muted-at-full-opacity on the grounds that muted
+	 * is the theme's own answer to "quieter but readable". Stacking a fade on
+	 * top of that token asks the same question twice and takes the worse
+	 * answer — and a rank is a number somebody is reading off a chart.
+	 */
 	color: var(--text-muted);
-	opacity: 0.7;
 	line-height: 1.4;
 }
 
@@ -14367,9 +14376,31 @@ button.reel-facet-tab {
 	color: var(--text-normal);
 }
 
+/*
+ * Blocked, not disabled — and the difference is the whole point of the tile.
+ *
+ * `cursor: not-allowed` was true when a blocked target was inert. It is not
+ * any more: these tiles became tappable so that the one thing standing between
+ * you and posting is one tap away, and the tile's own note is the instruction
+ * — "No Mastodon access token — tap to set up". A cursor telling you not to
+ * bother sat on top of a control whose entire job is to be pressed.
+ *
+ * The dimming went the same way. 0.6 put that instruction at 2.49:1, which is
+ * a sentence you have to read, greyed past legibility, on the screen where it
+ * is the only thing to do next.
+ */
 .reel-publish-target.is-blocked {
-	opacity: 0.6;
-	cursor: not-allowed;
+	opacity: 0.9;
+}
+
+/*
+ * Same double-quiet, and it matters more here: the note on a blocked target
+ * is the instruction. "No Mastodon access token — tap to set up" muted, then
+ * faded, is the one sentence on the tile that has to be read.
+ */
+.reel-publish-target.is-blocked .reel-publish-target-name,
+.reel-publish-target.is-blocked .reel-publish-target-note {
+	color: var(--text-normal);
 }
 
 .reel-publish-target-name {
@@ -15472,9 +15503,37 @@ button.reel-facet-tab {
  * A done step fades rather than collapses. Collapsing would move every step
  * below it, which on a phone means the thing you were reading jumps away the
  * instant you tick the thing above it.
+ *
+ * It fades less than it used to. At 0.55 the step's own text composited to
+ * about rgb(133, 133, 133) on white — 3.69:1, under the 4.5:1 that body text
+ * needs, and worse on the warm palettes. The audit had never said so because
+ * it read the computed colour, rgb(34, 34, 34), and opacity never reached the
+ * arithmetic. A done step is still readable text on a screen somebody opened
+ * to read it, and "settled" is a thing to say quietly, not illegibly.
  */
 .reel-setup-step.is-done {
-	opacity: 0.55;
+	opacity: 0.9;
+}
+
+/*
+ * Inside a faded step the quiet already exists. Saying it twice is what put
+ * these two under the line.
+ *
+ * A note is `--text-muted` because it is secondary to the step it hangs off,
+ * and that is right where the step is live. Once the step fades, the same
+ * sentence is being asked to recede twice over — and two quiet signals
+ * multiply rather than agree, landing at 4.46:1 on a warm palette while the
+ * step text beside it, which is `--text-normal` under the identical fade,
+ * reads comfortably.
+ *
+ * So the fade is left to do it alone. These end up exactly as quiet as the
+ * text they sit under, which is what "a note on a finished step" should look
+ * like anyway. Where the step is not done, nothing here applies and the note
+ * stays muted as before.
+ */
+.reel-setup-step.is-done .reel-setup-note,
+.reel-setup-step.is-done .reel-setup-copy-hint {
+	color: var(--text-normal);
 }
 
 .reel-setup-step-row {

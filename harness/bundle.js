@@ -5325,6 +5325,9 @@ ${body}
   // src/health.ts
   var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
   var NEEDS_KEY_TO_CHECK = ["tmdb", "omdb", "dtdd", "openrouter", "trakt"];
+  function lastCheckFailed(records, id) {
+    return records[id]?.ok === false;
+  }
   var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
   function ago(then, now) {
     const ms = Math.max(0, now - then);
@@ -5923,8 +5926,9 @@ ${body}
       title.createSpan({ cls: "reel-setup-name", text: this.spec.name });
       const done = isConfigured(this.plugin, this.spec);
       const part = isPartial(this.plugin, this.spec);
+      const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
       title.createSpan({
-        cls: done ? "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
+        cls: done ? failed ? "reel-pill" : "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
         text: done ? "Set up" : part ? "Half done" : this.spec.essential ? "Required" : "Not set up"
       });
       head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
@@ -6049,7 +6053,8 @@ ${body}
         return;
       }
       const toggle2 = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
-      const list2 = root.createEl("ol", { cls: "reel-setup-steps is-collapsed" });
+      const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
+      const list2 = root.createEl("ol", { cls: failed ? "reel-setup-steps" : "reel-setup-steps is-collapsed" });
       const label = () => {
         const shown2 = !list2.classList.contains("is-collapsed");
         toggle2.setText(shown2 ? "Hide the steps" : `All ${total} steps done \u2014 show them`);
@@ -10796,6 +10801,31 @@ ${body}
     });
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
+  function channels(colour) {
+    const parts = colour.match(/[\d.]+/g);
+    if (!parts || parts.length < 3)
+      return null;
+    const scale = colour.startsWith("color(") ? 1 / 255 : 1;
+    const [r, g, b] = parts.slice(0, 3).map((v) => Number(v) / scale);
+    return [r, g, b];
+  }
+  function paintedColour(el, backdrop) {
+    let alpha = 1;
+    for (let p = el; p; p = p.parentElement) {
+      const o = Number(getComputedStyle(p).opacity);
+      if (Number.isFinite(o))
+        alpha *= o;
+    }
+    const fg = getComputedStyle(el).color;
+    if (alpha > 0.995)
+      return fg;
+    const a = channels(fg);
+    const b = channels(backdrop);
+    if (!a || !b)
+      return fg;
+    const mix = a.map((v, i) => Math.round(v * alpha + b[i] * (1 - alpha)));
+    return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
+  }
   function contrastRatio(fg, bg) {
     const a = luminance(fg);
     const b = luminance(bg);
@@ -11047,19 +11077,21 @@ ${body}
       const bgHere = backdropOf(el);
       if (bgHere === accentColour)
         continue;
-      if (el.closest(".reel-heart, .reel-cell-heart, .reel-reaction-icon")) {
-        const iconRatio = contrastRatio(cs.color, bgHere);
+      if (el.closest(".reel-heart, .reel-cell-heart, .reel-reaction-icon, .reel-search-icon")) {
+        const iconRatio = contrastRatio(paintedColour(el, bgHere), bgHere);
         if (iconRatio != null && iconRatio < 3) {
           lowContrast.push(`${nameOf(el)} ${iconRatio.toFixed(2)}:1 (icon)`);
         }
         continue;
       }
+      if (el.closest('[disabled], [aria-disabled="true"], .is-disabled'))
+        continue;
       if (cs.visibility === "hidden" || cs.display === "none")
         continue;
       const size = parseFloat(cs.fontSize);
       const bold = Number(cs.fontWeight) >= 700;
       const large = size >= 24 || bold && size >= 18.66;
-      const ratio = contrastRatio(cs.color, backdropOf(el));
+      const ratio = contrastRatio(paintedColour(el, bgHere), bgHere);
       if (ratio != null && ratio < (large ? 3 : 4.5)) {
         lowContrast.push(`${nameOf(el)} ${ratio.toFixed(2)}:1`);
       }
@@ -12567,6 +12599,29 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function guideFailed(root) {
+    root.addClass("reel-view-body");
+    const spec = FEATURES.find((f) => f.id === "omdb");
+    if (!spec)
+      throw new Error("harness: no omdb feature spec");
+    const before = { ...plugin.settings };
+    present.add("omdb");
+    Object.assign(plugin.settings, {
+      connectionHealth: {
+        omdb: {
+          at: FIXED_NOW - 4 * 60 * 1e3,
+          ok: false,
+          error: "Invalid API key! (Please visit https://www.omdbapi.com/apikey.aspx to obtain a valid key.)"
+        }
+      }
+    });
+    try {
+      mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+    } finally {
+      present.delete("omdb");
+      Object.assign(plugin.settings, before);
+    }
+  }
   function settingsModels(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12743,6 +12798,7 @@ ${body}
     settingsPlain,
     settingsSession,
     guideLocked,
+    guideFailed,
     guideHalf,
     firstrun,
     setupsheet,

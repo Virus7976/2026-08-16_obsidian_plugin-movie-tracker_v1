@@ -1974,6 +1974,46 @@ function guideLocked(root: HTMLElement): void {
 }
 
 /**
+ * A walkthrough whose check came back a failure.
+ *
+ * The state a person is actually in when they need this screen most: they have
+ * followed the guide, pasted a key, pressed Check now, and been told no. Every
+ * other guide scene draws a check that has not run or one that passed, so the
+ * one tone this block paints in a colour of its own had never been rendered
+ * inside a guide — at all. It is on the settings screen — as one row among ten,
+ * where it is short and has a whole column to itself. Here it sits directly
+ * under the step list with a button beside it.
+ *
+ * The error is OMDb's real refusal, at its real length. A stub reading "401"
+ * would prove the tone renders and nothing about whether the sentence fits,
+ * and the sentence is the part a person has to read to know what to do next.
+ * There is no key in it: the fixture is a public repo and a rig that draws a
+ * real settings screen has no business holding a key-shaped string.
+ */
+function guideFailed(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const spec = FEATURES.find((f) => f.id === "omdb");
+	if (!spec) throw new Error("harness: no omdb feature spec");
+	const before = { ...plugin.settings };
+	present.add("omdb");
+	Object.assign(plugin.settings, {
+		connectionHealth: {
+			omdb: {
+				at: FIXED_NOW - 4 * 60 * 1000,
+				ok: false,
+				error: "Invalid API key! (Please visit https://www.omdbapi.com/apikey.aspx to obtain a valid key.)",
+			},
+		},
+	});
+	try {
+		mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+	} finally {
+		present.delete("omdb");
+		Object.assign(plugin.settings, before);
+	}
+}
+
+/**
  * The model picker after the list has been fetched.
  *
  * `models()` returned an empty array in this rig, so the only branch of the
@@ -2255,6 +2295,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	settingsPlain,
 	settingsSession,
 	guideLocked,
+	guideFailed,
 	guideHalf,
 	firstrun,
 	setupsheet,

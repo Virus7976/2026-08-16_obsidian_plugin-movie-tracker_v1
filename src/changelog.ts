@@ -52,6 +52,37 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.34",
+		date: "2026-08-22",
+		headline: "A walkthrough stops calling itself set up when its last check failed.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "A feature's guide no longer shows a green \"Set up\" badge above a line saying the connection failed.",
+				note: "The badge was answering \"did I already do this?\" and it still does — it just no longer answers in green when the last check came back an error. Green is the first thing you read, and it was contradicting the sentence underneath it.",
+			},
+			{
+				kind: "better",
+				text: "When a check has failed, the guide's steps are open instead of folded away behind \"All 3 steps done\".",
+				note: "They fold when everything works, because you did not open the screen to re-read how to make an account. A failed key is exactly when you did.",
+			},
+			{
+				kind: "fixed",
+				text: "Completed walkthrough steps are readable again.",
+				note: "They were faded to about a third of the contrast text needs, so a finished step was hard to read on the screen you had opened in order to read it.",
+			},
+			{
+				kind: "fixed",
+				text: "On the publish sheet, a target you have not set up yet no longer greys out its own instructions.",
+				note: "The line telling you what is missing — and that you can tap the tile to fix it — was the faintest thing on the tile. The tile also showed a \"not allowed\" cursor while being perfectly tappable.",
+			},
+			{
+				kind: "fixed",
+				text: "The position numbers on the statistics charts are no longer too faint to read.",
+			},
+		],
+	},
+	{
 		version: "0.9.33",
 		date: "2026-08-22",
 		headline: "Remove, on a film's page, no longer looks switched off.",

@@ -87,6 +87,29 @@ export interface HealthRecord {
 export type HealthMap = Partial<Record<FeatureId, HealthRecord>>;
 
 /**
+ * Did the last check on this feature come back a failure?
+ *
+ * A different question from the one `describeHealth` answers, and it needed
+ * asking separately. That function turns a record into a sentence for the
+ * status line. What wants this predicate is everything *around* that line
+ * — the parts of a screen that would otherwise go on claiming success
+ * beside it.
+ *
+ * The guide is where that showed: a green "Set up" pill sat directly above
+ * "Failed 4 minutes ago — Invalid API key!", because the pill was answering
+ * "did I already do this?" and had no way to know the answer had stopped
+ * being the whole story. Both statements were true and the green one is read
+ * first.
+ *
+ * Deliberately not "is this broken". A record that has never been written
+ * means nothing has been checked, which is not a failure — that distinction
+ * is the entire reason this module exists.
+ */
+export function lastCheckFailed(records: HealthMap, id: FeatureId): boolean {
+	return records[id]?.ok === false;
+}
+
+/**
  * How long a result stays worth believing.
  *
  * A key that worked a fortnight ago tells you almost nothing about today — it

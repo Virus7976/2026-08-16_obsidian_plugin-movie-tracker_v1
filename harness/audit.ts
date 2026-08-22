@@ -60,6 +60,62 @@ function luminance(colour: string): number | null {
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/**
+ * The same channels `luminance` reads, before it linearises them.
+ *
+ * Split out because compositing has to happen in the space the browser
+ * composites in, which is plain sRGB — not the linear values luminance works
+ * with. Blending the linearised numbers would give a different grey from the
+ * one on the screen.
+ */
+function channels(colour: string): [number, number, number] | null {
+	const parts = colour.match(/[\d.]+/g);
+	if (!parts || parts.length < 3) return null;
+	const scale = colour.startsWith("color(") ? 1 / 255 : 1;
+	const [r, g, b] = parts.slice(0, 3).map((v) => Number(v) / scale);
+	return [r, g, b];
+}
+
+/**
+ * The colour the text is actually painted, once the opacity above it applies.
+ *
+ * This was the audit's blind spot, and it was a structural one rather than a
+ * missing case. Contrast was measured from the computed `color`, which is what
+ * the rule asked for and not what the screen shows: a completed step in a
+ * walkthrough computes to rgb(34, 34, 34) and renders at rgb(133, 133, 133),
+ * because its container carries `opacity: 0.55`. The check read the first
+ * number, called it 15.9:1, and passed — on text that measures 3.69:1 in front
+ * of a person.
+ *
+ * `opacity` was already in this file, consulted once, as a visibility test for
+ * whether an element is drawn at all. Nothing asked what it did to an element
+ * that *is* drawn. So every dimmed thing in the app — and dimming is how this
+ * interface says "settled", "disabled", "secondary" — has been exempt from the
+ * contrast check for as long as the check has existed.
+ *
+ * Opacity compounds through ancestors, so the whole chain is walked. The
+ * result is composited against the same backdrop the ratio is measured
+ * against, which is exact whenever the dimmed group sits on a background close
+ * to what is behind it — the ordinary case, and the case here, since a
+ * dimmed panel over a contrasting one would be a different bug wearing this
+ * one's clothes.
+ */
+function paintedColour(el: HTMLElement, backdrop: string): string {
+	let alpha = 1;
+	for (let p: HTMLElement | null = el; p; p = p.parentElement) {
+		const o = Number(getComputedStyle(p).opacity);
+		if (Number.isFinite(o)) alpha *= o;
+	}
+	const fg = getComputedStyle(el).color;
+	if (alpha > 0.995) return fg;
+
+	const a = channels(fg);
+	const b = channels(backdrop);
+	if (!a || !b) return fg;
+	const mix = a.map((v, i) => Math.round(v * alpha + b[i] * (1 - alpha)));
+	return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
+}
+
 export function contrastRatio(fg: string, bg: string): number | null {
 	const a = luminance(fg);
 	const b = luminance(bg);
@@ -607,18 +663,47 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 		// A glyph used as an icon is held to the 3:1 non-text standard, which
 		// is what the spec actually asks of it. The heart is a heart whether
 		// or not you can read it as a character.
-		if (el.closest(".reel-heart, .reel-cell-heart, .reel-reaction-icon")) {
-			const iconRatio = contrastRatio(cs.color, bgHere);
+		/*
+		 * The magnifier joins the hearts. It is a glyph standing in for an
+		 * icon, next to a field that is labelled in words and announced to a
+		 * screen reader by that label — nobody reads the character itself, and
+		 * 1.4.11 asks 3:1 of a graphic, which it clears on every palette.
+		 *
+		 * Held to a standard rather than exempted. The alternative on the table
+		 * was to un-dim it, and that would have been the tail wagging the dog:
+		 * changing how a decoration looks because a checker was applying the
+		 * wrong rule to it.
+		 */
+		if (el.closest(".reel-heart, .reel-cell-heart, .reel-reaction-icon, .reel-search-icon")) {
+			const iconRatio = contrastRatio(paintedColour(el, bgHere), bgHere);
 			if (iconRatio != null && iconRatio < 3) {
 				lowContrast.push(`${nameOf(el)} ${iconRatio.toFixed(2)}:1 (icon)`);
 			}
 			continue;
 		}
+		/*
+		 * An inactive control is exempt, and the spec says so: 1.4.3 excludes
+		 * text that is part of a component in a disabled state.
+		 *
+		 * This only started to matter once opacity was composited in, because
+		 * dimming is how a disabled control is drawn — so the exemption and
+		 * the new measurement arrived together, and without it the first thing
+		 * the improved check did was report a greyed-out Back button as a
+		 * fault. That is the failure mode this file already names about the
+		 * accent colour: a checker that flags what is not wrong teaches you to
+		 * skim its output.
+		 *
+		 * `.is-disabled` alongside the real attributes because that is how
+		 * this app draws it. A `disabled` property makes a button unfocusable,
+		 * which is not always wanted, so several controls carry the state as a
+		 * class instead and the DOM property reads false on them.
+		 */
+		if (el.closest('[disabled], [aria-disabled="true"], .is-disabled')) continue;
 		if (cs.visibility === "hidden" || cs.display === "none") continue;
 		const size = parseFloat(cs.fontSize);
 		const bold = Number(cs.fontWeight) >= 700;
 		const large = size >= 24 || (bold && size >= 18.66);
-		const ratio = contrastRatio(cs.color, backdropOf(el));
+		const ratio = contrastRatio(paintedColour(el, bgHere), bgHere);
 		if (ratio != null && ratio < (large ? 3 : 4.5)) {
 			lowContrast.push(`${nameOf(el)} ${ratio.toFixed(2)}:1`);
 		}
