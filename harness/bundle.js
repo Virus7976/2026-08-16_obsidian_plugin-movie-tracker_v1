@@ -7984,7 +7984,7 @@ ${body}
   }
 
   // src/health.ts
-  var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon"];
+  var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
   var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
   function ago(then, now) {
     const ms = Math.max(0, now - then);
@@ -8032,7 +8032,10 @@ ${body}
       return { kind: "soon", expires };
     return { kind: "in", expires };
   }
-  function describeTrakt(state, now) {
+  function describeTrakt(state, now, rec) {
+    if (rec && !rec.ok && state.kind !== "out") {
+      return { text: `Token refused ${ago(rec.at, now)} \u2014 sign in again`, tone: "warn" };
+    }
     switch (state.kind) {
       case "out":
         return { text: "Not signed in", tone: "info" };
@@ -8041,10 +8044,21 @@ ${body}
       case "expired":
         return { text: `Session expired ${ago(state.expires, now)} \u2014 sign in again`, tone: "warn" };
       case "soon":
-        return { text: "Signed in \u2014 renews automatically this week", tone: "ok" };
+        return { text: `Signed in \u2014 renews automatically this week${checked(rec, now)}`, tone: "ok" };
       case "in":
-        return { text: "Signed in", tone: "ok" };
+        return { text: `Signed in${checked(rec, now)}`, tone: "ok" };
     }
+  }
+  function checked(rec, now) {
+    return rec?.ok ? `, checked ${ago(rec.at, now)}` : "";
+  }
+  function featureHealth(id, inputs, now) {
+    if (id === "trakt") {
+      return describeTrakt(traktState(inputs.hasTrakt, inputs.traktExpires, now), now, inputs.records.trakt);
+    }
+    if (!TESTABLE.includes(id))
+      return null;
+    return describeHealth(inputs.records[id], true, now);
   }
 
   // src/ai/models.ts
@@ -8204,16 +8218,24 @@ ${body}
       sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
       sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
     }
-    /** Null for the features nothing can honestly report on. */
+    /**
+     * Null for the features nothing can honestly report on.
+     *
+     * The routing lives in `health.ts` and is shared with the settings rows and
+     * the health table. It was written out here as well, which is how a guide
+     * and a row come to disagree about the same feature.
+     */
     healthLine() {
-      const now = Date.now();
       const s = this.plugin.settings;
-      if (this.spec.id === "trakt") {
-        return describeTrakt(traktState(this.plugin.credentials.has("trakt"), s.traktExpires, now), now);
-      }
-      if (!TESTABLE.includes(this.spec.id))
-        return null;
-      return describeHealth(s.connectionHealth[this.spec.id], true, now);
+      return featureHealth(
+        this.spec.id,
+        {
+          records: s.connectionHealth,
+          hasTrakt: this.plugin.credentials.has("trakt"),
+          traktExpires: s.traktExpires
+        },
+        Date.now()
+      );
     }
     renderSteps(root) {
       const list2 = root.createEl("ol", { cls: "reel-setup-steps" });
@@ -8806,11 +8828,12 @@ ${body}
       const drawHealth = () => {
         health.empty();
         const now = Date.now();
+        const inputs = this.healthInputs();
         for (const id of TESTABLE) {
           const rec = this.plugin.settings.connectionHealth[id];
           if (!rec && !store.has(id))
             continue;
-          const said = describeHealth(rec, true, now);
+          const said = featureHealth(id, inputs, now) ?? describeHealth(rec, true, now);
           const row = health.createDiv({ cls: `reel-health-row is-${said.tone}` });
           row.createSpan({ cls: "reel-health-name", text: KEY_LABELS[id] ?? id });
           row.createSpan({ cls: "reel-health-said", text: said.text });
@@ -9075,8 +9098,10 @@ ${body}
         return;
       const now = Date.now();
       const session = traktState(signedIn, this.plugin.settings.traktExpires, now);
-      const said = describeTrakt(session, now);
-      const dead = session.kind === "expired";
+      const check = this.plugin.settings.connectionHealth.trakt;
+      const said = describeTrakt(session, now, check);
+      const refused = signedIn && check?.ok === false;
+      const dead = session.kind === "expired" || refused;
       const signIn = async () => {
         const app2 = await this.plugin.publish.app();
         if (!app2) {
@@ -9296,6 +9321,8 @@ ${body}
       if (normaliseHost(this.plugin.settings.mastodonHost)) {
         record("mastodon", await this.plugin.publish.mastodon.test());
       }
+      if (store.has("trakt"))
+        record("trakt", await this.plugin.publish.trakt.test());
       await this.plugin.saveSettings();
       const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);
       new Notice(failed.length ? `Reel: ${failed.length} connection check failed.` : "Reel: all connections working.");
@@ -9308,13 +9335,15 @@ ${body}
      * network call could only approximate.
      */
     featureHealth(spec) {
-      const now = Date.now();
-      if (spec.id === "trakt") {
-        return describeTrakt(traktState(this.plugin.credentials.has("trakt"), this.plugin.settings.traktExpires, now), now);
-      }
-      if (!TESTABLE.includes(spec.id))
-        return null;
-      return describeHealth(this.plugin.settings.connectionHealth[spec.id], true, now);
+      return featureHealth(spec.id, this.healthInputs(), Date.now());
+    }
+    /** What the shared router needs, gathered in the one place that has it. */
+    healthInputs() {
+      return {
+        records: this.plugin.settings.connectionHealth,
+        hasTrakt: this.plugin.credentials.has("trakt"),
+        traktExpires: this.plugin.settings.traktExpires
+      };
     }
     /**
      * The model slug, with something checking it.
@@ -11696,9 +11725,18 @@ ${body}
           at: FIXED_NOW - 5 * 60 * 1e3,
           ok: true,
           proves: "mastodon.social answered. The token is not checked here: it can only post, and Reel will not post to test it."
-        }
+        },
+        /*
+         * Revoked, not expired — the state that had no way of being seen.
+         *
+         * The expiry is deliberately two months out, so the only thing
+         * making this session dead is the refusal. Anything that reads the
+         * expiry alone renders this row as "Signed in", which is what it
+         * used to do.
+         */
+        trakt: { at: FIXED_NOW - 3 * 60 * 1e3, ok: false, error: "Trakt refused this token. It may have been revoked." }
       },
-      traktExpires: FIXED_NOW - 9 * 24 * 60 * 60 * 1e3
+      traktExpires: FIXED_NOW + 60 * 24 * 60 * 60 * 1e3
     });
     try {
       const tab = new ReelSettingTab(plugin.app, plugin);

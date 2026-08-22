@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.12",
+		date: "2026-08-22",
+		headline: "A Trakt session you revoked no longer says you are signed in.",
+		changes: [
+			{
+				kind: "new",
+				text: "Test connections now checks your Trakt session, which catches access you revoked from Trakt's own website.",
+				note: "The stored token's expiry is exact, needs no network and can be read while your keys are locked, so it stays what the row reports on every render. What it cannot see is revocation: withdrawing Reel's access leaves the token stored and its expiry months away, so every signal still said “Signed in” and the first contradiction was a review that would not post.",
+			},
+			{
+				kind: "fixed",
+				text: "A refused Trakt token now offers the Sign in again button, instead of titling the row “Signed in to Trakt” and offering nothing.",
+				note: "That row is the one place the problem can be fixed from, and it was the one place that did not know there was a problem.",
+			},
+			{
+				kind: "better",
+				text: "Every screen now works out a feature's health the same way.",
+				note: "The rule had been written out four separate times — the health table, the settings row, the setup guide, and the Trakt sign-in row. The fourth copy had already been missed by this fix, which is how two screens come to disagree about whether the same thing works.",
+			},
+		],
+	},
+	{
 		version: "0.9.11",
 		date: "2026-08-22",
 		headline: "Ask and Mastodon can be tested, instead of only reporting that you typed something in.",

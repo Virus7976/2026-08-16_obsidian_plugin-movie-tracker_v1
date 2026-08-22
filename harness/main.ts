@@ -1507,8 +1507,17 @@ function settings(root: HTMLElement): void {
 				ok: true,
 				proves: "mastodon.social answered. The token is not checked here: it can only post, and Reel will not post to test it.",
 			},
+			/*
+			 * Revoked, not expired — the state that had no way of being seen.
+			 *
+			 * The expiry is deliberately two months out, so the only thing
+			 * making this session dead is the refusal. Anything that reads the
+			 * expiry alone renders this row as "Signed in", which is what it
+			 * used to do.
+			 */
+			trakt: { at: FIXED_NOW - 3 * 60 * 1000, ok: false, error: "Trakt refused this token. It may have been revoked." },
 		},
-		traktExpires: FIXED_NOW - 9 * 24 * 60 * 60 * 1000,
+		traktExpires: FIXED_NOW + 60 * 24 * 60 * 60 * 1000,
 	});
 	try {
 		const tab = new ReelSettingTab(plugin.app as never, plugin as never);

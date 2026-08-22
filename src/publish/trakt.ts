@@ -244,6 +244,55 @@ export class TraktClient {
 		return composeTrakt(payload);
 	}
 
+	/**
+	 * Is this session still real?
+	 *
+	 * The expiry stored beside the token answers a different question, exactly,
+	 * and keeps answering it while the vault is locked — so it stays the thing
+	 * the row reports on every render. What it cannot see is revocation. Access
+	 * withdrawn from Trakt's own website leaves the stored token untouched and
+	 * its expiry months away, so every passive signal still says "Signed in"
+	 * and the contradiction arrives when a review you have just written fails
+	 * to post.
+	 *
+	 * `freshToken` first, deliberately. It renews a token near expiry, which
+	 * means a pass here is evidence about the session Reel would actually
+	 * publish with rather than about a token it would have replaced first. A
+	 * refusal at that stage is the same answer by a shorter route: a revoked
+	 * refresh token cannot be exchanged either.
+	 *
+	 * `/users/settings` is the cheapest authenticated GET Trakt has, and it
+	 * exists to say who you are.
+	 */
+	async test(): Promise<{ ok: true } | { ok: false; error: string }> {
+		let app, token;
+		try {
+			({ app, token } = await this.freshToken());
+		} catch (e) {
+			return { ok: false, error: redact(e) };
+		}
+
+		try {
+			const res = await requestUrl({
+				url: `${API}/users/settings`,
+				method: "GET",
+				headers: {
+					"trakt-api-version": "2",
+					"trakt-api-key": app.id,
+					Authorization: `Bearer ${token.access}`,
+				},
+				throw: false,
+			});
+			// The one that matters, and the one the expiry could never see.
+			if (res.status === 401) return { ok: false, error: "Trakt refused this token. It may have been revoked." };
+			if (res.status >= 400) return { ok: false, error: `Trakt returned ${res.status}.` };
+			return { ok: true };
+		} catch (e) {
+			// The thrown error can carry the request, token included.
+			return { ok: false, error: redact(e) };
+		}
+	}
+
 	/* ------------------------------------------------------------------ */
 
 	private async post<T>(

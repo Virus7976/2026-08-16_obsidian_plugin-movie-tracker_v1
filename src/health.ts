@@ -43,11 +43,13 @@ import type { FeatureId } from "./setup";
  * clearly labelled as half, beats no answer — the server address is the part
  * people get wrong, and it currently fails at the moment you press publish.
  *
- * Trakt stays off the list, and not for want of an endpoint. Its token states
- * its own expiry, which is exact where a request would only be suggestive, and
- * that is already what the row reports.
+ * Trakt is on it for a reason its expiry cannot cover. The expiry is exact and
+ * needs no network, so it stays the answer the row gives on every render — but
+ * expiry is not revocation. A token you revoked from Trakt's own website this
+ * morning is still an unexpired token, and the row went on saying "Signed in"
+ * until a review failed to publish. Only a request can tell you that.
  */
-export const TESTABLE: FeatureId[] = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon"];
+export const TESTABLE: FeatureId[] = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
 
 export interface HealthRecord {
 	/** When the check ran. Epoch milliseconds. */
@@ -190,7 +192,38 @@ export function traktState(hasToken: boolean, expires: number | undefined, now: 
 	return { kind: "in", expires };
 }
 
-export function describeTrakt(state: TraktState, now: number): Said {
+/**
+ * @param rec the last connection check, if one has run. Optional because this
+ * is also drawn while the vault is locked, when no check is possible and the
+ * expiry is the only thing readable.
+ */
+export function describeTrakt(state: TraktState, now: number, rec?: HealthRecord): Said {
+	/*
+	 * A rejected token outranks an unexpired one.
+	 *
+	 * These two answers disagree precisely when it matters. Revoking Reel's
+	 * access on Trakt's website does not touch the stored token or the expiry
+	 * beside it, so every passive signal still reads "Signed in" and the first
+	 * contradiction arrives when a review you have just written fails to post.
+	 * Where a request has actually been refused, that is the newer and the
+	 * harder fact, and it is the one to show.
+	 *
+	 * Only when there is a token at all: a failure recorded before you signed
+	 * out is not news about the state you are in now.
+	 */
+	if (rec && !rec.ok && state.kind !== "out") {
+		/*
+		 * Not "Trakt refused this token". Every line this function returns is
+		 * read directly after something that already says Trakt — the health
+		 * table puts the service name in the label beside it, the setup guide
+		 * puts it in the heading above it — and naming it again renders as
+		 * "Trakt  Trakt refused this token". The rest of the module is written
+		 * to be read after its label ("Working", "Failed", "Not checked yet")
+		 * and this was the one line that forgot.
+		 */
+		return { text: `Token refused ${ago(rec.at, now)} — sign in again`, tone: "warn" };
+	}
+
 	switch (state.kind) {
 		case "out":
 			return { text: "Not signed in", tone: "info" };
@@ -199,8 +232,43 @@ export function describeTrakt(state: TraktState, now: number): Said {
 		case "expired":
 			return { text: `Session expired ${ago(state.expires, now)} — sign in again`, tone: "warn" };
 		case "soon":
-			return { text: "Signed in — renews automatically this week", tone: "ok" };
+			return { text: `Signed in — renews automatically this week${checked(rec, now)}`, tone: "ok" };
 		case "in":
-			return { text: "Signed in", tone: "ok" };
+			return { text: `Signed in${checked(rec, now)}`, tone: "ok" };
 	}
+}
+
+/** ", checked 5 minutes ago" — evidence the token was accepted, not merely held. */
+function checked(rec: HealthRecord | undefined, now: number): string {
+	return rec?.ok ? `, checked ${ago(rec.at, now)}` : "";
+}
+
+/* ------------------------------------------------------------------ */
+/* One answer to "how is this feature doing", for every screen that asks */
+/* ------------------------------------------------------------------ */
+
+export interface HealthInputs {
+	records: HealthMap;
+	hasTrakt: boolean;
+	traktExpires: number | undefined;
+}
+
+/**
+ * The single place that knows how a feature reports its health.
+ *
+ * This rule was written out three times — the health table, the settings row,
+ * and the setup guide — each an independent copy of "Trakt is special, the
+ * untestable ones say nothing, everything else describes its record". Three
+ * copies of a rule that was about to gain a fourth clause, in a plugin whose
+ * recurring bug is two screens disagreeing about whether something works.
+ *
+ * Returns null for a feature nothing can honestly report on, which the callers
+ * render as no line at all rather than as an empty one.
+ */
+export function featureHealth(id: FeatureId, inputs: HealthInputs, now: number): Said | null {
+	if (id === "trakt") {
+		return describeTrakt(traktState(inputs.hasTrakt, inputs.traktExpires, now), now, inputs.records.trakt);
+	}
+	if (!TESTABLE.includes(id)) return null;
+	return describeHealth(inputs.records[id], true, now);
 }

@@ -13,7 +13,7 @@
  * timezone, and not reading the clock is the only real defence.
  */
 
-import { ago, describeHealth, describeTrakt, traktState, STALE_AFTER, TESTABLE } from "../src/health";
+import { ago, describeHealth, describeTrakt, featureHealth, traktState, STALE_AFTER, TESTABLE } from "../src/health";
 
 let passed = 0;
 let failed = 0;
@@ -186,12 +186,80 @@ eq("an unqualified pass is unchanged", describeHealth({ at: NOW, ok: true }, tru
 
 /*
  * The three that could only report "a key is present" are checkable now.
- * Trakt is not on the list on purpose: its token states its own expiry, which
- * is exact where a request would be suggestive.
+ *
+ * Trakt was left off this list one release ago, on the grounds that its token
+ * states its own expiry and a request could only be suggestive. That was true
+ * and it was not the whole question: expiry is not revocation. Access
+ * withdrawn from Trakt's website leaves the token stored and its expiry months
+ * out, so the exact answer stays exactly right about the wrong thing.
+ *
+ * Both are kept, because they answer different questions. The expiry needs no
+ * network and is readable while the vault is locked, so it stays what the row
+ * says on every render; the request is what a check adds.
  */
 ok("Ask can be verified", TESTABLE.includes("openrouter"));
 ok("Mastodon can be verified", TESTABLE.includes("mastodon"));
-ok("Trakt is answered from its token instead", !TESTABLE.includes("trakt"));
+ok("Trakt can be verified too", TESTABLE.includes("trakt"));
+// The passive answer still comes from the token, with no check recorded.
+ok(
+	"and still answers from its token when nothing has been checked",
+	featureHealth("trakt", { records: {}, hasTrakt: true, traktExpires: NOW + 60 * 24 * 60 * 60 * 1000 }, NOW)?.text ===
+		"Signed in"
+);
+
+/* ---- revoked is not expired ------------------------------------------ */
+
+/*
+ * These two disagree exactly where it matters. Revoking Reel's access on
+ * Trakt's website leaves the stored token untouched and its expiry months
+ * away, so every passive signal still reads "Signed in" and the first
+ * contradiction is a review that will not post.
+ */
+const LIVE = traktState(true, NOW + 60 * 24 * 60 * 60 * 1000, NOW);
+const refused = { at: NOW - 3 * 60 * 1000, ok: false, error: "Trakt refused this token." };
+
+ok("an unexpired token that was refused is a warning", describeTrakt(LIVE, NOW, refused).tone === "warn");
+ok("and says to sign in again", describeTrakt(LIVE, NOW, refused).text.includes("sign in again"));
+ok("and says when it was refused", describeTrakt(LIVE, NOW, refused).text.includes("3 minutes ago"));
+/*
+ * Every line this returns is read straight after something that already says
+ * Trakt: the health table labels the row, the setup guide heads the section.
+ * Naming it again rendered as "Trakt  Trakt refused this token".
+ */
+ok("and does not repeat the label beside it", !describeTrakt(LIVE, NOW, refused).text.includes("Trakt"));
+// Without the check it is the old answer, which is the whole problem.
+ok("the same token with no check still reads as signed in", describeTrakt(LIVE, NOW).text === "Signed in");
+
+/*
+ * A failure recorded before you signed out is not news about the state you are
+ * in now, and "Not signed in" is the more useful thing to say.
+ */
+ok("a refusal does not survive signing out", describeTrakt(traktState(false, 0, NOW), NOW, refused).text === "Not signed in");
+
+// A pass is evidence the token was accepted, not merely held.
+const accepted = { at: NOW - 5 * 60 * 1000, ok: true };
+ok("a checked session says so", describeTrakt(LIVE, NOW, accepted).text.includes("checked 5 minutes ago"));
+ok("and is still fine", describeTrakt(LIVE, NOW, accepted).tone === "ok");
+
+/* ---- one router, so screens cannot disagree -------------------------- */
+
+/*
+ * This rule was written out four times: the health table, the settings row,
+ * the setup guide, and the Trakt sign-in row. The fourth had been missed and
+ * would have gone on saying "Signed in to Trakt" for a token Trakt had already
+ * refused — in a plugin whose recurring bug is two screens disagreeing about
+ * whether something works.
+ */
+const INPUTS = { records: { trakt: refused }, hasTrakt: true, traktExpires: NOW + 60 * 24 * 60 * 60 * 1000 };
+
+ok("the router routes Trakt through its own description", featureHealth("trakt", INPUTS, NOW)?.tone === "warn");
+ok("and agrees with calling it directly", featureHealth("trakt", INPUTS, NOW)?.text === describeTrakt(LIVE, NOW, refused).text);
+eq("a feature nothing can report on says nothing", featureHealth("letterboxd" as never, { records: {}, hasTrakt: false, traktExpires: 0 }, NOW), null);
+ok(
+	"an ordinary feature describes its record",
+	featureHealth("tmdb", { records: { tmdb: { at: NOW, ok: true } }, hasTrakt: false, traktExpires: 0 }, NOW)?.tone === "ok"
+);
+ok("Trakt is testable now", TESTABLE.includes("trakt"));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

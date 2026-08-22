@@ -7,7 +7,15 @@ import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credent
 import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
-import { HealthMap, TESTABLE, describeHealth, describeTrakt, traktState } from "./health";
+import {
+	HealthMap,
+	HealthInputs,
+	TESTABLE,
+	describeHealth,
+	describeTrakt,
+	featureHealth,
+	traktState,
+} from "./health";
 import { CURATED, ModelInfo, formatPrice, rankModels, slugProblem } from "./ai/models";
 import { dailyStatus, previewLine, scanDaily, suggestDailyFolders } from "./util/dailynote";
 import { normaliseHost } from "./publish/mastodon";
@@ -883,6 +891,7 @@ export class ReelSettingTab extends PluginSettingTab {
 		const drawHealth = (): void => {
 			health.empty();
 			const now = Date.now();
+			const inputs = this.healthInputs();
 			for (const id of TESTABLE) {
 				const rec = this.plugin.settings.connectionHealth[id];
 				/*
@@ -899,7 +908,9 @@ export class ReelSettingTab extends PluginSettingTab {
 				 * the result recorded and never shown it.
 				 */
 				if (!rec && !store.has(id)) continue;
-				const said = describeHealth(rec, true, now);
+				// The shared router, so Trakt cannot be described one way here
+				// and another way two screens over.
+				const said = featureHealth(id, inputs, now) ?? describeHealth(rec, true, now);
 				const row = health.createDiv({ cls: `reel-health-row is-${said.tone}` });
 				row.createSpan({ cls: "reel-health-name", text: KEY_LABELS[id] ?? id });
 				row.createSpan({ cls: "reel-health-said", text: said.text });
@@ -1257,8 +1268,21 @@ export class ReelSettingTab extends PluginSettingTab {
 		 */
 		const now = Date.now();
 		const session = traktState(signedIn, this.plugin.settings.traktExpires, now);
-		const said = describeTrakt(session, now);
-		const dead = session.kind === "expired";
+		const check = this.plugin.settings.connectionHealth.trakt;
+		const said = describeTrakt(session, now, check);
+
+		/*
+		 * A refused token is as dead as an expired one, and this row is where
+		 * you do something about it.
+		 *
+		 * `dead` decides both what the row is called and whether the sign-in
+		 * button is offered at all. Revocation reaches neither the stored token
+		 * nor its expiry, so without this a token Trakt has already refused
+		 * would still be titled "Signed in to Trakt" with no way to fix it from
+		 * the one row that exists to fix it.
+		 */
+		const refused = signedIn && check?.ok === false;
+		const dead = session.kind === "expired" || refused;
 
 		const signIn = async (): Promise<void> => {
 			const app = await this.plugin.publish.app();
@@ -1601,6 +1625,13 @@ export class ReelSettingTab extends PluginSettingTab {
 			record("mastodon", await this.plugin.publish.mastodon.test());
 		}
 
+		/*
+		 * Only when signed in. Testing a sign-in nobody has made would record a
+		 * failure about a state you are not in, and "Not signed in" is already
+		 * what the row says.
+		 */
+		if (store.has("trakt")) record("trakt", await this.plugin.publish.trakt.test());
+
 		await this.plugin.saveSettings();
 		const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);
 		new Notice(failed.length ? `Reel: ${failed.length} connection check failed.` : "Reel: all connections working.");
@@ -1614,12 +1645,16 @@ export class ReelSettingTab extends PluginSettingTab {
 	 * network call could only approximate.
 	 */
 	private featureHealth(spec: FeatureSpec): { text: string; tone: "ok" | "warn" | "info" } | null {
-		const now = Date.now();
-		if (spec.id === "trakt") {
-			return describeTrakt(traktState(this.plugin.credentials.has("trakt"), this.plugin.settings.traktExpires, now), now);
-		}
-		if (!TESTABLE.includes(spec.id)) return null;
-		return describeHealth(this.plugin.settings.connectionHealth[spec.id], true, now);
+		return featureHealth(spec.id, this.healthInputs(), Date.now());
+	}
+
+	/** What the shared router needs, gathered in the one place that has it. */
+	private healthInputs(): HealthInputs {
+		return {
+			records: this.plugin.settings.connectionHealth,
+			hasTrakt: this.plugin.credentials.has("trakt"),
+			traktExpires: this.plugin.settings.traktExpires,
+		};
 	}
 
 

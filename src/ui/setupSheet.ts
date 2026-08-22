@@ -42,7 +42,7 @@ import { App, Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
 import type { FeatureSpec, SetupStep } from "../setup";
 import { isConfigured, isPartial } from "../setup";
-import { TESTABLE, describeHealth, describeTrakt, traktState } from "../health";
+import { featureHealth } from "../health";
 
 export class SetupSheet extends Modal {
 	private ticked = new Set<number>();
@@ -111,15 +111,24 @@ export class SetupSheet extends Modal {
 		sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
 	}
 
-	/** Null for the features nothing can honestly report on. */
+	/**
+	 * Null for the features nothing can honestly report on.
+	 *
+	 * The routing lives in `health.ts` and is shared with the settings rows and
+	 * the health table. It was written out here as well, which is how a guide
+	 * and a row come to disagree about the same feature.
+	 */
 	private healthLine(): { text: string; tone: "ok" | "warn" | "info" } | null {
-		const now = Date.now();
 		const s = this.plugin.settings;
-		if (this.spec.id === "trakt") {
-			return describeTrakt(traktState(this.plugin.credentials.has("trakt"), s.traktExpires, now), now);
-		}
-		if (!TESTABLE.includes(this.spec.id)) return null;
-		return describeHealth(s.connectionHealth[this.spec.id], true, now);
+		return featureHealth(
+			this.spec.id,
+			{
+				records: s.connectionHealth,
+				hasTrakt: this.plugin.credentials.has("trakt"),
+				traktExpires: s.traktExpires,
+			},
+			Date.now()
+		);
 	}
 
 	private renderSteps(root: HTMLElement): void {
