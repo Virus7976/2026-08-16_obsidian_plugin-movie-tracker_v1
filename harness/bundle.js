@@ -8073,6 +8073,9 @@ ${body}
     dismissedIds: [],
     people: {},
     lastTab: "library",
+    // Only Getting started. Everything else is one tap away and, on a fresh
+    // install, none of it is what you came for.
+    settingsOpen: ["setup"],
     lastSeenVersion: "",
     libraryLayout: "grid",
     librarySort: "watched",
@@ -8108,47 +8111,260 @@ ${body}
     session: "Session only \u2014 never written to disk",
     plain: "Plain text in vault (not recommended)"
   };
-  function sectionAfter(el) {
-    const parent = el.parentElement ?? el;
-    return parent.createDiv({ cls: "reel-settings-section is-actions" });
-  }
   var ReelSettingTab = class extends PluginSettingTab {
     constructor(app2, plugin2) {
       super(app2, plugin2);
       this.plugin = plugin2;
+      /** What the search box currently holds. Not persisted; a search is a moment. */
+      this.query = "";
+      /** Set at render time so the filter can ask a card what it is. */
+      this.cards = /* @__PURE__ */ new Map();
       this.pendingKeyInput = null;
     }
     /**
-     * Nine sections, each in its own element.
+     * Ten sections, each collapsible, each saying what it holds.
      *
-     * They all used to be appended straight onto `containerEl`, which made the
-     * screen one flat run of forty-nine rows: the headings were the only thing
-     * separating them, and a heading is a line of text, not a boundary. There
-     * was no element a stylesheet could reach to say "this group is one thing",
-     * which is why `.reel-settings` had no rules at all — there was nothing to
-     * write them against.
-     *
-     * The order is by how often you touch it, not by when it was built:
-     * credentials and folders are what a new install needs, publishing and Ask
-     * are opt-in features, and the things that act rather than remember go
-     * last.
+     * The order is by how often you touch it, not by when it was built: what a
+     * new install needs first, then the things that shape your notes, then the
+     * opt-in features that reach outside the vault, and last the controls that
+     * act rather than remember.
      */
+    sections() {
+      const s = this.plugin.settings;
+      const yes = (on, a, b) => on ? a : b;
+      return [
+        {
+          id: "setup",
+          title: "Getting started",
+          /*
+           * Pinned only while Reel cannot work.
+           *
+           * A section that refuses to fold has to be earning it every
+           * time you open the screen, and "here is how to set up the
+           * thing you set up months ago" is not earning it. While the
+           * TMDB key is missing nothing else on the screen matters, so
+           * it stays; the moment it is in, this becomes an ordinary
+           * section you can put away.
+           */
+          pinned: setupState(this.plugin).blocked,
+          keywords: "setup first run guide walkthrough tmdb omdb trakt mastodon openrouter",
+          summary: () => {
+            const st = setupState(this.plugin);
+            if (st.blocked)
+              return "Reel needs a TMDB key";
+            return `Ready \u2014 ${st.done.length} of ${FEATURES.length - 1} optional features on`;
+          },
+          render: (el) => this.renderSetup(el)
+        },
+        {
+          id: "keys",
+          title: "API keys",
+          keywords: "credentials token secret passphrase encrypt unlock",
+          summary: () => {
+            const n2 = [...READ_KEYS, ...WRITE_KEYS].filter((k) => this.plugin.credentials.has(k)).length;
+            const mode = MODE_LABELS[s.keyMode] ?? s.keyMode;
+            return n2 ? `${mode} \xB7 ${n2} ${n2 === 1 ? "service" : "services"}` : "None saved";
+          },
+          render: (el) => this.renderCredentials(el)
+        },
+        {
+          id: "folders",
+          title: "Folders",
+          keywords: "path vault location posters people",
+          summary: () => `${s.filmFolder || "\u2014"} \xB7 ${s.seriesFolder || "\u2014"}`,
+          render: (el) => this.renderFolders(el)
+        },
+        {
+          id: "metadata",
+          title: "Metadata",
+          keywords: "cast crew region language specials people links",
+          summary: () => `${s.castLimit} cast \xB7 ${s.region}${yes(s.linkPeople, " \xB7 people linked", "")}`,
+          render: (el) => this.renderMetadata(el)
+        },
+        {
+          id: "reviews",
+          title: "Reviews",
+          keywords: "daily note journal rating prompt template",
+          summary: () => `${yes(s.askForReview, "Asks after watching", "Never asks")}${yes(s.linkFromDailyNote, " \xB7 linked from daily notes", "")}`,
+          render: (el) => this.renderReviews(el)
+        },
+        {
+          id: "publishing",
+          title: "Publishing",
+          keywords: "trakt mastodon post public share spoiler hashtags",
+          summary: () => {
+            const on = [s.publishTrakt && "Trakt", s.publishMastodon && "Mastodon"].filter(Boolean);
+            return on.length ? on.join(", ") : "Off \u2014 nothing leaves your vault";
+          },
+          render: (el) => this.renderPublishing(el)
+        },
+        {
+          id: "ask",
+          title: "Ask",
+          keywords: "openrouter ai model search recommend natural language",
+          summary: () => s.aiEnabled ? s.aiModel : "Off",
+          render: (el) => this.renderAsk(el)
+        },
+        {
+          id: "content",
+          title: "Content filtering",
+          keywords: "warnings triggers certification rating age hide",
+          summary: () => {
+            const bits = [];
+            if (s.hideFlags.length)
+              bits.push(`${s.hideFlags.length} hidden`);
+            if (s.maxCertification)
+              bits.push(`up to ${s.maxCertification}`);
+            if (s.hideUnrated)
+              bits.push("unrated hidden");
+            return bits.length ? bits.join(" \xB7 ") : "Nothing hidden";
+          },
+          render: (el) => this.renderContent(el)
+        },
+        {
+          id: "behaviour",
+          title: "Behaviour",
+          keywords: "poster quality cache episodes language template open note",
+          summary: () => `${s.posterQuality}${yes(s.downloadPosters, " \xB7 posters saved", "")}${yes(s.cacheResponses, ` \xB7 cache ${s.cacheTtlDays}d`, "")}`,
+          render: (el) => this.renderBehaviour(el)
+        },
+        {
+          id: "maintenance",
+          title: "Maintenance",
+          cls: "is-actions",
+          keywords: "rebuild clear cache delete posters index repair",
+          summary: () => "Runs immediately \u2014 some of it deletes files",
+          render: (el) => this.renderMaintenance(el)
+        }
+      ];
+    }
     display() {
       const { containerEl } = this;
       containerEl.empty();
       containerEl.addClass("reel-settings");
-      const section = (render) => {
-        render(containerEl.createDiv({ cls: "reel-settings-section" }));
-      };
-      section((el) => this.renderSetup(el));
-      section((el) => this.renderCredentials(el));
-      section((el) => this.renderFolders(el));
-      section((el) => this.renderMetadata(el));
-      section((el) => this.renderReviews(el));
-      section((el) => this.renderPublishing(el));
-      section((el) => this.renderAsk(el));
-      section((el) => this.renderContent(el));
-      section((el) => this.renderBehaviour(el));
+      this.cards.clear();
+      this.renderSearch(containerEl);
+      for (const spec of this.sections())
+        this.renderSection(containerEl, spec);
+      this.applyFilter();
+    }
+    /**
+     * The search box.
+     *
+     * Forty-nine controls is past the point where scrolling is a way of
+     * finding things, and it is well past it on a phone. Obsidian's own
+     * settings gained a search for the same reason; a plugin with its own tab
+     * does not inherit it.
+     *
+     * Matching is over the rendered text of each row, not over a hand-kept
+     * keyword table, so it covers the descriptions too — which is how you find
+     * "spoiler" without knowing it lives under Publishing.
+     */
+    renderSearch(root) {
+      const wrap = root.createDiv({ cls: "reel-settings-search" });
+      const input = wrap.createEl("input", { cls: "reel-input", type: "search" });
+      input.placeholder = "Search settings\u2026";
+      input.value = this.query;
+      input.setAttr("aria-label", "Search settings");
+      input.addEventListener("input", () => {
+        this.query = input.value;
+        this.applyFilter();
+      });
+    }
+    renderSection(root, spec) {
+      const card = root.createDiv({ cls: `reel-settings-section${spec.cls ? ` ${spec.cls}` : ""}` });
+      const open = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
+      card.toggleClass("is-open", open);
+      if (spec.pinned)
+        card.addClass("is-pinned");
+      const head = card.createEl("button", { cls: "reel-section-head" });
+      head.setAttr("aria-expanded", String(open));
+      const label = head.createDiv({ cls: "reel-section-label" });
+      label.createSpan({ cls: "reel-section-title", text: spec.title });
+      label.createSpan({ cls: "reel-section-summary", text: spec.summary() });
+      head.createSpan({ cls: "reel-section-chev", text: "\u203A" }).setAttr("aria-hidden", "true");
+      const body = card.createDiv({ cls: "reel-section-body" });
+      spec.render(body);
+      if (spec.pinned)
+        head.setAttr("disabled", "true");
+      else
+        head.addEventListener("click", () => void this.toggleSection(spec, card, head));
+      this.cards.set(spec.id, { spec, el: card });
+    }
+    /**
+     * Fold a section, without redrawing the screen.
+     *
+     * `display()` would be the easy call and it is the wrong one: it rebuilds
+     * forty-nine controls and throws away the scroll position, so folding
+     * something near the bottom would jump you back to the top — punishing the
+     * exact tidying-up the feature exists to allow.
+     */
+    async toggleSection(spec, card, head) {
+      const openIds = new Set(this.plugin.settings.settingsOpen);
+      const nowOpen = !openIds.has(spec.id);
+      if (nowOpen)
+        openIds.add(spec.id);
+      else
+        openIds.delete(spec.id);
+      card.toggleClass("is-open", nowOpen);
+      head.setAttr("aria-expanded", String(nowOpen));
+      this.plugin.settings.settingsOpen = [...openIds];
+      await this.plugin.saveSettings();
+    }
+    /**
+     * Show what matches, hide what does not.
+     *
+     * Done by toggling classes rather than by re-rendering: a filter that
+     * rebuilt the screen on every keystroke would lose focus from the box you
+     * are typing into, which is a special kind of unusable.
+     *
+     * A matching section is forced open regardless of its saved state. Finding
+     * a setting and being shown the closed section it is inside would be a
+     * search that answers the question and withholds the answer.
+     */
+    applyFilter() {
+      const q = this.query.trim().toLowerCase();
+      let hits = 0;
+      for (const { spec, el } of this.cards.values()) {
+        const rows2 = Array.from(el.querySelectorAll(".setting-item"));
+        if (!q) {
+          el.removeClass("is-filtered-out");
+          el.removeClass("is-forced-open");
+          rows2.forEach((r) => r.removeClass("is-filtered-out"));
+          continue;
+        }
+        const titled = spec.title.toLowerCase().includes(q);
+        const keyed = (spec.keywords ?? "").toLowerCase().includes(q);
+        let any = false;
+        for (const row of rows2) {
+          const hit = titled || (row.textContent ?? "").toLowerCase().includes(q);
+          row.toggleClass("is-filtered-out", !hit);
+          if (hit)
+            any = true;
+        }
+        if (!any && keyed)
+          rows2.forEach((r) => r.removeClass("is-filtered-out"));
+        const show = any || titled || keyed;
+        el.toggleClass("is-filtered-out", !show);
+        el.toggleClass("is-forced-open", show);
+        if (show)
+          hits++;
+      }
+      this.renderNoMatches(q, hits);
+    }
+    /**
+     * Say when a search found nothing.
+     *
+     * Without this the screen goes blank below the box, which reads as a crash
+     * rather than as an answer — and "no results" is a perfectly good answer
+     * that deserves saying out loud.
+     */
+    renderNoMatches(q, hits) {
+      const host = this.containerEl.querySelector(".reel-settings-search");
+      host?.querySelector(".reel-settings-empty")?.remove();
+      if (!q || hits > 0)
+        return;
+      host?.createDiv({ cls: "reel-settings-empty", text: `Nothing in settings matches \u201C${q}\u201D.` });
     }
     /** The live content policy, read by every surface that lists titles. */
     get policy() {
@@ -8174,7 +8390,6 @@ ${body}
      * first-run setup" actually means.
      */
     renderSetup(el) {
-      new Setting(el).setName("Getting started").setHeading();
       const state = setupState(this.plugin);
       if (state.blocked) {
         const stop = el.createDiv({ cls: "reel-setup-blocked" });
@@ -8241,7 +8456,8 @@ ${body}
         top.createSpan({ cls: "reel-pill warn", text: "Half done" });
       else if (!done && spec.essential)
         top.createSpan({ cls: "reel-pill warn", text: "Required" });
-      body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+      if (!done)
+        body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
       const chev = row.createSpan({ cls: "reel-setup-chev", text: "\u203A" });
       chev.setAttr("aria-hidden", "true");
       row.addEventListener("click", () => this.openGuide(spec));
@@ -8258,7 +8474,6 @@ ${body}
     }
     /* ---------------------------------------------------------------- */
     renderCredentials(el) {
-      new Setting(el).setName("API keys").setHeading();
       const store = this.plugin.credentials;
       const status = el.createDiv({ cls: "reel-key-status" });
       const describe2 = () => {
@@ -8437,7 +8652,6 @@ ${body}
      * the settings for an option that was never there.
      */
     renderPublishing(el) {
-      new Setting(el).setName("Publishing").setHeading();
       el.createDiv({
         cls: "reel-settings-note",
         text: "Reviews stay in your vault unless you publish one, one at a time, from the button beside it. Nothing here posts automatically, and nothing posts without showing you the exact text first."
@@ -8612,7 +8826,6 @@ ${body}
      * be checked against the code; "some data about your library" would not be.
      */
     renderAsk(el) {
-      new Setting(el).setName("Ask").setHeading();
       el.createDiv({
         cls: "reel-settings-note",
         text: "Describe what you feel like watching and Reel finds it in your own library. A question sends your words, plus a short list of titles \u2014 names, years, genres, runtimes and your star ratings \u2014 to OpenRouter. Not your reviews, not your watch dates, not your file paths."
@@ -8662,7 +8875,6 @@ ${body}
     }
     /* ---------------------------------------------------------------- */
     renderFolders(el) {
-      new Setting(el).setName("Folders").setHeading();
       const films = this.plugin.library.films().length;
       const shows = this.plugin.library.shows().length;
       el.createDiv({
@@ -8695,7 +8907,6 @@ ${body}
       });
     }
     renderMetadata(el) {
-      new Setting(el).setName("Metadata").setHeading();
       new Setting(el).setName("Link people and use wikilinks").setDesc(
         "Store directors and cast as [[People/Name|Name]] rather than plain text, so they appear in the graph and get backlinks. This is the thing Letterboxd cannot do."
       ).addToggle(
@@ -8730,7 +8941,6 @@ ${body}
       );
     }
     renderReviews(el) {
-      new Setting(el).setName("Reviews").setHeading();
       new Setting(el).setName("Ask for a review when logging").setDesc("Adds a review box to the log sheet. Reviews are appended to the note body under a dated heading \u2014 never overwriting what's already there.").addToggle(
         (t) => t.setValue(this.plugin.settings.askForReview).onChange(async (v) => {
           this.plugin.settings.askForReview = v;
@@ -8769,7 +8979,6 @@ ${body}
       });
     }
     renderContent(el) {
-      new Setting(el).setName("Content filtering").setHeading();
       el.createDiv({
         cls: "reel-callout",
         text: "Read this before relying on it. TMDB has no structured content-advisory data. Certification (R, PG-13, TV-MA) comes from a ratings board and is dependable. Flags are inferred from crowd-sourced keywords, so they under-report: no flag means nothing was tagged, not that nothing is there. You can add or remove flags on any note by hand, and a refresh will not undo your edits."
@@ -8811,7 +9020,6 @@ ${body}
       );
     }
     renderBehaviour(el) {
-      new Setting(el).setName("Behaviour").setHeading();
       new Setting(el).setName("Rating scale").setDesc("Five stars with halves. Fixed \u2014 the stored numbers and the star widget assume it.").addText((t) => t.setValue("\u2605 0.5 \u2013 5.0").setDisabled(true));
       new Setting(el).setName("Download posters").setDesc("Saves a jpg per title into the poster folder, so the library works offline.").addToggle(
         (t) => t.setValue(this.plugin.settings.downloadPosters).onChange(async (v) => {
@@ -8849,10 +9057,8 @@ ${body}
           await this.plugin.saveSettings();
         })
       );
-      this.renderMaintenance(sectionAfter(el));
     }
     renderMaintenance(maint) {
-      new Setting(maint).setName("Maintenance").setHeading();
       maint.createDiv({
         cls: "reel-setting-note",
         text: "These run straight away rather than changing a preference. The ones that remove files move them to the trash, and ask first."
@@ -10755,7 +10961,18 @@ ${body}
       publishMastodon: true,
       mastodonHost: "mastodon.social",
       aiEnabled: true,
-      dismissedIds: [1, 2, 3]
+      dismissedIds: [1, 2, 3],
+      /*
+       * Every section open, which is the whole point of this scene.
+       *
+       * Sections fold now, and the moment they did the audit quietly stopped
+       * measuring what was inside them: forty-six controls became display:
+       * none and the pass stayed green at the same count, which is the most
+       * dangerous shape a green result can have. The folded screen is worth
+       * measuring too and the firstrun scene does it; this one has to show
+       * every control there is.
+       */
+      settingsOpen: ["setup", "keys", "folders", "metadata", "reviews", "publishing", "ask", "content", "behaviour", "maintenance"]
     });
     try {
       const tab = new ReelSettingTab(plugin.app, plugin);

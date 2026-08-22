@@ -64,6 +64,16 @@ export interface ReelSettings {
 	/** The Reel view reopens where you left it. */
 	lastTab: string;
 	/**
+	 * Which settings sections are expanded, by id.
+	 *
+	 * Persisted because a settings screen you have arranged and come back to
+	 * find rearranged has not remembered anything about you. Stored as the
+	 * *open* set rather than the closed one, so a section added in a later
+	 * release arrives collapsed — the alternative is every update silently
+	 * unfolding a screen the reader had folded up.
+	 */
+	settingsOpen: string[];
+	/**
 	 * The version whose update notes have been read.
 	 *
 	 * Empty on an install that predates the notes screen, which is treated as
@@ -180,6 +190,9 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	dismissedIds: [],
 	people: {},
 	lastTab: "library",
+	// Only Getting started. Everything else is one tap away and, on a fresh
+	// install, none of it is what you came for.
+	settingsOpen: ["setup"],
 	lastSeenVersion: "",
 	libraryLayout: "grid",
 	librarySort: "watched",
@@ -223,17 +236,36 @@ const MODE_LABELS: Record<KeyMode, string> = {
 
 
 /**
- * A new section element beside the one given.
+ * One section of the settings screen.
  *
- * Maintenance is drawn from inside `renderBehaviour` but is not part of it, so
- * it needs a sibling rather than a child. Falls back to the element itself if
- * there is no parent, which only happens in a test that mounts a section on
- * its own — better a slightly wrong card than a thrown error on a screen made
- * entirely of other people's settings.
+ * A registry rather than a run of calls, because three separate features all
+ * need to ask the same question — what sections are there? Collapsing needs an
+ * id to remember, the summary line needs somewhere to live, and search needs
+ * something to match against besides the rendered DOM. Written as nine
+ * consecutive method calls, the answer to "what sections are there" existed
+ * only in the order of the statements.
  */
-function sectionAfter(el: HTMLElement): HTMLElement {
-	const parent = el.parentElement ?? el;
-	return parent.createDiv({ cls: "reel-settings-section is-actions" });
+interface SectionSpec {
+	/** Stable across releases: it is persisted in the open set. */
+	id: string;
+	title: string;
+	/**
+	 * What this section currently says, in one line, shown while collapsed.
+	 *
+	 * A closed section that shows only its name is a filing cabinet: you have
+	 * to open all of them to find the one you want. A closed section that says
+	 * "Trakt, Mastodon" or "Nothing hidden" is an index, and most of the time
+	 * the summary is the whole answer and you never open it at all.
+	 *
+	 * A function, not a string, because every one of these is live state.
+	 */
+	summary: () => string;
+	render: (el: HTMLElement) => void;
+	/** Words worth matching that do not appear in the rendered rows. */
+	keywords?: string;
+	/** Never collapsed — the one section whose job is to be seen. */
+	pinned?: boolean;
+	cls?: string;
 }
 
 export class ReelSettingTab extends PluginSettingTab {
@@ -241,39 +273,291 @@ export class ReelSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
+	/** What the search box currently holds. Not persisted; a search is a moment. */
+	private query = "";
+	/** Set at render time so the filter can ask a card what it is. */
+	private cards = new Map<string, { spec: SectionSpec; el: HTMLElement }>();
+
 	/**
-	 * Nine sections, each in its own element.
+	 * Ten sections, each collapsible, each saying what it holds.
 	 *
-	 * They all used to be appended straight onto `containerEl`, which made the
-	 * screen one flat run of forty-nine rows: the headings were the only thing
-	 * separating them, and a heading is a line of text, not a boundary. There
-	 * was no element a stylesheet could reach to say "this group is one thing",
-	 * which is why `.reel-settings` had no rules at all — there was nothing to
-	 * write them against.
-	 *
-	 * The order is by how often you touch it, not by when it was built:
-	 * credentials and folders are what a new install needs, publishing and Ask
-	 * are opt-in features, and the things that act rather than remember go
-	 * last.
+	 * The order is by how often you touch it, not by when it was built: what a
+	 * new install needs first, then the things that shape your notes, then the
+	 * opt-in features that reach outside the vault, and last the controls that
+	 * act rather than remember.
 	 */
+	private sections(): SectionSpec[] {
+		const s = this.plugin.settings;
+		const yes = (on: boolean, a: string, b: string): string => (on ? a : b);
+
+		return [
+			{
+				id: "setup",
+				title: "Getting started",
+				/*
+				 * Pinned only while Reel cannot work.
+				 *
+				 * A section that refuses to fold has to be earning it every
+				 * time you open the screen, and "here is how to set up the
+				 * thing you set up months ago" is not earning it. While the
+				 * TMDB key is missing nothing else on the screen matters, so
+				 * it stays; the moment it is in, this becomes an ordinary
+				 * section you can put away.
+				 */
+				pinned: setupState(this.plugin).blocked,
+				keywords: "setup first run guide walkthrough tmdb omdb trakt mastodon openrouter",
+				summary: () => {
+					const st = setupState(this.plugin);
+					if (st.blocked) return "Reel needs a TMDB key";
+					return `Ready — ${st.done.length} of ${FEATURES.length - 1} optional features on`;
+				},
+				render: (el) => this.renderSetup(el),
+			},
+			{
+				id: "keys",
+				title: "API keys",
+				keywords: "credentials token secret passphrase encrypt unlock",
+				summary: () => {
+					const n = [...READ_KEYS, ...WRITE_KEYS].filter((k) => this.plugin.credentials.has(k)).length;
+					const mode = MODE_LABELS[s.keyMode] ?? s.keyMode;
+					return n ? `${mode} · ${n} ${n === 1 ? "service" : "services"}` : "None saved";
+				},
+				render: (el) => this.renderCredentials(el),
+			},
+			{
+				id: "folders",
+				title: "Folders",
+				keywords: "path vault location posters people",
+				summary: () => `${s.filmFolder || "—"} · ${s.seriesFolder || "—"}`,
+				render: (el) => this.renderFolders(el),
+			},
+			{
+				id: "metadata",
+				title: "Metadata",
+				keywords: "cast crew region language specials people links",
+				summary: () =>
+					`${s.castLimit} cast · ${s.region}${yes(s.linkPeople, " · people linked", "")}`,
+				render: (el) => this.renderMetadata(el),
+			},
+			{
+				id: "reviews",
+				title: "Reviews",
+				keywords: "daily note journal rating prompt template",
+				summary: () =>
+					`${yes(s.askForReview, "Asks after watching", "Never asks")}` +
+					`${yes(s.linkFromDailyNote, " · linked from daily notes", "")}`,
+				render: (el) => this.renderReviews(el),
+			},
+			{
+				id: "publishing",
+				title: "Publishing",
+				keywords: "trakt mastodon post public share spoiler hashtags",
+				summary: () => {
+					const on = [s.publishTrakt && "Trakt", s.publishMastodon && "Mastodon"].filter(Boolean);
+					return on.length ? on.join(", ") : "Off — nothing leaves your vault";
+				},
+				render: (el) => this.renderPublishing(el),
+			},
+			{
+				id: "ask",
+				title: "Ask",
+				keywords: "openrouter ai model search recommend natural language",
+				summary: () => (s.aiEnabled ? s.aiModel : "Off"),
+				render: (el) => this.renderAsk(el),
+			},
+			{
+				id: "content",
+				title: "Content filtering",
+				keywords: "warnings triggers certification rating age hide",
+				summary: () => {
+					const bits: string[] = [];
+					if (s.hideFlags.length) bits.push(`${s.hideFlags.length} hidden`);
+					if (s.maxCertification) bits.push(`up to ${s.maxCertification}`);
+					if (s.hideUnrated) bits.push("unrated hidden");
+					return bits.length ? bits.join(" · ") : "Nothing hidden";
+				},
+				render: (el) => this.renderContent(el),
+			},
+			{
+				id: "behaviour",
+				title: "Behaviour",
+				keywords: "poster quality cache episodes language template open note",
+				summary: () =>
+					`${s.posterQuality}${yes(s.downloadPosters, " · posters saved", "")}` +
+					`${yes(s.cacheResponses, ` · cache ${s.cacheTtlDays}d`, "")}`,
+				render: (el) => this.renderBehaviour(el),
+			},
+			{
+				id: "maintenance",
+				title: "Maintenance",
+				cls: "is-actions",
+				keywords: "rebuild clear cache delete posters index repair",
+				summary: () => "Runs immediately — some of it deletes files",
+				render: (el) => this.renderMaintenance(el),
+			},
+		];
+	}
+
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 		containerEl.addClass("reel-settings");
+		this.cards.clear();
 
-		const section = (render: (el: HTMLElement) => void): void => {
-			render(containerEl.createDiv({ cls: "reel-settings-section" }));
-		};
+		this.renderSearch(containerEl);
+		for (const spec of this.sections()) this.renderSection(containerEl, spec);
+		this.applyFilter();
+	}
 
-		section((el) => this.renderSetup(el));
-		section((el) => this.renderCredentials(el));
-		section((el) => this.renderFolders(el));
-		section((el) => this.renderMetadata(el));
-		section((el) => this.renderReviews(el));
-		section((el) => this.renderPublishing(el));
-		section((el) => this.renderAsk(el));
-		section((el) => this.renderContent(el));
-		section((el) => this.renderBehaviour(el));
+	/**
+	 * The search box.
+	 *
+	 * Forty-nine controls is past the point where scrolling is a way of
+	 * finding things, and it is well past it on a phone. Obsidian's own
+	 * settings gained a search for the same reason; a plugin with its own tab
+	 * does not inherit it.
+	 *
+	 * Matching is over the rendered text of each row, not over a hand-kept
+	 * keyword table, so it covers the descriptions too — which is how you find
+	 * "spoiler" without knowing it lives under Publishing.
+	 */
+	private renderSearch(root: HTMLElement): void {
+		const wrap = root.createDiv({ cls: "reel-settings-search" });
+		const input = wrap.createEl("input", { cls: "reel-input", type: "search" });
+		input.placeholder = "Search settings…";
+		input.value = this.query;
+		input.setAttr("aria-label", "Search settings");
+		input.addEventListener("input", () => {
+			this.query = input.value;
+			this.applyFilter();
+		});
+	}
+
+	private renderSection(root: HTMLElement, spec: SectionSpec): void {
+		const card = root.createDiv({ cls: `reel-settings-section${spec.cls ? ` ${spec.cls}` : ""}` });
+		const open = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
+		card.toggleClass("is-open", open);
+		if (spec.pinned) card.addClass("is-pinned");
+
+		const head = card.createEl("button", { cls: "reel-section-head" });
+		head.setAttr("aria-expanded", String(open));
+		const label = head.createDiv({ cls: "reel-section-label" });
+		label.createSpan({ cls: "reel-section-title", text: spec.title });
+		label.createSpan({ cls: "reel-section-summary", text: spec.summary() });
+		head.createSpan({ cls: "reel-section-chev", text: "›" }).setAttr("aria-hidden", "true");
+
+		const body = card.createDiv({ cls: "reel-section-body" });
+		spec.render(body);
+
+		// A pinned section still gets a header, because the title and the live
+		// summary are worth having; it simply does not fold away.
+		if (spec.pinned) head.setAttr("disabled", "true");
+		else head.addEventListener("click", () => void this.toggleSection(spec, card, head));
+
+		this.cards.set(spec.id, { spec, el: card });
+	}
+
+	/**
+	 * Fold a section, without redrawing the screen.
+	 *
+	 * `display()` would be the easy call and it is the wrong one: it rebuilds
+	 * forty-nine controls and throws away the scroll position, so folding
+	 * something near the bottom would jump you back to the top — punishing the
+	 * exact tidying-up the feature exists to allow.
+	 */
+	private async toggleSection(spec: SectionSpec, card: HTMLElement, head: HTMLElement): Promise<void> {
+		const openIds = new Set(this.plugin.settings.settingsOpen);
+		const nowOpen = !openIds.has(spec.id);
+		if (nowOpen) openIds.add(spec.id);
+		else openIds.delete(spec.id);
+
+		card.toggleClass("is-open", nowOpen);
+		head.setAttr("aria-expanded", String(nowOpen));
+
+		this.plugin.settings.settingsOpen = [...openIds];
+		await this.plugin.saveSettings();
+	}
+
+	/**
+	 * Show what matches, hide what does not.
+	 *
+	 * Done by toggling classes rather than by re-rendering: a filter that
+	 * rebuilt the screen on every keystroke would lose focus from the box you
+	 * are typing into, which is a special kind of unusable.
+	 *
+	 * A matching section is forced open regardless of its saved state. Finding
+	 * a setting and being shown the closed section it is inside would be a
+	 * search that answers the question and withholds the answer.
+	 */
+	private applyFilter(): void {
+		const q = this.query.trim().toLowerCase();
+		let hits = 0;
+
+		for (const { spec, el } of this.cards.values()) {
+			const rows = Array.from(el.querySelectorAll<HTMLElement>(".setting-item"));
+
+			if (!q) {
+				el.removeClass("is-filtered-out");
+				el.removeClass("is-forced-open");
+				rows.forEach((r) => r.removeClass("is-filtered-out"));
+				continue;
+			}
+
+			/*
+			 * Three ways to match, and they are not the same strength.
+			 *
+			 * A title hit means you asked for the section, so you get all of
+			 * it. A row hit means you asked for a control, so you get that
+			 * control. A keyword hit is the weakest: it only decides whether
+			 * the section appears at all, and the rows inside it still have to
+			 * earn their place.
+			 *
+			 * Collapsing those three into one boolean is what the first
+			 * version did, and searching "spoiler" — a Publishing keyword —
+			 * returned all nine Publishing rows. Technically a match, and no
+			 * more useful than scrolling.
+			 */
+			const titled = spec.title.toLowerCase().includes(q);
+			const keyed = (spec.keywords ?? "").toLowerCase().includes(q);
+
+			let any = false;
+			for (const row of rows) {
+				const hit = titled || (row.textContent ?? "").toLowerCase().includes(q);
+				row.toggleClass("is-filtered-out", !hit);
+				if (hit) any = true;
+			}
+
+			/*
+			 * A keyword got the section here and no row matched, so show the
+			 * whole thing rather than an empty card. This is the case where
+			 * the word you searched is genuinely the subject of the section
+			 * without appearing in any of its labels.
+			 */
+			if (!any && keyed) rows.forEach((r) => r.removeClass("is-filtered-out"));
+
+			// Getting started has no `.setting-item` rows at all, so it can
+			// only ever match on its name and keywords.
+			const show = any || titled || keyed;
+			el.toggleClass("is-filtered-out", !show);
+			el.toggleClass("is-forced-open", show);
+			if (show) hits++;
+		}
+
+		this.renderNoMatches(q, hits);
+	}
+
+	/**
+	 * Say when a search found nothing.
+	 *
+	 * Without this the screen goes blank below the box, which reads as a crash
+	 * rather than as an answer — and "no results" is a perfectly good answer
+	 * that deserves saying out loud.
+	 */
+	private renderNoMatches(q: string, hits: number): void {
+		const host = this.containerEl.querySelector<HTMLElement>(".reel-settings-search");
+		host?.querySelector(".reel-settings-empty")?.remove();
+		if (!q || hits > 0) return;
+		host?.createDiv({ cls: "reel-settings-empty", text: `Nothing in settings matches “${q}”.` });
 	}
 
 	/** The live content policy, read by every surface that lists titles. */
@@ -302,8 +586,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	 * first-run setup" actually means.
 	 */
 	private renderSetup(el: HTMLElement): void {
-		new Setting(el).setName("Getting started").setHeading();
-
 		const state = setupState(this.plugin);
 
 		if (state.blocked) {
@@ -413,7 +695,14 @@ export class ReelSettingTab extends PluginSettingTab {
 		if (part) top.createSpan({ cls: "reel-pill warn", text: "Half done" });
 		else if (!done && spec.essential) top.createSpan({ cls: "reel-pill warn", text: "Required" });
 
-		body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+		/*
+		 * The description is a pitch, and a pitch is for something you have not
+		 * bought yet. On an install with everything configured it was five
+		 * paragraphs explaining features you are already using — 1,500px of
+		 * settled questions above the first thing you might actually want to
+		 * change. Done rows are one line; the guide is still a tap away.
+		 */
+		if (!done) body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
 
 		const chev = row.createSpan({ cls: "reel-setup-chev", text: "›" });
 		chev.setAttr("aria-hidden", "true");
@@ -435,8 +724,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	/* ---------------------------------------------------------------- */
 
 	private renderCredentials(el: HTMLElement): void {
-		new Setting(el).setName("API keys").setHeading();
-
 		const store = this.plugin.credentials;
 
 		const status = el.createDiv({ cls: "reel-key-status" });
@@ -661,8 +948,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	 * the settings for an option that was never there.
 	 */
 	private renderPublishing(el: HTMLElement): void {
-		new Setting(el).setName("Publishing").setHeading();
-
 		el.createDiv({
 			cls: "reel-settings-note",
 			text:
@@ -902,8 +1187,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	 * be checked against the code; "some data about your library" would not be.
 	 */
 	private renderAsk(el: HTMLElement): void {
-		new Setting(el).setName("Ask").setHeading();
-
 		el.createDiv({
 			cls: "reel-settings-note",
 			text:
@@ -982,8 +1265,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	/* ---------------------------------------------------------------- */
 
 	private renderFolders(el: HTMLElement): void {
-		new Setting(el).setName("Folders").setHeading();
-
 		// A count is the quickest way to tell "the folder setting is wrong"
 		// from "I haven't added anything yet" — both otherwise look identical.
 		const films = this.plugin.library.films().length;
@@ -1035,8 +1316,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	}
 
 	private renderMetadata(el: HTMLElement): void {
-		new Setting(el).setName("Metadata").setHeading();
-
 		new Setting(el)
 			.setName("Link people and use wikilinks")
 			.setDesc(
@@ -1093,8 +1372,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	}
 
 	private renderReviews(el: HTMLElement): void {
-		new Setting(el).setName("Reviews").setHeading();
-
 		new Setting(el)
 			.setName("Ask for a review when logging")
 			.setDesc("Adds a review box to the log sheet. Reviews are appended to the note body under a dated heading — never overwriting what's already there.")
@@ -1154,8 +1431,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	}
 
 	private renderContent(el: HTMLElement): void {
-		new Setting(el).setName("Content filtering").setHeading();
-
 		el.createDiv({
 			cls: "reel-callout",
 			text:
@@ -1211,8 +1486,6 @@ export class ReelSettingTab extends PluginSettingTab {
 	}
 
 	private renderBehaviour(el: HTMLElement): void {
-		new Setting(el).setName("Behaviour").setHeading();
-
 		new Setting(el)
 			.setName("Rating scale")
 			.setDesc("Five stars with halves. Fixed — the stored numbers and the star widget assume it.")
@@ -1291,15 +1564,14 @@ export class ReelSettingTab extends PluginSettingTab {
 		// — same visual weight, entirely different consequence.
 		//
 		// The separation was a heading and a paragraph asking to be believed.
-		// Now it is structural: Maintenance is its own section element, so it
-		// can carry its own card and its own colouring, and the difference
-		// between "change a preference" and "delete forty files" is something
-		// you can see rather than something you have to read.
-		this.renderMaintenance(sectionAfter(el));
+		// Now it is structural: Maintenance is a registered section in its own
+		// right, with its own card, its own colouring and its own collapsed
+		// state, so the difference between "change a preference" and "delete
+		// forty files" is something you can see rather than something you have
+		// to read.
 	}
 
 	private renderMaintenance(maint: HTMLElement): void {
-		new Setting(maint).setName("Maintenance").setHeading();
 		maint.createDiv({
 			cls: "reel-setting-note",
 			text: "These run straight away rather than changing a preference. The ones that remove files move them to the trash, and ask first.",

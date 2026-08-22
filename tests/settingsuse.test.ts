@@ -96,6 +96,10 @@ const SCREEN_ONLY: Record<string, string> = {
 	// .settings` on an aliased local rather than by name.
 	keysPlain: "held by CredentialStore, not read by name",
 	keyBlob: "held by CredentialStore, not read by name",
+	// Which settings sections you left expanded. The settings screen is
+	// genuinely the whole of the behaviour here — nothing else in the app has
+	// any business knowing, or any way to act on it if it did.
+	settingsOpen: "the settings screen is the only thing this describes",
 };
 
 const dead: string[] = [];
@@ -133,6 +137,57 @@ ok(
 	"nothing reads a setting that no longer exists",
 	phantom.length === 0,
 	phantom.length ? `read but not declared: ${phantom.join(", ")}` : ""
+);
+
+/*
+ * ---- The section registry ------------------------------------------------
+ *
+ * Sections used to be nine consecutive method calls, which meant the answer to
+ * "what sections are there" existed only in the order of the statements.
+ * Three features now need to ask it — collapsing needs an id to remember, the
+ * summary line needs somewhere to live, and search needs something to match
+ * besides the DOM — so it is a list, and a list can be checked.
+ */
+const registry = settingsSrc.slice(
+	settingsSrc.indexOf("private sections(): SectionSpec[]"),
+	settingsSrc.indexOf("display(): void")
+);
+
+ok("the section registry was found", registry.length > 500, `parsed ${registry.length} chars`);
+
+const sectionIds = [...registry.matchAll(/^\t\t\t\tid: "([a-z]+)",$/gm)].map((m) => m[1]);
+ok("every section has an id", sectionIds.length >= 10, `found ${sectionIds.length}: ${sectionIds.join(", ")}`);
+ok(
+	"section ids are unique",
+	new Set(sectionIds).size === sectionIds.length,
+	`ids: ${sectionIds.join(", ")}`
+);
+
+const titles = [...registry.matchAll(/^\t\t\t\ttitle: "([^"]+)",$/gm)].map((m) => m[1]);
+ok("every section has a title", titles.length === sectionIds.length, `${titles.length} titles, ${sectionIds.length} ids`);
+
+const summaries = registry.match(/summary: \(\) =>/g) ?? [];
+ok(
+	"every section has a live summary",
+	summaries.length === sectionIds.length,
+	`${summaries.length} summaries, ${sectionIds.length} sections\n` +
+		`      A collapsed section showing only its name is a filing cabinet. The\n` +
+		`      summary is what makes the closed state worth reading.`
+);
+
+/*
+ * No section draws its own heading any more.
+ *
+ * The card header carries the title, so a leftover `setHeading()` renders the
+ * section name twice — once in the header you fold with and once at the top of
+ * the body it folds away. It looks like a duplicated word rather than like a
+ * structural mistake, which is exactly the sort of thing that survives review.
+ */
+const strayHeadings = [...code(settingsSrc).matchAll(/setName\("([^"]+)"\)\.setHeading\(\)/g)].map((m) => m[1]);
+ok(
+	"no section renders its own heading",
+	strayHeadings.length === 0,
+	strayHeadings.length ? `these would render twice: ${strayHeadings.join(", ")}` : ""
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

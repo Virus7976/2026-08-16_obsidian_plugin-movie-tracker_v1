@@ -1324,6 +1324,17 @@ function settings(root: HTMLElement): void {
 		mastodonHost: "mastodon.social",
 		aiEnabled: true,
 		dismissedIds: [1, 2, 3],
+		/*
+		 * Every section open, which is the whole point of this scene.
+		 *
+		 * Sections fold now, and the moment they did the audit quietly stopped
+		 * measuring what was inside them: forty-six controls became display:
+		 * none and the pass stayed green at the same count, which is the most
+		 * dangerous shape a green result can have. The folded screen is worth
+		 * measuring too and the firstrun scene does it; this one has to show
+		 * every control there is.
+		 */
+		settingsOpen: ["setup", "keys", "folders", "metadata", "reviews", "publishing", "ask", "content", "behaviour", "maintenance"],
 	});
 	try {
 		const tab = new ReelSettingTab(plugin.app as never, plugin as never);

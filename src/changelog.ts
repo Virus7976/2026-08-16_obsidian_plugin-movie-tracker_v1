@@ -52,6 +52,36 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.5",
+		date: "2026-08-22",
+		headline: "Settings folds up, says what is inside each section, and can be searched.",
+		changes: [
+			{
+				kind: "new",
+				text: "Every settings section folds, and a folded one tells you what it holds \u2014 \u201cMovies \u00b7 Series\u201d, \u201c10 cast \u00b7 US \u00b7 people linked\u201d, \u201cOff \u2014 nothing leaves your vault\u201d.",
+				note: "The screen opens at 1,657px instead of roughly 3,700px, and most of the time the summary line is the whole thing you came to check.",
+			},
+			{
+				kind: "new",
+				text: "A search box at the top of Settings. Type \u201cspoiler\u201d and you get the one control, not the section it lives in.",
+				note: "It searches the descriptions too, so you can find a setting without knowing what it is called or which section somebody filed it under.",
+			},
+			{
+				kind: "better",
+				text: "Settings remembers which sections you left open.",
+			},
+			{
+				kind: "better",
+				text: "A feature you have already set up is one line in Getting started instead of a paragraph.",
+				note: "The description is a pitch, and a pitch is for something you have not bought yet. With everything configured it was five paragraphs about features you were already using.",
+			},
+			{
+				kind: "better",
+				text: "Getting started stops being pinned open once TMDB is in. Until then nothing else on the screen matters, so it stays.",
+			},
+		],
+	},
+	{
 		version: "0.9.4",
 		date: "2026-08-22",
 		headline: "Setting Reel up is now something the app walks you through.",
