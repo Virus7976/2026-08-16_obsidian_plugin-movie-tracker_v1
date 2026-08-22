@@ -5472,6 +5472,7 @@ ${body}
       modalEl.addClass("reel-modal");
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-confirm");
       contentEl.createEl("h3", { cls: "reel-log-title", text: this.opts.title });
       contentEl.createDiv({ cls: "reel-log-sub", text: this.opts.body });
       const actions = contentEl.createDiv({ cls: "reel-log-actions" });
@@ -12629,6 +12630,23 @@ ${body}
   function settingsSearchEmpty(root) {
     searchIn(root, "zzzznothing");
   }
+  function confirmsheet(root) {
+    root.addClass("reel-view-body");
+    mountSheet(
+      root,
+      new ConfirmModal(
+        plugin.app,
+        {
+          title: "Write your keys in plain text?",
+          body: "Every saved key is written readably into .obsidian/plugins/reel/data.json. Anything that can read the vault can read them: sync, backups, another plugin, anyone you share the folder with. Reel can encrypt them again later, but a key that has been on disk in the clear is best treated as exposed and replaced at the service that issued it.",
+          confirmText: "Write in plain text",
+          danger: true
+        },
+        () => {
+        }
+      )
+    );
+  }
   function settingsLocked(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12700,6 +12718,7 @@ ${body}
     publishrefused,
     settings,
     settingsLocked,
+    confirmsheet,
     settingsFolded,
     settingsSearch,
     settingsSearchSection,

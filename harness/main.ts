@@ -34,6 +34,7 @@ import { SeasonSheet } from "../src/ui/seasonSheet";
 import { PersonSheet } from "../src/ui/personSheet";
 import { ReelSettingTab } from "../src/settings";
 import { SetupSheet } from "../src/ui/setupSheet";
+import { ConfirmModal } from "../src/ui/confirm";
 import { FEATURES } from "../src/setup";
 import { traktComplaint } from "../src/publish/compose";
 import { BLOCKERS } from "../src/publish";
@@ -2094,6 +2095,40 @@ function settingsSearchEmpty(root: HTMLElement): void {
 	searchIn(root, "zzzznothing");
 }
 
+/**
+ * The dialog standing in front of every irreversible thing Reel can do.
+ *
+ * Removing every stored key, deleting a single key, disconnecting Trakt,
+ * moving cached posters to the trash, writing your keys to disk in cleartext
+ * — all six go through this one modal, and it had never been drawn. The whole
+ * safety net of the plugin was unmeasured.
+ *
+ * Built with the longest body any caller actually passes rather than an
+ * invented one, because the question worth asking of a confirmation is whether
+ * the reason for it survives being read on a phone: a warning that pushes its
+ * own buttons off the bottom of the screen is a warning nobody finishes.
+ */
+function confirmsheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(
+		root,
+		new ConfirmModal(
+			plugin.app,
+			{
+				title: "Write your keys in plain text?",
+				body:
+					"Every saved key is written readably into .obsidian/plugins/reel/data.json. Anything that can " +
+					"read the vault can read them: sync, backups, another plugin, anyone you share the folder with. " +
+					"Reel can encrypt them again later, but a key that has been on disk in the clear is best treated " +
+					"as exposed and replaced at the service that issued it.",
+				confirmText: "Write in plain text",
+				danger: true,
+			},
+			() => {}
+		) as never
+	);
+}
+
 function settingsLocked(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const before = { ...plugin.settings };
@@ -2176,6 +2211,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	publishrefused,
 	settings,
 	settingsLocked,
+	confirmsheet,
 	settingsFolded,
 	settingsSearch,
 	settingsSearchSection,

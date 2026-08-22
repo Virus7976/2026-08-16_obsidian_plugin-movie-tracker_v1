@@ -3384,6 +3384,37 @@ input.reel-input {
  */
 :root {
 	--reel-danger: var(--text-error, #b91c1c);
+	/*
+	 * The red to put *behind* white text, which is a different colour from the
+	 * red to put text *in*, and deliberately not theme-derived.
+	 *
+	 * `--reel-danger` defers to the theme, and a dark theme lightens its error
+	 * colour so it reads on a dark surface — rgb(248, 113, 113) in Obsidian's
+	 * own. As a fill under white text that is 2.77:1, which the audit caught
+	 * the moment a filled destructive button was first drawn.
+	 *
+	 * Same lesson as the success tokens below: where the requirement is a
+	 * contrast ratio rather than a hue, reading the theme reproduces the
+	 * theme's answer to a question it was not asked. This one is fixed, in both
+	 * themes, because a fill supplies its own background — the surface under it
+	 * does not enter into it — and #b91c1c under white is 7.1:1 anywhere.
+	 */
+	--reel-danger-fill: #b91c1c;
+	/*
+	 * And the ink that goes on it, fixed for the same reason and defined here
+	 * so the pair cannot drift apart.
+	 *
+	 * The first attempt used `--text-on-accent`, which was the same mistake one
+	 * step over: that token means "text that sits on the accent colour", and a
+	 * palette whose accent is light defines it dark. On the audit's warm-dark
+	 * palette it came out rgb(32, 26, 19) on the red — 2.66:1 — because the
+	 * theme was answering a question about its accent while being asked about
+	 * a fill that is not its accent.
+	 *
+	 * These two values are a pair. Neither is meaningful without the other, so
+	 * neither reads the theme.
+	 */
+	--reel-danger-ink: #fff;
 }
 
 .theme-dark {
@@ -3429,8 +3460,8 @@ input.reel-input {
 }
 
 .reel-btn-danger[data-confirming="true"] {
-	background: var(--text-error, #dc2626);
-	color: var(--text-on-accent, #fff);
+	background: var(--reel-danger-fill);
+	color: var(--reel-danger-ink);
 	border-color: transparent;
 	font-weight: 700;
 }
@@ -10933,10 +10964,36 @@ input.reel-input {
 	font-weight: 500;
 }
 
+/*
+ * The confirmation dialog is the decision, so it gets the decided treatment.
+ *
+ * The quiet rule above is for a destructive button standing among ordinary
+ * ones, where being findable and not thumb-bait is the whole point. A dialog
+ * that exists solely to ask the question is the opposite case: there is
+ * nothing else on it, you arrived deliberately, and the button that does the
+ * thing has to look like a button. Left quiet it rendered as muted text on the
+ * panel, indistinguishable from a label, while Cancel beside it had a fill.
+ *
+ * Filled rather than red-on-panel, for the reason the note above gives: a
+ * saturated red reads at 4.35:1 in light and 3.17:1 in dark directly on the
+ * surface, and comfortably above AA as white on red.
+ */
+.reel-modal .reel-confirm .reel-btn.reel-btn-danger {
+	background: var(--reel-danger-fill);
+	color: var(--reel-danger-ink);
+	border-color: transparent;
+	font-weight: 600;
+}
+
+/*
+ * The second tap of the detail screen's inline remove, which had the same fault
+ * and was never drawn either: it also filled with the theme's text colour and
+ * put white on top, so on a dark theme it was the same 2.77:1.
+ */
 .reel-view .reel-btn.reel-btn-danger[data-confirming="true"],
 .reel-modal .reel-btn.reel-btn-danger[data-confirming="true"] {
-	background: var(--text-error, #dc2626);
-	color: var(--text-on-accent, #fff);
+	background: var(--reel-danger-fill);
+	color: var(--reel-danger-ink);
 	border-color: transparent;
 	font-weight: 700;
 }

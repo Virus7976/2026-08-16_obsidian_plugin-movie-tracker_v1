@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.32",
+		date: "2026-08-22",
+		headline: "The button that confirms a deletion now looks like a button.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "In every confirmation dialog, the confirm button rendered as plain grey text with no fill and no border.",
+				note: "Cancel beside it had both, so the only thing on the screen that looked pressable was the one that does nothing. It affected all six irreversible actions: removing every key, removing one, disconnecting Trakt, trashing cached posters, and switching to plain-text storage.",
+			},
+			{
+				kind: "fixed",
+				text: "Destructive buttons are now readable on dark and unusual themes.",
+				note: "The red fill and its white text were both taken from theme colours meant for other purposes, so on a dark theme the text on them fell to 2.7:1 — well below the readable threshold.",
+			},
+		],
+	},
+	{
 		version: "0.9.31",
 		date: "2026-08-22",
 		headline: "Clearing the settings search now puts the screen back exactly as it was.",
