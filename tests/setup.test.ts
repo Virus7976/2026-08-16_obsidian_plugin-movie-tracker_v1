@@ -22,7 +22,7 @@
 
 import { readFileSync } from "fs";
 import { join } from "path";
-import { FEATURES, isConfigured, isPartial, setupState } from "../src/setup";
+import { completedSteps, FEATURES, isConfigured, isPartial, setupState } from "../src/setup";
 import { READ_KEYS, WRITE_KEYS, KeyName } from "../src/credentials";
 
 let passed = 0;
@@ -209,6 +209,59 @@ ok(
 	"the guides do still say it",
 	FEATURES.filter((f) => f.steps.some((s) => s.text.toLowerCase().includes("below"))).length >= 5
 );
+
+/* ---- steps you can be shown you have already done -------------------- */
+
+/*
+ * Half of these steps happen on somebody else's website. You leave, do the
+ * thing, and come back to a wall of instructions that looks exactly as it did
+ * before you started — and "where was I" is the one question the screen did
+ * not answer once the sitting ended.
+ */
+const traktSpec = FEATURES.find((f) => f.id === "trakt");
+const omdbSpec = FEATURES.find((f) => f.id === "omdb");
+if (!traktSpec || !omdbSpec) throw new Error("missing specs");
+
+const none = () => false;
+const all = () => true;
+
+ok("nothing saved, nothing done", completedSteps(traktSpec, none) === 0);
+ok("everything saved, everything done", completedSteps(traktSpec, all) === traktSpec.steps.length);
+ok("a one-key guide finishes with its key", completedSteps(omdbSpec, (k) => k === "omdb") === omdbSpec.steps.length);
+
+/*
+ * The inference the whole thing rests on: you cannot be holding a Trakt client
+ * secret without having created the application it belongs to. So one
+ * satisfied step settles every step before it, and two or three observable
+ * points make the entire list meaningful.
+ */
+const appOnly = completedSteps(traktSpec, (k) => k === "traktApp");
+ok("saving the application settles the steps that led to it", appOnly >= 4);
+ok("but not the sign-in that follows it", appOnly < traktSpec.steps.length);
+
+/*
+ * Counted from the last satisfied step rather than the first unsatisfied one.
+ * A feature can be finished out of order — signing in with a key that was
+ * already there — and stopping at the first gap would report a finished guide
+ * as barely begun.
+ */
+ok("a later step settles an earlier gap", completedSteps(traktSpec, (k) => k === "trakt") === traktSpec.steps.length);
+
+// A key belonging to some other feature must not count.
+ok("somebody else's key proves nothing", completedSteps(traktSpec, (k) => k === "omdb") === 0);
+
+/*
+ * Every guide has to end somewhere provable, or its steps can never be shown
+ * as done at all.
+ */
+for (const f of FEATURES) {
+	ok(`${f.id}: at least one step produces something checkable`, f.steps.some((st) => st.key));
+	// A step may only claim a key the feature actually uses.
+	for (const st of f.steps) {
+		if (!st.key) continue;
+		ok(`${f.id}: the step's key is one of the feature's own`, f.keys.includes(st.key));
+	}
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

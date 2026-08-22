@@ -80,10 +80,19 @@ export function keyField(
 			t.inputEl.addClass("reel-input");
 			input = t.inputEl;
 		})
-		.addButton((b) =>
-			b
+		.addButton((b) => {
+			/*
+			 * The accent points at the next thing to do, and once a key is
+			 * saved this is not it.
+			 *
+			 * On a half-finished Trakt guide it left Save and Sign in wearing
+			 * the same purple: one of them replaces a credential that is
+			 * already there, the other is the step you actually came back for.
+			 * A screen with two primary actions has none.
+			 */
+			if (!store.has(name)) b.setCta();
+			return b
 				.setButtonText("Save")
-				.setCta()
 				.onClick(async () => {
 					const value = input?.value ?? "";
 					if (!value.trim()) {
@@ -96,8 +105,8 @@ export function keyField(
 					if (input) input.value = "";
 					new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
 					ctx.onChanged();
-				})
-		);
+				});
+		});
 
 	if (opts.remove && store.has(name)) {
 		setting.addButton((b) =>
@@ -150,10 +159,12 @@ export function traktAppField(el: HTMLElement, ctx: FieldContext, opts: KeyField
 			t.inputEl.addClass("reel-input");
 			secretEl = t.inputEl;
 		})
-		.addButton((b) =>
-			b
+		.addButton((b) => {
+			// Same rationing: replacing a saved application is not the primary
+			// action on a guide whose remaining step is the sign-in.
+			if (!hasApp) b.setCta();
+			return b
 				.setButtonText("Save")
-				.setCta()
 				.onClick(async () => {
 					const clientId = (idEl?.value ?? "").trim();
 					const clientSecret = (secretEl?.value ?? "").trim();
@@ -169,8 +180,8 @@ export function traktAppField(el: HTMLElement, ctx: FieldContext, opts: KeyField
 					if (secretEl) secretEl.value = "";
 					new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
 					ctx.onChanged();
-				})
-		);
+				});
+		});
 
 	if (opts.remove && hasApp) {
 		setting.addButton((b) =>

@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.17",
+		date: "2026-08-22",
+		headline: "A guide you come back to knows which steps you already finished.",
+		changes: [
+			{
+				kind: "new",
+				text: "Steps whose key is already saved are ticked when the guide opens, along with every step before them.",
+				note: "Ticking existed and was entirely manual, so it lasted one sitting — come back tomorrow to a guide you half finished and the marks were gone. A saved credential is durable and settles it directly: you cannot be holding a Trakt client secret without having created the application it belongs to.",
+			},
+			{
+				kind: "fixed",
+				text: "Ticks no longer vanish when the guide redraws after saving a key.",
+				note: "The marks were only ever applied by the tap that made them, which was fine while the sheet was drawn once. It now redraws whenever you save something, and each redraw cleared a list that still believed it was holding them — so the buttons looked untouched and did nothing visible when pressed.",
+			},
+			{
+				kind: "better",
+				text: "Save stops competing for attention once the key it saves is already there.",
+				note: "A half-finished Trakt guide had Save and Sign in in the same accent: one replaces a credential you already have, the other is the step you came back for. A screen with two primary actions has none.",
+			},
+		],
+	},
+	{
 		version: "0.9.16",
 		date: "2026-08-22",
 		headline: "Getting started says what each feature will cost you, before you tap it.",

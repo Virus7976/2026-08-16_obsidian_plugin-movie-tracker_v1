@@ -45,6 +45,7 @@ import { isConfigured, isPartial } from "../setup";
 import { featureHealth } from "../health";
 import { checkFeature, checkable } from "../checks";
 import { setupFields } from "./fields";
+import { completedSteps } from "../setup";
 
 export class SetupSheet extends Modal {
 	private ticked = new Set<number>();
@@ -76,6 +77,7 @@ export class SetupSheet extends Modal {
 	 */
 	private draw(): void {
 		const { contentEl } = this;
+		this.seedTicks();
 		contentEl.empty();
 		contentEl.addClass("reel-setup");
 
@@ -83,6 +85,25 @@ export class SetupSheet extends Modal {
 		this.renderSteps(contentEl);
 		this.renderFields(contentEl);
 		this.renderFoot(contentEl);
+	}
+
+	/**
+	 * Steps the vault can prove you have already done.
+	 *
+	 * Ticking was there and was purely manual, which means it only ever
+	 * survived one sitting: come back tomorrow to a guide you half finished
+	 * and the marks are gone, along with the answer to the only question you
+	 * have. A saved credential is durable, and it settles the question
+	 * directly — no new state to store, and nothing to go stale.
+	 *
+	 * Only ever adds. A tick you put there by hand is a statement about
+	 * something Reel cannot see, and taking it away because the plugin has no
+	 * evidence of it would be the screen overruling you about your own
+	 * afternoon.
+	 */
+	private seedTicks(): void {
+		const done = completedSteps(this.spec, (k) => this.plugin.credentials.has(k));
+		for (let i = 0; i < done; i++) this.ticked.add(i);
 	}
 
 	/**
@@ -231,9 +252,21 @@ export class SetupSheet extends Modal {
 		// The number itself is the button. Keeping your place in a list you
 		// keep tabbing away from is the whole job of these ticks, and it should
 		// not require aim.
-		const tick = row.createEl("button", { cls: "reel-setup-tick", text: String(i + 1) });
+		/*
+		 * Drawn from the state, not assumed blank.
+		 *
+		 * The ticks were only ever applied by the click handler, which was
+		 * fine while the sheet was rendered once and never again. It now
+		 * redraws whenever a key is saved, and every redraw wiped the marks off
+		 * a list that still believed it was holding them — leaving buttons that
+		 * looked untouched and did nothing visible when pressed, because the
+		 * first press was toggling them back off.
+		 */
+		const done = this.ticked.has(i);
+		if (done) li.addClass("is-done");
+		const tick = row.createEl("button", { cls: "reel-setup-tick", text: done ? "✓" : String(i + 1) });
 		tick.setAttr("aria-label", `Step ${i + 1}. Tap to mark done.`);
-		tick.setAttr("aria-pressed", "false");
+		tick.setAttr("aria-pressed", String(done));
 
 		row.createSpan({ cls: "reel-setup-step-text", text: step.text });
 

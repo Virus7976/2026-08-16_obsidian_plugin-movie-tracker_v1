@@ -47,6 +47,15 @@ export interface SetupStep {
 	copy?: string;
 	/** A caution or an aside. Rendered quieter than the instruction. */
 	note?: string;
+	/**
+	 * The credential this step produces, when it produces one.
+	 *
+	 * Only the steps that end in something being saved carry this, because
+	 * those are the only ones the plugin can actually verify. Reel cannot know
+	 * whether you have read a paragraph or opened a website; it knows exactly
+	 * whether the key that step asks for is now in the vault.
+	 */
+	key?: KeyName;
 }
 
 export interface FeatureSpec {
@@ -102,6 +111,7 @@ export const FEATURES: FeatureSpec[] = [
 			},
 			{
 				text: "Paste it below and press Save. You'll be asked for a passphrase — that encrypts the key inside your vault.",
+				key: "tmdb",
 			},
 		],
 	},
@@ -122,7 +132,7 @@ export const FEATURES: FeatureSpec[] = [
 				text: "Check your email and click the activation link. The key does not work until you do.",
 				note: "This one catches people out — the key arrives before it is active.",
 			},
-			{ text: "Paste the key below and press Save." },
+			{ text: "Paste the key below and press Save.", key: "omdb" },
 		],
 	},
 	{
@@ -142,7 +152,7 @@ export const FEATURES: FeatureSpec[] = [
 				text: "Wait for the reply. A person reads these, so it is not instant.",
 				note: "Everything else in Reel works meanwhile. Content filtering falls back to TMDB keywords until the key arrives.",
 			},
-			{ text: "Paste the key below and press Save." },
+			{ text: "Paste the key below and press Save.", key: "dtdd" },
 		],
 	},
 	{
@@ -163,7 +173,7 @@ export const FEATURES: FeatureSpec[] = [
 				note: "Reel shows what every question cost in tokens, so this is checkable rather than a mystery bill.",
 			},
 			{ text: "Create an API key and copy it.", url: "https://openrouter.ai/keys" },
-			{ text: "Paste it below, press Save, then turn Ask on." },
+			{ text: "Paste it below, press Save, then turn Ask on.", key: "openrouter" },
 		],
 	},
 	{
@@ -186,9 +196,13 @@ export const FEATURES: FeatureSpec[] = [
 				copy: "urn:ietf:wg:oauth:2.0:oob",
 				note: "This is the standard value for an app with no website to return to. Getting it wrong is the usual reason sign-in fails.",
 			},
-			{ text: "Save the application, then copy its Client ID and Client Secret into the two fields below." },
+			{
+				text: "Save the application, then copy its Client ID and Client Secret into the two fields below.",
+				key: "traktApp",
+			},
 			{
 				text: "Press Sign in. Trakt shows a short code — type it on any device, and Reel waits for you.",
+				key: "trakt",
 				note: "No redirect back to the app is needed, which is what makes this work on a phone at all.",
 			},
 		],
@@ -213,7 +227,7 @@ export const FEATURES: FeatureSpec[] = [
 				note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post.",
 			},
 			{ text: "Submit, open the application, and copy “Your access token”." },
-			{ text: "Enter your instance's address and paste the token below." },
+			{ text: "Enter your instance's address and paste the token below.", key: "mastodon" },
 		],
 	},
 ];
@@ -233,6 +247,34 @@ export function featureById(id: FeatureId): FeatureSpec | undefined {
  * application without having signed in is a real and confusing halfway state
  * that used to render as simply "not set up".
  */
+/**
+ * How many of a guide's steps are demonstrably behind you.
+ *
+ * Coming back to a walkthrough is the normal way to use one. Half of these
+ * steps happen on somebody else's website, so you leave, do the thing, and
+ * return to 2,700px of instructions that look exactly as they did before you
+ * started — and the one question you have, which is "where was I", is the one
+ * the screen does not answer.
+ *
+ * Only steps that end in a saved credential can be checked directly. The rest
+ * are inferred, and soundly: you cannot be holding a Trakt client secret
+ * without having created the application it belongs to, so a satisfied step
+ * settles every step before it. That makes the whole list meaningful from the
+ * two or three points the plugin can actually observe.
+ *
+ * Counts from the *last* satisfied step, not the first unsatisfied one. A
+ * feature can be finished out of order — signing in before pasting a key that
+ * was already there — and stopping at the first gap would report a guide as
+ * barely begun when it is done.
+ */
+export function completedSteps(spec: FeatureSpec, has: (key: KeyName) => boolean): number {
+	let done = 0;
+	spec.steps.forEach((step, i) => {
+		if (step.key && has(step.key)) done = i + 1;
+	});
+	return done;
+}
+
 export function isConfigured(plugin: ReelPlugin, spec: FeatureSpec): boolean {
 	return spec.keys.every((k) => plugin.credentials.has(k));
 }

@@ -38,6 +38,16 @@ import { FEATURES } from "../src/setup";
 
 /** Set by the first-run scene so the credential stub reports an empty vault. */
 let noKeys = false;
+/*
+ * Keys a scene wants to be *missing* while the rest are present.
+ *
+ * Everything-or-nothing was enough while a guide could only be shown from the
+ * outside. Now that it reports which of its steps are already behind you, the
+ * state worth measuring is the mixed one — some ticked, some not, on the same
+ * list — which is also the realistic one: the Trakt application pasted, the
+ * sign-in not yet done.
+ */
+const missing = new Set<string>();
 
 /*
  * A fixed clock for the health fixtures.
@@ -441,7 +451,7 @@ const plugin = {
 	 * ever presses anything.
 	 */
 	credentials: {
-		has: (name: string) => name !== "mastodon" && !noKeys,
+		has: (name: string) => name !== "mastodon" && !missing.has(name) && !noKeys,
 		isUnlocked: true,
 		hasStoredKey: true,
 		store: async () => true,
@@ -1456,7 +1466,13 @@ function setupsheet(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const spec = FEATURES.find((f) => f.id === "trakt");
 	if (!spec) throw new Error("harness: no trakt feature spec");
-	mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+	// Application saved, sign-in still to do: four steps ticked, one not.
+	missing.add("trakt");
+	try {
+		mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+	} finally {
+		missing.delete("trakt");
+	}
 }
 
 function settings(root: HTMLElement): void {

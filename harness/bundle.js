@@ -7778,7 +7778,8 @@ ${body}
           note: "The token travels in a request header; the v3 key has to go in the URL, and URLs end up in logs. Reel accepts either, but this one is safer."
         },
         {
-          text: "Paste it below and press Save. You'll be asked for a passphrase \u2014 that encrypts the key inside your vault."
+          text: "Paste it below and press Save. You'll be asked for a passphrase \u2014 that encrypts the key inside your vault.",
+          key: "tmdb"
         }
       ]
     },
@@ -7799,7 +7800,7 @@ ${body}
           text: "Check your email and click the activation link. The key does not work until you do.",
           note: "This one catches people out \u2014 the key arrives before it is active."
         },
-        { text: "Paste the key below and press Save." }
+        { text: "Paste the key below and press Save.", key: "omdb" }
       ]
     },
     {
@@ -7819,7 +7820,7 @@ ${body}
           text: "Wait for the reply. A person reads these, so it is not instant.",
           note: "Everything else in Reel works meanwhile. Content filtering falls back to TMDB keywords until the key arrives."
         },
-        { text: "Paste the key below and press Save." }
+        { text: "Paste the key below and press Save.", key: "dtdd" }
       ]
     },
     {
@@ -7838,7 +7839,7 @@ ${body}
           note: "Reel shows what every question cost in tokens, so this is checkable rather than a mystery bill."
         },
         { text: "Create an API key and copy it.", url: "https://openrouter.ai/keys" },
-        { text: "Paste it below, press Save, then turn Ask on." }
+        { text: "Paste it below, press Save, then turn Ask on.", key: "openrouter" }
       ]
     },
     {
@@ -7861,9 +7862,13 @@ ${body}
           copy: "urn:ietf:wg:oauth:2.0:oob",
           note: "This is the standard value for an app with no website to return to. Getting it wrong is the usual reason sign-in fails."
         },
-        { text: "Save the application, then copy its Client ID and Client Secret into the two fields below." },
+        {
+          text: "Save the application, then copy its Client ID and Client Secret into the two fields below.",
+          key: "traktApp"
+        },
         {
           text: "Press Sign in. Trakt shows a short code \u2014 type it on any device, and Reel waits for you.",
+          key: "trakt",
           note: "No redirect back to the app is needed, which is what makes this work on a phone at all."
         }
       ]
@@ -7888,10 +7893,18 @@ ${body}
           note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post."
         },
         { text: "Submit, open the application, and copy \u201CYour access token\u201D." },
-        { text: "Enter your instance's address and paste the token below." }
+        { text: "Enter your instance's address and paste the token below.", key: "mastodon" }
       ]
     }
   ];
+  function completedSteps(spec, has) {
+    let done = 0;
+    spec.steps.forEach((step, i) => {
+      if (step.key && has(step.key))
+        done = i + 1;
+    });
+    return done;
+  }
   function isConfigured(plugin2, spec) {
     return spec.keys.every((k) => plugin2.credentials.has(k));
   }
@@ -8135,8 +8148,10 @@ ${body}
       t.inputEl.spellcheck = false;
       t.inputEl.addClass("reel-input");
       input = t.inputEl;
-    }).addButton(
-      (b) => b.setButtonText("Save").setCta().onClick(async () => {
+    }).addButton((b) => {
+      if (!store.has(name))
+        b.setCta();
+      return b.setButtonText("Save").onClick(async () => {
         const value = input?.value ?? "";
         if (!value.trim()) {
           new Notice("Reel: nothing to save.");
@@ -8147,8 +8162,8 @@ ${body}
           input.value = "";
         new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
         ctx.onChanged();
-      })
-    );
+      });
+    });
     if (opts.remove && store.has(name)) {
       setting.addButton(
         (b) => b.setButtonText("Remove").onClick(async () => {
@@ -8186,8 +8201,10 @@ ${body}
       t.inputEl.spellcheck = false;
       t.inputEl.addClass("reel-input");
       secretEl = t.inputEl;
-    }).addButton(
-      (b) => b.setButtonText("Save").setCta().onClick(async () => {
+    }).addButton((b) => {
+      if (!hasApp)
+        b.setCta();
+      return b.setButtonText("Save").onClick(async () => {
         const clientId = (idEl?.value ?? "").trim();
         const clientSecret = (secretEl?.value ?? "").trim();
         if (!clientId || !clientSecret) {
@@ -8204,8 +8221,8 @@ ${body}
           secretEl.value = "";
         new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
         ctx.onChanged();
-      })
-    );
+      });
+    });
     if (opts.remove && hasApp) {
       setting.addButton(
         (b) => b.setButtonText("Remove").onClick(async () => {
@@ -8414,12 +8431,32 @@ ${body}
      */
     draw() {
       const { contentEl } = this;
+      this.seedTicks();
       contentEl.empty();
       contentEl.addClass("reel-setup");
       this.renderHead(contentEl);
       this.renderSteps(contentEl);
       this.renderFields(contentEl);
       this.renderFoot(contentEl);
+    }
+    /**
+     * Steps the vault can prove you have already done.
+     *
+     * Ticking was there and was purely manual, which means it only ever
+     * survived one sitting: come back tomorrow to a guide you half finished
+     * and the marks are gone, along with the answer to the only question you
+     * have. A saved credential is durable, and it settles the question
+     * directly — no new state to store, and nothing to go stale.
+     *
+     * Only ever adds. A tick you put there by hand is a statement about
+     * something Reel cannot see, and taking it away because the plugin has no
+     * evidence of it would be the screen overruling you about your own
+     * afternoon.
+     */
+    seedTicks() {
+      const done = completedSteps(this.spec, (k) => this.plugin.credentials.has(k));
+      for (let i = 0; i < done; i++)
+        this.ticked.add(i);
     }
     /**
      * The fields the steps have been pointing at all along.
@@ -8534,9 +8571,12 @@ ${body}
     renderStep(list2, step, i) {
       const li = list2.createEl("li", { cls: "reel-setup-step" });
       const row = li.createDiv({ cls: "reel-setup-step-row" });
-      const tick = row.createEl("button", { cls: "reel-setup-tick", text: String(i + 1) });
+      const done = this.ticked.has(i);
+      if (done)
+        li.addClass("is-done");
+      const tick = row.createEl("button", { cls: "reel-setup-tick", text: done ? "\u2713" : String(i + 1) });
       tick.setAttr("aria-label", `Step ${i + 1}. Tap to mark done.`);
-      tick.setAttr("aria-pressed", "false");
+      tick.setAttr("aria-pressed", String(done));
       row.createSpan({ cls: "reel-setup-step-text", text: step.text });
       const mark = () => {
         const on = this.ticked.has(i);
@@ -10954,6 +10994,7 @@ ${body}
 
   // harness/main.ts
   var noKeys = false;
+  var missing = /* @__PURE__ */ new Set();
   var FIXED_NOW = Date.now();
   function poster(title) {
     let h = 0;
@@ -11260,7 +11301,7 @@ ${body}
      * ever presses anything.
      */
     credentials: {
-      has: (name) => name !== "mastodon" && !noKeys,
+      has: (name) => name !== "mastodon" && !missing.has(name) && !noKeys,
       isUnlocked: true,
       hasStoredKey: true,
       store: async () => true,
@@ -11906,7 +11947,12 @@ ${body}
     const spec = FEATURES.find((f) => f.id === "trakt");
     if (!spec)
       throw new Error("harness: no trakt feature spec");
-    mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+    missing.add("trakt");
+    try {
+      mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+    } finally {
+      missing.delete("trakt");
+    }
   }
   function settings(root) {
     root.addClass("reel-view-body");
