@@ -8782,6 +8782,11 @@ ${body}
     session: "Session only \u2014 never written to disk",
     plain: "Plain text in vault (not recommended)"
   };
+  var MODE_NOTES = {
+    encrypted: "Every key shares one encrypted blob and one passphrase. A prompt per service would be intolerable, and splitting them buys nothing, since whatever can read one can read the rest. Reel asks once, the first time it needs a key after Obsidian starts.",
+    session: "Nothing is written to disk. Reel asks for your TMDB key the first time it needs one and forgets it when Obsidian closes, so you enter it again every time you start, on every device.",
+    plain: ""
+  };
   var ReelSettingTab = class extends PluginSettingTab {
     constructor(app2, plugin2) {
       super(app2, plugin2);
@@ -9171,6 +9176,7 @@ ${body}
       const store = this.plugin.credentials;
       const sealed = store.needsUnlock && store.hasStoredKey;
       const dataPath = `${this.app.vault.configDir ?? ".obsidian"}/plugins/reel/data.json`;
+      const nothingToTest = !sealed && !TESTABLE.some((id) => checkable(this.plugin, id));
       const status = el.createDiv({ cls: "reel-key-status" });
       const describe2 = () => {
         status.empty();
@@ -9209,7 +9215,7 @@ ${body}
         );
       }
       new Setting(el).setName("Key storage").setDesc(
-        "Every key shares one encrypted blob and one passphrase \u2014 a prompt per service would be intolerable, and splitting them buys nothing, since whatever can read one can read the rest. Note that Trakt and Mastodon are different in kind from the others: those can post publicly as you."
+        "Where Reel keeps your keys. Note that Trakt and Mastodon are different in kind from the others: those can post publicly as you."
       ).addDropdown((d) => {
         Object.keys(MODE_LABELS).forEach((m) => d.addOption(m, MODE_LABELS[m]));
         d.setValue(this.plugin.settings.keyMode).onChange(async (value) => {
@@ -9230,12 +9236,11 @@ ${body}
           this.display();
         });
       });
-      if (this.plugin.settings.keyMode === "plain") {
-        el.createDiv({
-          cls: "reel-callout warn",
-          text: `Plain text mode writes your keys readably into ${dataPath}. If this vault is synced to git or a shared drive, treat them as public.`
-        });
-      }
+      const mode = this.plugin.settings.keyMode;
+      el.createDiv({
+        cls: mode === "plain" ? "reel-callout warn" : "reel-callout",
+        text: mode === "plain" ? `Plain text mode writes your keys readably into ${dataPath}. If this vault is synced to git or a shared drive, treat them as public.` : MODE_NOTES[mode]
+      });
       const keyField2 = (name, label, desc) => this.keyField(el, name, label, desc);
       keyField2(
         "tmdb",
@@ -9274,38 +9279,28 @@ ${body}
         }
       };
       new Setting(el).setName("Test connections").setDesc(
-        sealed ? "One small request per configured service. The keys are locked, so this asks for the passphrase first." : "One small request per configured service, so a mistyped key fails here rather than silently."
-      ).addButton(
-        (b) => (
-          /*
-           * The unlock is named on the button rather than sprung by it.
-           *
-           * Pressing Test while sealed used to reach for five keys it
-           * could not read, which put a passphrase modal over a screen
-           * nobody had asked it to and recorded five failures if you
-           * declined. The checks now decline to run instead, so the
-           * button has to say what it is going to do and then do it.
-           */
-          b.setButtonText(sealed ? "Unlock and test" : "Test").onClick(async () => {
-            const label = sealed ? "Unlock and test" : "Test";
-            b.setDisabled(true).setButtonText(sealed ? "Unlocking\u2026" : "Testing\u2026");
-            if (sealed && !await this.plugin.credentials.unlock()) {
-              new Notice("Reel: keys stay locked, so nothing was tested.");
-              b.setDisabled(false).setButtonText(label);
-              return;
-            }
-            b.setButtonText("Testing\u2026");
-            await this.runTests();
-            if (sealed) {
-              this.display();
-              return;
-            }
+        nothingToTest ? "Nothing to test yet. Save a key above and this will check it against the service." : sealed ? "One small request per configured service. The keys are locked, so this asks for the passphrase first." : "One small request per configured service, so a mistyped key fails here rather than silently."
+      ).addButton((b) => {
+        b.setDisabled(nothingToTest);
+        return b.setButtonText(sealed ? "Unlock and test" : "Test").onClick(async () => {
+          const label = sealed ? "Unlock and test" : "Test";
+          b.setDisabled(true).setButtonText(sealed ? "Unlocking\u2026" : "Testing\u2026");
+          if (sealed && !await this.plugin.credentials.unlock()) {
+            new Notice("Reel: keys stay locked, so nothing was tested.");
             b.setDisabled(false).setButtonText(label);
-            drawHealth();
-            describe2();
-          })
-        )
-      );
+            return;
+          }
+          b.setButtonText("Testing\u2026");
+          await this.runTests();
+          if (sealed) {
+            this.display();
+            return;
+          }
+          b.setDisabled(false).setButtonText(label);
+          drawHealth();
+          describe2();
+        });
+      });
       el.appendChild(health);
       drawHealth();
       if (this.plugin.settings.keyMode === "encrypted" && store.isUnlocked) {
@@ -11439,7 +11434,19 @@ ${body}
         return locked;
       },
       unlock: async () => true,
-      hasStoredKey: true,
+      /*
+       * Read off the settings, not pinned true.
+       *
+       * Pinned, it put an Unlock button and a Remove all keys button on the
+       * session-only screen, where nothing is stored and there is nothing to
+       * unlock or remove. Both are gated on exactly this flag in the real
+       * store, so a fixture that answers yes unconditionally cannot see the
+       * gate at all — it can only ever render the open branch.
+       */
+      get hasStoredKey() {
+        const s = plugin.settings;
+        return !!(s.keyBlob || s.keysPlain && Object.keys(s.keysPlain).length);
+      },
       store: async () => true,
       remove: async () => void 0,
       migrateTo: async () => void 0,
@@ -12184,6 +12191,29 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function settingsSession(root) {
+    root.addClass("reel-view-body");
+    const before = { ...plugin.settings };
+    noKeys = true;
+    locked = true;
+    Object.assign(plugin.settings, {
+      keyMode: "session",
+      keyBlob: null,
+      keysPlain: null,
+      keyNames: [],
+      settingsOpen: ["setup", "keys"],
+      connectionHealth: {}
+    });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+    } finally {
+      noKeys = false;
+      locked = false;
+      Object.assign(plugin.settings, before);
+    }
+  }
   function settingsPlain(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12293,6 +12323,7 @@ ${body}
     settings,
     settingsLocked,
     settingsPlain,
+    settingsSession,
     guideLocked,
     firstrun,
     setupsheet,

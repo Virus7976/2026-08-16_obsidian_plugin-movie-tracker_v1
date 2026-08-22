@@ -482,7 +482,19 @@ const plugin = {
 			return locked;
 		},
 		unlock: async () => true,
-		hasStoredKey: true,
+		/*
+		 * Read off the settings, not pinned true.
+		 *
+		 * Pinned, it put an Unlock button and a Remove all keys button on the
+		 * session-only screen, where nothing is stored and there is nothing to
+		 * unlock or remove. Both are gated on exactly this flag in the real
+		 * store, so a fixture that answers yes unconditionally cannot see the
+		 * gate at all — it can only ever render the open branch.
+		 */
+		get hasStoredKey() {
+			const s = plugin.settings;
+			return !!(s.keyBlob || (s.keysPlain && Object.keys(s.keysPlain).length));
+		},
 		store: async () => true,
 		remove: async () => undefined,
 		migrateTo: async () => undefined,
@@ -1649,6 +1661,43 @@ function settings(root: HTMLElement): void {
  * vault is open, and be wrong about all of it.
  */
 /**
+ * Session-only storage, with nothing entered yet.
+ *
+ * The last of the three modes never drawn, and the one that inverts every
+ * assumption the other two share. Nothing is stored, so no key reports as
+ * configured, no health row appears, and `hasStoredKey` — which gates the
+ * unlock offered in 0.9.21 and the remove-everything button — is false.
+ *
+ * Which means this is the screen where the most controls are absent, and the
+ * question worth asking of it is whether what is left explains itself. A mode
+ * whose whole premise is that you re-enter a key every time Obsidian starts
+ * has to say so somewhere you will read it.
+ */
+function settingsSession(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const before = { ...plugin.settings };
+	noKeys = true;
+	locked = true;
+	Object.assign(plugin.settings, {
+		keyMode: "session",
+		keyBlob: null,
+		keysPlain: null,
+		keyNames: [],
+		settingsOpen: ["setup", "keys"],
+		connectionHealth: {},
+	});
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+	} finally {
+		noKeys = false;
+		locked = false;
+		Object.assign(plugin.settings, before);
+	}
+}
+
+/**
  * The third storage mode, which had never been drawn.
  *
  * Plain text is the mode with the most to say and the least screen time. It is
@@ -1792,6 +1841,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	settings,
 	settingsLocked,
 	settingsPlain,
+	settingsSession,
 	guideLocked,
 	firstrun,
 	setupsheet,

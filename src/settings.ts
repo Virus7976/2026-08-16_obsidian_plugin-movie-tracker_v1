@@ -7,7 +7,7 @@ import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credent
 import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
-import { checkAll } from "./checks";
+import { checkAll, checkable } from "./checks";
 import { FieldContext, keyField, traktAppField } from "./ui/fields";
 import {
 	HealthMap,
@@ -267,6 +267,35 @@ const MODE_LABELS: Record<KeyMode, string> = {
 	encrypted: "Encrypted in vault (recommended)",
 	session: "Session only — never written to disk",
 	plain: "Plain text in vault (not recommended)",
+};
+
+/**
+ * What the mode you have chosen actually does to you.
+ *
+ * The dropdown offers three and the paragraph above it described one. It
+ * explained the encrypted blob and its single passphrase to everybody —
+ * including the person on session-only storage, for whom there is no blob and
+ * no passphrase, and the person on plain text, for whom there is no encryption
+ * at all. Three different arrangements of your secrets, one explanation, and no
+ * way to tell from the screen which one you were reading about.
+ *
+ * Session mode had the most to lose by that. Its label says "never written to
+ * disk", which is the appealing half; the half you find out by restarting
+ * Obsidian — that you type your key in again, every time — was written down
+ * nowhere.
+ *
+ * Plain text keeps its own sentence below, because that one has to name a file
+ * path and is a caution rather than a description.
+ */
+const MODE_NOTES: Record<KeyMode, string> = {
+	encrypted:
+		"Every key shares one encrypted blob and one passphrase. A prompt per service would be intolerable, and " +
+		"splitting them buys nothing, since whatever can read one can read the rest. Reel asks once, the first " +
+		"time it needs a key after Obsidian starts.",
+	session:
+		"Nothing is written to disk. Reel asks for your TMDB key the first time it needs one and forgets it when " +
+		"Obsidian closes, so you enter it again every time you start, on every device.",
+	plain: "",
 };
 
 
@@ -845,6 +874,19 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * invites you to disbelieve the rest of the sentence.
 		 */
 		const dataPath = `${this.app.vault.configDir ?? ".obsidian"}/plugins/reel/data.json`;
+		/*
+		 * Is there anything for the Test button to do?
+		 *
+		 * With nothing configured it ran, checked none of six services, saved,
+		 * and returned — so the button went "Testing…" and back to "Test" with
+		 * no row, no notice and no change at all. On the first screen of a new
+		 * install that is the most discouraging answer available: you press the
+		 * control that proves it works and the screen says nothing.
+		 *
+		 * Sealed is excluded because there is something to do there: unlock, and
+		 * then everything becomes checkable.
+		 */
+		const nothingToTest = !sealed && !TESTABLE.some((id) => checkable(this.plugin, id));
 
 		const status = el.createDiv({ cls: "reel-key-status" });
 		const describe = () => {
@@ -924,9 +966,8 @@ export class ReelSettingTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Key storage")
 			.setDesc(
-				"Every key shares one encrypted blob and one passphrase — a prompt per service would be intolerable, " +
-					"and splitting them buys nothing, since whatever can read one can read the rest. Note that Trakt and " +
-					"Mastodon are different in kind from the others: those can post publicly as you."
+				"Where Reel keeps your keys. Note that Trakt and Mastodon are different in kind from the others: " +
+					"those can post publicly as you."
 			)
 			.addDropdown((d) => {
 				(Object.keys(MODE_LABELS) as KeyMode[]).forEach((m) => d.addOption(m, MODE_LABELS[m]));
@@ -983,14 +1024,15 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * and you would only meet it by scrolling past everything you had come
 		 * for. A caution you have to go looking for is decoration.
 		 */
-		if (this.plugin.settings.keyMode === "plain") {
-			el.createDiv({
-				cls: "reel-callout warn",
-				text:
-					`Plain text mode writes your keys readably into ${dataPath}. ` +
-					"If this vault is synced to git or a shared drive, treat them as public.",
-			});
-		}
+		const mode = this.plugin.settings.keyMode;
+		el.createDiv({
+			cls: mode === "plain" ? "reel-callout warn" : "reel-callout",
+			text:
+				mode === "plain"
+					? `Plain text mode writes your keys readably into ${dataPath}. ` +
+						"If this vault is synced to git or a shared drive, treat them as public."
+					: MODE_NOTES[mode],
+		});
 
 		const keyField = (name: KeyName, label: string, desc: string) => this.keyField(el, name, label, desc);
 
@@ -1062,11 +1104,13 @@ export class ReelSettingTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Test connections")
 			.setDesc(
-				sealed
-					? "One small request per configured service. The keys are locked, so this asks for the passphrase first."
-					: "One small request per configured service, so a mistyped key fails here rather than silently."
+				nothingToTest
+					? "Nothing to test yet. Save a key above and this will check it against the service."
+					: sealed
+						? "One small request per configured service. The keys are locked, so this asks for the passphrase first."
+						: "One small request per configured service, so a mistyped key fails here rather than silently."
 			)
-			.addButton((b) =>
+			.addButton((b) => {
 				/*
 				 * The unlock is named on the button rather than sprung by it.
 				 *
@@ -1076,7 +1120,15 @@ export class ReelSettingTab extends PluginSettingTab {
 				 * declined. The checks now decline to run instead, so the
 				 * button has to say what it is going to do and then do it.
 				 */
-				b.setButtonText(sealed ? "Unlock and test" : "Test").onClick(async () => {
+				/*
+				 * Disabled rather than merely explained.
+				 *
+				 * The sentence beside it says there is nothing to test; a live
+				 * button next to that sentence invites you to disagree with it,
+				 * press, and get silence for an answer. The two have to agree.
+				 */
+				b.setDisabled(nothingToTest);
+				return b.setButtonText(sealed ? "Unlock and test" : "Test").onClick(async () => {
 					const label = sealed ? "Unlock and test" : "Test";
 					b.setDisabled(true).setButtonText(sealed ? "Unlocking…" : "Testing…");
 					if (sealed && !(await this.plugin.credentials.unlock())) {
@@ -1095,8 +1147,8 @@ export class ReelSettingTab extends PluginSettingTab {
 					b.setDisabled(false).setButtonText(label);
 					drawHealth();
 					describe();
-				})
-			);
+				});
+			});
 
 		el.appendChild(health);
 		drawHealth();

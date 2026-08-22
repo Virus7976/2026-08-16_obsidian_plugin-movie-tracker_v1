@@ -278,5 +278,57 @@ ok(
 	/Plain text mode writes your keys readably/.test(settingsCode)
 );
 
+/* ---- three storage modes, one explanation ----------------------------- */
+
+/*
+ * The dropdown offers three arrangements of your secrets and the paragraph
+ * above it described one of them. Everybody read about the encrypted blob and
+ * its single passphrase, including the person on session-only storage, for
+ * whom there is neither.
+ *
+ * Session mode lost the most by that. Its label says "never written to disk",
+ * which is the appealing half; the half you discover by restarting Obsidian —
+ * that you type the key in again, every time, on every device — was written
+ * down nowhere on the screen.
+ */
+const modes = [...settingsCode.matchAll(/^	(encrypted|session|plain):/gm)].map((m) => m[1]);
+const labelled = new Set(modes);
+ok("every storage mode is labelled", labelled.size === 3, [...labelled].join(", "));
+ok(
+	"and every one of them is explained",
+	/const MODE_NOTES/.test(settingsCode),
+	"the mode table has labels and no descriptions, so the dropdown explains one mode to people using another"
+);
+// Session's own fact, which is the one that costs you something if unsaid.
+ok(
+	"session mode says you re-enter the key every start",
+	/every time you start/.test(settingsCode),
+	"the appealing half of session mode was on the screen and the inconvenient half was not"
+);
+
+/* ---- a control that can do nothing says so ---------------------------- */
+
+/*
+ * With nothing configured, Test connections checked none of six services and
+ * returned: the button read "Testing…", went back to "Test", and no row, notice
+ * or change appeared. On the first screen of a new install that is the most
+ * discouraging answer available — you press the control that proves it works
+ * and the screen says nothing at all.
+ *
+ * Both halves are pinned, because either alone is worse than neither: a
+ * sentence saying there is nothing to test beside a live button invites you to
+ * disagree with the sentence and press it.
+ */
+ok(
+	"the test button explains an empty vault",
+	/Nothing to test yet/.test(settingsCode),
+	"pressing Test with nothing configured is answered by silence"
+);
+ok(
+	"and is disabled rather than silent",
+	/setDisabled\(nothingToTest\)/.test(settingsCode),
+	"the description and the button disagree about whether there is anything to do"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

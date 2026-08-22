@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.23",
+		date: "2026-08-22",
+		headline: "The key storage dropdown now explains the mode you picked, not the one it was written for.",
+		changes: [
+			{
+				kind: "better",
+				text: "Each of the three storage modes explains itself, under the control that chose it.",
+				note: "The paragraph described the encrypted blob and its single passphrase to everybody, including people on session-only storage, for whom there is neither.",
+			},
+			{
+				kind: "new",
+				text: "Session-only storage now says you re-enter your key every time Obsidian starts.",
+				note: "The label said “never written to disk”, which is the appealing half. The half you found out by restarting was written down nowhere.",
+			},
+			{
+				kind: "fixed",
+				text: "Test connections no longer answers with silence when nothing is configured.",
+				note: "It checked none of six services and returned, so the button read Testing… and went back to Test with no row and no notice. On a new install that is the control you press to prove it works. It now says there is nothing to test yet, and is disabled until there is.",
+			},
+		],
+	},
+	{
 		version: "0.9.22",
 		date: "2026-08-22",
 		headline: "Switching your keys to plain text now asks first, and says where they will land.",
