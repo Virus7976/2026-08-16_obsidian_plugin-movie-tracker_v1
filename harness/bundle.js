@@ -6618,7 +6618,7 @@ ${body}
   // src/util/blend.ts
   function becauseText(because, cap = 3) {
     const names = because.slice(0, cap);
-    const extra = because.length - names.length;
+    const extra2 = because.length - names.length;
     let list2;
     if (names.length === 1)
       list2 = names[0];
@@ -6626,8 +6626,8 @@ ${body}
       list2 = `${names[0]} and ${names[1]}`;
     else
       list2 = `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-    if (extra > 0)
-      list2 += ` and ${extra} more`;
+    if (extra2 > 0)
+      list2 += ` and ${extra2} more`;
     return `Because it's like ${list2}`;
   }
 
@@ -7624,18 +7624,6 @@ ${body}
     }
   };
 
-  // src/publish/mastodon.ts
-  function normaliseHost(raw) {
-    let host = (raw ?? "").trim();
-    if (!host)
-      return "";
-    host = host.replace(/^https?:\/\//i, "");
-    host = host.split("/")[0];
-    if (host.includes("@"))
-      host = host.slice(host.lastIndexOf("@") + 1);
-    return host.toLowerCase();
-  }
-
   // src/publish/trakt.ts
   var ACTIVATE_URL = "https://trakt.tv/activate";
 
@@ -7996,7 +7984,7 @@ ${body}
   }
 
   // src/health.ts
-  var TESTABLE = ["tmdb", "omdb", "dtdd"];
+  var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon"];
   var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
   function ago(then, now) {
     const ms = Math.max(0, now - then);
@@ -8014,6 +8002,10 @@ ${body}
     const mon = Math.floor(day / 30);
     return `${mon} month${mon === 1 ? "" : "s"} ago`;
   }
+  function extra(rec, withProves = true) {
+    const said = [withProves ? rec.proves : "", rec.note].filter((s) => s && s.trim());
+    return said.length ? `. ${said.join(" ")}` : "";
+  }
   function describeHealth(rec, configured, now) {
     if (!configured)
       return { text: "Not set up", tone: "info" };
@@ -8022,9 +8014,11 @@ ${body}
     const when = ago(rec.at, now);
     if (!rec.ok)
       return { text: `Failed ${when}${rec.error ? ` \u2014 ${rec.error}` : ""}`, tone: "warn" };
+    if (rec.proves)
+      return { text: `Checked ${when}. ${rec.proves}${extra(rec, false)}`, tone: "info" };
     if (now - rec.at > STALE_AFTER)
-      return { text: `Worked ${when}`, tone: "info" };
-    return { text: `Working \u2014 checked ${when}`, tone: "ok" };
+      return { text: `Worked ${when}${extra(rec)}`, tone: "info" };
+    return { text: `Working \u2014 checked ${when}${extra(rec)}`, tone: "ok" };
   }
   var SOON = 7 * 24 * 60 * 60 * 1e3;
   function traktState(hasToken, expires, now) {
@@ -8153,6 +8147,18 @@ ${body}
   }
   function previewLine(prefix, example = "Heat (1995)") {
     return `${prefix.trim() || "- Watched"} [[${example}]]`;
+  }
+
+  // src/publish/mastodon.ts
+  function normaliseHost(raw) {
+    let host = (raw ?? "").trim();
+    if (!host)
+      return "";
+    host = host.replace(/^https?:\/\//i, "");
+    host = host.split("/")[0];
+    if (host.includes("@"))
+      host = host.slice(host.lastIndexOf("@") + 1);
+    return host.toLowerCase();
   }
 
   // src/ui/setupSheet.ts
@@ -8801,9 +8807,10 @@ ${body}
         health.empty();
         const now = Date.now();
         for (const id of TESTABLE) {
-          if (!store.has(id))
+          const rec = this.plugin.settings.connectionHealth[id];
+          if (!rec && !store.has(id))
             continue;
-          const said = describeHealth(this.plugin.settings.connectionHealth[id], true, now);
+          const said = describeHealth(rec, true, now);
           const row = health.createDiv({ cls: `reel-health-row is-${said.tone}` });
           row.createSpan({ cls: "reel-health-name", text: KEY_LABELS[id] ?? id });
           row.createSpan({ cls: "reel-health-said", text: said.text });
@@ -9254,9 +9261,9 @@ ${body}
         t.inputEl.spellcheck = false;
         input = t.inputEl;
       });
-      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
-      extra.appendChild(status);
-      extra.appendChild(list2);
+      const extra2 = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra2.appendChild(status);
+      extra2.appendChild(list2);
       refresh(this.plugin.settings[key]);
     }
     /**
@@ -9277,13 +9284,18 @@ ${body}
       const store = this.plugin.credentials;
       const at = Date.now();
       const record = (id, r) => {
-        this.plugin.settings.connectionHealth[id] = r.ok ? { at, ok: true } : { at, ok: false, error: redact(r.error) };
+        this.plugin.settings.connectionHealth[id] = r.ok ? { at, ok: true, ...r.proves ? { proves: r.proves } : {}, ...r.note ? { note: r.note } : {} } : { at, ok: false, error: redact(r.error) };
       };
       record("tmdb", await this.plugin.tmdb.testCredentials());
       if (store.has("omdb"))
         record("omdb", await this.plugin.omdb.test());
       if (store.has("dtdd"))
         record("dtdd", await this.plugin.dtdd.test());
+      if (store.has("openrouter"))
+        record("openrouter", await this.plugin.ai.test());
+      if (normaliseHost(this.plugin.settings.mastodonHost)) {
+        record("mastodon", await this.plugin.publish.mastodon.test());
+      }
       await this.plugin.saveSettings();
       const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);
       new Notice(failed.length ? `Reel: ${failed.length} connection check failed.` : "Reel: all connections working.");
@@ -9384,9 +9396,9 @@ ${body}
           refresh(input?.value ?? this.plugin.settings.aiModel);
         })
       );
-      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
-      extra.appendChild(status);
-      extra.appendChild(list2);
+      const extra2 = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra2.appendChild(status);
+      extra2.appendChild(list2);
       refresh(this.plugin.settings.aiModel);
     }
     /**
@@ -9447,9 +9459,9 @@ ${body}
         t.inputEl.spellcheck = false;
         input = t.inputEl;
       });
-      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
-      extra.appendChild(status);
-      extra.appendChild(list2);
+      const extra2 = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra2.appendChild(status);
+      extra2.appendChild(list2);
       refresh(this.plugin.settings.dailyNoteFolder);
     }
     /**
@@ -9478,8 +9490,8 @@ ${body}
         });
         t.inputEl.addClass("reel-input");
       });
-      const extra = wrap.createDiv({ cls: "reel-folder-extra" });
-      extra.appendChild(preview2);
+      const extra2 = wrap.createDiv({ cls: "reel-folder-extra" });
+      extra2.appendChild(preview2);
       preview2.setText(previewLine(this.plugin.settings.dailyNotePrefix));
     }
     renderMetadata(el) {
@@ -11671,7 +11683,20 @@ ${body}
        */
       connectionHealth: {
         tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1e3, ok: true },
-        omdb: { at: FIXED_NOW - 2 * 24 * 60 * 60 * 1e3, ok: false, error: "401 Unauthorized" }
+        omdb: { at: FIXED_NOW - 2 * 24 * 60 * 60 * 1e3, ok: false, error: "401 Unauthorized" },
+        /*
+         * The two shapes a pass can now take, both present on purpose.
+         *
+         * A row that qualifies itself is longer than one that does not, and
+         * the whole point of the qualification is lost if it is the thing
+         * that overflows. Neither had ever been rendered anywhere.
+         */
+        openrouter: { at: FIXED_NOW - 40 * 60 * 1e3, ok: true, note: "$4.20 of $10.00 used" },
+        mastodon: {
+          at: FIXED_NOW - 5 * 60 * 1e3,
+          ok: true,
+          proves: "mastodon.social answered. The token is not checked here: it can only post, and Reel will not post to test it."
+        }
       },
       traktExpires: FIXED_NOW - 9 * 24 * 60 * 60 * 1e3
     });

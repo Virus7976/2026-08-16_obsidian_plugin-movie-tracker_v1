@@ -13,7 +13,7 @@
  * timezone, and not reading the clock is the only real defence.
  */
 
-import { ago, describeHealth, describeTrakt, traktState, STALE_AFTER } from "../src/health";
+import { ago, describeHealth, describeTrakt, traktState, STALE_AFTER, TESTABLE } from "../src/health";
 
 let passed = 0;
 let failed = 0;
@@ -139,6 +139,59 @@ eq("expiring this instant is expired", traktState(true, NOW, NOW).kind, "expired
 eq("a token with no recorded expiry is unknown", traktState(true, 0, NOW).kind, "unknown");
 eq("and is not treated as broken", describeTrakt(traktState(true, 0, NOW), NOW).tone, "info");
 eq("nor is undefined", traktState(true, undefined, NOW).kind, "unknown");
+
+/* ---- half an answer, labelled as half -------------------------------- */
+
+/*
+ * Mastodon can have its server checked and its token cannot: Reel asks for a
+ * token that can only post, and will not post to find out whether posting
+ * works. That makes "working" an overstatement, and the whole reason this
+ * module exists is that an overstatement here is how the original bug read.
+ */
+// Reusing the clock the rest of this suite runs on.
+const partial = { at: NOW - 60_000, ok: true, proves: "mastodon.social answered. The token is not checked here." };
+
+/*
+ * Not "ok". Carrying the caveat in the text was not enough: the row read
+ * "Working — checked 5 minutes ago. The token is not checked here" in green,
+ * and the first word is the only one somebody scanning five rows reads.
+ * `info` is what this module already gives a true-but-weaker answer.
+ */
+ok("a half-check does not claim to be working", describeHealth(partial, true, NOW).tone === "info");
+ok("and never says the word", !describeHealth(partial, true, NOW).text.startsWith("Working"));
+ok("and carries the qualification", describeHealth(partial, true, NOW).text.includes("token is not checked"));
+ok("and still says when", describeHealth(partial, true, NOW).text.includes("minute"));
+// Nothing is wrong, so it must not read as a warning either.
+ok("but is not a complaint about a correct setup", describeHealth(partial, true, NOW).tone !== "warn");
+
+// A stale qualified pass must not quietly drop the qualification.
+ok(
+	"the limit survives going stale",
+	describeHealth({ ...partial, at: NOW - STALE_AFTER - 1 }, true, NOW).text.includes("token is not checked")
+);
+
+/*
+ * `proves` before `note`: a limit on what was checked outranks an
+ * encouraging detail found inside it. Being told there is credit left is
+ * worse than useless if you have not yet been told the claim is narrow.
+ */
+const both = { at: NOW - 60_000, ok: true, proves: "Server answered.", note: "$1.00 of $10.00 used" };
+const text = describeHealth(both, true, NOW).text;
+ok("the caveat comes before the detail", text.indexOf("Server answered") < text.indexOf("$1.00"));
+// Led with, then not repeated.
+eq("the caveat is said once", text.split("Server answered").length - 1, 1);
+
+// An ordinary pass gains nothing and says nothing extra.
+eq("an unqualified pass is unchanged", describeHealth({ at: NOW, ok: true }, true, NOW).text, "Working — checked just now");
+
+/*
+ * The three that could only report "a key is present" are checkable now.
+ * Trakt is not on the list on purpose: its token states its own expiry, which
+ * is exact where a request would be suggestive.
+ */
+ok("Ask can be verified", TESTABLE.includes("openrouter"));
+ok("Mastodon can be verified", TESTABLE.includes("mastodon"));
+ok("Trakt is answered from its token instead", !TESTABLE.includes("trakt"));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

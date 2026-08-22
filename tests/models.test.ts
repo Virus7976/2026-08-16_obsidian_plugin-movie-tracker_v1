@@ -12,7 +12,7 @@
  * would reject every model released after this release.
  */
 
-import { slugProblem, parseModels, formatPrice, rankModels, CURATED } from "../src/ai/models";
+import { slugProblem, parseModels, formatPrice, rankModels, describeKey, CURATED } from "../src/ai/models";
 
 let passed = 0;
 let failed = 0;
@@ -136,6 +136,37 @@ ok("the limit is honoured", rankModels(ALL, "", 2).length === 2);
 // An unpriced model sorts last rather than sorting as free.
 const withUnknown = parseModels({ data: [{ id: "a/unpriced" }, { id: "b/cheap", pricing: { prompt: "0.000001" } }] });
 eq("an unknown price is not treated as free", rankModels(withUnknown, "")[0].id, "b/cheap");
+
+/* ---- what the key says about itself ---------------------------------- */
+
+/*
+ * An OpenRouter key that has run out of credit is not rejected. It is accepted
+ * and then fails on the question you asked, which reads as Ask being broken
+ * rather than as an account being empty. Telling those apart is the point.
+ */
+eq("spend against a limit", describeKey({ data: { usage: 4.2, limit: 10 } }), "$4.20 of $10.00 used");
+ok("a spent key says so", describeKey({ data: { usage: 10, limit: 10 } }).includes("out of credit"));
+ok("a key with room does not", !describeKey({ data: { usage: 1, limit: 10 } }).includes("out of credit"));
+
+/*
+ * `limit: null` is OpenRouter for "no cap on this key". It must not read as
+ * "no credit left", which is the opposite situation.
+ */
+eq("no cap is not no credit", describeKey({ data: { usage: 2, limit: null } }), "$2.00 used, no limit set");
+ok("free tier is mentioned", describeKey({ data: { usage: 0, limit: 0, is_free_tier: true } }).includes("free tier"));
+
+/*
+ * OpenRouter is entitled to change this shape. An unreadable answer has to
+ * come back as no answer, leaving the check saying only that the key was
+ * accepted — which is still the useful half. A settings row is not the thing
+ * that should break when a third party edits its JSON.
+ */
+eq("an unknown body says nothing", describeKey({ hello: "world" }), "");
+eq("null says nothing", describeKey(null), "");
+eq("a string says nothing", describeKey("nope"), "");
+eq("missing numbers say nothing", describeKey({ data: { label: "k" } }), "");
+// NaN and Infinity are numbers as far as typeof is concerned.
+eq("nonsense numbers say nothing", describeKey({ data: { usage: NaN, limit: 10 } }), "");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

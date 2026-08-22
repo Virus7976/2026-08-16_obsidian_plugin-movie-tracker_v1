@@ -52,6 +52,32 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.11",
+		date: "2026-08-22",
+		headline: "Ask and Mastodon can be tested, instead of only reporting that you typed something in.",
+		changes: [
+			{
+				kind: "new",
+				text: "Test connections now checks your OpenRouter key, and tells you how much credit is left on it.",
+				note: "A wrong OpenRouter key is not rejected when you save it — it is rejected when you ask a question, so the error arrives attached to the question and reads like Ask being broken. A key that has simply run out of credit behaves exactly the same way. Both are answerable before the first question.",
+			},
+			{
+				kind: "new",
+				text: "Test connections now checks your Mastodon server, and says plainly that it has not checked your token.",
+				note: "Reel asks for a token that can only post, which is the least a thing that posts can hold. The endpoint that would verify a token needs permission to read your account, so on a correctly scoped token it fails — and a check that fails on the setup Reel told you to create is worse than no check. The server address is the half people actually get wrong, and it used to fail at the moment you pressed publish on a review you had just written.",
+			},
+			{
+				kind: "better",
+				text: "A check that could only test half the question says “Checked” rather than “Working”.",
+				note: "Green, a tick and the word Working is what a scan of five rows actually reads, whatever the sentence after it says.",
+			},
+			{
+				kind: "fixed",
+				text: "A connection result is shown whenever there is one, rather than only when a key happens to be stored for it.",
+			},
+		],
+	},
+	{
 		version: "0.9.10",
 		date: "2026-08-22",
 		headline: "Ask shows its answer above the buttons, and the reasons read as writing rather than as links.",

@@ -29,13 +29,25 @@ import type { FeatureId } from "./setup";
 /**
  * The services Reel can actually check.
  *
- * Not every feature. OpenRouter, Trakt and Mastodon have no cheap test
- * request, and listing them so the table looks even would mean inventing
- * network calls to fill rows. Trakt is answered a better way anyway — its
- * token knows its own expiry, which is exact where a request would only be
- * suggestive.
+ * This list used to stop at the three metadata services, on the grounds that
+ * the rest "have no cheap test request". That was true of the code and not of
+ * the world, and it left half the features in the setup walkthrough able to
+ * report only that a key had been typed in.
+ *
+ * OpenRouter has an endpoint whose whole purpose is to describe the key you
+ * asked with, so there was never a reason for Ask to be unverifiable.
+ *
+ * Mastodon is on the list for a narrower reason and carries `proves` to say
+ * so: its server can be checked and its token cannot, because Reel asks for a
+ * token that can only post and will not post to test it. Half an answer,
+ * clearly labelled as half, beats no answer — the server address is the part
+ * people get wrong, and it currently fails at the moment you press publish.
+ *
+ * Trakt stays off the list, and not for want of an endpoint. Its token states
+ * its own expiry, which is exact where a request would only be suggestive, and
+ * that is already what the row reports.
  */
-export const TESTABLE: FeatureId[] = ["tmdb", "omdb", "dtdd"];
+export const TESTABLE: FeatureId[] = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon"];
 
 export interface HealthRecord {
 	/** When the check ran. Epoch milliseconds. */
@@ -43,6 +55,20 @@ export interface HealthRecord {
 	ok: boolean;
 	/** Why it failed, already redacted. Absent when it worked. */
 	error?: string;
+	/**
+	 * What the check established, when that is less than "this feature works".
+	 *
+	 * The whole module exists because a stored key was being reported as a
+	 * working one. A check that verifies a server but not the token sitting
+	 * behind it is that same gap in miniature, and the only thing that stops it
+	 * becoming the same lie is saying out loud which half was tested.
+	 *
+	 * Absent means the check proved the ordinary thing, and the row can say so
+	 * without qualification.
+	 */
+	proves?: string;
+	/** Anything extra worth knowing on a pass — remaining credit, say. */
+	note?: string;
 }
 
 export type HealthMap = Partial<Record<FeatureId, HealthRecord>>;
@@ -88,16 +114,46 @@ export interface Said {
  * set up is not unhealthy, and saying "never checked" about something you
  * deliberately never enabled is noise dressed as a warning.
  */
+/**
+ * The qualification, if the pass came with one.
+ *
+ * `proves` first, because a limit on what was checked outranks a detail about
+ * what was found: the reader needs to know the claim is narrow before they are
+ * told anything encouraging inside it. `withProves` is false where the caller
+ * has already led with it, so it is not said twice.
+ */
+function extra(rec: HealthRecord, withProves = true): string {
+	const said = [withProves ? rec.proves : "", rec.note].filter((s) => s && s.trim());
+	return said.length ? `. ${said.join(" ")}` : "";
+}
+
 export function describeHealth(rec: HealthRecord | undefined, configured: boolean, now: number): Said {
 	if (!configured) return { text: "Not set up", tone: "info" };
 	if (!rec) return { text: "Not checked yet", tone: "info" };
 
 	const when = ago(rec.at, now);
 	if (!rec.ok) return { text: `Failed ${when}${rec.error ? ` — ${rec.error}` : ""}`, tone: "warn" };
+	/*
+	 * A partial check does not get to say "Working".
+	 *
+	 * Carrying the caveat in the text was not enough on its own. The row read
+	 * "Working — checked 5 minutes ago. The token is not checked here", in
+	 * green, next to a tick, and the first word is the only one a person
+	 * scanning a list of five services actually reads. That is the same
+	 * overstatement this whole module was written to stop, one level up from
+	 * where it was fixed.
+	 *
+	 * Not a warning either: nothing is wrong, and flagging a correct setup
+	 * would be the opposite mistake. `info` is the register this module already
+	 * uses for a true-but-weaker answer — it is what a stale pass gets, and a
+	 * half-checked pass is weak in the same way.
+	 */
+	if (rec.proves) return { text: `Checked ${when}. ${rec.proves}${extra(rec, false)}`, tone: "info" };
+
 	// Still reported, still says when. A fortnight-old pass is evidence, just
 	// weaker evidence, and hiding it would leave the row looking unchecked.
-	if (now - rec.at > STALE_AFTER) return { text: `Worked ${when}`, tone: "info" };
-	return { text: `Working — checked ${when}`, tone: "ok" };
+	if (now - rec.at > STALE_AFTER) return { text: `Worked ${when}${extra(rec)}`, tone: "info" };
+	return { text: `Working — checked ${when}${extra(rec)}`, tone: "ok" };
 }
 
 /* ------------------------------------------------------------------ */

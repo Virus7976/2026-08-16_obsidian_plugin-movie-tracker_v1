@@ -164,3 +164,44 @@ export function rankModels(all: ModelInfo[], query: string, limit = 8): ModelInf
 		.map((x) => x.m)
 		.slice(0, limit);
 }
+
+/* ------------------------------------------------------------------ */
+/* What the key itself says about the account behind it                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * "$4.20 of $10.00 used", from OpenRouter's own account of the key.
+ *
+ * The reason this is worth showing at all: an OpenRouter key that has run out
+ * of credit is not rejected, it is *accepted* and then fails on the question
+ * you asked, which reads as Ask being broken rather than as an account being
+ * empty. The two need telling apart before the first question, not after.
+ *
+ * Pure, and forgiving of a body it does not recognise. OpenRouter is entitled
+ * to change this shape and a settings row should not be the thing that breaks
+ * when it does — an unreadable answer is reported as no answer, which leaves
+ * the check saying only that the key was accepted. That is still the useful
+ * half.
+ */
+export function describeKey(body: unknown): string {
+	const data = (body as { data?: Record<string, unknown> } | null)?.data;
+	if (!data || typeof data !== "object") return "";
+
+	const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+	const usage = num(data.usage);
+	const limit = num(data.limit);
+
+	const parts: string[] = [];
+	if (usage != null && limit != null) {
+		parts.push(`$${usage.toFixed(2)} of $${limit.toFixed(2)} used`);
+		// The number that actually predicts the next failure.
+		if (usage >= limit) parts.push("this key is out of credit");
+	} else if (usage != null) {
+		// `limit: null` is OpenRouter for "no cap on this key", which is a
+		// different statement from "no credit left" and must not read like it.
+		parts.push(`$${usage.toFixed(2)} used, no limit set`);
+	}
+	if (data.is_free_tier === true) parts.push("free tier");
+
+	return parts.join(" · ");
+}

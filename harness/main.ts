@@ -1494,6 +1494,19 @@ function settings(root: HTMLElement): void {
 		connectionHealth: {
 			tmdb: { at: FIXED_NOW - 3 * 60 * 60 * 1000, ok: true },
 			omdb: { at: FIXED_NOW - 2 * 24 * 60 * 60 * 1000, ok: false, error: "401 Unauthorized" },
+			/*
+			 * The two shapes a pass can now take, both present on purpose.
+			 *
+			 * A row that qualifies itself is longer than one that does not, and
+			 * the whole point of the qualification is lost if it is the thing
+			 * that overflows. Neither had ever been rendered anywhere.
+			 */
+			openrouter: { at: FIXED_NOW - 40 * 60 * 1000, ok: true, note: "$4.20 of $10.00 used" },
+			mastodon: {
+				at: FIXED_NOW - 5 * 60 * 1000,
+				ok: true,
+				proves: "mastodon.social answered. The token is not checked here: it can only post, and Reel will not post to test it.",
+			},
 		},
 		traktExpires: FIXED_NOW - 9 * 24 * 60 * 60 * 1000,
 	});

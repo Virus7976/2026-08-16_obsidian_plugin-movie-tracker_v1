@@ -64,6 +64,53 @@ export class MastodonClient {
 	}
 
 	/**
+	 * The server, and honestly only the server.
+	 *
+	 * Mastodon is the one feature here where a full check is not available and
+	 * saying so is the whole point.
+	 *
+	 * Reel asks you for a token scoped to `write:statuses` and nothing else,
+	 * deliberately: it is the least a thing that posts can hold. The endpoint
+	 * that would verify a token, `/accounts/verify_credentials`, needs
+	 * `read:accounts` — so on a correctly scoped token it fails. A check that
+	 * reports failure for the exact configuration Reel asked you to create is
+	 * worse than no check, and widening the scope so the test can pass would be
+	 * handing over read access to your account in order to light up a tick.
+	 *
+	 * The only thing a write-only token can do is write, and Reel will not post
+	 * something to find out whether posting works.
+	 *
+	 * So this checks what can be checked. The server URL is the half of this
+	 * setup that people actually get wrong — a typo, a defunct instance, a host
+	 * that never answers — and it fails at the moment you press publish on a
+	 * review you have just written, which is the worst moment available. That
+	 * half is now answerable in advance, and `proves` carries the other half so
+	 * the row cannot be read as more than it is.
+	 */
+	async test(): Promise<{ ok: true; proves: string } | { ok: false; error: string }> {
+		const host = this.host;
+		if (!host) return { ok: false, error: "No Mastodon server set." };
+		try {
+			const res = await requestUrl({
+				url: `https://${host}/api/v2/instance`,
+				method: "GET",
+				headers: { Accept: "application/json" },
+				throw: false,
+			});
+			if (res.status >= 400) {
+				return { ok: false, error: `${host} answered ${res.status}. Check the server address.` };
+			}
+			const title = typeof res.json?.title === "string" ? res.json.title : host;
+			return {
+				ok: true,
+				proves: `${title} answered. The token is not checked here: it can only post, and Reel will not post to test it.`,
+			};
+		} catch (e) {
+			return { ok: false, error: redact(e) };
+		}
+	}
+
+	/**
 	 * The instance's real character limit, or the default if it won't say.
 	 *
 	 * Worth one request. Instances vary from 500 up to several thousand, and

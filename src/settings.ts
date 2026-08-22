@@ -4,13 +4,13 @@ import type ReelPlugin from "./main";
 import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
 import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credentials";
-import { normaliseHost } from "./publish/mastodon";
 import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
 import { HealthMap, TESTABLE, describeHealth, describeTrakt, traktState } from "./health";
 import { CURATED, ModelInfo, formatPrice, rankModels, slugProblem } from "./ai/models";
 import { dailyStatus, previewLine, scanDaily, suggestDailyFolders } from "./util/dailynote";
+import { normaliseHost } from "./publish/mastodon";
 import { todayISO } from "./util/dates";
 import { redact } from "./secrets";
 import { SetupSheet } from "./ui/setupSheet";
@@ -884,8 +884,22 @@ export class ReelSettingTab extends PluginSettingTab {
 			health.empty();
 			const now = Date.now();
 			for (const id of TESTABLE) {
-				if (!store.has(id)) continue;
-				const said = describeHealth(this.plugin.settings.connectionHealth[id], true, now);
+				const rec = this.plugin.settings.connectionHealth[id];
+				/*
+				 * A row appears if there is a result to show, or if a key is
+				 * stored and a result is therefore expected.
+				 *
+				 * This was keyed on the stored credential alone, which was
+				 * right while every testable service was a key and stopped
+				 * being right the moment Mastodon joined the list. Mastodon is
+				 * checked by its server address, on purpose — that is the half
+				 * that can be checked — so a token is exactly the wrong thing to
+				 * ask for before showing the answer. Somebody who has typed a
+				 * server, pressed Test and not yet made a token would have had
+				 * the result recorded and never shown it.
+				 */
+				if (!rec && !store.has(id)) continue;
+				const said = describeHealth(rec, true, now);
 				const row = health.createDiv({ cls: `reel-health-row is-${said.tone}` });
 				row.createSpan({ cls: "reel-health-name", text: KEY_LABELS[id] ?? id });
 				row.createSpan({ cls: "reel-health-said", text: said.text });
@@ -1563,15 +1577,29 @@ export class ReelSettingTab extends PluginSettingTab {
 	private async runTests(): Promise<void> {
 		const store = this.plugin.credentials;
 		const at = Date.now();
-		const record = (id: FeatureId, r: { ok: true } | { ok: false; error: string }): void => {
+		const record = (
+			id: FeatureId,
+			r: { ok: true; proves?: string; note?: string } | { ok: false; error: string }
+		): void => {
 			this.plugin.settings.connectionHealth[id] = r.ok
-				? { at, ok: true }
+				? { at, ok: true, ...(r.proves ? { proves: r.proves } : {}), ...(r.note ? { note: r.note } : {}) }
 				: { at, ok: false, error: redact(r.error) };
 		};
 
 		record("tmdb", await this.plugin.tmdb.testCredentials());
 		if (store.has("omdb")) record("omdb", await this.plugin.omdb.test());
 		if (store.has("dtdd")) record("dtdd", await this.plugin.dtdd.test());
+		if (store.has("openrouter")) record("openrouter", await this.plugin.ai.test());
+
+		/*
+		 * Gated on the server, not on the token, because the server is what
+		 * this one actually checks. Someone part-way through setting Mastodon
+		 * up has typed an address and not yet made a token, and that is exactly
+		 * the moment a wrong address is cheap to fix.
+		 */
+		if (normaliseHost(this.plugin.settings.mastodonHost)) {
+			record("mastodon", await this.plugin.publish.mastodon.test());
+		}
 
 		await this.plugin.saveSettings();
 		const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);

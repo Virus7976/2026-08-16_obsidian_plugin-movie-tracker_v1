@@ -29,10 +29,11 @@
 import { requestUrl } from "obsidian";
 import type ReelPlugin from "../main";
 import { redact } from "../secrets";
-import { ModelInfo, parseModels } from "./models";
+import { ModelInfo, describeKey, parseModels } from "./models";
 
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models";
+const KEY_ENDPOINT = "https://openrouter.ai/api/v1/key";
 
 export class AiError extends Error {
 	constructor(
@@ -95,6 +96,48 @@ export class OpenRouterClient {
 			promptTokens: numberOr(raw.usage?.prompt_tokens),
 			completionTokens: numberOr(raw.usage?.completion_tokens),
 		};
+	}
+
+	/**
+	 * Does this key work, and is there anything left on it?
+	 *
+	 * Ask was one of three features whose setup could only report that a key
+	 * had been *typed in*. That is the same present-versus-working lie the
+	 * health module exists to stop telling, and it is worse here than
+	 * elsewhere, because the two ways an OpenRouter key disappoints you both
+	 * look like the plugin misbehaving:
+	 *
+	 *   - a wrong key is not rejected until you ask a question, and the error
+	 *     arrives attached to the question rather than to the key;
+	 *   - a *correct* key with no credit left behaves identically.
+	 *
+	 * `/api/v1/key` answers both before the first question, and it is the
+	 * cheapest request OpenRouter has — it is the endpoint whose entire purpose
+	 * is to describe the key you asked with.
+	 *
+	 * Unlike `send`, this does not require `aiEnabled`, for the same reason
+	 * `models` does not: you check a key while setting Ask up, which is before
+	 * you switch it on.
+	 */
+	async test(): Promise<{ ok: true; note?: string } | { ok: false; error: string }> {
+		const key = await this.plugin.credentials.getOptional("openrouter");
+		if (!key) return { ok: false, error: "No OpenRouter key saved." };
+		try {
+			const res = await requestUrl({
+				url: KEY_ENDPOINT,
+				method: "GET",
+				headers: { Authorization: `Bearer ${key}`, "X-Title": "Obsidian Reel" },
+				throw: false,
+			});
+			// Said plainly, because "401" on a settings row is not an answer.
+			if (res.status === 401) return { ok: false, error: "OpenRouter did not accept this key." };
+			if (res.status >= 400) return { ok: false, error: `OpenRouter returned ${res.status}.` };
+			return { ok: true, note: describeKey(res.json) };
+		} catch (e) {
+			// redact: the message can carry the request URL and the URL can
+			// carry the key.
+			return { ok: false, error: redact(e) };
+		}
 	}
 
 	/**
