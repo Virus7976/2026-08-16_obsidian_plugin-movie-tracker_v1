@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.30",
+		date: "2026-08-22",
+		headline: "Searching settings now hides the explanations along with the controls they describe.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "A search no longer leaves paragraphs about settings it just hid.",
+				note: "Searching \"spoiler\" gave you one matching control under three hundred pixels of prose, including a note about why IMDb is not a publishing destination, beside a list of destinations that was no longer on screen.",
+			},
+			{
+				kind: "better",
+				text: "Searching a section by name still shows all of it, prose included.",
+				note: "Asking for \"publishing\" is asking for the section; asking for \"spoiler\" is asking for a control.",
+			},
+		],
+	},
+	{
 		version: "0.9.29",
 		date: "2026-08-22",
 		headline: "The setup summary now mentions anything you started and haven't finished.",

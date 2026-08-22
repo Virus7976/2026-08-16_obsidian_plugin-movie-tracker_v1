@@ -9136,14 +9136,25 @@ ${body}
         const titled = spec.title.toLowerCase().includes(q);
         const keyed = (spec.keywords ?? "").toLowerCase().includes(q);
         let any = false;
+        let hidden = false;
         for (const row of rows2) {
           const hit = titled || (row.textContent ?? "").toLowerCase().includes(q);
           row.toggleClass("is-filtered-out", !hit);
           if (hit)
             any = true;
+          else
+            hidden = true;
         }
-        if (!any && keyed)
+        if (!any && keyed) {
           rows2.forEach((r) => r.removeClass("is-filtered-out"));
+          hidden = false;
+        }
+        const body = el.querySelector(".reel-section-body");
+        const prose = body ? Array.from(body.children).filter(
+          (c) => !c.classList.contains("setting-item") && !c.querySelector(".setting-item")
+        ) : [];
+        for (const p of prose)
+          p.toggleClass("is-filtered-out", hidden);
         const show = any || titled || keyed;
         el.toggleClass("is-filtered-out", !show);
         el.toggleClass("is-forced-open", show);
@@ -12567,6 +12578,32 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function searchIn(root, query) {
+    root.addClass("reel-view-body");
+    const before = { ...plugin.settings };
+    Object.assign(plugin.settings, { settingsOpen: [] });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+      const box = root.querySelector(".reel-settings-search input");
+      if (!box)
+        throw new Error("harness: no settings search box");
+      box.value = query;
+      box.dispatchEvent(new Event("input"));
+    } finally {
+      Object.assign(plugin.settings, before);
+    }
+  }
+  function settingsSearch(root) {
+    searchIn(root, "spoiler");
+  }
+  function settingsSearchSection(root) {
+    searchIn(root, "publishing");
+  }
+  function settingsSearchEmpty(root) {
+    searchIn(root, "zzzznothing");
+  }
   function settingsLocked(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -12639,6 +12676,9 @@ ${body}
     settings,
     settingsLocked,
     settingsFolded,
+    settingsSearch,
+    settingsSearchSection,
+    settingsSearchEmpty,
     settingsModels,
     settingsPlain,
     settingsSession,

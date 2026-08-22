@@ -620,10 +620,12 @@ export class ReelSettingTab extends PluginSettingTab {
 			const keyed = (spec.keywords ?? "").toLowerCase().includes(q);
 
 			let any = false;
+			let hidden = false;
 			for (const row of rows) {
 				const hit = titled || (row.textContent ?? "").toLowerCase().includes(q);
 				row.toggleClass("is-filtered-out", !hit);
 				if (hit) any = true;
+				else hidden = true;
 			}
 
 			/*
@@ -632,7 +634,38 @@ export class ReelSettingTab extends PluginSettingTab {
 			 * the word you searched is genuinely the subject of the section
 			 * without appearing in any of its labels.
 			 */
-			if (!any && keyed) rows.forEach((r) => r.removeClass("is-filtered-out"));
+			if (!any && keyed) {
+				rows.forEach((r) => r.removeClass("is-filtered-out"));
+				hidden = false;
+			}
+
+			/*
+			 * The prose goes with the rows it explains.
+			 *
+			 * Only the `.setting-item` rows were ever filtered, so every
+			 * paragraph in a section survived a search that hid everything it
+			 * was about. Searching "spoiler" left one matching control under
+			 * three hundred pixels of explanation — including a note saying why
+			 * IMDb is not among the destinations, beside a list of destinations
+			 * that was no longer on screen.
+			 *
+			 * Structural rather than a list of prose classes: anything that is
+			 * not a row and contains no rows. A list would be right the day it
+			 * was written and wrong the first time somebody adds a callout,
+			 * which is how the one narrow patch for `.reel-folder-extra` in the
+			 * stylesheet came to be the only case handled.
+			 *
+			 * Only when rows were actually hidden. A section matched by its
+			 * title or by a keyword shows everything, and its explanation is
+			 * part of everything.
+			 */
+			const body = el.querySelector<HTMLElement>(".reel-section-body");
+			const prose = body
+				? (Array.from(body.children) as HTMLElement[]).filter(
+						(c) => !c.classList.contains("setting-item") && !c.querySelector(".setting-item")
+					)
+				: [];
+			for (const p of prose) p.toggleClass("is-filtered-out", hidden);
 
 			// Getting started has no `.setting-item` rows at all, so it can
 			// only ever match on its name and keywords.

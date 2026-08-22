@@ -355,5 +355,46 @@ ok(
 	"one caption for two different pools says nothing"
 );
 
+/* ---- a filter has to take the explanation with it --------------------- */
+
+/*
+ * Only `.setting-item` rows were ever filtered, so every paragraph in a section
+ * survived a search that hid everything it was about. Searching "spoiler" left
+ * one matching control sitting under three hundred pixels of prose — including
+ * a note explaining why IMDb is not among the publishing destinations, beside a
+ * list of destinations that was no longer on screen.
+ *
+ * The stylesheet already carried one narrow patch for this, for the folder
+ * suggestion chips. One case handled, and the general shape missed.
+ */
+ok(
+	"prose is filtered along with the rows",
+	/reel-section-body/.test(settingsCode) && /toggleClass\("is-filtered-out", hidden\)/.test(settingsCode),
+	"a search hides the controls and leaves the paragraphs describing them"
+);
+
+/*
+ * Structural, not a list of prose classes. A list is right the day it is
+ * written and wrong the first time somebody adds a callout, which is exactly
+ * how the folder-chip patch came to be the only case covered.
+ */
+ok(
+	"and decided by shape rather than by class name",
+	/!c\.querySelector\("\.setting-item"\)/.test(settingsCode),
+	"anything wrapping a control would be hidden with the prose, taking a matching row with it"
+);
+
+/*
+ * Only when rows were actually hidden. Asking for "publishing" is asking for
+ * the section, so you get all of it; asking for "spoiler" is asking for a
+ * control. The two differ by one boolean and would be easy to get backwards in
+ * a way nothing else would notice.
+ */
+ok(
+	"a whole-section match keeps its explanation",
+	/hidden = false;/.test(settingsCode),
+	"a keyword match un-hides the rows and would leave the prose hidden beside them"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

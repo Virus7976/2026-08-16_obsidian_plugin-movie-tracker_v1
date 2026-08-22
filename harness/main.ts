@@ -2002,6 +2002,65 @@ function settingsFolded(root: HTMLElement): void {
 	}
 }
 
+/**
+ * Settings, filtered by a search.
+ *
+ * Forty-nine controls behind a search box, three different match strengths,
+ * sections forced open, rows hidden individually — and no scene had ever typed
+ * anything into it. The whole feature existed only in its unfiltered state.
+ *
+ * Driven by dispatching a real input event rather than by setting the private
+ * query field, so what runs is the listener the app installs.
+ */
+function searchIn(root: HTMLElement, query: string): void {
+	root.addClass("reel-view-body");
+	const before = { ...plugin.settings };
+	Object.assign(plugin.settings, { settingsOpen: [] });
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+		const box = root.querySelector(".reel-settings-search input") as HTMLInputElement | null;
+		if (!box) throw new Error("harness: no settings search box");
+		box.value = query;
+		box.dispatchEvent(new Event("input"));
+	} finally {
+		Object.assign(plugin.settings, before);
+	}
+}
+
+/*
+ * A keyword hit. "spoiler" is one of Publishing's keywords and also appears in
+ * a row inside it, so this exercises the ordinary case: one section survives,
+ * forced open, with most of its rows hidden.
+ */
+function settingsSearch(root: HTMLElement): void {
+	searchIn(root, "spoiler");
+}
+
+/**
+ * A search that names a whole section.
+ *
+ * The other side of the prose rule. Asking for "publishing" is asking for the
+ * section, so you get all of it — every row and every paragraph — where asking
+ * for "spoiler" is asking for a control and the explanation of the controls it
+ * hid would only be in the way. The two cases differ by one boolean and it
+ * would be easy to get backwards in a way nothing else would notice.
+ */
+function settingsSearchSection(root: HTMLElement): void {
+	searchIn(root, "publishing");
+}
+
+/**
+ * A search that finds nothing.
+ *
+ * The screen goes blank below the box, which reads as a crash rather than as an
+ * answer — so there is an element that says so, and it had never been drawn.
+ */
+function settingsSearchEmpty(root: HTMLElement): void {
+	searchIn(root, "zzzznothing");
+}
+
 function settingsLocked(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const before = { ...plugin.settings };
@@ -2085,6 +2144,9 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	settings,
 	settingsLocked,
 	settingsFolded,
+	settingsSearch,
+	settingsSearchSection,
+	settingsSearchEmpty,
 	settingsModels,
 	settingsPlain,
 	settingsSession,
