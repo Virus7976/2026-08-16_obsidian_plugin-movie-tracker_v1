@@ -15241,10 +15241,34 @@ button.reel-facet-tab {
 	gap: var(--reel-space-3);
 }
 
+/*
+ * The head was the only part of a guide with no padding of its own.
+ *
+ * Every other block on this screen pads itself — the numbered steps, the
+ * "what leaves your vault" band, the status line — so their text sits about
+ * fourteen pixels in. The title, the sentence explaining what the feature
+ * gives you, and the effort line had nothing, so on a 375px phone they alone
+ * ran flush into both edges of the screen. Nothing measured it, because
+ * nothing overflowed: the text is inside its box, and the box is the width of
+ * the phone.
+ */
 .reel-setup-head {
 	display: flex;
 	flex-direction: column;
 	gap: var(--reel-space-1);
+	padding-inline: var(--reel-space-3);
+}
+
+/*
+ * ...and the status band steps back out to the full width.
+ *
+ * It carries its own padding and a left border, so inheriting the head's would
+ * indent its text twice and leave it the only line on the screen in a
+ * different column from the rest. Bleeding it back out puts the band flush
+ * with the bands above and below it and its text exactly where theirs is.
+ */
+.reel-setup-health {
+	margin-inline: calc(var(--reel-space-3) * -1);
 }
 
 .reel-setup-title {
@@ -15921,6 +15945,32 @@ button.reel-facet-tab {
 .reel-setup-health.is-warn {
 	color: var(--reel-warn);
 	border-left-color: var(--reel-warn);
+}
+
+/*
+ * The status, and the button that refreshes it.
+ *
+ * Stacked rather than side by side. Mastodon's line has to say that the server
+ * answered and that the token was not checked, which is two clauses that
+ * cannot be shortened without losing the part that stops the row overstating
+ * itself — and a button beside it on a 375px phone would leave that sentence
+ * about eight characters wide.
+ *
+ * `align-self: flex-start` because the button is sized to its own words. A
+ * column of full-width buttons is what this screen looked like before the
+ * accent was rationed, and "Check now" is not the primary action here; the way
+ * out of the guide is.
+ */
+.reel-setup-check {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--reel-space-2);
+}
+
+.reel-setup-check-btn {
+	align-self: flex-start;
+	flex: 0 0 auto;
 }
 
 

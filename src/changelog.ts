@@ -52,6 +52,33 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.13",
+		date: "2026-08-22",
+		headline: "Every setup guide can now check itself, on the spot.",
+		changes: [
+			{
+				kind: "new",
+				text: "A Check now button in each guide, which tests just that feature and updates its status in place.",
+				note: "Verification used to live on a different screen from setup, behind one button that tested all six services at once. Finishing a walkthrough meant closing it and going to look for something else in order to find out whether the key you had just pasted was right.",
+			},
+			{
+				kind: "new",
+				text: "Mastodon can be checked as soon as you have typed a server, before you have made a token.",
+				note: "The server address is what people actually get wrong, and that is the cheapest moment to find out.",
+			},
+			{
+				kind: "fixed",
+				text: "A guide's title and description no longer run into both edges of the screen.",
+				note: "Every other block on that screen pads itself — the numbered steps, the privacy note, the status line — so the head was the only text sitting flush against the phone. Nothing caught it, because nothing overflowed: the text was inside its box, and the box was the width of the phone.",
+			},
+			{
+				kind: "better",
+				text: "Test connections runs its checks at once rather than one after another.",
+				note: "Three services became six, and they share no rate limit and no dependency, so waiting for each in turn bought nothing but the wait.",
+			},
+		],
+	},
+	{
 		version: "0.9.12",
 		date: "2026-08-22",
 		headline: "A Trakt session you revoked no longer says you are signed in.",

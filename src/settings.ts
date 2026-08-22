@@ -7,6 +7,7 @@ import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credent
 import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
+import { checkAll } from "./checks";
 import {
 	HealthMap,
 	HealthInputs,
@@ -1599,41 +1600,13 @@ export class ReelSettingTab extends PluginSettingTab {
 	 * than a Notice ever had.
 	 */
 	private async runTests(): Promise<void> {
-		const store = this.plugin.credentials;
-		const at = Date.now();
-		const record = (
-			id: FeatureId,
-			r: { ok: true; proves?: string; note?: string } | { ok: false; error: string }
-		): void => {
-			this.plugin.settings.connectionHealth[id] = r.ok
-				? { at, ok: true, ...(r.proves ? { proves: r.proves } : {}), ...(r.note ? { note: r.note } : {}) }
-				: { at, ok: false, error: redact(r.error) };
-		};
-
-		record("tmdb", await this.plugin.tmdb.testCredentials());
-		if (store.has("omdb")) record("omdb", await this.plugin.omdb.test());
-		if (store.has("dtdd")) record("dtdd", await this.plugin.dtdd.test());
-		if (store.has("openrouter")) record("openrouter", await this.plugin.ai.test());
-
 		/*
-		 * Gated on the server, not on the token, because the server is what
-		 * this one actually checks. Someone part-way through setting Mastodon
-		 * up has typed an address and not yet made a token, and that is exactly
-		 * the moment a wrong address is cheap to fix.
+		 * The routing lives in `checks.ts` so the setup guides can run the same
+		 * check on one feature. This used to be the only place in the plugin
+		 * that knew how to verify anything, which put verification on a
+		 * different screen from configuration.
 		 */
-		if (normaliseHost(this.plugin.settings.mastodonHost)) {
-			record("mastodon", await this.plugin.publish.mastodon.test());
-		}
-
-		/*
-		 * Only when signed in. Testing a sign-in nobody has made would record a
-		 * failure about a state you are not in, and "Not signed in" is already
-		 * what the row says.
-		 */
-		if (store.has("trakt")) record("trakt", await this.plugin.publish.trakt.test());
-
-		await this.plugin.saveSettings();
-		const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);
+		const failed = await checkAll(this.plugin, Date.now());
 		new Notice(failed.length ? `Reel: ${failed.length} connection check failed.` : "Reel: all connections working.");
 	}
 

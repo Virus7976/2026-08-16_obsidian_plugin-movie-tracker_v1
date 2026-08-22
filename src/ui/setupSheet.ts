@@ -43,6 +43,7 @@ import type ReelPlugin from "../main";
 import type { FeatureSpec, SetupStep } from "../setup";
 import { isConfigured, isPartial } from "../setup";
 import { featureHealth } from "../health";
+import { checkFeature, checkable } from "../checks";
 
 export class SetupSheet extends Modal {
 	private ticked = new Set<number>();
@@ -98,10 +99,7 @@ export class SetupSheet extends Modal {
 		 * only the question you were not asking — how to set it up, which you
 		 * already did.
 		 */
-		if (done) {
-			const said = this.healthLine();
-			if (said) head.createDiv({ cls: `reel-setup-health is-${said.tone}`, text: said.text });
-		}
+		this.renderHealth(head, done);
 
 		// Not a disclosure buried behind a link. If a feature sends something
 		// out of the vault, the sentence saying so is on the screen where you
@@ -109,6 +107,61 @@ export class SetupSheet extends Modal {
 		const sends = root.createDiv({ cls: "reel-setup-sends" });
 		sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
 		sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
+	}
+
+	/**
+	 * What this connection last did, and a way to find out now.
+	 *
+	 * Opening a guide for something already set up is almost always because it
+	 * has stopped working, and the guide used to answer only the question you
+	 * were not asking — how to set it up, which you already did.
+	 *
+	 * The button is the other half of that. Verification lived on a different
+	 * screen from configuration, behind one control that tested all six
+	 * services at once, so finishing this walkthrough meant closing it and
+	 * going to look for something else in order to learn whether the key you
+	 * had just pasted was right.
+	 *
+	 * Shown when the feature is set up *or* merely checkable, which are not the
+	 * same thing and the difference is the point. Mastodon is checked by its
+	 * server address rather than its token, so somebody who has typed a server
+	 * and not yet made a token can find out the address is wrong — which is
+	 * both the commonest mistake and the cheapest moment to fix it.
+	 */
+	private renderHealth(head: HTMLElement, done: boolean): void {
+		const can = checkable(this.plugin, this.spec.id);
+		if (!done && !can) return;
+
+		const said = this.healthLine();
+		if (!said && !can) return;
+
+		const wrap = head.createDiv({ cls: "reel-setup-check" });
+		const line = wrap.createDiv({ cls: "reel-setup-health" });
+
+		const draw = (): void => {
+			const now = this.healthLine();
+			line.setText(now?.text ?? "");
+			line.className = `reel-setup-health is-${now?.tone ?? "info"}`;
+		};
+		draw();
+
+		if (!can) return;
+
+		const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
+		btn.addEventListener("click", async () => {
+			btn.disabled = true;
+			btn.setText("Checking…");
+			try {
+				await checkFeature(this.plugin, this.spec.id, Date.now());
+				// checkFeature records the result but does not persist — the
+				// bulk run saves once at the end rather than once per check.
+				await this.plugin.saveSettings();
+			} finally {
+				btn.disabled = false;
+				btn.setText("Check now");
+				draw();
+			}
+		});
 	}
 
 	/**

@@ -1,12 +1,12 @@
 {
 	"name": "obsidian-reel",
-	"version": "0.9.12",
+	"version": "0.9.13",
 	"description": "Track films and series in your Obsidian vault with TMDB metadata. Mobile-first.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:filters && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot && npm run test:reviews && npm run test:publish && npm run test:ask && npm run test:publishguard && npm run test:settingsuse && npm run test:setup && npm run test:folders && npm run test:health && npm run test:models && npm run test:dailynote && npm run test:errorclass",
+		"test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:filters && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot && npm run test:reviews && npm run test:publish && npm run test:ask && npm run test:publishguard && npm run test:settingsuse && npm run test:setup && npm run test:folders && npm run test:health && npm run test:models && npm run test:dailynote && npm run test:errorclass && npm run test:checks",
 		"test:content": "esbuild tests/content.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.content.cjs --log-level=error && node tests/.content.cjs",
 		"test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
 		"test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
@@ -48,6 +48,7 @@
 		"test:publishguard": "esbuild tests/publishguard.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.publishguard.cjs --log-level=error && node tests/.publishguard.cjs",
 		"test:settingsuse": "esbuild tests/settingsuse.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.settingsuse.cjs --log-level=error && node tests/.settingsuse.cjs",
 		"test:errorclass": "esbuild tests/errorclass.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.errorclass.cjs --log-level=error && node tests/.errorclass.cjs",
+		"test:checks": "esbuild tests/checks.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.checks.cjs --log-level=error && node tests/.checks.cjs",
 		"test:setup": "esbuild tests/setup.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.setup.cjs --log-level=error && node tests/.setup.cjs",
 		"test:folders": "esbuild tests/folders.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.folders.cjs --log-level=error && node tests/.folders.cjs",
 		"test:health": "esbuild tests/health.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.health.cjs --log-level=error && node tests/.health.cjs",

@@ -1126,7 +1126,7 @@
       return;
     }
     const menu = new Menu();
-    const run = (job) => void job.catch((e) => new Notice(`Reel: ${redact(e)}`));
+    const run2 = (job) => void job.catch((e) => new Notice(`Reel: ${redact(e)}`));
     menu.addItem(
       (i) => i.setTitle("Open").setIcon("panel-right-open").onClick(() => {
         if (onSelect)
@@ -1139,12 +1139,12 @@
       (i) => i.setTitle(entry.rating != null ? "Change rating" : "Rate").setIcon("star").onClick(() => new QuickRate(plugin2, entry, file).open())
     );
     menu.addItem(
-      (i) => i.setTitle(entry.liked ? "Unlike" : "Like").setIcon("heart").onClick(() => run(plugin2.notes.toggleLiked(file).then((on) => plugin2.undo.offer(on ? "Liked" : "Unliked"))))
+      (i) => i.setTitle(entry.liked ? "Unlike" : "Like").setIcon("heart").onClick(() => run2(plugin2.notes.toggleLiked(file).then((on) => plugin2.undo.offer(on ? "Liked" : "Unliked"))))
     );
     if (entry.status === "watchlist") {
       menu.addItem(
         (i) => i.setTitle("Mark watched").setIcon("check").onClick(
-          () => run(
+          () => run2(
             plugin2.notes.setStatus(file, entry.type === "tv" ? "watching" : "watched").then(() => plugin2.undo.offer(`${entry.title} marked watched`))
           )
         )
@@ -1152,7 +1152,7 @@
     } else {
       menu.addItem(
         (i) => i.setTitle("Move to watchlist").setIcon("bookmark").onClick(
-          () => run(
+          () => run2(
             plugin2.notes.setStatus(file, "watchlist").then(() => plugin2.undo.offer(`${entry.title} moved to the watchlist`))
           )
         )
@@ -8061,6 +8061,69 @@ ${body}
     return describeHealth(inputs.records[id], true, now);
   }
 
+  // src/publish/mastodon.ts
+  function normaliseHost(raw) {
+    let host = (raw ?? "").trim();
+    if (!host)
+      return "";
+    host = host.replace(/^https?:\/\//i, "");
+    host = host.split("/")[0];
+    if (host.includes("@"))
+      host = host.slice(host.lastIndexOf("@") + 1);
+    return host.toLowerCase();
+  }
+
+  // src/checks.ts
+  function checkable(plugin2, id) {
+    if (!TESTABLE.includes(id))
+      return false;
+    switch (id) {
+      case "tmdb":
+        return true;
+      case "mastodon":
+        return Boolean(normaliseHost(plugin2.settings.mastodonHost));
+      default:
+        return plugin2.credentials.has(id);
+    }
+  }
+  async function run(plugin2, id) {
+    switch (id) {
+      case "tmdb":
+        return plugin2.tmdb.testCredentials();
+      case "omdb":
+        return plugin2.omdb.test();
+      case "dtdd":
+        return plugin2.dtdd.test();
+      case "openrouter":
+        return plugin2.ai.test();
+      case "mastodon":
+        return plugin2.publish.mastodon.test();
+      case "trakt":
+        return plugin2.publish.trakt.test();
+      default:
+        return { ok: false, error: "Nothing to check." };
+    }
+  }
+  async function checkFeature(plugin2, id, now) {
+    if (!checkable(plugin2, id))
+      return null;
+    let out;
+    try {
+      out = await run(plugin2, id);
+    } catch (e) {
+      out = { ok: false, error: redact(e) };
+    }
+    const rec = out.ok ? { at: now, ok: true, ...out.proves ? { proves: out.proves } : {}, ...out.note ? { note: out.note } : {} } : { at: now, ok: false, error: redact(out.error) };
+    plugin2.settings.connectionHealth[id] = rec;
+    return rec;
+  }
+  async function checkAll(plugin2, now) {
+    const ids = TESTABLE.filter((id) => checkable(plugin2, id));
+    await Promise.all(ids.map((id) => checkFeature(plugin2, id, now)));
+    await plugin2.saveSettings();
+    return ids.filter((id) => plugin2.settings.connectionHealth[id]?.ok === false);
+  }
+
   // src/ai/models.ts
   var SLUG = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*(:[a-z0-9][a-z0-9._-]*)?$/;
   function slugProblem(raw) {
@@ -8163,18 +8226,6 @@ ${body}
     return `${prefix.trim() || "- Watched"} [[${example}]]`;
   }
 
-  // src/publish/mastodon.ts
-  function normaliseHost(raw) {
-    let host = (raw ?? "").trim();
-    if (!host)
-      return "";
-    host = host.replace(/^https?:\/\//i, "");
-    host = host.split("/")[0];
-    if (host.includes("@"))
-      host = host.slice(host.lastIndexOf("@") + 1);
-    return host.toLowerCase();
-  }
-
   // src/ui/setupSheet.ts
   var SetupSheet = class extends Modal {
     constructor(app2, plugin2, spec, onDone) {
@@ -8209,14 +8260,60 @@ ${body}
       });
       head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
       head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
-      if (done) {
-        const said = this.healthLine();
-        if (said)
-          head.createDiv({ cls: `reel-setup-health is-${said.tone}`, text: said.text });
-      }
+      this.renderHealth(head, done);
       const sends = root.createDiv({ cls: "reel-setup-sends" });
       sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
       sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
+    }
+    /**
+     * What this connection last did, and a way to find out now.
+     *
+     * Opening a guide for something already set up is almost always because it
+     * has stopped working, and the guide used to answer only the question you
+     * were not asking — how to set it up, which you already did.
+     *
+     * The button is the other half of that. Verification lived on a different
+     * screen from configuration, behind one control that tested all six
+     * services at once, so finishing this walkthrough meant closing it and
+     * going to look for something else in order to learn whether the key you
+     * had just pasted was right.
+     *
+     * Shown when the feature is set up *or* merely checkable, which are not the
+     * same thing and the difference is the point. Mastodon is checked by its
+     * server address rather than its token, so somebody who has typed a server
+     * and not yet made a token can find out the address is wrong — which is
+     * both the commonest mistake and the cheapest moment to fix it.
+     */
+    renderHealth(head, done) {
+      const can = checkable(this.plugin, this.spec.id);
+      if (!done && !can)
+        return;
+      const said = this.healthLine();
+      if (!said && !can)
+        return;
+      const wrap = head.createDiv({ cls: "reel-setup-check" });
+      const line = wrap.createDiv({ cls: "reel-setup-health" });
+      const draw2 = () => {
+        const now = this.healthLine();
+        line.setText(now?.text ?? "");
+        line.className = `reel-setup-health is-${now?.tone ?? "info"}`;
+      };
+      draw2();
+      if (!can)
+        return;
+      const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.setText("Checking\u2026");
+        try {
+          await checkFeature(this.plugin, this.spec.id, Date.now());
+          await this.plugin.saveSettings();
+        } finally {
+          btn.disabled = false;
+          btn.setText("Check now");
+          draw2();
+        }
+      });
     }
     /**
      * Null for the features nothing can honestly report on.
@@ -9306,25 +9403,7 @@ ${body}
      * than a Notice ever had.
      */
     async runTests() {
-      const store = this.plugin.credentials;
-      const at = Date.now();
-      const record = (id, r) => {
-        this.plugin.settings.connectionHealth[id] = r.ok ? { at, ok: true, ...r.proves ? { proves: r.proves } : {}, ...r.note ? { note: r.note } : {} } : { at, ok: false, error: redact(r.error) };
-      };
-      record("tmdb", await this.plugin.tmdb.testCredentials());
-      if (store.has("omdb"))
-        record("omdb", await this.plugin.omdb.test());
-      if (store.has("dtdd"))
-        record("dtdd", await this.plugin.dtdd.test());
-      if (store.has("openrouter"))
-        record("openrouter", await this.plugin.ai.test());
-      if (normaliseHost(this.plugin.settings.mastodonHost)) {
-        record("mastodon", await this.plugin.publish.mastodon.test());
-      }
-      if (store.has("trakt"))
-        record("trakt", await this.plugin.publish.trakt.test());
-      await this.plugin.saveSettings();
-      const failed = TESTABLE.filter((id) => this.plugin.settings.connectionHealth[id]?.ok === false);
+      const failed = await checkAll(this.plugin, Date.now());
       new Notice(failed.length ? `Reel: ${failed.length} connection check failed.` : "Reel: all connections working.");
     }
     /**
@@ -10758,10 +10837,10 @@ ${body}
   }
   var all = [...LIBRARY, SHOW, ...AWKWARD, LONG_SHOW];
   var pool = all;
-  function withPool(rows2, run) {
+  function withPool(rows2, run2) {
     pool = rows2;
     try {
-      run();
+      run2();
     } finally {
       pool = all;
     }
