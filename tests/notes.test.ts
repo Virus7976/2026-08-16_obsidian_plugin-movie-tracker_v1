@@ -37,8 +37,25 @@ function ok(cond: boolean, label: string) {
 /* A vault just real enough                                            */
 /* ------------------------------------------------------------------ */
 
-function makeVault(notes: { path: string; body?: string; fm?: Record<string, unknown> }[] = []) {
+function makeVault(
+	notes: { path: string; body?: string; fm?: Record<string, unknown> }[] = [],
+	opts: { enrich?: boolean } = {}
+) {
 	const files = new Map<string, { file: TFile; body: string; fm: Record<string, unknown> }>();
+	/*
+	 * Every credential lookup enrichment makes, recorded.
+	 *
+	 * `enrichNow` asks `credentials.has("dtdd")` unconditionally, so one entry
+	 * here means enrichment ran and none means it did not — which is the only
+	 * way to tell from outside, since the work is fire-and-forget and its whole
+	 * effect on a stub vault is nothing.
+	 *
+	 * This is also why the suite used to print three "enrichment failed"
+	 * warnings: the stub sets `enrich: false`, enrichment ran regardless, and
+	 * reached for a `credentials` object that was never stubbed. The noise was
+	 * the bug reporting itself, and it was read as an incomplete fixture.
+	 */
+	const credentialChecks: string[] = [];
 
 	const add = (path: string, body = "", fm: Record<string, unknown> = {}) => {
 		const file = new TFile();
@@ -92,7 +109,7 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 			peopleFolder: "People",
 			noteTemplate: "",
 			ratingScale: 5,
-			enrich: false,
+			enrich: opts.enrich ?? false,
 			downloadPosters: false,
 			linkPeople: false,
 			castLimit: 10,
@@ -112,6 +129,13 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 			},
 		},
 		posters: { cache: async () => null },
+		credentials: {
+			has: (name: string) => {
+				credentialChecks.push(name);
+				return false;
+			},
+			getOptional: async () => null,
+		},
 		undo: {
 			record: (file: TFile, label: string) => undone.push(label),
 			recordCreation: (file: TFile, label: string) => undone.push(label),
@@ -138,6 +162,7 @@ function makeVault(notes: { path: string; body?: string; fm?: Record<string, unk
 		count: () => files.size,
 		fetches: () => fetched,
 		undoable: () => undone,
+		enrichRan: () => credentialChecks.includes("dtdd"),
 	};
 }
 
@@ -358,6 +383,44 @@ async function main(): Promise<void> {
 		const after = v.undoable().length;
 		await v.notes.setRating(file, 4.5);
 		eq(v.undoable().length, after, "setting the rating it already had records nothing");
+	}
+
+	/* ---- "Enrich new notes automatically" has to mean something -------- */
+
+	{
+		/*
+		 * The setting was dead. It had a default, a toggle and a paragraph of
+		 * copy, and both creation paths called `enrich` unconditionally — so
+		 * switching it off still fired OMDb and DoesTheDogDie requests after
+		 * every title added, on behalf of someone who had just declined them.
+		 *
+		 * Asserted from both sides, because only one of them is the bug and
+		 * only the other proves the fix did not simply disable the feature.
+		 */
+		const off = makeVault([], { enrich: false });
+		await off.notes.createFromResult({ id: 550, media_type: "movie" }, { date: "2026-08-16", watchlist: true });
+		// Fire-and-forget: let the queued microtasks drain before asking.
+		await new Promise((r) => setTimeout(r, 0));
+		eq(off.enrichRan(), false, "enrichment is skipped when the setting is off");
+
+		const on = makeVault([], { enrich: true });
+		await on.notes.createFromResult({ id: 550, media_type: "movie" }, { date: "2026-08-16", watchlist: true });
+		await new Promise((r) => setTimeout(r, 0));
+		eq(on.enrichRan(), true, "and runs when it is on");
+	}
+
+	{
+		/*
+		 * The setting says "automatically", and that word is load-bearing.
+		 *
+		 * The two Fetch commands are the user asking for enrichment in so many
+		 * words. Having the toggle silence those too would be a different
+		 * setting than the one described, and would leave no way to enrich a
+		 * title at all without first going to Settings and back.
+		 */
+		const v = makeVault([{ path: "Movies/Heat.md" }], { enrich: false });
+		await v.notes.enrich(v.file("Movies/Heat.md"), { title: "Heat", year: 1995 });
+		eq(v.enrichRan(), true, "an explicit Fetch still enriches with the setting off");
 	}
 
 	{

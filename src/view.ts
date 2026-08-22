@@ -26,6 +26,7 @@ import { redact } from "./secrets";
 import { renderStarsStatic } from "./ui/stars";
 import { renderEmpty } from "./ui/empty";
 import { paintReviews } from "./ui/reviewPane";
+import { openAsk } from "./ui/askSheet";
 import { paintHero, heroSubject } from "./ui/hero";
 import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
@@ -955,6 +956,28 @@ export class ReelView extends ItemView {
 		open.createSpan({ text: "Filters" });
 		if (set.length) open.createSpan({ cls: "reel-filter-count", text: String(set.length) });
 		open.addEventListener("click", () => this.openFilters(showSort));
+
+		/*
+		 * Ask, beside the filters, because that is what it is.
+		 *
+		 * It shipped reachable only from the command palette, which on a phone
+		 * is three taps and a keyboard — for the feature whose entire pitch is
+		 * describing a mood in one sentence. Here it sits next to Filters, where
+		 * you already are when the question is \u201cwhat should I watch\u201d.
+		 *
+		 * Only when a key exists. A chip that opens a panel explaining why it
+		 * cannot work is worse than no chip, and Filters is not a shelf for
+		 * advertising features you have not set up.
+		 */
+		if (this.plugin.ai.configured) {
+			const askBtn = bar.createEl("button", {
+				cls: "reel-chip reel-ask-btn",
+				attr: { type: "button", "aria-label": "Ask for something to watch" },
+			});
+			setIcon(askBtn.createSpan({ cls: "reel-filter-btn-icon" }), "sparkles");
+			askBtn.createSpan({ text: "Ask" });
+			askBtn.addEventListener("click", () => openAsk(this.plugin, (entry) => this.openDetail(entry)));
+		}
 
 		if (showSort) {
 			this.paintSortControls(bar);

@@ -16,7 +16,7 @@ import { reportFailure, offline } from "./ui/failure";
 import { PeopleStore } from "./people";
 import { PublishService } from "./publish";
 import { OpenRouterClient } from "./ai/openrouter";
-import { AskSheet } from "./ui/askSheet";
+import { openAsk } from "./ui/askSheet";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
 import { RecipeSheet } from "./ui/recipeSheet";
@@ -382,15 +382,15 @@ export default class ReelPlugin extends Plugin {
 		 *
 		 * It costs money per use and depends on a key most installs will never
 		 * have, and a tab that is empty-or-broken for everybody who has not set it
-		 * up is worse than no tab. The Library toolbar grows a button once a key
-		 * exists; until then this is the only way in, and it is the right amount
-		 * of way in.
+		 * up is worse than no tab. The Library's filter bar grows an Ask chip
+		 * once a key exists — see `paintFilterBar` — and this command covers the
+		 * keyboard and the rest of the app.
 		 */
 		this.addCommand({
 			id: "ask",
 			name: "Ask for something to watch",
 			icon: "sparkles",
-			callback: () => new AskSheet(this.app, this, (entry) => void this.openDetail(entry)).open(),
+			callback: () => openAsk(this, (entry) => void this.openDetail(entry)),
 		});
 
 		/*

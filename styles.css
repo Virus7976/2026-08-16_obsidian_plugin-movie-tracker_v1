@@ -8650,7 +8650,20 @@ input.reel-input {
 
 /* The button that holds everything not currently set. Outlined rather than
    filled: it is a way in, not a statement about the list. */
-.reel-filter-btn {
+/*
+ * Ask shares this rule rather than copying it.
+ *
+ * It is the same object — an icon and a word in a pill, sitting in the same
+ * row — and it shipped without any of this, so the icon butted straight into
+ * the label and read as "✦Ask". The gap is 0.35em here and would have been
+ * some other number in a second rule written later.
+ *
+ * Only the layout is shared. The sticky rules further down pin Filters to the
+ * left edge while the rest of the bar scrolls under it, and a second sticky
+ * chip would park itself on top of the first.
+ */
+.reel-filter-btn,
+.reel-ask-btn {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.35em;

@@ -22,7 +22,7 @@
  * quietly bills you is one you are right not to trust.
  */
 
-import { App, Modal, Notice, Platform, setIcon } from "obsidian";
+import { App, Modal, Platform, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { ask, type AskResult } from "../ai/find";
@@ -273,10 +273,14 @@ function list(items: string[]): string {
 	return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/** Convenience for the command palette and the toolbar button. */
+/**
+ * The one way to open Ask, used by both things that open it.
+ *
+ * It used to fire a Notice first when no key was configured, which duplicated
+ * — badly, in eight words — the paragraph the sheet itself renders explaining
+ * what Ask sends and where. Two copies of the same explanation is how one of
+ * them ends up wrong; the sheet's is the better one, so it is the only one.
+ */
 export function openAsk(plugin: ReelPlugin, onOpenEntry: (entry: Entry) => void, seed = ""): void {
-	if (!plugin.settings.aiEnabled && !plugin.credentials.has("openrouter")) {
-		new Notice("Reel: Ask needs an OpenRouter key. Settings → Reel → Ask.", 6000);
-	}
 	new AskSheet(plugin.app, plugin, onOpenEntry, seed).open();
 }

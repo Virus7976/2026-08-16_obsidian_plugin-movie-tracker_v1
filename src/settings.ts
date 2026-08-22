@@ -114,13 +114,22 @@ export interface ReelSettings {
 	publishMastodon: boolean;
 	/** Which instance to post to, e.g. "mastodon.social". Not a secret. */
 	mastodonHost: string;
-	/**
-	 * Show the exact text, and where it is going, before anything is sent.
+	/*
+	 * There is deliberately no "skip the confirmation" setting.
 	 *
-	 * On by default and worth leaving on. A post is not undoable the way the
-	 * rest of Reel is: deleting it later does not un-read it.
+	 * 0.9.0 shipped one — `publishConfirm`, defaulting to true, with a toggle
+	 * in this very section — and nothing anywhere read it. The sheet confirmed
+	 * unconditionally, which was the correct behaviour attached to a lie: a
+	 * control that claims to govern something it does not.
+	 *
+	 * The fix is not to wire it up. Publishing is the one irreversible,
+	 * outward-facing thing this plugin does, the confirmation *is* the feature
+	 * rather than a speed bump in front of it, and a setting whose only purpose
+	 * is to remove it should not exist to be found later by someone in a hurry.
+	 * So the switch is gone and the guarantee is unconditional — and
+	 * `tests/publishguard.test.ts` now asserts that the sheet cannot be
+	 * bypassed, which is a much better home for the promise than a boolean.
 	 */
-	publishConfirm: boolean;
 	/** Send the star rating to Trakt alongside the review. */
 	publishRatings: boolean;
 	/** Appended to a Mastodon post, e.g. "#film #letterboxd". */
@@ -191,7 +200,6 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	publishTrakt: false,
 	publishMastodon: false,
 	mastodonHost: "",
-	publishConfirm: true,
 	publishRatings: true,
 	publishHashtags: "",
 	publishSpoilerDefault: true,
@@ -534,17 +542,12 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		if (!this.plugin.publish.anyEnabled) return;
 
-		new Setting(el)
-			.setName("Confirm before posting")
-			.setDesc(
-				"Show the exact text, and where it's going, before anything is sent. Worth leaving on: deleting a post later doesn't un-read it."
-			)
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.publishConfirm).onChange(async (v) => {
-					this.plugin.settings.publishConfirm = v;
-					await this.plugin.saveSettings();
-				})
-			);
+		el.createDiv({
+			cls: "reel-settings-note reel-dim",
+			text:
+				"There's no switch to skip the confirmation. Publishing is the one thing Reel does that can't be " +
+				"undone, so the sheet showing you the exact text is the feature rather than a step in front of it.",
+		});
 
 		new Setting(el)
 			.setName("Publish ratings too")

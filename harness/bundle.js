@@ -7921,7 +7921,6 @@ ${body}
     publishTrakt: false,
     publishMastodon: false,
     mastodonHost: "",
-    publishConfirm: true,
     publishRatings: true,
     publishHashtags: "",
     publishSpoilerDefault: true,
@@ -8744,6 +8743,9 @@ ${body}
     open.createSpan({ text: "Filters" });
     if (active.length)
       open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
+    const ask2 = bar.createEl("button", { cls: "reel-chip reel-ask-btn" });
+    ask2.createSpan({ cls: "reel-filter-btn-icon", text: "\u2726" });
+    ask2.createSpan({ text: "Ask" });
     if (sort) {
       const sel = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
       sel.createEl("option", { text: "Recently watched" });

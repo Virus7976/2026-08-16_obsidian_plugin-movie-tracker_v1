@@ -85,7 +85,12 @@ export class NoteWriter {
 		this.plugin.undo.recordCreation(file, `adding ${meta.title}`);
 		// Enrichment runs after the note exists, so a slow or missing
 		// third-party service delays extra fields rather than the note itself.
-		void this.enrich(file, { title: meta.title, year, imdbId: str(meta.external_ids?.imdb_id ?? meta.imdb_id) });
+		void this.enrich(file, {
+			title: meta.title,
+			year,
+			imdbId: str(meta.external_ids?.imdb_id ?? meta.imdb_id),
+			auto: true,
+		});
 		return file;
 	}
 
@@ -118,6 +123,7 @@ export class NoteWriter {
 			title: meta.name,
 			year: yearOf(meta.first_air_date),
 			imdbId: str(meta.external_ids?.imdb_id),
+			auto: true,
 		});
 		return file;
 	}
@@ -421,7 +427,27 @@ export class NoteWriter {
 	private creating = new Map<string, Promise<TFile>>();
 	private enrichDepth = 0;
 
-	async enrich(file: TFile, opts: { title: string; year?: number; imdbId?: string }): Promise<void> {
+	async enrich(file: TFile, opts: { title: string; year?: number; imdbId?: string; auto?: boolean }): Promise<void> {
+		/*
+		 * "Enrich new notes automatically" has to actually govern them.
+		 *
+		 * It did not. The setting existed, defaulted on, and had a toggle with
+		 * a sentence of copy under it — and both creation paths called this
+		 * method unconditionally, so turning it off changed nothing at all.
+		 * Reel went on making OMDb and DoesTheDogDie requests after every title
+		 * added, on behalf of someone who had just said not to. That is the
+		 * worst version of a dead setting: it is not a preference being
+		 * ignored, it is third-party network calls that were declined.
+		 *
+		 * The guard lives here rather than at the two call sites on purpose.
+		 * Gating the callers is what produced the bug — a third automatic path
+		 * added later would silently not be gated, and nothing would look
+		 * wrong. `auto` is the caller saying "this one is on Reel's initiative,
+		 * not the user's", which is precisely the distinction the setting
+		 * makes, so the two explicit Fetch commands still work with it off.
+		 */
+		if (opts.auto && !this.plugin.settings.enrich) return;
+
 		// Reset the chain when it drains, so a long session doesn't hold a
 		// promise link per title ever added.
 		this.enrichDepth++;

@@ -514,6 +514,19 @@ function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElemen
 	open.createSpan({ text: "Filters" });
 	if (active.length) open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
 
+	/*
+	 * Ask, which the view draws here once an OpenRouter key exists.
+	 *
+	 * Drawn unconditionally in the rig, because the row with it is the wider
+	 * one and the width is the whole question this screen is measured on. The
+	 * comment further down records this bar drifting from the app once before;
+	 * it drifted again the day Ask shipped, and a replica nobody updates is a
+	 * green tick for a layout that no longer exists.
+	 */
+	const ask = bar.createEl("button", { cls: "reel-chip reel-ask-btn" });
+	ask.createSpan({ cls: "reel-filter-btn-icon", text: "✦" });
+	ask.createSpan({ text: "Ask" });
+
 	// Sort and layout share the row rather than owning one each. Three stacked
 	// rows of controls above two posters is a control panel with a preview pane
 	// attached, which is what the device screenshot showed.

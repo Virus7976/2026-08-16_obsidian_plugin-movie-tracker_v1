@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.2",
+		date: "2026-08-21",
+		headline: "Turning off automatic enrichment now actually turns it off.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "\u201cEnrich new notes automatically\u201d works. With it off, adding a title no longer calls OMDb and DoesTheDogDie anyway.",
+				note: "The setting has existed for a long time and nothing ever read it, so switching it off changed nothing at all \u2014 Reel kept making third-party requests on behalf of someone who had just declined them. The two Fetch commands still work with it off, since asking for enrichment outright is not the same as it happening automatically.",
+			},
+			{
+				kind: "new",
+				text: "Ask has a button in the Library, next to Filters, instead of living only in the command palette.",
+				note: "Three taps and a keyboard was a strange way in for the feature whose whole pitch is describing a mood in one sentence. It appears only once an OpenRouter key exists.",
+			},
+			{
+				kind: "fixed",
+				text: "Removed the \u201cConfirm before posting\u201d switch, which governed nothing.",
+				note: "It shipped in 0.9.0 with a default and a toggle and was read by no code: the confirmation always happened. Rather than wire up a way to skip it, the switch is gone and the guarantee is unconditional \u2014 a review is never posted without you reading the exact text first.",
+			},
+		],
+	},
+	{
 		version: "0.9.1",
 		date: "2026-08-21",
 		headline: "Every filter chip carries its own count, so the size of your watchlist is just there.",
