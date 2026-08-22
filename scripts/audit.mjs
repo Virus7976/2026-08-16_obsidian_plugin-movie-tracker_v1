@@ -131,7 +131,7 @@ try {
 	// vault and vice versa, and Reel has no theme rules of its own — which is
 	// correct, and exactly why nobody has ever checked that the variables
 	// carry it.
-	for (const { phone, dark, pane, keyboard, palette } of [
+	for (const { phone, dark, pane, keyboard, palette, scale } of [
 		{ phone: 1, dark: 0 },
 		{ phone: 1, dark: 1 },
 		{ phone: 0, dark: 0 },
@@ -180,6 +180,19 @@ try {
 		 */
 		{ phone: 1, dark: 0, palette: "warm-light" },
 		{ phone: 1, dark: 1, palette: "warm-dark" },
+		/*
+		 * The same phone, for somebody who has turned the text up.
+		 *
+		 * Obsidian has a text size slider and every pass above sits at its
+		 * default, so each of them proves the layout at exactly one size. Two
+		 * faults reached a photo of a real phone that way: a feature's
+		 * description cut off mid-word inside its row, and the paragraph under
+		 * the list overlapped by the row above it.
+		 *
+		 * 1.35 is near the top of what the slider offers, which is the point.
+		 * A size somebody actually uses and no check had ever rendered.
+		 */
+		{ phone: 1, dark: 0, scale: 1.35 },
 	]) {
 		const page = await browser.newPage();
 		// A real phone viewport, and a desktop one — the compact layout is a
@@ -191,7 +204,8 @@ try {
 		// ask different questions of the same layout.
 		const kbArg = keyboard ? "&keyboard=1" : "";
 		const palArg = palette ? `&palette=${palette}` : "";
-		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}${paneArg}${kbArg}${palArg}`, {
+		const scaleArg = scale ? `&scale=${scale}` : "";
+		await page.goto(`http://localhost:${PORT}/harness/?audit=1&phone=${phone}&dark=${dark}${paneArg}${kbArg}${palArg}${scaleArg}`, {
 			waitUntil: "networkidle0",
 		});
 
@@ -201,7 +215,9 @@ try {
 		// reports zero checks as a pass.
 		await page.waitForFunction(() => window.REEL_AUDIT, { timeout: 60_000 });
 		const result = await page.evaluate(() => window.REEL_AUDIT);
-		const label = palette
+		const label = scale
+			? `phone 375x812 — text at ${Math.round(scale * 100)}%`
+			: palette
 			? `phone 375x812 — ${palette} palette`
 			: pane
 				? `docked pane ${pane}px in 1280x900 ${dark ? "dark" : "light"}`

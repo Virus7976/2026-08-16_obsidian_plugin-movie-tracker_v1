@@ -10927,7 +10927,7 @@ ${body}
     const first = view.querySelector(
       ".reel-cell, .reel-row, .reel-upnext-row, .reel-chart, .reel-tile, .reel-hero, .reel-recipe-seed, .reel-dcard, .reel-drow-card"
     );
-    if (first && !opts.keyboard) {
+    if (first && !opts.keyboard && !opts.scale) {
       const top = first.getBoundingClientRect().top;
       check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round(top / vh * 100)}%`);
     }
@@ -12829,6 +12829,20 @@ ${body}
   document.body.classList.toggle("theme-dark", params2.get("dark") === "1");
   document.body.classList.toggle("theme-light", params2.get("dark") !== "1");
   document.body.setAttribute("data-palette", params2.get("palette") ?? "neutral");
+  var textScale = Number(params2.get("scale") ?? "") || 1;
+  if (textScale !== 1) {
+    const root = document.documentElement.style;
+    for (const [token, px] of [
+      ["--font-ui-smaller", 12],
+      ["--font-ui-small", 13],
+      ["--font-ui-medium", 15],
+      ["--font-ui-large", 20],
+      ["--font-ui-larger", 24]
+    ]) {
+      root.setProperty(token, `${Math.round(px * textScale)}px`);
+    }
+    document.body.style.fontSize = `${Math.round(16 * textScale)}px`;
+  }
   function mountObsidianChrome(app2) {
     if (!phone2)
       return;
@@ -12903,7 +12917,7 @@ ${e?.stack ?? ""}` });
       }
       const view = mount(app2, name);
       await settled(view);
-      results.push({ screen: name, checks: auditScreen(view, { phone: phone2, keyboard }) });
+      results.push({ screen: name, checks: auditScreen(view, { phone: phone2, keyboard, scale: textScale !== 1 }) });
       view.remove();
     }
     const failures = results.flatMap((r) => r.checks.filter((c) => !c.ok).map((c) => ({ ...c, screen: r.screen })));

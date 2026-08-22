@@ -250,6 +250,46 @@ body {
 }
 
 /*
+ * The same, for the buttons that are not `.reel-btn`.
+ *
+ * The rule below was written for controls that look like buttons. It was
+ * never extended to the ones that do not: a settings section header and a
+ * feature row are each a single `<button>` so the whole row is tappable, and
+ * nothing about them was ever meant to look like a button at all.
+ *
+ * They inherited the host's anyway, and two photographs of the real app show
+ * what that costs. On the phone, `white-space: nowrap` reached every word
+ * inside the row — it inherits — so each feature's description stopped
+ * wrapping, ran out past the chevron and overlapped the paragraph below the
+ * list. On the desktop the settings tab came back as a column of grey pills
+ * with centred labels and their text printed across the row beneath, because
+ * a bare button there also carries a background and a fixed `height`, and
+ * content taller than one input row spills straight out of it.
+ *
+ * None of it could be seen here. The harness gave bare buttons nothing at
+ * all, so the layout was proved against a host that does not exist. What this
+ * restores is exactly that tested baseline — the null appearance every one of
+ * these rows was designed against — rather than any new opinion.
+ *
+ * `:where()` contributes no specificity, so this weighs the same as the
+ * host's own `button` rule and wins only because Reel's stylesheet loads
+ * second. Every real rule in this file, `.reel-btn` included, still beats it.
+ * A reset that outranked the thing it is protecting would be the worse bug.
+ */
+:where(.reel-view, .reel-modal, .reel-settings) button {
+	height: auto;
+	text-align: inherit;
+	white-space: normal;
+	background: none;
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	line-height: inherit;
+}
+
+/*
  * Reel's buttons state their own appearance rather than inheriting it.
  *
  * Left to inherit, a theme with a decorative button style — raised edges,
@@ -3877,15 +3917,31 @@ input.reel-input {
 	overflow: hidden;
 }
 
+/*
+ * Three actions across, until they cannot be.
+ *
+ * `flex: 1` gives a basis of zero, and an item whose basis is zero still
+ * cannot shrink under its own text — `min-width` is `auto` on a flex item.
+ * With nowhere to go and no permission to wrap, the row simply ran off the
+ * side: at Obsidian's larger text sizes the three buttons reached 386px on a
+ * 375px screen, and the page scrolled sideways.
+ *
+ * An equal basis instead of zero fixes it without moving anything at the
+ * default size. All three still start from the same width and grow by the
+ * same amount, so they stay equal thirds; but the basis is now a real number
+ * the wrap can be decided against, and at a larger text size they drop onto a
+ * second line rather than off the screen.
+ */
 .reel-quickcard-actions {
 	display: flex;
+	flex-wrap: wrap;
 	gap: var(--reel-space-2);
 	width: 100%;
 	margin-top: 4px;
 }
 
 .reel-quickcard-actions .reel-btn {
-	flex: 1;
+	flex: 1 1 6em;
 	min-height: 46px;
 	font-weight: 600;
 }

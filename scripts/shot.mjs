@@ -125,7 +125,11 @@ if (args.includes("--console")) {
 // the whole point of the palette passes is that this differs.
 const palette = args.find((a) => a.startsWith("--palette="))?.slice(10) ?? "";
 const palArg = palette ? `&palette=${palette}` : "";
-await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}${palArg}&probeMax=${probeMax}`, {
+// Obsidian's text size slider, so a screen can be looked at the way somebody
+// who turned it up actually sees it.
+const shotScale = flag("scale", "");
+const scaleArg = shotScale ? `&scale=${shotScale}` : "";
+await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}${palArg}${scaleArg}&probeMax=${probeMax}`, {
 	waitUntil: "networkidle0",
 });
 

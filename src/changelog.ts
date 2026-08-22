@@ -52,6 +52,27 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.35",
+		date: "2026-08-22",
+		headline: "The settings screen stops borrowing Obsidian's button styling.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "On the desktop, the settings tab no longer renders as a column of grey pills with their labels centred and their text printed across the row below.",
+				note: "Reel builds each section header and each feature row as one button, so the whole row can be tapped. A bare button in Obsidian carries a background and a fixed height, and anything taller than one row spilled straight out of it onto whatever came next.",
+			},
+			{
+				kind: "fixed",
+				text: "On the phone, each feature's description wraps again instead of being cut off mid-word.",
+				note: "Obsidian stops text wrapping inside a button, and that setting reaches every word inside it. The descriptions ran out past the arrow and over the paragraph underneath the list.",
+			},
+			{
+				kind: "fixed",
+				text: "With Obsidian's text size turned up, the three buttons under a Discover suggestion wrap onto a second line instead of running off the side of the screen.",
+			},
+		],
+	},
+	{
 		version: "0.9.34",
 		date: "2026-08-22",
 		headline: "A walkthrough stops calling itself set up when its last check failed.",

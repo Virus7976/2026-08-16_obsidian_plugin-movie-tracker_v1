@@ -2385,6 +2385,40 @@ document.body.classList.toggle("theme-light", params.get("dark") !== "1");
 document.body.setAttribute("data-palette", params.get("palette") ?? "neutral");
 
 /*
+ * Obsidian's text size setting, which nothing here has ever moved.
+ *
+ * Every pass renders at 16px with the UI tokens at their defaults, so every
+ * layout in this plugin has only ever been proved at one text size. That is
+ * not a test of the layout, for the same reason the neutral palette was not a
+ * test of the colours: it holds one variable fixed and calls the result
+ * general.
+ *
+ * It let two faults through to a photograph of a real phone. On the settings
+ * screen at a larger size, each feature's one-line description ran out of its
+ * row and was cut mid-word, and the paragraph below the list was overlapped by
+ * the row above it. Both are the ordinary shape of a text-size bug: something
+ * sized for the text it happened to be given.
+ *
+ * The tokens are scaled rather than the root font size, because that is what
+ * Obsidian does — its slider moves the UI scale, and a rule reading
+ * `--font-ui-small` has to see the number the app would really hand it.
+ */
+const textScale = Number(params.get("scale") ?? "") || 1;
+if (textScale !== 1) {
+	const root = document.documentElement.style;
+	for (const [token, px] of [
+		["--font-ui-smaller", 12],
+		["--font-ui-small", 13],
+		["--font-ui-medium", 15],
+		["--font-ui-large", 20],
+		["--font-ui-larger", 24],
+	] as const) {
+		root.setProperty(token, `${Math.round(px * textScale)}px`);
+	}
+	document.body.style.fontSize = `${Math.round(16 * textScale)}px`;
+}
+
+/*
  * Obsidian's own mobile chrome, at the sizes it really uses.
  *
  * The harness rendered `.reel-view` into a bare page. The app wraps it in a
@@ -2610,7 +2644,7 @@ async function runAudit(app: HTMLElement): Promise<void> {
 		}
 		const view = mount(app, name);
 		await settled(view);
-		results.push({ screen: name, checks: auditScreen(view, { phone, keyboard }) });
+		results.push({ screen: name, checks: auditScreen(view, { phone, keyboard, scale: textScale !== 1 }) });
 		view.remove();
 	}
 

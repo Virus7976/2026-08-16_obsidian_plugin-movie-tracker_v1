@@ -392,3 +392,47 @@ body.theme-dark {
 .setting-item.is-disabled {
 	opacity: 0.5;
 }
+
+/*
+ * What the host does to bare elements, which this file had never modelled.
+ *
+ * Reel does not render into a blank page. It renders into somebody else's
+ * app, and that app styles bare tags — so every `<button>`, `<input>` and
+ * `<select>` Reel creates arrives already carrying rules it never asked for.
+ * This stylesheet reproduced Obsidian's *variables* faithfully and its element
+ * rules not at all, which made the harness kinder than the real thing in
+ * exactly the places a plugin gets hurt.
+ *
+ * `white-space` is the one that bit. It inherits, so a rule on `button`
+ * reaches every text node inside a button — and Reel builds whole rows as
+ * buttons so the entire row is tappable. On a real phone each feature's
+ * description stopped wrapping, ran out of its row, printed under the chevron
+ * and overlapped the paragraph below the list. Nothing here could see it: the
+ * harness let the text wrap, so it fitted, so every check passed.
+ *
+ * Kept as a permanent part of the simulated host rather than a one-off pass.
+ * It is not a hostile edge case, it is what the app actually does.
+ */
+button {
+	white-space: nowrap;
+	/*
+	 * The rest of what the host does to a bare button, read off two
+	 * photographs of the real app rather than guessed at.
+	 *
+	 * On desktop the settings tab came back as a column of grey pills with
+	 * their labels centred and their text printed across the row beneath —
+	 * which is not "unstyled", it is precisely the host's own button, applied
+	 * to elements Reel builds as buttons so the whole row is tappable. The
+	 * fixed `height` is the part that overlaps: content taller than one input
+	 * row spills straight out of the box and lands on whatever is next.
+	 *
+	 * Every property here has to be one Reel then overrides deliberately. That
+	 * is the point of modelling it: a rule Reel forgets to set is a rule the
+	 * host is setting for it.
+	 */
+	height: var(--input-height, 32px);
+	padding: 4px 12px;
+	text-align: center;
+	background-color: var(--interactive-normal, #e3e3e3);
+	border-radius: 6px;
+}

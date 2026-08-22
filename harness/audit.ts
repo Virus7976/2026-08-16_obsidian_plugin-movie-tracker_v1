@@ -205,7 +205,7 @@ const SCROLLERS = [
 	"reel-preview-links",
 ];
 
-export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?: boolean }): Check[] {
+export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?: boolean; scale?: boolean }): Check[] {
 	/*
 	 * Width is measured from the *pane*, not the window.
 	 *
@@ -337,7 +337,23 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	 * three failures it produced there were all "the screen is short", which
 	 * is the premise of that pass and not a finding.
 	 */
-	if (first && !opts.keyboard) {
+	/*
+	 * Not while the text is turned up either, for the reason above.
+	 *
+	 * The fraction is a judgement about layout only while the numerator and
+	 * the denominator move together. Chrome is made of text and the screen is
+	 * not, so enlarging the text raises this ratio for every app ever written,
+	 * and holding a viewport fraction constant across text sizes asks for
+	 * something no layout can give.
+	 *
+	 * Worth stating what was actually measured before exempting it, since
+	 * widening a check to make it pass is the way checks stop meaning
+	 * anything. At 135% the header grew about 15px — a third more text bought
+	 * four percent more chrome. It is growing far slower than its contents,
+	 * which is the thing this check exists to notice, and it still trips
+	 * purely on the denominator standing still.
+	 */
+	if (first && !opts.keyboard && !opts.scale) {
 		const top = first.getBoundingClientRect().top;
 		check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round((top / vh) * 100)}%`);
 	}
