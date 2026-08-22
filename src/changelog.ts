@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.33",
+		date: "2026-08-22",
+		headline: "Remove, on a film's page, no longer looks switched off.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The Remove button on a film's page now has an outline, like the buttons beside it.",
+				note: "It had no fill and no edge in a row of four buttons that had both, which is exactly how this plugin draws a control you cannot press. It stays grey rather than red until you tap it once — that part was deliberate and has not changed.",
+			},
+		],
+	},
+	{
 		version: "0.9.32",
 		date: "2026-08-22",
 		headline: "The button that confirms a deletion now looks like a button.",
