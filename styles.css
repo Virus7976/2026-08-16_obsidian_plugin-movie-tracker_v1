@@ -14635,3 +14635,41 @@ button.reel-facet-tab {
 	margin: var(--reel-space-2) 0 var(--reel-space-3);
 	max-width: 62ch;
 }
+
+
+/* ==================================================================== */
+/* The number on a filter chip                                          */
+/* ==================================================================== */
+
+/*
+ * "How many films are on my watchlist" was answerable and not visible.
+ *
+ * You could tick the Watchlist chip and read "Show 23 titles" at the bottom of
+ * the sheet — but that is a question you have to already be asking, and the
+ * point of a count is seeing it without asking. Now every Type and Status chip
+ * carries its own, so the whole shape of the library reads at a glance.
+ *
+ * A margin rather than a flex gap, deliberately. `.reel-chip` is a plain inline
+ * button shared by six screens, and switching it to `inline-flex` to gain a gap
+ * would change how every one of them lays out for the sake of four pixels here.
+ *
+ * `tabular-nums` because a column of chips with counts of 9, 47 and 132 should
+ * not have its labels shifting by fractions of a character.
+ */
+.reel-chip-count {
+	margin-inline-start: 6px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--font-ui-smaller);
+}
+
+/*
+ * On a ticked chip the count sits on the accent fill, where `--text-muted` is
+ * a theme colour chosen against the page background and can fall to almost
+ * nothing. Inheriting the chip's own resolved colour keeps it legible on
+ * whatever the active state turns out to be, on any theme.
+ */
+.reel-chip.is-active .reel-chip-count {
+	color: inherit;
+	opacity: 0.75;
+}

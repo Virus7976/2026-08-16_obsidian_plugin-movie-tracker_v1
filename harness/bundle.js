@@ -1377,15 +1377,18 @@
     const perMonth = watched.length && monthsCovered(watched.map((v) => v.date));
     if (perMonth && perMonth > 1)
       tile("Films per month", (watched.length / perMonth).toFixed(1));
-    const watchlist = all2.filter((e) => e.status === "watchlist").length;
-    if (watchlist) {
+    const queued = all2.filter((e) => e.status === "watchlist");
+    if (queued.length) {
+      const queuedFilms = queued.filter((e) => e.type === "film").length;
+      const queuedShows = queued.length - queuedFilms;
       const rate2 = perMonth ? watched.length / perMonth : 0;
-      tile(
-        "On the watchlist",
-        String(watchlist),
-        rate2 > 0 ? `${Math.ceil(watchlist / rate2)} months at this pace` : void 0,
-        show("On the watchlist", all2.filter((e) => e.status === "watchlist"))
-      );
+      const split = [
+        queuedFilms ? `${queuedFilms} film${queuedFilms === 1 ? "" : "s"}` : "",
+        queuedShows ? `${queuedShows} series` : ""
+      ].filter(Boolean).join(", ");
+      const pace = rate2 > 0 ? `${Math.ceil(queued.length / rate2)} months at this pace` : "";
+      const sub = [split, pace].filter(Boolean).join(" \xB7 ") || void 0;
+      tile("On the watchlist", String(queued.length), sub, show("On the watchlist", queued));
     }
     const unrated = films.filter((e) => e.rating == null && e.watched.length).length;
     if (unrated)
@@ -7223,8 +7226,16 @@ ${body}
         box.createDiv({ cls: "reel-filter-label", text: label });
         return box.createDiv({ cls: "reel-chips reel-filter-chips" });
       };
-      const one = (into, label, active, onClick) => {
-        const b = into.createEl("button", { cls: "reel-chip", text: label, attr: { type: "button" } });
+      const withCount = (b, label, n2) => {
+        b.setText(label);
+        if (n2 == null)
+          return;
+        b.createSpan({ cls: "reel-chip-count", text: String(n2) });
+        b.setAttr("aria-label", `${label}, ${n2} title${n2 === 1 ? "" : "s"}`);
+      };
+      const one = (into, label, active, onClick, count) => {
+        const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        withCount(b, label, count);
         setSelected(b, active);
         b.addEventListener("click", () => {
           onClick();
@@ -7232,8 +7243,9 @@ ${body}
           this.redraw();
         });
       };
-      const many = (into, label, set, value) => {
-        const b = into.createEl("button", { cls: "reel-chip", text: label, attr: { type: "button" } });
+      const many = (into, label, set, value, count) => {
+        const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        withCount(b, label, count);
         setSelected(b, set.includes(value));
         b.addEventListener("click", () => {
           toggle(set, value);
@@ -7248,14 +7260,21 @@ ${body}
         ["film", "Films"],
         ["tv", "Series"]
       ]) {
-        one(kinds, label, this.filters.type === value, () => this.filters.type = value);
+        one(
+          kinds,
+          label,
+          this.filters.type === value,
+          () => this.filters.type = value,
+          value === "all" ? this.opts.pool.length : this.opts.pool.filter((e) => e.type === value).length
+        );
       }
       const pool2 = narrow(this.opts.pool, { ...this.filters, statuses: [], genres: [], lists: [] });
       const statuses = [...new Set(pool2.map((e) => e.status))].filter(Boolean).sort();
       if (statuses.length > 1) {
         const row = section("Status");
-        for (const s of statuses)
-          many(row, s, this.filters.statuses, s);
+        for (const s of statuses) {
+          many(row, s, this.filters.statuses, s, pool2.filter((e) => matchesStatus(e, s)).length);
+        }
       }
       const genres = [...new Set(pool2.flatMap((e) => e.genres))].filter(Boolean).sort();
       if (genres.length > 1) {

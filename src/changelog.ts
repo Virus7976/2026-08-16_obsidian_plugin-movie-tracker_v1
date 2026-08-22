@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.1",
+		date: "2026-08-21",
+		headline: "Every filter chip carries its own count, so the size of your watchlist is just there.",
+		changes: [
+			{
+				kind: "new",
+				text: "The Type and Status chips in Filters show how many titles each one holds \u2014 \u201cFilms 36\u201d, \u201cwatchlist 4\u201d.",
+				note: "It was answerable before: tick the chip, read \u201cShow 4 titles\u201d at the bottom. But that is a question you have to already be asking, and the point of a count is seeing it without asking.",
+			},
+			{
+				kind: "better",
+				text: "The watchlist tile in Stats splits films from series \u2014 \u201c12 films, 6 series\u201d \u2014 alongside how long the backlog runs at your current pace.",
+				note: "One number covering both described an evening very differently depending on which you were planning.",
+			},
+			{
+				kind: "fixed",
+				text: "Status counts agree with what the chip actually shows when you tap it.",
+				note: "Counting the raw labels would have printed a number next to \u201cwatched\u201d that the filter then disagreed with, since watched and completed are answered from your logged dates and episode progress rather than from a label.",
+			},
+		],
+	},
+	{
 		version: "0.9.0",
 		date: "2026-08-21",
 		headline: "Your reviews can leave the vault, and you can ask for something to watch in your own words.",

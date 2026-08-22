@@ -424,16 +424,37 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 	const perMonth = watched.length && monthsCovered(watched.map((v) => v.date));
 	if (perMonth && perMonth > 1) tile("Films per month", (watched.length / perMonth).toFixed(1));
 
-	const watchlist = all.filter((e) => e.status === "watchlist").length;
-	if (watchlist) {
-		// At your current pace, how long is the backlog?
+	/*
+	 * The backlog, split the way people actually ask about it.
+	 *
+	 * "How many films are on my watchlist" is a different question from "how
+	 * big is my watchlist", and a single number answered neither well — a
+	 * count of 60 covering 12 films and 48 series describes an evening very
+	 * differently depending on which you were planning.
+	 *
+	 * The pace line stays, but only when there is a pace to speak of. It is
+	 * the more interesting fact when it exists, and an invented one when it
+	 * does not, so the split takes the subtitle when there is no history to
+	 * divide by.
+	 */
+	const queued = all.filter((e) => e.status === "watchlist");
+	if (queued.length) {
+		const queuedFilms = queued.filter((e) => e.type === "film").length;
+		const queuedShows = queued.length - queuedFilms;
+
 		const rate = perMonth ? watched.length / perMonth : 0;
-		tile(
-			"On the watchlist",
-			String(watchlist),
-			rate > 0 ? `${Math.ceil(watchlist / rate)} months at this pace` : undefined,
-			show("On the watchlist", all.filter((e) => e.status === "watchlist"))
-		);
+		const split = [
+			queuedFilms ? `${queuedFilms} film${queuedFilms === 1 ? "" : "s"}` : "",
+			queuedShows ? `${queuedShows} series` : "",
+		]
+			.filter(Boolean)
+			.join(", ");
+		const pace = rate > 0 ? `${Math.ceil(queued.length / rate)} months at this pace` : "";
+		// Both when both are worth saying; the split alone when there is no
+		// watch history to compute a pace from.
+		const sub = [split, pace].filter(Boolean).join(" \u00b7 ") || undefined;
+
+		tile("On the watchlist", String(queued.length), sub, show("On the watchlist", queued));
 	}
 
 	const unrated = films.filter((e) => e.rating == null && e.watched.length).length;

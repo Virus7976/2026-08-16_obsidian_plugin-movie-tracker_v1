@@ -1,12 +1,12 @@
 {
 	"name": "obsidian-reel",
-	"version": "0.9.0",
+	"version": "0.9.1",
 	"description": "Track films and series in your Obsidian vault with TMDB metadata. Mobile-first.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:filters && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot && npm run test:reviews && npm run test:publish && npm run test:ask",
+		"test": "npm run test:logic && npm run test:crypto && npm run test:content && npm run test:mutations && npm run test:legacy && npm run test:prune && npm run test:importer && npm run test:library && npm run test:notes && npm run test:posters && npm run test:undo && npm run test:swatch && npm run test:failure && npm run test:suggest && npm run test:milestones && npm run test:blend && npm run test:cachekey && npm run test:filters && npm run test:roving && npm run test:settingsguard && npm run test:gesture && npm run test:snapshot && npm run test:reviews && npm run test:publish && npm run test:ask && npm run test:publishguard",
 		"test:content": "esbuild tests/content.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.content.cjs --log-level=error && node tests/.content.cjs",
 		"test:logic": "esbuild tests/selftest.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.selftest.cjs --log-level=error && node tests/.selftest.cjs",
 		"test:crypto": "esbuild tests/crypto.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.crypto.cjs --log-level=error && node tests/.crypto.cjs",
@@ -44,7 +44,8 @@
 		"test:snapshot": "esbuild tests/snapshot.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.snapshot.cjs --log-level=error && node tests/.snapshot.cjs",
 		"test:reviews": "esbuild tests/reviews.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.reviews.cjs --log-level=error && node tests/.reviews.cjs",
 		"test:publish": "esbuild tests/publish.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.publish.cjs --log-level=error && node tests/.publish.cjs",
-		"test:ask": "esbuild tests/ask.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.ask.cjs --log-level=error && node tests/.ask.cjs"
+		"test:ask": "esbuild tests/ask.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.ask.cjs --log-level=error && node tests/.ask.cjs",
+		"test:publishguard": "esbuild tests/publishguard.test.ts --bundle --platform=node --format=cjs --alias:obsidian=./tests/obsidian-stub.ts --outfile=tests/.publishguard.cjs --log-level=error && node tests/.publishguard.cjs"
 	},
 	"keywords": [
 		"obsidian",

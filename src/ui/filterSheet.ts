@@ -272,9 +272,36 @@ export class FilterSheet extends Modal {
 			return box.createDiv({ cls: "reel-chips reel-filter-chips" });
 		};
 
+		/**
+		 * The number on a chip.
+		 *
+		 * Written as its own element rather than into the label, so it can be
+		 * dimmed and so a screen reader announces "Watchlist, 23 titles" rather
+		 * than the string "Watchlist 23".
+		 *
+		 * This is the answer to "how many films are on my watchlist", put where
+		 * the question is actually asked. It was answerable before — tick the
+		 * chip, read the count at the bottom — but that is a question you have
+		 * to already suspect the answer to, and the whole point of a number is
+		 * being able to see it without asking.
+		 */
+		const withCount = (b: HTMLElement, label: string, n: number | undefined): void => {
+			b.setText(label);
+			if (n == null) return;
+			b.createSpan({ cls: "reel-chip-count", text: String(n) });
+			b.setAttr("aria-label", `${label}, ${n} title${n === 1 ? "" : "s"}`);
+		};
+
 		/** A chip that switches one of several exclusive values. */
-		const one = (into: HTMLElement, label: string, active: boolean, onClick: () => void): void => {
-			const b = into.createEl("button", { cls: "reel-chip", text: label, attr: { type: "button" } });
+		const one = (
+			into: HTMLElement,
+			label: string,
+			active: boolean,
+			onClick: () => void,
+			count?: number
+		): void => {
+			const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+			withCount(b, label, count);
 			setSelected(b, active);
 			b.addEventListener("click", () => {
 				onClick();
@@ -291,8 +318,15 @@ export class FilterSheet extends Modal {
 		 * left it. That is the difference between ticking four genres in four
 		 * taps and ticking one, scrolling back down, ticking another.
 		 */
-		const many = (into: HTMLElement, label: string, set: string[], value: string): void => {
-			const b = into.createEl("button", { cls: "reel-chip", text: label, attr: { type: "button" } });
+		const many = (
+			into: HTMLElement,
+			label: string,
+			set: string[],
+			value: string,
+			count?: number
+		): void => {
+			const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+			withCount(b, label, count);
 			setSelected(b, set.includes(value));
 			b.addEventListener("click", () => {
 				toggle(set, value);
@@ -308,7 +342,33 @@ export class FilterSheet extends Modal {
 			["film", "Films"],
 			["tv", "Series"],
 		] as const) {
-			one(kinds, label, this.filters.type === value, () => (this.filters.type = value));
+			/*
+			 * Counted against this section's own pool, like every other count
+			 * in the sheet — not against the filters as they currently stand.
+			 *
+			 * The first version did the latter, on the reasoning that a number
+			 * should predict the tap. Rendered, it was plainly wrong: "Films 3"
+			 * sat directly above "watched 34", because Type was being narrowed
+			 * by two ticked genres and Status was not. Two rows of numbers
+			 * computed against different pools, four millimetres apart, read as
+			 * a bug however defensible each one is alone.
+			 *
+			 * So a count follows the same rule as the chip it sits on. Status
+			 * chips are built from the pool after Type, and count that way;
+			 * Type chips are built from everything, and count that way. The
+			 * button at the bottom is the one that answers "what will I get" —
+			 * it is labelled "Show N titles" and it is the only number here
+			 * that moves with every filter at once.
+			 */
+			one(
+				kinds,
+				label,
+				this.filters.type === value,
+				() => (this.filters.type = value),
+				value === "all"
+					? this.opts.pool.length
+					: this.opts.pool.filter((e) => e.type === value).length
+			);
 		}
 
 		// Built from the pool as it stands *after* Type, so a chip is never
@@ -321,7 +381,19 @@ export class FilterSheet extends Modal {
 		const statuses = [...new Set(pool.map((e) => e.status))].filter(Boolean).sort();
 		if (statuses.length > 1) {
 			const row = section("Status");
-			for (const s of statuses) many(row, s, this.filters.statuses, s);
+			/*
+			 * Counted with `matchesStatus`, not `e.status === s`.
+			 *
+			 * The chip *list* is built from the raw labels, because those are
+			 * the words in your notes — but ticking one filters through
+			 * `matchesStatus`, where "watched" and "completed" are answered from
+			 * your logged dates and episode progress rather than from a label a
+			 * later intention can overwrite. Counting the labels would print a
+			 * number next to the chip that the chip then disagrees with.
+			 */
+			for (const s of statuses) {
+				many(row, s, this.filters.statuses, s, pool.filter((e) => matchesStatus(e, s)).length);
+			}
 		}
 
 		const genres = [...new Set(pool.flatMap((e) => e.genres))].filter(Boolean).sort();
