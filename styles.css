@@ -10960,7 +10960,23 @@ input.reel-input {
 	 */
 	color: var(--text-muted);
 	background: transparent;
-	border-color: transparent;
+	/*
+	 * Outlined rather than borderless, which the note above never argued for.
+	 *
+	 * That note is about the *colour* — a saturated red directly on the panel
+	 * is under AA — and it is right. The border went with it, and taking both
+	 * away is a different decision that was never stated.
+	 *
+	 * It cost more than it looks. This button sits at the bottom of a column of
+	 * five, and the other four are filled. In this app a control with no fill
+	 * among filled ones is what a *disabled* control looks like, so the one
+	 * button that deletes your note read as the one button you could not press.
+	 * Demoted and unavailable are not the same claim.
+	 *
+	 * A muted outline is quiet, is legibly a button, and is still visibly not
+	 * one of the filled four.
+	 */
+	border-color: var(--background-modifier-border);
 	font-weight: 500;
 }
 

@@ -1345,6 +1345,38 @@ function detail(root: HTMLElement): void {
 	screen.render(root);
 }
 
+/**
+ * The detail screen's Remove button, asked once.
+ *
+ * It is a two-stage control: the first tap turns it into "Delete note?" and
+ * fills it red, the second trashes the note, and it reverts on its own after
+ * four seconds so a stray tap leaves nothing armed. Only the resting stage had
+ * ever been drawn.
+ *
+ * That mattered this release. The stylesheet's rule for the armed stage was
+ * rewritten — it was filling with a theme colour meant for text, which on a
+ * dark theme put white on a pale red at 2.77:1 — and the fix went in on
+ * reasoning, because the state it applies to could not be rendered.
+ *
+ * The assertion is the point of the scene as much as the render is. `settled()`
+ * waits for animations rather than for a fixed delay, so the click lands well
+ * inside the four seconds; if that ever stops being true the button reverts and
+ * this would quietly measure the resting state and pass. Throwing makes a
+ * timing regression loud instead.
+ */
+function detailremove(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const screen = new DetailScreen(plugin, SHOW, () => {}, "Library");
+	screen.render(root);
+
+	const remove = Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "Remove");
+	if (!remove) throw new Error("harness: no Remove button on the detail screen");
+	remove.click();
+	if (remove.dataset.confirming !== "true") {
+		throw new Error("harness: Remove did not arm, so the confirming state is not what was measured");
+	}
+}
+
 function longshow(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	// 34 seasons. The season strip is the one control whose layout depends on
@@ -2195,6 +2227,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	stars,
 	detail,
 	detailFilm,
+	detailremove,
 	discover,
 	recipe,
 	quickrate,

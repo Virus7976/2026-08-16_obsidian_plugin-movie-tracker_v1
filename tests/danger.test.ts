@@ -93,5 +93,37 @@ ok(
 	"a per-theme fill is a per-theme contrast ratio, which is the bug this token exists to prevent"
 );
 
+/* ---- quiet is not the same claim as unavailable ----------------------- */
+
+/*
+ * The resting destructive button was transparent with no border, sitting at the
+ * bottom of a column of five where the other four are filled. In this app a
+ * control with no fill among filled ones is what a *disabled* control looks
+ * like, so the one button that deletes your note read as the one button you
+ * could not press.
+ *
+ * The stylesheet note beside that rule argues for the muted *colour*, and is
+ * right — a saturated red on the panel is under AA. The border went away with
+ * it, which is a different decision and was never stated.
+ */
+/*
+ * To the rule's own closing brace, not to the next danger rule.
+ *
+ * The first draft ran to the next `[data-confirming]` selector and swept up the
+ * confirmation dialog's filled button on the way, which sets
+ * `border-color: transparent` and is right to: a filled button has no use for
+ * an outline. The test failed on a rule it was not asking about.
+ */
+const quietStart = css.indexOf(".reel-view .reel-btn.reel-btn-danger,");
+const quiet = css.slice(quietStart, css.indexOf("\n}", quietStart));
+ok("the resting rule was found", quiet.length > 100);
+ok(
+	"a destructive button at rest is still visibly a button",
+	!/border-color: transparent/.test(quiet),
+	"borderless and unfilled among filled neighbours is how this app draws a disabled control"
+);
+ok("and stays demoted rather than red", /color: var\(--text-muted\)/.test(quiet));
+ok("and unfilled, so it is never the thing your thumb lands on", /background: transparent/.test(quiet));
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

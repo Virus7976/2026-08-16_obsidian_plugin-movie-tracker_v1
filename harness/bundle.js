@@ -12196,6 +12196,19 @@ ${body}
     }, "Library");
     screen.render(root);
   }
+  function detailremove(root) {
+    root.addClass("reel-view-body");
+    const screen = new DetailScreen(plugin, SHOW, () => {
+    }, "Library");
+    screen.render(root);
+    const remove = Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "Remove");
+    if (!remove)
+      throw new Error("harness: no Remove button on the detail screen");
+    remove.click();
+    if (remove.dataset.confirming !== "true") {
+      throw new Error("harness: Remove did not arm, so the confirming state is not what was measured");
+    }
+  }
   function longshow(root) {
     root.addClass("reel-view-body");
     new DetailScreen(plugin, LONG_SHOW, () => {
@@ -12702,6 +12715,7 @@ ${body}
     stars,
     detail,
     detailFilm,
+    detailremove,
     discover,
     recipe,
     quickrate,
