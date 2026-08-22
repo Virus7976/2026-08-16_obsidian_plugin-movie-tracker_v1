@@ -107,6 +107,20 @@ export interface ReelSettings {
 	 */
 	settingsOpen: string[];
 	/**
+	 * Which walkthrough steps you have marked done, per feature.
+	 *
+	 * Kept because half of these steps happen on somebody else's website, and
+	 * the phone this plugin is built for cannot show two apps at once. You tick
+	 * step two, switch to a browser to do step three, come back — and the sheet
+	 * was rebuilt, so every mark you made is gone and you are looking at 2,700
+	 * pixels of instructions with no idea where you were.
+	 *
+	 * Which is the exact question the ticks exist to answer. Holding them in
+	 * memory made them survive a redraw and nothing else, and leaving the guide
+	 * is not an edge case here — it is the middle of the task.
+	 */
+	setupTicks: Record<string, number[]>;
+	/**
 	 * The version whose update notes have been read.
 	 *
 	 * Empty on an install that predates the notes screen, which is treated as
@@ -228,6 +242,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	// Only Getting started. Everything else is one tap away and, on a fresh
 	// install, none of it is what you came for.
 	settingsOpen: ["setup"],
+	setupTicks: {},
 	lastSeenVersion: "",
 	libraryLayout: "grid",
 	librarySort: "watched",

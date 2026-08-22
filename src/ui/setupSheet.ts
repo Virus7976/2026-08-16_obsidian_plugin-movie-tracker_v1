@@ -46,6 +46,8 @@ import { NEEDS_KEY_TO_CHECK, featureHealth } from "../health";
 import { checkFeature, checkable } from "../checks";
 import { setupFields } from "./fields";
 import { completedSteps } from "../setup";
+import type { StepProof } from "../setup";
+import { normaliseHost } from "../publish/mastodon";
 
 export class SetupSheet extends Modal {
 	private ticked = new Set<number>();
@@ -102,8 +104,39 @@ export class SetupSheet extends Modal {
 	 * afternoon.
 	 */
 	private seedTicks(): void {
-		const done = completedSteps(this.spec, (k) => this.plugin.credentials.has(k));
+		// What you marked yourself, from a previous opening of this guide.
+		for (const i of this.plugin.settings.setupTicks[this.spec.id] ?? []) this.ticked.add(i);
+		// ...and what a saved credential proves regardless.
+		const done = completedSteps(this.spec, (k) => this.proves(k));
 		for (let i = 0; i < done; i++) this.ticked.add(i);
+	}
+
+	/**
+	 * Is this step's product in the vault?
+	 *
+	 * Two kinds of answer, because two kinds of thing. Credentials are asked of
+	 * the stored *names* so the question survives a locked vault; Mastodon's
+	 * server is an ordinary setting and is simply read.
+	 */
+	private proves(k: StepProof): boolean {
+		if (k === "mastodonHost") return Boolean(normaliseHost(this.plugin.settings.mastodonHost));
+		return this.plugin.credentials.has(k);
+	}
+
+	/**
+	 * Write the marks down.
+	 *
+	 * Only the ones you made: a step the credentials already prove is re-seeded
+	 * on every open and storing it as well would freeze an inference that ought
+	 * to be recomputed — remove the key and the guide should stop claiming the
+	 * step is behind you.
+	 */
+	private async saveTicks(): Promise<void> {
+		const proven = completedSteps(this.spec, (k) => this.proves(k));
+		const mine = [...this.ticked].filter((i) => i >= proven).sort((a, b) => a - b);
+		if (mine.length) this.plugin.settings.setupTicks[this.spec.id] = mine;
+		else delete this.plugin.settings.setupTicks[this.spec.id];
+		await this.plugin.saveSettings();
 	}
 
 	/**
@@ -353,6 +386,9 @@ export class SetupSheet extends Modal {
 			li.toggleClass("is-done", !on);
 			tick.setAttr("aria-pressed", String(!on));
 			tick.setText(!on ? "✓" : String(i + 1));
+			// Not awaited: the mark is already on screen, and a tick that waited
+			// for a disk write before responding would feel broken on a phone.
+			void this.saveTicks();
 		};
 		tick.addEventListener("click", mark);
 

@@ -268,10 +268,26 @@ for (const f of FEATURES) {
 	 * above the two things you actually opened it for.
 	 */
 	ok(`${f.id}: the last step is the one that proves it`, Boolean(f.steps[f.steps.length - 1]?.key));
-	// A step may only claim a key the feature actually uses.
+	/*
+	 * A step may only claim something the feature actually produces.
+	 *
+	 * Widened once, on purpose. Not everything observable is a credential:
+	 * Mastodon's server address is a plain setting, and it was the only piece
+	 * of visible progress in that walkthrough that could tick nothing — which
+	 * left a five-step guide with no middle, nothing behind you until the very
+	 * last paste.
+	 *
+	 * The exception is named rather than the rule dropped, so a step claiming
+	 * some third thing still fails here.
+	 */
+	const NON_CREDENTIAL: string[] = ["mastodonHost"];
 	for (const st of f.steps) {
 		if (!st.key) continue;
-		ok(`${f.id}: the step's key is one of the feature's own`, f.keys.includes(st.key));
+		ok(
+			`${f.id}: the step proves something the feature produces`,
+			f.keys.includes(st.key as never) || NON_CREDENTIAL.includes(st.key),
+			`step claims "${st.key}", which this feature never produces`
+		);
 	}
 }
 
@@ -355,6 +371,57 @@ ok(
 	"no screen answers 'not set up yet' by opening the settings tab",
 	jumps.length === 0,
 	jumps.length ? `these send you to hunt for the section instead of opening its guide: ${jumps.join(", ")}` : ""
+);
+
+/* ---- a walkthrough you can leave and come back to --------------------- */
+
+/*
+ * Mastodon had no middle.
+ *
+ * Its five steps could only be ticked by the access token, which is the last
+ * thing you get. So the realistic state — server typed into Reel, off to your
+ * own instance to create an application — came back to a list reporting
+ * nothing done at all, which is the one question the ticks exist to answer.
+ *
+ * The address is the single piece of progress in that walkthrough Reel can
+ * watch you make, and it is not a credential, which is why it could not count.
+ */
+const masto = FEATURES.find((f) => f.id === "mastodon");
+ok("Mastodon has a spec", Boolean(masto));
+if (masto) {
+	const hostOnly = completedSteps(masto, (k) => k === "mastodonHost");
+	ok("typing the server is progress", hostOnly > 0, "the guide reports nothing done until the very last paste");
+	ok("but not the whole guide", hostOnly < masto.steps.length);
+	// And the token still settles everything, in or out of order.
+	ok("the token finishes it", completedSteps(masto, (k) => k === "mastodon") === masto.steps.length);
+	// The address and the token are asked for separately, because they are two
+	// actions and one of them can be checked.
+	ok(
+		"the address and the token are separate steps",
+		masto.steps.filter((st) => st.key).length >= 2,
+		"one step asking for two things can only be ticked by the second"
+	);
+}
+
+/*
+ * And the marks survive leaving.
+ *
+ * Half of these steps happen on somebody else's website, and the phone this is
+ * built for cannot show two apps at once: you tick step two, switch to a
+ * browser for step three, and come back. The ticks lived in a field on the
+ * sheet, so they survived a redraw and nothing else — leaving the guide is not
+ * an edge case here, it is the middle of the task.
+ */
+const sheetSrc = readFileSync(join(__dirname, "..", "src", "ui", "setupSheet.ts"), "utf8");
+ok(
+	"ticks are written down",
+	/setupTicks/.test(sheetSrc),
+	"marking a step is forgotten the moment the sheet closes"
+);
+ok(
+	"and only the ones you made yourself",
+	/filter\(\(i\) => i >= proven\)/.test(sheetSrc),
+	"storing an inferred tick freezes it, so removing the key would leave the guide still claiming the step"
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

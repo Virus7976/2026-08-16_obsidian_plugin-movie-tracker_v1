@@ -1903,6 +1903,28 @@ function settingsPlain(root: HTMLElement): void {
  * Obsidian just opened, nothing has needed a key yet — is the one where the
  * help it offers is the help it cannot give.
  */
+/**
+ * Mastodon halfway: the server typed, the token not yet made.
+ *
+ * The realistic middle of that walkthrough, and until now an impossible state
+ * for it to be in — the guide could only be ticked by the token, so somebody
+ * who had entered their server and gone off to create an application came back
+ * to a list reporting nothing done at all.
+ */
+function guideHalf(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const spec = FEATURES.find((f) => f.id === "mastodon");
+	if (!spec) throw new Error("harness: no mastodon feature spec");
+	const before = plugin.settings.mastodonHost;
+	plugin.settings.mastodonHost = "mastodon.social";
+	// Server yes, token no: the stub reports mastodon absent by default.
+	try {
+		mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+	} finally {
+		plugin.settings.mastodonHost = before;
+	}
+}
+
 function guideLocked(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const spec = FEATURES.find((f) => f.id === "omdb");
@@ -2037,6 +2059,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	settingsPlain,
 	settingsSession,
 	guideLocked,
+	guideHalf,
 	firstrun,
 	setupsheet,
 	setupdone,

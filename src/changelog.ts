@@ -52,6 +52,27 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.27",
+		date: "2026-08-22",
+		headline: "A walkthrough now remembers where you were when you left it.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Steps you tick off stay ticked after you close the guide.",
+				note: "Half of these steps happen on somebody else's website, and a phone cannot show two apps at once. You marked step two, switched to a browser for step three, came back — and every mark was gone, which is the one question the ticks exist to answer.",
+			},
+			{
+				kind: "better",
+				text: "The Mastodon guide now has a middle: typing your server address counts as progress.",
+				note: "Its steps could only be ticked by the access token, the very last thing you get, so entering your server and going off to make a token brought you back to a list reporting nothing done at all.",
+			},
+			{
+				kind: "better",
+				text: "That guide asks for the server and the token as two steps, because they are two actions.",
+			},
+		],
+	},
+	{
 		version: "0.9.26",
 		date: "2026-08-22",
 		headline: "The model picker now says whether the prices in front of you are real.",

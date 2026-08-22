@@ -5248,7 +5248,17 @@ ${body}
           note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post."
         },
         { text: "Submit, open the application, and copy \u201CYour access token\u201D." },
-        { text: "Enter your instance's address and paste the token below.", key: "mastodon" }
+        /*
+         * Two steps, because they were two actions.
+         *
+         * "Enter your instance's address and paste the token below" asked
+         * for both in one line and could only be ticked by the token, so
+         * somebody who had typed their server and gone off to make a token
+         * came back to a guide reporting nothing done at all. The address
+         * is the one thing in this walkthrough Reel can watch you do.
+         */
+        { text: "Enter your instance's address below.", key: "mastodonHost" },
+        { text: "Paste the access token below.", key: "mastodon" }
       ]
     }
   ];
@@ -5839,9 +5849,40 @@ ${body}
      * afternoon.
      */
     seedTicks() {
-      const done = completedSteps(this.spec, (k) => this.plugin.credentials.has(k));
+      for (const i of this.plugin.settings.setupTicks[this.spec.id] ?? [])
+        this.ticked.add(i);
+      const done = completedSteps(this.spec, (k) => this.proves(k));
       for (let i = 0; i < done; i++)
         this.ticked.add(i);
+    }
+    /**
+     * Is this step's product in the vault?
+     *
+     * Two kinds of answer, because two kinds of thing. Credentials are asked of
+     * the stored *names* so the question survives a locked vault; Mastodon's
+     * server is an ordinary setting and is simply read.
+     */
+    proves(k) {
+      if (k === "mastodonHost")
+        return Boolean(normaliseHost(this.plugin.settings.mastodonHost));
+      return this.plugin.credentials.has(k);
+    }
+    /**
+     * Write the marks down.
+     *
+     * Only the ones you made: a step the credentials already prove is re-seeded
+     * on every open and storing it as well would freeze an inference that ought
+     * to be recomputed — remove the key and the guide should stop claiming the
+     * step is behind you.
+     */
+    async saveTicks() {
+      const proven = completedSteps(this.spec, (k) => this.proves(k));
+      const mine = [...this.ticked].filter((i) => i >= proven).sort((a, b) => a - b);
+      if (mine.length)
+        this.plugin.settings.setupTicks[this.spec.id] = mine;
+      else
+        delete this.plugin.settings.setupTicks[this.spec.id];
+      await this.plugin.saveSettings();
     }
     /**
      * The fields the steps have been pointing at all along.
@@ -6027,6 +6068,7 @@ ${body}
         li.toggleClass("is-done", !on);
         tick.setAttr("aria-pressed", String(!on));
         tick.setText(!on ? "\u2713" : String(i + 1));
+        void this.saveTicks();
       };
       tick.addEventListener("click", mark);
       if (step.copy)
@@ -8802,6 +8844,7 @@ ${body}
     // Only Getting started. Everything else is one tap away and, on a fresh
     // install, none of it is what you came for.
     settingsOpen: ["setup"],
+    setupTicks: {},
     lastSeenVersion: "",
     libraryLayout: "grid",
     librarySort: "watched",
@@ -12441,6 +12484,19 @@ ${body}
       Object.assign(plugin.settings, before);
     }
   }
+  function guideHalf(root) {
+    root.addClass("reel-view-body");
+    const spec = FEATURES.find((f) => f.id === "mastodon");
+    if (!spec)
+      throw new Error("harness: no mastodon feature spec");
+    const before = plugin.settings.mastodonHost;
+    plugin.settings.mastodonHost = "mastodon.social";
+    try {
+      mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+    } finally {
+      plugin.settings.mastodonHost = before;
+    }
+  }
   function guideLocked(root) {
     root.addClass("reel-view-body");
     const spec = FEATURES.find((f) => f.id === "omdb");
@@ -12549,6 +12605,7 @@ ${body}
     settingsPlain,
     settingsSession,
     guideLocked,
+    guideHalf,
     firstrun,
     setupsheet,
     setupdone,

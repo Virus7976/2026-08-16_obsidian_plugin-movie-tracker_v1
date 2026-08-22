@@ -31,6 +31,14 @@ import type { KeyName } from "./credentials";
 
 export type FeatureId = "tmdb" | "omdb" | "dtdd" | "openrouter" | "trakt" | "mastodon";
 
+/**
+ * What a step can be proved by: a stored credential, or Mastodon's server.
+ *
+ * A union rather than widening to `string`, so a typo in a spec is a compile
+ * error rather than a step that can never tick.
+ */
+export type StepProof = KeyName | "mastodonHost";
+
 export interface SetupStep {
 	/** One instruction, imperative, in the order you do it. */
 	text: string;
@@ -48,14 +56,20 @@ export interface SetupStep {
 	/** A caution or an aside. Rendered quieter than the instruction. */
 	note?: string;
 	/**
-	 * The credential this step produces, when it produces one.
+	 * What this step produces, when it produces something checkable.
 	 *
 	 * Only the steps that end in something being saved carry this, because
 	 * those are the only ones the plugin can actually verify. Reel cannot know
 	 * whether you have read a paragraph or opened a website; it knows exactly
-	 * whether the key that step asks for is now in the vault.
+	 * whether the thing that step asks for is now in the vault.
+	 *
+	 * Not every such thing is a credential. Mastodon's server address is a
+	 * plain setting — not secret, not encrypted — and it was the one piece of
+	 * observable progress in that walkthrough that could tick nothing, because
+	 * this field only admitted key names. Which left a five-step guide with no
+	 * middle: nothing was behind you until the very last paste.
 	 */
-	key?: KeyName;
+	key?: StepProof;
 }
 
 export interface FeatureSpec {
@@ -227,7 +241,17 @@ export const FEATURES: FeatureSpec[] = [
 				note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post.",
 			},
 			{ text: "Submit, open the application, and copy “Your access token”." },
-			{ text: "Enter your instance's address and paste the token below.", key: "mastodon" },
+			/*
+			 * Two steps, because they were two actions.
+			 *
+			 * "Enter your instance's address and paste the token below" asked
+			 * for both in one line and could only be ticked by the token, so
+			 * somebody who had typed their server and gone off to make a token
+			 * came back to a guide reporting nothing done at all. The address
+			 * is the one thing in this walkthrough Reel can watch you do.
+			 */
+			{ text: "Enter your instance's address below.", key: "mastodonHost" },
+			{ text: "Paste the access token below.", key: "mastodon" },
 		],
 	},
 ];
@@ -267,7 +291,7 @@ export function featureById(id: FeatureId): FeatureSpec | undefined {
  * was already there — and stopping at the first gap would report a guide as
  * barely begun when it is done.
  */
-export function completedSteps(spec: FeatureSpec, has: (key: KeyName) => boolean): number {
+export function completedSteps(spec: FeatureSpec, has: (key: StepProof) => boolean): number {
 	let done = 0;
 	spec.steps.forEach((step, i) => {
 		if (step.key && has(step.key)) done = i + 1;
