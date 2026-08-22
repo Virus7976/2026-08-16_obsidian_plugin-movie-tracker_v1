@@ -2052,6 +2052,39 @@ function settingsSearchSection(root: HTMLElement): void {
 }
 
 /**
+ * A search, then the box cleared again.
+ *
+ * The state you are in for most of the time you spend on this screen after ever
+ * using the search once, and the one nobody thinks to draw — the interesting
+ * render feels like the filtered one, so the unfiltered render *after* a filter
+ * never gets looked at.
+ */
+function settingsSearchCleared(root: HTMLElement): void {
+	searchIn(root, "spoiler");
+	const box = root.querySelector(".reel-settings-search input") as HTMLInputElement | null;
+	if (!box) throw new Error("harness: no settings search box");
+	box.value = "";
+	box.dispatchEvent(new Event("input"));
+}
+
+/**
+ * Tapping the header of a section a search forced open.
+ *
+ * The body is shown when either `is-open` or `is-forced-open` is present, so
+ * while a search is running the header's own state is not what decides what you
+ * see. Tapping it still toggles that state, and still writes it to disk.
+ *
+ * Which would mean a control that does nothing visible and quietly changes what
+ * the screen looks like after you clear the box. Worth measuring rather than
+ * reasoning about, since both halves are one CSS selector apart.
+ */
+function settingsSearchTap(root: HTMLElement): void {
+	searchIn(root, "spoiler");
+	const head = root.querySelector(".reel-settings-section.is-forced-open .reel-section-head") as HTMLElement | null;
+	head?.click();
+}
+
+/**
  * A search that finds nothing.
  *
  * The screen goes blank below the box, which reads as a crash rather than as an
@@ -2146,6 +2179,8 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	settingsFolded,
 	settingsSearch,
 	settingsSearchSection,
+	settingsSearchTap,
+	settingsSearchCleared,
 	settingsSearchEmpty,
 	settingsModels,
 	settingsPlain,

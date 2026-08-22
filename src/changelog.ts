@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.31",
+		date: "2026-08-22",
+		headline: "Clearing the settings search now puts the screen back exactly as it was.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Explanations no longer stay hidden after you clear the search box.",
+				note: "A screen that had ever been searched lost its paragraphs until the next full redraw. Introduced in the previous release, alongside the fix that hides them while a search is running.",
+			},
+			{
+				kind: "fixed",
+				text: "Tapping a section header during a search no longer silently changes which sections are open.",
+				note: "A section a search opens stays visible whether or not it is folded, so the tap moved nothing — and then turned up later as a section standing open when you cleared the box. The header is inert for as long as the search is deciding, and goes back to normal when the query does.",
+			},
+		],
+	},
+	{
 		version: "0.9.30",
 		date: "2026-08-22",
 		headline: "Searching settings now hides the explanations along with the controls they describe.",

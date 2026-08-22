@@ -9127,10 +9127,22 @@ ${body}
       let hits = 0;
       for (const { spec, el } of this.cards.values()) {
         const rows2 = Array.from(el.querySelectorAll(".setting-item"));
+        const head = el.querySelector(".reel-section-head");
+        const body = el.querySelector(".reel-section-body");
+        const prose = body ? Array.from(body.children).filter(
+          (c) => !c.classList.contains("setting-item") && !c.querySelector(".setting-item")
+        ) : [];
         if (!q) {
           el.removeClass("is-filtered-out");
           el.removeClass("is-forced-open");
           rows2.forEach((r) => r.removeClass("is-filtered-out"));
+          prose.forEach((p) => p.removeClass("is-filtered-out"));
+          if (head) {
+            const open = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
+            head.setAttr("aria-expanded", String(open));
+            if (!spec.pinned)
+              head.removeAttribute("disabled");
+          }
           continue;
         }
         const titled = spec.title.toLowerCase().includes(q);
@@ -9149,10 +9161,6 @@ ${body}
           rows2.forEach((r) => r.removeClass("is-filtered-out"));
           hidden = false;
         }
-        const body = el.querySelector(".reel-section-body");
-        const prose = body ? Array.from(body.children).filter(
-          (c) => !c.classList.contains("setting-item") && !c.querySelector(".setting-item")
-        ) : [];
         for (const p of prose)
           p.toggleClass("is-filtered-out", hidden);
         const show = any || titled || keyed;
@@ -9160,6 +9168,10 @@ ${body}
         el.toggleClass("is-forced-open", show);
         if (show)
           hits++;
+        if (head) {
+          head.setAttr("aria-expanded", String(show));
+          head.setAttr("disabled", "true");
+        }
       }
       this.renderNoMatches(q, hits);
     }
@@ -12601,6 +12613,19 @@ ${body}
   function settingsSearchSection(root) {
     searchIn(root, "publishing");
   }
+  function settingsSearchCleared(root) {
+    searchIn(root, "spoiler");
+    const box = root.querySelector(".reel-settings-search input");
+    if (!box)
+      throw new Error("harness: no settings search box");
+    box.value = "";
+    box.dispatchEvent(new Event("input"));
+  }
+  function settingsSearchTap(root) {
+    searchIn(root, "spoiler");
+    const head = root.querySelector(".reel-settings-section.is-forced-open .reel-section-head");
+    head?.click();
+  }
   function settingsSearchEmpty(root) {
     searchIn(root, "zzzznothing");
   }
@@ -12678,6 +12703,8 @@ ${body}
     settingsFolded,
     settingsSearch,
     settingsSearchSection,
+    settingsSearchTap,
+    settingsSearchCleared,
     settingsSearchEmpty,
     settingsModels,
     settingsPlain,

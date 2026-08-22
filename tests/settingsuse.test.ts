@@ -396,5 +396,59 @@ ok(
 	"a keyword match un-hides the rows and would leave the prose hidden beside them"
 );
 
+/* ---- every class the filter adds, it has to take away ----------------- */
+
+/*
+ * Hiding the prose with its rows was right; leaving it hidden once the box was
+ * cleared was a regression shipped in the same release. A screen that had ever
+ * been searched lost its explanations until the next full redraw — which, on a
+ * settings tab you keep open, is a long time.
+ *
+ * The general rule is the one worth holding: this function is the only thing
+ * that adds `is-filtered-out`, so it is the only thing that can remove it, and
+ * the empty-query branch is where that has to happen.
+ */
+const cleared = settingsCode.slice(settingsCode.indexOf("if (!q) {"), settingsCode.indexOf("Three ways to match"));
+ok("the empty-query branch was found", cleared.length > 80);
+ok(
+	"clearing the box restores the rows",
+	/rows\.forEach\(\(r\) => r\.removeClass\("is-filtered-out"\)\)/.test(cleared)
+);
+ok(
+	"and the prose with them",
+	/prose\.forEach\(\(p\) => p\.removeClass\("is-filtered-out"\)\)/.test(cleared),
+	"a search leaves the paragraphs hidden after the query is gone"
+);
+
+/* ---- a control that cannot do anything must not pretend --------------- */
+
+/*
+ * A section a search forces open shows its body whether or not `is-open` is
+ * set, so during a search the fold control decides nothing. It was still doing
+ * two things: reporting aria-expanded="false" for a section whose contents were
+ * on screen, and, when tapped, toggling the saved state and writing it to disk
+ * with nothing moving. You tapped to collapse something, nothing happened, and
+ * the change surfaced later as a section that was open when you cleared the box.
+ */
+ok(
+	"the header is inert while a search decides what is open",
+	/head\.setAttr\("disabled", "true"\)/.test(settingsCode),
+	"tapping a forced-open section silently rewrites the fold state you saved"
+);
+ok(
+	"and reports what is actually shown",
+	/head\.setAttr\("aria-expanded", String\(show\)\)/.test(settingsCode),
+	"a section whose rows are on screen is announced as collapsed"
+);
+/*
+ * Restored afterwards, and never to a pinned section, whose disabled attribute
+ * was not the search's to give or take.
+ */
+ok(
+	"the header comes back when the query goes",
+	/if \(!spec\.pinned\) head\.removeAttribute\("disabled"\)/.test(cleared),
+	"one search leaves every section header permanently unfoldable"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

@@ -594,11 +594,50 @@ export class ReelSettingTab extends PluginSettingTab {
 
 		for (const { spec, el } of this.cards.values()) {
 			const rows = Array.from(el.querySelectorAll<HTMLElement>(".setting-item"));
+			const head = el.querySelector<HTMLElement>(".reel-section-head");
+
+			/*
+			 * Everything in the body that is not a row and holds no rows.
+			 *
+			 * Computed before the branch below, because both halves need it:
+			 * one hides it and the other has to be able to put it back.
+			 *
+			 * Structural rather than a list of prose classes. A list is right
+			 * the day it is written and wrong the first time somebody adds a
+			 * callout, which is how the one narrow patch in the stylesheet for
+			 * the folder chips came to be the only case that was handled.
+			 */
+			const body = el.querySelector<HTMLElement>(".reel-section-body");
+			const prose = body
+				? (Array.from(body.children) as HTMLElement[]).filter(
+						(c) => !c.classList.contains("setting-item") && !c.querySelector(".setting-item")
+					)
+				: [];
 
 			if (!q) {
 				el.removeClass("is-filtered-out");
 				el.removeClass("is-forced-open");
 				rows.forEach((r) => r.removeClass("is-filtered-out"));
+				/*
+				 * Including the prose, which was the half I forgot.
+				 *
+				 * Hiding it with its rows was right; leaving it hidden once the
+				 * box was cleared meant a screen that had ever been searched
+				 * lost its explanations until the next full redraw. Every
+				 * class this function adds has to be a class it can take away.
+				 */
+				prose.forEach((p) => p.removeClass("is-filtered-out"));
+				/*
+				 * And the header goes back to describing its own state.
+				 *
+				 * Pinned sections keep their disabled attribute: it was never
+				 * the search that put it there.
+				 */
+				if (head) {
+					const open = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
+					head.setAttr("aria-expanded", String(open));
+					if (!spec.pinned) head.removeAttribute("disabled");
+				}
 				continue;
 			}
 
@@ -659,12 +698,6 @@ export class ReelSettingTab extends PluginSettingTab {
 			 * title or by a keyword shows everything, and its explanation is
 			 * part of everything.
 			 */
-			const body = el.querySelector<HTMLElement>(".reel-section-body");
-			const prose = body
-				? (Array.from(body.children) as HTMLElement[]).filter(
-						(c) => !c.classList.contains("setting-item") && !c.querySelector(".setting-item")
-					)
-				: [];
 			for (const p of prose) p.toggleClass("is-filtered-out", hidden);
 
 			// Getting started has no `.setting-item` rows at all, so it can
@@ -673,6 +706,27 @@ export class ReelSettingTab extends PluginSettingTab {
 			el.toggleClass("is-filtered-out", !show);
 			el.toggleClass("is-forced-open", show);
 			if (show) hits++;
+
+			/*
+			 * While a search is running, the fold control is not what decides
+			 * whether you can see the section, so it stops pretending to be.
+			 *
+			 * It was doing two wrong things at once. It reported
+			 * `aria-expanded="false"` for a section whose contents were on
+			 * screen, so anybody listening to the page was told a section was
+			 * collapsed while it was being read out. And tapping it still
+			 * toggled the saved state and wrote it to disk — with the body
+			 * visible either way, so nothing moved. You tapped to collapse
+			 * something, nothing happened, and the change turned up later as a
+			 * section that was open when you cleared the box.
+			 *
+			 * Disabled for the duration, exactly as a pinned section is, and
+			 * restored above when the query goes.
+			 */
+			if (head) {
+				head.setAttr("aria-expanded", String(show));
+				head.setAttr("disabled", "true");
+			}
 		}
 
 		this.renderNoMatches(q, hits);
