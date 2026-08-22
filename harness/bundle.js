@@ -7766,6 +7766,290 @@ ${body}
     return new Promise((r) => window.setTimeout(r, ms));
   }
 
+  // src/setup.ts
+  var FEATURES = [
+    {
+      id: "tmdb",
+      name: "TMDB",
+      gives: "Everything. Posters, cast, runtimes, episode lists \u2014 Reel cannot add a title without it.",
+      essential: true,
+      effort: "2 minutes, free",
+      sends: "The title you search for, or its TMDB id. Nothing about your library.",
+      keys: ["tmdb"],
+      steps: [
+        {
+          text: "Create a free TMDB account, if you don't have one.",
+          url: "https://www.themoviedb.org/signup"
+        },
+        {
+          text: "Open your API settings and request a key. Pick \u201CDeveloper\u201D, and answer the form \u2014 any personal or hobby use is fine.",
+          url: "https://www.themoviedb.org/settings/api"
+        },
+        {
+          text: "Copy the API Read Access Token \u2014 the long one starting eyJ, not the short v3 key.",
+          note: "The token travels in a request header; the v3 key has to go in the URL, and URLs end up in logs. Reel accepts either, but this one is safer."
+        },
+        {
+          text: "Paste it below and press Save. You'll be asked for a passphrase \u2014 that encrypts the key inside your vault."
+        }
+      ]
+    },
+    {
+      id: "omdb",
+      name: "OMDb",
+      gives: "IMDb ratings, Rotten Tomatoes and Metacritic scores on every title.",
+      essential: false,
+      effort: "1 minute, free",
+      sends: "A film's IMDb id, when a note is created or refreshed.",
+      keys: ["omdb"],
+      steps: [
+        {
+          text: "Request a free key. The FREE tier is 1,000 requests a day, which Reel's cache makes ample.",
+          url: "https://www.omdbapi.com/apikey.aspx"
+        },
+        {
+          text: "Check your email and click the activation link. The key does not work until you do.",
+          note: "This one catches people out \u2014 the key arrives before it is active."
+        },
+        { text: "Paste the key below and press Save." }
+      ]
+    },
+    {
+      id: "dtdd",
+      name: "DoesTheDogDie",
+      gives: "Content warnings voted on per topic, so you can tell one upsetting scene from a film full of them.",
+      essential: false,
+      effort: "A few minutes, free \u2014 they approve by hand",
+      sends: "A film's title and year.",
+      keys: ["dtdd"],
+      steps: [
+        {
+          text: "Request an API key. Say what it's for \u2014 a personal Obsidian film tracker is a fine answer.",
+          url: "https://www.doesthedogdie.com/api"
+        },
+        {
+          text: "Wait for the reply. A person reads these, so it is not instant.",
+          note: "Everything else in Reel works meanwhile. Content filtering falls back to TMDB keywords until the key arrives."
+        },
+        { text: "Paste the key below and press Save." }
+      ]
+    },
+    {
+      id: "openrouter",
+      name: "OpenRouter",
+      gives: "Ask \u2014 describe what you feel like watching and Reel finds it in your own library.",
+      essential: false,
+      effort: "2 minutes, and you pay per question",
+      sends: "Your question, plus a shortlist of titles from your library \u2014 names, years, genres, runtimes and your ratings. Never your reviews, your watch dates or your file paths.",
+      keys: ["openrouter"],
+      steps: [
+        { text: "Create an OpenRouter account.", url: "https://openrouter.ai/" },
+        {
+          text: "Add some credit. Questions cost a fraction of a penny each on the default model.",
+          url: "https://openrouter.ai/credits",
+          note: "Reel shows what every question cost in tokens, so this is checkable rather than a mystery bill."
+        },
+        { text: "Create an API key and copy it.", url: "https://openrouter.ai/keys" },
+        { text: "Paste it below, press Save, then turn Ask on." }
+      ]
+    },
+    {
+      id: "trakt",
+      name: "Trakt",
+      gives: "Publishing a review to a public film profile, with your star rating alongside.",
+      essential: false,
+      effort: "5 minutes, free",
+      sends: "Only what you explicitly publish: one review's text, your rating, and the title's id. Nothing automatic.",
+      keys: ["traktApp", "trakt"],
+      steps: [
+        { text: "Create a Trakt account, if you don't have one.", url: "https://trakt.tv/auth/join" },
+        {
+          text: "Create an application. Any name will do \u2014 it is yours and nobody else sees it.",
+          url: "https://trakt.tv/oauth/applications/new",
+          note: "Reel asks you to register your own rather than shipping one, because Trakt's sign-in needs a client secret, and a secret compiled into an open-source plugin is printed in the repository for anyone to read."
+        },
+        {
+          text: "Set the Redirect URI to exactly this:",
+          copy: "urn:ietf:wg:oauth:2.0:oob",
+          note: "This is the standard value for an app with no website to return to. Getting it wrong is the usual reason sign-in fails."
+        },
+        { text: "Save the application, then copy its Client ID and Client Secret into the two fields below." },
+        {
+          text: "Press Sign in. Trakt shows a short code \u2014 type it on any device, and Reel waits for you.",
+          note: "No redirect back to the app is needed, which is what makes this work on a phone at all."
+        }
+      ]
+    },
+    {
+      id: "mastodon",
+      name: "Mastodon",
+      gives: "Publishing a review as a public post, with the title, your stars and the text.",
+      essential: false,
+      effort: "3 minutes, free",
+      sends: "Only what you explicitly publish: one post. Nothing automatic.",
+      keys: ["mastodon"],
+      steps: [
+        {
+          text: "Open your instance's development settings \u2014 that's your own server, e.g. mastodon.social/settings/applications.",
+          note: "Reel needs the server you post from; there is no central Mastodon."
+        },
+        { text: "Create a new application. Any name and website will do." },
+        {
+          text: "Tick only this scope, and untick the rest:",
+          copy: "write:statuses",
+          note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post."
+        },
+        { text: "Submit, open the application, and copy \u201CYour access token\u201D." },
+        { text: "Enter your instance's address and paste the token below." }
+      ]
+    }
+  ];
+  function isConfigured(plugin2, spec) {
+    return spec.keys.every((k) => plugin2.credentials.has(k));
+  }
+  function isPartial(plugin2, spec) {
+    if (isConfigured(plugin2, spec))
+      return false;
+    return spec.keys.some((k) => plugin2.credentials.has(k));
+  }
+  function setupState(plugin2) {
+    const essential = FEATURES.find((f) => f.essential);
+    const done = [];
+    const partial = [];
+    const todo = [];
+    for (const f of FEATURES) {
+      if (f.essential)
+        continue;
+      if (isConfigured(plugin2, f))
+        done.push(f);
+      else if (isPartial(plugin2, f))
+        partial.push(f);
+      else
+        todo.push(f);
+    }
+    return { done, partial, todo, blocked: !isConfigured(plugin2, essential), essential };
+  }
+
+  // src/ui/setupSheet.ts
+  var SetupSheet = class extends Modal {
+    constructor(app2, plugin2, spec, onDone) {
+      super(app2);
+      this.plugin = plugin2;
+      this.spec = spec;
+      this.onDone = onDone;
+      this.ticked = /* @__PURE__ */ new Set();
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      modalEl.addClass("reel-setup-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-modal-phone");
+      contentEl.empty();
+      contentEl.addClass("reel-setup");
+      this.renderHead(contentEl);
+      this.renderSteps(contentEl);
+      this.renderFoot(contentEl);
+    }
+    /* ------------------------------------------------------------------ */
+    renderHead(root) {
+      const head = root.createDiv({ cls: "reel-setup-head" });
+      const title = head.createDiv({ cls: "reel-setup-title" });
+      title.createSpan({ cls: "reel-setup-name", text: this.spec.name });
+      const done = isConfigured(this.plugin, this.spec);
+      const part = isPartial(this.plugin, this.spec);
+      title.createSpan({
+        cls: done ? "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
+        text: done ? "Set up" : part ? "Half done" : this.spec.essential ? "Required" : "Not set up"
+      });
+      head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
+      head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
+      const sends = root.createDiv({ cls: "reel-setup-sends" });
+      sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
+      sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
+    }
+    renderSteps(root) {
+      const list2 = root.createEl("ol", { cls: "reel-setup-steps" });
+      this.spec.steps.forEach((step, i) => this.renderStep(list2, step, i));
+    }
+    renderStep(list2, step, i) {
+      const li = list2.createEl("li", { cls: "reel-setup-step" });
+      const row = li.createDiv({ cls: "reel-setup-step-row" });
+      const tick = row.createEl("button", { cls: "reel-setup-tick", text: String(i + 1) });
+      tick.setAttr("aria-label", `Step ${i + 1}. Tap to mark done.`);
+      tick.setAttr("aria-pressed", "false");
+      row.createSpan({ cls: "reel-setup-step-text", text: step.text });
+      const mark = () => {
+        const on = this.ticked.has(i);
+        if (on)
+          this.ticked.delete(i);
+        else
+          this.ticked.add(i);
+        li.toggleClass("is-done", !on);
+        tick.setAttr("aria-pressed", String(!on));
+        tick.setText(!on ? "\u2713" : String(i + 1));
+      };
+      tick.addEventListener("click", mark);
+      if (step.copy)
+        this.renderCopy(li, step.copy);
+      if (step.url) {
+        const a = li.createEl("a", {
+          cls: "reel-btn reel-setup-go",
+          text: this.hostOf(step.url),
+          href: step.url
+        });
+        a.setAttr("target", "_blank");
+        a.setAttr("rel", "noopener");
+        a.addEventListener("click", () => {
+          if (!this.ticked.has(i))
+            mark();
+        });
+      }
+      if (step.note)
+        li.createDiv({ cls: "reel-setup-note", text: step.note });
+    }
+    /**
+     * A literal to be typed exactly, with a button that copies it.
+     *
+     * The two values in Reel's entire setup that must match character for
+     * character are Trakt's redirect URI and Mastodon's scope, and both are
+     * strings of punctuation that mean nothing to read. Copying either by eye
+     * is how a setup fails five minutes later with somebody else's error
+     * message attached.
+     */
+    renderCopy(li, value) {
+      const btn = li.createEl("button", { cls: "reel-setup-copy" });
+      btn.createSpan({ cls: "reel-setup-copy-value", text: value });
+      btn.createSpan({ cls: "reel-setup-copy-hint", text: "Copy" });
+      btn.setAttr("aria-label", `Copy ${value}`);
+      btn.addEventListener("click", () => {
+        navigator.clipboard?.writeText(value).then(() => {
+          new Notice("Reel: copied.");
+          btn.addClass("is-copied");
+        }).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
+      });
+    }
+    renderFoot(root) {
+      const foot = root.createDiv({ cls: "reel-setup-foot" });
+      const close = foot.createEl("button", { cls: "reel-btn mod-cta", text: "Back to settings" });
+      close.addEventListener("click", () => {
+        this.close();
+        this.onDone?.();
+      });
+    }
+    /** "Open themoviedb.org" reads better on a button than the whole URL does. */
+    hostOf(url) {
+      try {
+        return `Open ${new URL(url).hostname.replace(/^www\./, "")}`;
+      } catch {
+        return "Open";
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/settings.ts
   var DEFAULT_SETTINGS = {
     keyMode: "encrypted",
@@ -7856,6 +8140,7 @@ ${body}
       const section = (render) => {
         render(containerEl.createDiv({ cls: "reel-settings-section" }));
       };
+      section((el) => this.renderSetup(el));
       section((el) => this.renderCredentials(el));
       section((el) => this.renderFolders(el));
       section((el) => this.renderMetadata(el));
@@ -7872,6 +8157,104 @@ ${body}
         maxCertification: this.plugin.settings.maxCertification,
         hideUnrated: this.plugin.settings.hideUnrated
       };
+    }
+    /* ---------------------------------------------------------------- */
+    /**
+     * Getting started — the section that answers "what do I do first".
+     *
+     * Everything below it is a preference. This one is a checklist, and it is
+     * built out of plain markup rather than `Setting` rows on purpose: a
+     * settings row says "here is a choice, make it", and none of these are
+     * choices. They are six things that are either done or not.
+     *
+     * The distinction it draws that nothing drew before is between *off because
+     * you decided against it* and *off because you never got round to it*. Both
+     * used to render as an empty field. One is a finished state and the other
+     * is an unfinished one, and telling them apart is most of what "seamless
+     * first-run setup" actually means.
+     */
+    renderSetup(el) {
+      new Setting(el).setName("Getting started").setHeading();
+      const state = setupState(this.plugin);
+      if (state.blocked) {
+        const stop = el.createDiv({ cls: "reel-setup-blocked" });
+        stop.createDiv({ cls: "reel-setup-blocked-title", text: "Reel needs one key before it can do anything" });
+        stop.createDiv({
+          cls: "reel-setup-blocked-body",
+          text: "TMDB supplies every poster, cast list and runtime in the plugin. It is free and takes about two minutes. Everything else on this screen is optional."
+        });
+        const go = stop.createEl("button", { cls: "reel-btn mod-cta", text: "Set up TMDB" });
+        go.addEventListener("click", () => this.openGuide(state.essential));
+      } else {
+        const on = state.done.length;
+        const total = FEATURES.length - 1;
+        const line = el.createDiv({ cls: "reel-setup-ready" });
+        line.createSpan({ cls: "reel-pill ok", text: "Ready" });
+        line.createSpan({
+          cls: "reel-setup-ready-text",
+          text: on === 0 ? `Reel works. ${total} optional features are available below.` : `Reel works, with ${on} of ${total} optional features on.`
+        });
+      }
+      const anyMark = FEATURES.some((f) => isConfigured(this.plugin, f) || isPartial(this.plugin, f));
+      const list2 = el.createDiv({ cls: `reel-setup-list${anyMark ? "" : " is-fresh"}` });
+      for (const spec of FEATURES) {
+        if (state.blocked && spec.essential)
+          continue;
+        this.renderSetupRow(list2, spec);
+      }
+      el.createDiv({
+        cls: "reel-settings-note",
+        text: "Each guide opens the pages you need, gives you the exact values to paste, and says what leaves your vault before you commit to anything."
+      });
+    }
+    /**
+     * One feature, as a row you tap.
+     *
+     * The row is a `<button>` rather than a div containing one. The first
+     * version gave every feature its own "Set up" control, which rendered as
+     * six full-width accent buttons stacked down a phone screen — a wall of
+     * identical calls to action, none of which could be more important than
+     * any other because they all looked the same. It passed every check in the
+     * audit and was obviously wrong in the first screenshot.
+     *
+     * The whole row being the target also means the touch area is the size of
+     * the thing you are aiming at, which on a phone is the only sane answer.
+     */
+    renderSetupRow(list2, spec) {
+      const done = isConfigured(this.plugin, spec);
+      const part = isPartial(this.plugin, spec);
+      const row = list2.createEl("button", { cls: "reel-setup-row" });
+      if (done)
+        row.addClass("is-done");
+      if (part)
+        row.addClass("is-partial");
+      if (spec.essential)
+        row.addClass("is-essential");
+      row.setAttr("aria-label", `${spec.name}. ${done ? "Set up." : part ? "Half done." : "Not set up."} Open the guide.`);
+      const mark = row.createSpan({ cls: "reel-setup-mark" });
+      mark.setText(done ? "\u2713" : part ? "!" : "");
+      mark.setAttr("aria-hidden", "true");
+      const body = row.createDiv({ cls: "reel-setup-row-body" });
+      const top = body.createDiv({ cls: "reel-setup-row-top" });
+      top.createSpan({ cls: "reel-setup-row-name", text: spec.name });
+      if (part)
+        top.createSpan({ cls: "reel-pill warn", text: "Half done" });
+      else if (!done && spec.essential)
+        top.createSpan({ cls: "reel-pill warn", text: "Required" });
+      body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+      const chev = row.createSpan({ cls: "reel-setup-chev", text: "\u203A" });
+      chev.setAttr("aria-hidden", "true");
+      row.addEventListener("click", () => this.openGuide(spec));
+    }
+    /**
+     * Redraw after the guide closes.
+     *
+     * A key can be saved from inside the sheet's steps, and coming back to a
+     * checklist still claiming you have not started is exactly the kind of
+     * small lie that makes a settings screen feel dead.
+     */
+    openGuide(spec) {
+      new SetupSheet(this.app, this.plugin, spec, () => this.display()).open();
     }
     /* ---------------------------------------------------------------- */
     renderCredentials(el) {
@@ -9531,6 +9914,7 @@ ${body}
   var lastGoodHeight = /* @__PURE__ */ new WeakMap();
 
   // harness/main.ts
+  var noKeys = false;
   function poster(title) {
     let h = 0;
     for (let i = 0; i < title.length; i++)
@@ -9712,6 +10096,13 @@ ${body}
     },
     ai: { configured: true },
     /*
+     * Flipped by the first-run scene.
+     *
+     * A module-level flag rather than a parameter because `plugin` is built
+     * once at load and the settings tab reads the store through it. The scene
+     * sets it, renders, and puts it back.
+     */
+    /*
      * Enough of the credential store for the settings screen to render.
      *
      * Keys are reported present so the sections that unfold behind one are
@@ -9721,7 +10112,7 @@ ${body}
      * ever presses anything.
      */
     credentials: {
-      has: (name) => name !== "mastodon",
+      has: (name) => name !== "mastodon" && !noKeys,
       isUnlocked: true,
       hasStoredKey: true,
       store: async () => true,
@@ -10335,6 +10726,27 @@ ${body}
       )
     );
   }
+  function firstrun(root) {
+    root.addClass("reel-view-body");
+    noKeys = true;
+    const before = { ...plugin.settings };
+    Object.assign(plugin.settings, { keyBlob: null, keysPlain: null, keyNames: [] });
+    try {
+      const tab = new ReelSettingTab(plugin.app, plugin);
+      tab.containerEl = root;
+      tab.display();
+    } finally {
+      noKeys = false;
+      Object.assign(plugin.settings, before);
+    }
+  }
+  function setupsheet(root) {
+    root.addClass("reel-view-body");
+    const spec = FEATURES.find((f) => f.id === "trakt");
+    if (!spec)
+      throw new Error("harness: no trakt feature spec");
+    mountSheet(root, new SetupSheet(plugin.app, plugin, spec));
+  }
   function settings(root) {
     root.addClass("reel-view-body");
     const before = { ...plugin.settings };
@@ -10383,6 +10795,8 @@ ${body}
     publishsheet,
     asksheet,
     settings,
+    firstrun,
+    setupsheet,
     longshow,
     quick
   };

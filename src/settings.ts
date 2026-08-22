@@ -6,6 +6,8 @@ import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertificat
 import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credentials";
 import { normaliseHost } from "./publish/mastodon";
 import { TraktSignIn } from "./ui/traktSignIn";
+import { FEATURES, FeatureSpec, isConfigured, isPartial, setupState } from "./setup";
+import { SetupSheet } from "./ui/setupSheet";
 
 /** What you think of a person, used to weight what gets recommended. */
 import type { Recipe } from "./util/recipe";
@@ -263,6 +265,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			render(containerEl.createDiv({ cls: "reel-settings-section" }));
 		};
 
+		section((el) => this.renderSetup(el));
 		section((el) => this.renderCredentials(el));
 		section((el) => this.renderFolders(el));
 		section((el) => this.renderMetadata(el));
@@ -280,6 +283,153 @@ export class ReelSettingTab extends PluginSettingTab {
 			maxCertification: this.plugin.settings.maxCertification,
 			hideUnrated: this.plugin.settings.hideUnrated,
 		};
+	}
+
+	/* ---------------------------------------------------------------- */
+
+	/**
+	 * Getting started — the section that answers "what do I do first".
+	 *
+	 * Everything below it is a preference. This one is a checklist, and it is
+	 * built out of plain markup rather than `Setting` rows on purpose: a
+	 * settings row says "here is a choice, make it", and none of these are
+	 * choices. They are six things that are either done or not.
+	 *
+	 * The distinction it draws that nothing drew before is between *off because
+	 * you decided against it* and *off because you never got round to it*. Both
+	 * used to render as an empty field. One is a finished state and the other
+	 * is an unfinished one, and telling them apart is most of what "seamless
+	 * first-run setup" actually means.
+	 */
+	private renderSetup(el: HTMLElement): void {
+		new Setting(el).setName("Getting started").setHeading();
+
+		const state = setupState(this.plugin);
+
+		if (state.blocked) {
+			// The only genuinely blocking state Reel has. It gets said once,
+			// plainly, at the top, rather than being inferred from an empty
+			// field forty rows further down.
+			const stop = el.createDiv({ cls: "reel-setup-blocked" });
+			stop.createDiv({ cls: "reel-setup-blocked-title", text: "Reel needs one key before it can do anything" });
+			stop.createDiv({
+				cls: "reel-setup-blocked-body",
+				text:
+					"TMDB supplies every poster, cast list and runtime in the plugin. It is free and takes about " +
+					"two minutes. Everything else on this screen is optional.",
+			});
+			const go = stop.createEl("button", { cls: "reel-btn mod-cta", text: "Set up TMDB" });
+			go.addEventListener("click", () => this.openGuide(state.essential));
+		} else {
+			const on = state.done.length;
+			const total = FEATURES.length - 1;
+			const line = el.createDiv({ cls: "reel-setup-ready" });
+			line.createSpan({ cls: "reel-pill ok", text: "Ready" });
+			line.createSpan({
+				cls: "reel-setup-ready-text",
+				text:
+					on === 0
+						? `Reel works. ${total} optional features are available below.`
+						: `Reel works, with ${on} of ${total} optional features on.`,
+			});
+		}
+
+		/*
+		 * The tick column is reserved, not per-row — six names have to line up,
+		 * and a column that appears only on the rows that earned it makes a
+		 * ragged left edge that reads as a rendering fault.
+		 *
+		 * But on a fresh install nothing has a tick, so the column is pure
+		 * unexplained indent on every row of the one screen every single user
+		 * sees. So it is reserved when it holds something and absent when it
+		 * does not, decided once for the whole list.
+		 */
+		const anyMark = FEATURES.some((f) => isConfigured(this.plugin, f) || isPartial(this.plugin, f));
+		const list = el.createDiv({ cls: `reel-setup-list${anyMark ? "" : " is-fresh"}` });
+		for (const spec of FEATURES) {
+			// When Reel is blocked, the callout above *is* the TMDB item,
+			// promoted out of the list because it is the only thing that
+			// matters. Listing it again three inches below the button that
+			// already does it is the sort of duplication that makes a screen
+			// feel machine-generated.
+			if (state.blocked && spec.essential) continue;
+			this.renderSetupRow(list, spec);
+		}
+
+		el.createDiv({
+			cls: "reel-settings-note",
+			text:
+				"Each guide opens the pages you need, gives you the exact values to paste, and says what leaves " +
+				"your vault before you commit to anything.",
+		});
+	}
+
+	/**
+	 * One feature, as a row you tap.
+	 *
+	 * The row is a `<button>` rather than a div containing one. The first
+	 * version gave every feature its own "Set up" control, which rendered as
+	 * six full-width accent buttons stacked down a phone screen — a wall of
+	 * identical calls to action, none of which could be more important than
+	 * any other because they all looked the same. It passed every check in the
+	 * audit and was obviously wrong in the first screenshot.
+	 *
+	 * The whole row being the target also means the touch area is the size of
+	 * the thing you are aiming at, which on a phone is the only sane answer.
+	 */
+	private renderSetupRow(list: HTMLElement, spec: FeatureSpec): void {
+		const done = isConfigured(this.plugin, spec);
+		const part = isPartial(this.plugin, spec);
+
+		const row = list.createEl("button", { cls: "reel-setup-row" });
+		if (done) row.addClass("is-done");
+		if (part) row.addClass("is-partial");
+		if (spec.essential) row.addClass("is-essential");
+		row.setAttr("aria-label", `${spec.name}. ${done ? "Set up." : part ? "Half done." : "Not set up."} Open the guide.`);
+
+		const mark = row.createSpan({ cls: "reel-setup-mark" });
+		mark.setText(done ? "✓" : part ? "!" : "");
+		// Decoration. The state is already in the row's own label, and a
+		// screen reader announcing "check mark" before the name is noise.
+		mark.setAttr("aria-hidden", "true");
+
+		const body = row.createDiv({ cls: "reel-setup-row-body" });
+		const top = body.createDiv({ cls: "reel-setup-row-top" });
+		top.createSpan({ cls: "reel-setup-row-name", text: spec.name });
+
+		/*
+		 * A pill only when the tick cannot say it.
+		 *
+		 * This has now been wrong twice in opposite directions. The first
+		 * version put one on every row, which was four identical "Optional"
+		 * chips — a label true of most rows, charging rent on the line that
+		 * carries the name. The second dropped those and kept "Set up", which
+		 * on a configured install is five green pills beside five green ticks
+		 * saying the same word twice in the same colour.
+		 *
+		 * A tick means done. That leaves exactly two states a tick cannot
+		 * express, and those are the two that get a pill.
+		 */
+		if (part) top.createSpan({ cls: "reel-pill warn", text: "Half done" });
+		else if (!done && spec.essential) top.createSpan({ cls: "reel-pill warn", text: "Required" });
+
+		body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+
+		const chev = row.createSpan({ cls: "reel-setup-chev", text: "›" });
+		chev.setAttr("aria-hidden", "true");
+
+		row.addEventListener("click", () => this.openGuide(spec));
+	}
+
+	/**
+	 * Redraw after the guide closes.
+	 *
+	 * A key can be saved from inside the sheet's steps, and coming back to a
+	 * checklist still claiming you have not started is exactly the kind of
+	 * small lie that makes a settings screen feel dead.
+	 */
+	private openGuide(spec: FeatureSpec): void {
+		new SetupSheet(this.app, this.plugin, spec, () => this.display()).open();
 	}
 
 	/* ---------------------------------------------------------------- */

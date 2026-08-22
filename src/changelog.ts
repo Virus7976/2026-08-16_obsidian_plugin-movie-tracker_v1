@@ -52,6 +52,45 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.4",
+		date: "2026-08-22",
+		headline: "Setting Reel up is now something the app walks you through.",
+		changes: [
+			{
+				kind: "new",
+				text: "Settings opens with Getting started \u2014 every feature Reel can use, which are set up, and which are not.",
+				note: "A new install used to show forty-nine controls with nothing marking the one that matters from the forty-eight with sensible defaults. It now says so in a sentence at the top, and nothing else competes with it until TMDB is in.",
+			},
+			{
+				kind: "new",
+				text: "Every feature has a guide: numbered steps, the pages to open, and the exact values to paste.",
+				note: "Trakt's redirect URI and Mastodon's scope have to match character for character, and both are now a button that copies them rather than a string to retype from a paragraph.",
+			},
+			{
+				kind: "new",
+				text: "Each guide says what leaves your vault before you set the feature up, not after.",
+			},
+			{
+				kind: "better",
+				text: "A feature that is half set up says so. Registering a Trakt application and not signing in used to look exactly like never having started.",
+			},
+			{
+				kind: "fixed",
+				text: "The links inside the new guides were invisible \u2014 a white button on a white card.",
+				note: "The same collision that hid the key pills in 0.9.3: a control filled with the theme's form-field colour, sitting on a surface that is the same colour. Correctly sized, correctly padded, and not there.",
+			},
+			{
+				kind: "fixed",
+				text: "The tick and warning marks were unreadable on warm-toned themes, at 4.09:1.",
+				note: "Reel now owns those two colours instead of borrowing the theme's. A green chosen against a white page is a fail on a cream card, and both the borrowed value and the fallback behind it had been picked against white.",
+			},
+			{
+				kind: "fixed",
+				text: "In a long guide on a phone with the keyboard up, the way back to settings had scrolled 800px off the bottom.",
+			},
+		],
+	},
+	{
 		version: "0.9.3",
 		date: "2026-08-22",
 		headline: "The settings screen has been designed, and can finally be checked.",

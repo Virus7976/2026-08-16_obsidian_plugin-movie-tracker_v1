@@ -3390,6 +3390,37 @@ input.reel-input {
 	--reel-danger: var(--text-error, #f87171);
 }
 
+/*
+ * The same treatment for the states that are not failures — with one
+ * deliberate difference, which is the whole lesson of this token.
+ *
+ * These do *not* read the theme. `--reel-danger` above defers to
+ * `--text-error` and takes a fallback; the first draft of these did the same
+ * with `--text-success`, and it changed nothing at all: still 4.09:1, the
+ * identical failing number, because the theme defines the token and the
+ * fallback therefore never ran.
+ *
+ * The value it defines is #15803d, which is not an eccentric choice — it is a
+ * standard green-700 and themes ship it constantly. On a white page it is
+ * 6.1:1 and entirely fine. On the warm-light palette's cream card, which sits
+ * at 0.81 relative luminance where a default card sits at 0.95, the same green
+ * is 4.09:1 and fails.
+ *
+ * So a theme's success colour is safe on a theme's own surfaces and not on
+ * ours. Where Reel paints its own card and puts a coloured glyph on it, Reel
+ * owns the colour. Both values below are picked against that cream card rather
+ * than against white, and clear 4.5:1 on every surface either palette has.
+ */
+:root {
+	--reel-ok: #146b34;
+	--reel-warn: #9a4a06;
+}
+
+.theme-dark {
+	--reel-ok: #4ade80;
+	--reel-warn: #fbbf24;
+}
+
 .reel-btn-danger.reel-btn-danger {
 	color: var(--reel-danger);
 	background: transparent;
@@ -14922,4 +14953,507 @@ button.reel-facet-tab {
 .reel-settings .reel-key-status .reel-pill.ok {
 	background: var(--background-modifier-success, rgba(22, 163, 74, 0.2));
 	border-color: transparent;
+}
+
+
+/* ==================================================================== */
+/* Getting started, and the per-feature guides                          */
+/* ==================================================================== */
+
+/*
+ * A checklist is not a settings screen, and should not look like one.
+ *
+ * Everything else under `.reel-settings` is a preference — a question with an
+ * answer you can change. These six rows are states: done or not done. Giving
+ * them the same chrome as a toggle row would be the same mistake Maintenance
+ * used to make, where "delete forty files" sat in identical dress to "poster
+ * size".
+ */
+
+/* ---- The blocking state ------------------------------------------- */
+
+/*
+ * Reel has exactly one hard requirement, and until this release the way you
+ * discovered it was by adding a film and watching nothing happen. It is a
+ * statement now, at the top, before anything else on the screen.
+ *
+ * Accent rather than red: nothing has gone wrong, and dressing a fresh install
+ * as an error is a poor way to meet somebody.
+ */
+.reel-setup-blocked {
+	margin: var(--reel-space-2) 0 var(--reel-space-3);
+	padding: var(--reel-space-3);
+	border: 1px solid var(--interactive-accent, #5b6cff);
+	border-left-width: 3px;
+	border-radius: var(--reel-radius);
+	background: var(--background-primary);
+}
+
+.reel-setup-blocked-title {
+	font-weight: var(--reel-weight-semibold, 600);
+	color: var(--text-normal);
+	margin-bottom: var(--reel-space-1);
+}
+
+.reel-setup-blocked-body {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	max-width: 62ch;
+	margin-bottom: var(--reel-space-3);
+}
+
+/* `.reel-btn` is `flex: 1 1 auto`, which makes a lone button span the card. */
+.reel-settings .reel-setup-blocked button {
+	flex: 0 0 auto;
+	padding-inline: var(--reel-space-4);
+}
+
+.reel-setup-ready {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+	flex-wrap: wrap;
+	margin: var(--reel-space-2) 0 var(--reel-space-3);
+}
+
+.reel-setup-ready-text {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+}
+
+/* ---- The feature rows ---------------------------------------------- */
+
+.reel-setup-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2);
+	margin-bottom: var(--reel-space-2);
+}
+
+/*
+ * Two classes so this outranks a theme's `button:not(button.clickable-icon)`,
+ * which is (0,1,2) and would otherwise decide what a checklist row looks like.
+ */
+.reel-settings .reel-setup-row {
+	display: flex;
+	/*
+	 * Top, not centre. A row is one to three lines depending on how long the
+	 * feature takes to describe, and centring hung the tick beside the middle
+	 * line — so on a three-line row the tick sat next to the description
+	 * rather than next to the name it was ticking.
+	 */
+	align-items: flex-start;
+	gap: var(--reel-space-3);
+	width: 100%;
+	padding: var(--reel-space-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-radius-sm);
+	background: var(--background-primary);
+	box-shadow: none;
+	text-align: left;
+	cursor: pointer;
+	/*
+	 * The row became a `<button>` so the whole thing is tappable, and a button
+	 * does not inherit type from its container. Everything inside it is sized
+	 * in `em`, so the description silently shrank from 12.8px to 10.4px — the
+	 * layout was identical and the text was simply smaller than Reel allows
+	 * anywhere else.
+	 */
+	font: inherit;
+	transition:
+		background 120ms ease,
+		border-color 120ms ease;
+}
+
+.reel-settings .reel-setup-row:hover {
+	background: var(--background-modifier-hover);
+	border-color: var(--background-modifier-border-hover);
+}
+
+.reel-settings .reel-setup-row:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+/* The affordance, now that nothing in the row is a button of its own. */
+.reel-setup-chev {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	font-size: 1.4em;
+	line-height: 1;
+}
+
+/*
+ * A configured feature recedes. The eye should land on what is left to do,
+ * and six identically-weighted rows give it nowhere to land.
+ */
+.reel-settings .reel-setup-row.is-done {
+	background: transparent;
+	border-color: transparent;
+}
+
+.reel-settings .reel-setup-row.is-essential {
+	border-left: 3px solid var(--interactive-accent, #5b6cff);
+}
+
+/*
+ * A done row has no border at all, so keeping the essential bar left a single
+ * grey line floating in the margin attached to nothing. The bar exists to say
+ * "start here"; once you have, it has nothing left to say.
+ */
+.reel-settings .reel-setup-row.is-essential.is-done {
+	border-left-color: transparent;
+}
+
+/*
+ * The tick column is fixed width whether or not it holds a tick, so the six
+ * names line up. Ragged left edges on a checklist read as a rendering fault.
+ */
+.reel-setup-mark {
+	flex: 0 0 1.25em;
+	text-align: center;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	/* Sits on the name's baseline rather than the top of its line box. */
+	line-height: var(--reel-leading-body);
+}
+
+/* The chevron belongs to the row, not to any one line of it. */
+.reel-setup-chev {
+	align-self: center;
+}
+
+.reel-setup-row.is-done .reel-setup-mark {
+	color: var(--reel-ok);
+}
+
+.reel-setup-row.is-partial .reel-setup-mark {
+	color: var(--reel-warn);
+	font-weight: var(--reel-weight-semibold, 600);
+}
+
+.reel-setup-list.is-fresh .reel-setup-mark {
+	display: none;
+}
+
+/* Without this the description refuses to wrap and pushes the chevron off. */
+.reel-setup-row-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.reel-setup-row-top {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+	flex-wrap: wrap;
+}
+
+.reel-setup-row-name {
+	font-weight: var(--reel-weight-semibold, 600);
+	color: var(--text-normal);
+}
+
+.reel-setup-row-gives {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	margin-top: 2px;
+}
+
+/*
+ * No narrow-pane rule any more, and that is the point.
+ *
+ * There was one, and it made the per-row button span the card below the text.
+ * Six of those down a phone screen was 1,400px of purple before you reached a
+ * single actual setting. Removing the buttons removed the need for the rule:
+ * a row that is itself the target has nothing to reflow.
+ */
+
+/* ==================================================================== */
+/* The guide sheet                                                      */
+/* ==================================================================== */
+
+.reel-setup {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-3);
+}
+
+.reel-setup-head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-1);
+}
+
+.reel-setup-title {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+	flex-wrap: wrap;
+}
+
+.reel-setup-name {
+	font-size: var(--font-ui-large);
+	font-weight: var(--reel-weight-semibold, 600);
+	color: var(--text-normal);
+}
+
+.reel-setup-gives {
+	line-height: var(--reel-leading-body);
+	color: var(--text-normal);
+	max-width: 62ch;
+}
+
+.reel-setup-effort {
+	font-size: var(--reel-text-caption);
+	color: var(--text-muted);
+}
+
+/*
+ * What leaves your vault, said before the first step.
+ *
+ * Deliberately given its own box rather than folded into the description. The
+ * sentence "your question and a shortlist of titles are sent to OpenRouter" is
+ * the single most consequential thing on this screen, and prose is where
+ * consequential sentences go to be skimmed.
+ */
+.reel-setup-sends {
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border-radius: var(--reel-radius-sm);
+	background: var(--background-secondary);
+	border-left: 2px solid var(--background-modifier-border);
+}
+
+.reel-setup-sends-label {
+	font-size: var(--font-ui-smaller);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	margin-bottom: 2px;
+}
+
+.reel-setup-sends-text {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-normal);
+}
+
+/* ---- Steps ---------------------------------------------------------- */
+
+.reel-setup-steps {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-3);
+}
+
+.reel-setup-step {
+	padding: var(--reel-space-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-radius);
+	background: var(--background-primary);
+	transition:
+		opacity 140ms ease,
+		border-color 140ms ease;
+}
+
+/*
+ * A done step fades rather than collapses. Collapsing would move every step
+ * below it, which on a phone means the thing you were reading jumps away the
+ * instant you tick the thing above it.
+ */
+.reel-setup-step.is-done {
+	opacity: 0.55;
+}
+
+.reel-setup-step-row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--reel-space-3);
+}
+
+/*
+ * The step number is the button. 44px, round, and the only thing in the sheet
+ * that changes when you press it.
+ */
+.reel-setup .reel-setup-tick {
+	flex: 0 0 auto;
+	width: 44px;
+	height: 44px;
+	min-height: 44px;
+	padding: 0;
+	border-radius: var(--reel-radius-full);
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-weight: var(--reel-weight-semibold, 600);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.reel-setup .reel-setup-tick[aria-pressed="true"] {
+	background: var(--background-modifier-success, rgba(22, 163, 74, 0.2));
+	border-color: transparent;
+	color: var(--text-normal);
+}
+
+.reel-setup .reel-setup-tick:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+/*
+ * Everything a step carries lines up under the instruction, not under the
+ * number. The link, the value to copy and the note are all *about* the
+ * sentence above them, and hanging them off the left margin instead put them
+ * at the same level as the step itself — which reads as four things in the
+ * card rather than one thing with its supporting detail.
+ */
+.reel-setup-step > .reel-setup-copy,
+.reel-setup-step > .reel-setup-go,
+.reel-setup-step > .reel-setup-note {
+	margin-left: calc(44px + var(--reel-space-3));
+}
+
+.reel-setup-step-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	line-height: var(--reel-leading-body);
+	color: var(--text-normal);
+	/* Optically centred against a 44px control rather than top-aligned. */
+	padding-top: 10px;
+}
+
+/*
+ * The copy button holds a value that must be typed exactly, so it is shown
+ * in full and in monospace — an elided redirect URI is worse than none, since
+ * you cannot tell it was elided.
+ */
+.reel-setup .reel-setup-copy {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--reel-space-3);
+	/*
+	 * Not `100%`. `display: flex` makes this block-level, so `auto` already
+	 * fills the row — and unlike `100%` it subtracts the element's own margins
+	 * first. With `100%` the indent that aligns it under the instruction was
+	 * added *on top of* a full-width box, and the sheet scrolled sideways.
+	 */
+	width: auto;
+	min-height: 44px;
+	margin-top: var(--reel-space-2);
+	padding: var(--reel-space-2) var(--reel-space-3);
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--reel-radius-sm);
+	background: var(--background-secondary);
+	box-shadow: none;
+	cursor: pointer;
+	text-align: left;
+}
+
+.reel-setup-copy-value {
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}
+
+.reel-setup-copy-hint {
+	flex: 0 0 auto;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-setup .reel-setup-copy.is-copied {
+	border-style: solid;
+	border-color: var(--interactive-accent, #5b6cff);
+}
+
+.reel-setup .reel-setup-copy.is-copied .reel-setup-copy-hint::after {
+	content: " ✓";
+}
+
+/*
+ * The link out of a step, and the second time this exact bug has shipped.
+ *
+ * `.reel-btn` fills with `--background-modifier-form-field`, which on most
+ * light themes is white. The step card it sits on is `--background-primary`,
+ * which is also white. So the button was there, correctly sized at 113x44,
+ * correctly padded, and completely invisible — the same collision that made
+ * the key pills disappear into the settings card in 0.9.3.
+ *
+ * Every automated check passed, both times, because an invisible control has
+ * no contrast fault, no overflow and no undersized target. A control's fill
+ * has to be chosen against the surface it actually lands on, and a form-field
+ * colour is chosen against a form.
+ */
+.reel-setup .reel-setup-go {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: var(--reel-space-2);
+	flex: 0 0 auto;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+	font-weight: var(--font-medium, 500);
+	text-decoration: none;
+}
+
+.reel-setup .reel-setup-go:hover {
+	background: var(--background-modifier-hover);
+	text-decoration: none;
+}
+
+/* It leaves the app, and says so. */
+.reel-setup .reel-setup-go::after {
+	content: "\2197";
+	margin-left: 0.4em;
+	color: var(--text-muted);
+}
+
+.reel-setup-note {
+	font-size: var(--reel-text-caption);
+	line-height: var(--reel-leading-body);
+	color: var(--text-muted);
+	margin-top: var(--reel-space-2);
+	padding-left: var(--reel-space-3);
+	border-left: 2px solid var(--background-modifier-border);
+	max-width: 62ch;
+}
+
+/*
+ * The way out of a guide is always on screen.
+ *
+ * A sheet is `max-height: 88vh` with `overflow-y: auto`, so a five-step guide
+ * scrolls — and the footer was landing at y1259 in a 432px window, which is
+ * what a phone is once the keyboard is up. Every other sheet in Reel is short
+ * enough that this never came up; this is the first one that is a document.
+ *
+ * Sticky rather than fixed, so it sits at the bottom of the sheet rather than
+ * the bottom of the screen, and stops being sticky once you have scrolled far
+ * enough that it is genuinely the end of the content.
+ */
+.reel-setup-foot {
+	position: sticky;
+	bottom: 0;
+	z-index: 1;
+	display: flex;
+	justify-content: flex-end;
+	margin-top: auto;
+	padding-top: var(--reel-space-3);
+	/* Opaque, or the last step reads through the button as it scrolls under. */
+	background: var(--background-primary);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.reel-setup .reel-setup-foot button {
+	flex: 0 0 auto;
+	padding-inline: var(--reel-space-4);
 }

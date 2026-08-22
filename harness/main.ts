@@ -33,6 +33,11 @@ import { FilterSheet, emptyFilters } from "../src/ui/filterSheet";
 import { SeasonSheet } from "../src/ui/seasonSheet";
 import { PersonSheet } from "../src/ui/personSheet";
 import { ReelSettingTab } from "../src/settings";
+import { SetupSheet } from "../src/ui/setupSheet";
+import { FEATURES } from "../src/setup";
+
+/** Set by the first-run scene so the credential stub reports an empty vault. */
+let noKeys = false;
 import { PublishSheet } from "../src/ui/publishSheet";
 import { AskSheet } from "../src/ui/askSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
@@ -302,6 +307,13 @@ const plugin = {
 	},
 	ai: { configured: true },
 	/*
+	 * Flipped by the first-run scene.
+	 *
+	 * A module-level flag rather than a parameter because `plugin` is built
+	 * once at load and the settings tab reads the store through it. The scene
+	 * sets it, renders, and puts it back.
+	 */
+	/*
 	 * Enough of the credential store for the settings screen to render.
 	 *
 	 * Keys are reported present so the sections that unfold behind one are
@@ -311,7 +323,7 @@ const plugin = {
 	 * ever presses anything.
 	 */
 	credentials: {
-		has: (name: string) => name !== "mastodon",
+		has: (name: string) => name !== "mastodon" && !noKeys,
 		isUnlocked: true,
 		hasStoredKey: true,
 		store: async () => true,
@@ -1264,6 +1276,45 @@ function asksheet(root: HTMLElement): void {
  * half its length and none of the sections that unfold behind a key exist —
  * which is the state that would pass most easily and prove least.
  */
+/**
+ * The very first screen a new install sees.
+ *
+ * Every other scene in this rig is drawn with the app in a good state — keys
+ * present, library full, features on — because that is where the interesting
+ * layout lives. It is also the state nobody starts in. This one has nothing
+ * configured at all, which is the only view of Reel that every single user is
+ * guaranteed to see, and until now the only one never measured.
+ */
+function firstrun(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	noKeys = true;
+	const before = { ...plugin.settings };
+	Object.assign(plugin.settings, { keyBlob: null, keysPlain: null, keyNames: [] });
+	try {
+		const tab = new ReelSettingTab(plugin.app as never, plugin as never);
+		tab.containerEl = root;
+		tab.display();
+	} finally {
+		noKeys = false;
+		Object.assign(plugin.settings, before);
+	}
+}
+
+/**
+ * One feature's setup guide.
+ *
+ * Trakt, because it is the longest and the only one carrying every kind of
+ * step the format supports — a link, a value that must be copied character
+ * for character, and the notes explaining why. If the layout holds here it
+ * holds for the other five.
+ */
+function setupsheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const spec = FEATURES.find((f) => f.id === "trakt");
+	if (!spec) throw new Error("harness: no trakt feature spec");
+	mountSheet(root, new SetupSheet(plugin.app, plugin as never, spec) as never);
+}
+
 function settings(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const before = { ...plugin.settings };
@@ -1323,6 +1374,8 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	publishsheet,
 	asksheet,
 	settings,
+	firstrun,
+	setupsheet,
 	longshow,
 	quick,
 };
