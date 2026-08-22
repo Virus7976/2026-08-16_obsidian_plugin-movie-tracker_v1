@@ -35,6 +35,8 @@ import { PersonSheet } from "../src/ui/personSheet";
 import { ReelSettingTab } from "../src/settings";
 import { SetupSheet } from "../src/ui/setupSheet";
 import { FEATURES } from "../src/setup";
+import { traktComplaint } from "../src/publish/compose";
+import { BLOCKERS } from "../src/publish";
 
 /** Set by the first-run scene so the credential stub reports an empty vault. */
 let noKeys = false;
@@ -57,6 +59,8 @@ let locked = false;
 let aiOff = false;
 /* Set by the publish scene that models an install with no destination set up. */
 let noTargets = false;
+/* Set by the scene that models a review already sent to one of the two. */
+let alreadySent = false;
 /*
  * Keys a scene wants to be *missing* while the rest are present.
  *
@@ -391,11 +395,28 @@ const plugin = {
 							id: "mastodon",
 							label: "Mastodon",
 							enabled: true,
-							blocker: "No Mastodon access token — add one in Settings → Reel.",
+							blocker: BLOCKERS.mastodonToken,
 						},
 					],
-		publishedTo: () => ({}),
-		complaint: () => null,
+		/*
+		 * Whether this review has been sent before.
+		 *
+		 * Pinned empty, so the "Already published once" note — the only thing
+		 * standing between a rewatch review and a duplicate post — had never
+		 * been rendered.
+		 */
+		publishedTo: () => (alreadySent ? { trakt: "https://trakt.tv/comments/1" } : {}),
+		/*
+		 * The real rule, not a constant.
+		 *
+		 * `() => null` meant the warning box was unreachable in the rig, and it
+		 * is the box that says why Publish is disabled. Delegating to the
+		 * function the app uses means the fixture cannot drift from the rule:
+		 * a review the harness calls short is short because Trakt's own
+		 * minimum says so.
+		 */
+		complaint: (payload: { text: string; entry: { tmdbId?: number } }, id: string) =>
+			id === "trakt" ? traktComplaint(payload as never) : payload.text.trim() ? null : "There's nothing written to post.",
 		preview: async () => ({
 			text:
 				"★★★★½\n\nA review long enough to wrap several times in the preview box, because a " +
@@ -1508,6 +1529,37 @@ function publishnowhere(root: HTMLElement): void {
 	}
 }
 
+/**
+ * A review Trakt will refuse, and one already sent.
+ *
+ * `complaint()` and `publishedTo()` were both constants in this rig, so two
+ * branches of the publish sheet had never been drawn: the box explaining why
+ * Publish is greyed out, and the note saying you have posted this once already.
+ *
+ * Both matter more than their size suggests. The first is the only thing on the
+ * screen that answers "why can't I press this"; the second is the only thing
+ * standing between a rewatch and a duplicate public post.
+ */
+function publishrefused(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	alreadySent = true;
+	try {
+		mountSheet(
+			root,
+			new PublishSheet(plugin.app, plugin as never, {
+				entry: LIBRARY[0],
+				date: "2026-08-20",
+				rating: 4.5,
+				// Under Trakt's minimum on purpose, which the real rule decides.
+				text: "Loved it.",
+			}) as never
+		);
+		(root.querySelector(".reel-publish-target") as HTMLElement | null)?.click();
+	} finally {
+		alreadySent = false;
+	}
+}
+
 function asksheet(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	mountSheet(
@@ -1929,6 +1981,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	askoff,
 	askdisabled,
 	publishnowhere,
+	publishrefused,
 	settings,
 	settingsLocked,
 	settingsPlain,

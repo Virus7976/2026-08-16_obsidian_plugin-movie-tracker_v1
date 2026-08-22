@@ -45,6 +45,22 @@ export interface PublishOutcome {
 	error?: string;
 }
 
+/**
+ * Why a destination cannot be used yet, and what tapping it will do.
+ *
+ * A table rather than four inline strings, because the test harness had its own
+ * copy of one of them and it drifted the moment these were reworded — the rig
+ * went on rendering "add one in Settings → Reel" while the app had stopped
+ * saying it. A fixture that quotes the app instead of paraphrasing it cannot
+ * disagree with the app.
+ */
+export const BLOCKERS = {
+	traktApp: "No Trakt application yet — tap to set up.",
+	traktSignIn: "Not signed in to Trakt — tap to sign in.",
+	mastodonHost: "No Mastodon server set — tap to set up.",
+	mastodonToken: "No Mastodon access token — tap to set up.",
+} as const;
+
 export class PublishService {
 	readonly trakt: TraktClient;
 	readonly mastodon: MastodonClient;
@@ -74,15 +90,24 @@ export class PublishService {
 
 		if (s.publishTrakt) {
 			let blocker: string | null = null;
-			if (!creds.has("traktApp")) blocker = "No Trakt application yet — add one in Settings → Reel.";
-			else if (!creds.has("trakt")) blocker = "Not signed in to Trakt — sign in from Settings → Reel.";
+			/*
+			 * What is missing, and what tapping will do about it.
+			 *
+			 * These used to end "add one in Settings → Reel", which was a
+			 * direction rather than an action, printed inside a button that was
+			 * disabled so you could not follow it from where you were reading
+			 * it. The tile opens the feature's own walkthrough now, so the
+			 * sentence can name that instead of naming a tab.
+			 */
+			if (!creds.has("traktApp")) blocker = BLOCKERS.traktApp;
+			else if (!creds.has("trakt")) blocker = BLOCKERS.traktSignIn;
 			out.push({ id: "trakt", label: "Trakt", enabled: true, blocker });
 		}
 
 		if (s.publishMastodon) {
 			let blocker: string | null = null;
-			if (!normaliseHost(s.mastodonHost)) blocker = "No Mastodon instance set — add one in Settings → Reel.";
-			else if (!creds.has("mastodon")) blocker = "No Mastodon access token — add one in Settings → Reel.";
+			if (!normaliseHost(s.mastodonHost)) blocker = BLOCKERS.mastodonHost;
+			else if (!creds.has("mastodon")) blocker = BLOCKERS.mastodonToken;
 			out.push({ id: "mastodon", label: "Mastodon", enabled: true, blocker });
 		}
 

@@ -144,5 +144,57 @@ ok(
 );
 ok("the post is reached from a click", /addEventListener\("click", \(\) => void this\.run\(\)\)/.test(sheet));
 
+/* ---- a blocked destination is not a dead end -------------------------- */
+
+/*
+ * The blocked tile carried the instruction and could not be acted on.
+ *
+ * "No Mastodon access token — add one in Settings → Reel", printed inside a
+ * disabled button: the one control on the screen telling you what to do was
+ * the one control you could not press. You closed the sheet, opened settings,
+ * and hunted for the section, having been told which feature it was by a screen
+ * that could have opened it.
+ *
+ * It opens the walkthrough now, which puts a new click handler inside the
+ * publish sheet — so this file, whose whole charter is that no new edge reaches
+ * a public post, is where it gets pinned.
+ */
+ok(
+	"a blocked destination opens its walkthrough",
+	/new SetupSheet\(this\.app, this\.plugin, spec\)\.open\(\)/.test(sheet),
+	"the blocker text names a feature and does nothing about it"
+);
+
+/*
+ * And that path must not touch the post. The blocked branch closes the sheet
+ * before opening anything, so it cannot select a target, cannot enable Publish
+ * and cannot reach run().
+ */
+const blockedBranch = sheet.slice(sheet.indexOf("if (t.blocker) {"), sheet.indexOf("if (already) {"));
+ok("the blocked branch was found", blockedBranch.length > 100);
+ok(
+	"tapping a blocked destination cannot choose it",
+	!blockedBranch.includes("this.chosen"),
+	"a destination that cannot post would be added to the set that does"
+);
+ok("nor reach the post", !blockedBranch.includes("this.run"));
+
+/*
+ * The blocker sentences live in one table.
+ *
+ * The test harness kept its own copy of one of them, and it drifted the moment
+ * these were reworded: the rig went on rendering "add one in Settings → Reel"
+ * for a release in which the app had stopped saying it, and every check passed.
+ * A fixture that quotes the app cannot disagree with the app.
+ */
+const publishSrc = readFileSync(join(SRC, "publish", "index.ts"), "utf8");
+ok("there is one table of blocker text", /export const BLOCKERS/.test(publishSrc));
+const strays = readFileSync(join(__dirname, "..", "harness", "main.ts"), "utf8").match(/blocker: "/g) ?? [];
+ok(
+	"and the harness quotes it rather than paraphrasing",
+	strays.length === 0,
+	"the rig writes its own blocker text, so it can render a sentence the app no longer says"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

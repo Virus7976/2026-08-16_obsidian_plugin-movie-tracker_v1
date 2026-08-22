@@ -149,9 +149,31 @@ export class PublishSheet extends Modal {
 
 			const already = this.plugin.publish.publishedTo(this.opts.entry)[t.id];
 			if (t.blocker) {
+				/*
+				 * Blocked, not inert.
+				 *
+				 * The note said what was missing and where to go and fix it,
+				 * inside a button that was disabled — so the one control on the
+				 * screen carrying the instruction was the one control you could
+				 * not act on. You closed the sheet, opened settings, and hunted
+				 * for the section, having been told which feature it was by a
+				 * screen that could simply have opened it.
+				 *
+				 * It stays visually distinct from a chosen destination, because
+				 * it is not one: tapping sets it up rather than selecting it.
+				 */
 				btn.addClass("is-blocked");
 				btn.createSpan({ cls: "reel-publish-target-note", text: t.blocker });
-				btn.disabled = true;
+				const spec = FEATURES.find((f) => f.id === t.id);
+				if (!spec) {
+					btn.disabled = true;
+					continue;
+				}
+				btn.setAttribute("aria-label", `Set up ${spec.name}`);
+				btn.addEventListener("click", () => {
+					this.close();
+					new SetupSheet(this.app, this.plugin, spec).open();
+				});
 				continue;
 			}
 			if (already) {

@@ -5090,9 +5090,23 @@ ${body}
   }
 
   // src/publish/compose.ts
+  var TRAKT_MIN_WORDS = 5;
   var TRAKT_REVIEW_WORDS = 200;
   function wordCount(text) {
     return text.trim().split(/\s+/).filter(Boolean).length;
+  }
+  function traktComplaint(payload) {
+    const body = payload.text.trim();
+    if (!body)
+      return "There's nothing written to post.";
+    const words = wordCount(body);
+    if (words < TRAKT_MIN_WORDS) {
+      return `Trakt needs at least ${TRAKT_MIN_WORDS} words \u2014 this is ${words}.`;
+    }
+    if (!payload.entry.tmdbId) {
+      return "This note has no TMDB id, so Trakt can't tell which title it's about.";
+    }
+    return null;
   }
 
   // src/setup.ts
@@ -6167,7 +6181,16 @@ ${body}
         if (t.blocker) {
           btn.addClass("is-blocked");
           btn.createSpan({ cls: "reel-publish-target-note", text: t.blocker });
-          btn.disabled = true;
+          const spec = FEATURES.find((f) => f.id === t.id);
+          if (!spec) {
+            btn.disabled = true;
+            continue;
+          }
+          btn.setAttribute("aria-label", `Set up ${spec.name}`);
+          btn.addEventListener("click", () => {
+            this.close();
+            new SetupSheet(this.app, this.plugin, spec).open();
+          });
           continue;
         }
         if (already) {
@@ -10074,6 +10097,14 @@ ${body}
     }
   };
 
+  // src/publish/index.ts
+  var BLOCKERS = {
+    traktApp: "No Trakt application yet \u2014 tap to set up.",
+    traktSignIn: "Not signed in to Trakt \u2014 tap to sign in.",
+    mastodonHost: "No Mastodon server set \u2014 tap to set up.",
+    mastodonToken: "No Mastodon access token \u2014 tap to set up."
+  };
+
   // src/ai/find.ts
   var EMPTY_CRITERIA = {
     pool: "any",
@@ -11173,6 +11204,7 @@ ${body}
   var locked = false;
   var aiOff = false;
   var noTargets = false;
+  var alreadySent = false;
   var missing = /* @__PURE__ */ new Set();
   var present = /* @__PURE__ */ new Set();
   var FIXED_NOW = Date.now();
@@ -11395,11 +11427,27 @@ ${body}
           id: "mastodon",
           label: "Mastodon",
           enabled: true,
-          blocker: "No Mastodon access token \u2014 add one in Settings \u2192 Reel."
+          blocker: BLOCKERS.mastodonToken
         }
       ],
-      publishedTo: () => ({}),
-      complaint: () => null,
+      /*
+       * Whether this review has been sent before.
+       *
+       * Pinned empty, so the "Already published once" note — the only thing
+       * standing between a rewatch review and a duplicate post — had never
+       * been rendered.
+       */
+      publishedTo: () => alreadySent ? { trakt: "https://trakt.tv/comments/1" } : {},
+      /*
+       * The real rule, not a constant.
+       *
+       * `() => null` meant the warning box was unreachable in the rig, and it
+       * is the box that says why Publish is disabled. Delegating to the
+       * function the app uses means the fixture cannot drift from the rule:
+       * a review the harness calls short is short because Trakt's own
+       * minimum says so.
+       */
+      complaint: (payload, id) => id === "trakt" ? traktComplaint(payload) : payload.text.trim() ? null : "There's nothing written to post.",
       preview: async () => ({
         text: "\u2605\u2605\u2605\u2605\xBD\n\nA review long enough to wrap several times in the preview box, because a one-line sample would never show whether the text block scrolls, clips, or pushes the Publish button off the bottom of a phone screen.",
         truncated: true
@@ -12157,6 +12205,25 @@ ${body}
       noTargets = false;
     }
   }
+  function publishrefused(root) {
+    root.addClass("reel-view-body");
+    alreadySent = true;
+    try {
+      mountSheet(
+        root,
+        new PublishSheet(plugin.app, plugin, {
+          entry: LIBRARY[0],
+          date: "2026-08-20",
+          rating: 4.5,
+          // Under Trakt's minimum on purpose, which the real rule decides.
+          text: "Loved it."
+        })
+      );
+      root.querySelector(".reel-publish-target")?.click();
+    } finally {
+      alreadySent = false;
+    }
+  }
   function asksheet(root) {
     root.addClass("reel-view-body");
     mountSheet(
@@ -12435,6 +12502,7 @@ ${body}
     askoff,
     askdisabled,
     publishnowhere,
+    publishrefused,
     settings,
     settingsLocked,
     settingsPlain,

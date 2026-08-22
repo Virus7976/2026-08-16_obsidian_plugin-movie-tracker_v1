@@ -52,6 +52,22 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.25",
+		date: "2026-08-22",
+		headline: "A destination you haven't set up is now something you can tap, not just something you're told about.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Tapping a greyed-out Trakt or Mastodon tile in the publish sheet opens its walkthrough.",
+				note: "The tile said what was missing and where to go and fix it, inside a button that was disabled — so the one control carrying the instruction was the one control you could not press.",
+			},
+			{
+				kind: "better",
+				text: "Those tiles now say what tapping will do instead of naming a settings tab.",
+			},
+		],
+	},
+	{
 		version: "0.9.24",
 		date: "2026-08-22",
 		headline: "Finishing a walkthrough now leaves you with a working feature.",
