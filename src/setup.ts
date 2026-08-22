@@ -28,6 +28,7 @@
 
 import type ReelPlugin from "./main";
 import type { KeyName } from "./credentials";
+import { normaliseHost } from "./publish/mastodon";
 
 export type FeatureId = "tmdb" | "omdb" | "dtdd" | "openrouter" | "trakt" | "mastodon";
 
@@ -303,10 +304,40 @@ export function isConfigured(plugin: ReelPlugin, spec: FeatureSpec): boolean {
 	return spec.keys.every((k) => plugin.credentials.has(k));
 }
 
-/** Has setup been begun but not finished? Trakt is the only one that can be. */
+/**
+ * Is the thing a step produces in the vault?
+ *
+ * The one place that knows what proves what, because there is now more than one
+ * kind of proof and two screens were about to disagree about it. Credentials are
+ * asked of the stored *names*, never the values, so every question here can be
+ * answered while the vault is locked — which is the whole reason an honest
+ * picture can be drawn before anybody is asked for a passphrase.
+ */
+export function proves(plugin: ReelPlugin, k: StepProof): boolean {
+	if (k === "mastodonHost") return Boolean(normaliseHost(plugin.settings.mastodonHost));
+	return plugin.credentials.has(k);
+}
+
+/**
+ * Has setup been begun but not finished?
+ *
+ * Asked of the steps rather than of the credentials, which is not a
+ * simplification — it is the fix for two screens disagreeing.
+ *
+ * This used to read "Trakt is the only one that can be", and that was true
+ * while a credential was the only observable thing. It stopped being true the
+ * moment Mastodon's server address could tick a step: the guide would show five
+ * of six steps behind you while the row on the settings tab that opens it said
+ * "Not set up", because the row asked about tokens and the guide asked about
+ * progress. Both were describing the same vault.
+ *
+ * Deriving both from the step list is what stops that recurring. A feature is
+ * half done when something a step asks for is there and the feature still is
+ * not ready, whatever kind of thing that was.
+ */
 export function isPartial(plugin: ReelPlugin, spec: FeatureSpec): boolean {
 	if (isConfigured(plugin, spec)) return false;
-	return spec.keys.some((k) => plugin.credentials.has(k));
+	return spec.steps.some((s) => s.key && proves(plugin, s.key));
 }
 
 export interface SetupState {

@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.28",
+		date: "2026-08-22",
+		headline: "The settings list and the guide it opens now agree about how far in you are.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Mastodon reads as half done once your server is entered, instead of not set up.",
+				note: "The guide had started counting your server address as progress and the row that opens it had not, so one screen showed five of six steps behind you while the other said you had not begun. Both were describing the same vault.",
+			},
+		],
+	},
+	{
 		version: "0.9.27",
 		date: "2026-08-22",
 		headline: "A walkthrough now remembers where you were when you left it.",

@@ -5109,6 +5109,18 @@ ${body}
     return null;
   }
 
+  // src/publish/mastodon.ts
+  function normaliseHost(raw) {
+    let host = (raw ?? "").trim();
+    if (!host)
+      return "";
+    host = host.replace(/^https?:\/\//i, "");
+    host = host.split("/")[0];
+    if (host.includes("@"))
+      host = host.slice(host.lastIndexOf("@") + 1);
+    return host.toLowerCase();
+  }
+
   // src/setup.ts
   var FEATURES = [
     {
@@ -5273,10 +5285,15 @@ ${body}
   function isConfigured(plugin2, spec) {
     return spec.keys.every((k) => plugin2.credentials.has(k));
   }
+  function proves(plugin2, k) {
+    if (k === "mastodonHost")
+      return Boolean(normaliseHost(plugin2.settings.mastodonHost));
+    return plugin2.credentials.has(k);
+  }
   function isPartial(plugin2, spec) {
     if (isConfigured(plugin2, spec))
       return false;
-    return spec.keys.some((k) => plugin2.credentials.has(k));
+    return spec.steps.some((s) => s.key && proves(plugin2, s.key));
   }
   function setupState(plugin2) {
     const essential = FEATURES.find((f) => f.essential);
@@ -5377,18 +5394,6 @@ ${body}
       return { text: "Keys are locked \u2014 unlock to check", tone: "info" };
     }
     return describeHealth(rec, true, now);
-  }
-
-  // src/publish/mastodon.ts
-  function normaliseHost(raw) {
-    let host = (raw ?? "").trim();
-    if (!host)
-      return "";
-    host = host.replace(/^https?:\/\//i, "");
-    host = host.split("/")[0];
-    if (host.includes("@"))
-      host = host.slice(host.lastIndexOf("@") + 1);
-    return host.toLowerCase();
   }
 
   // src/checks.ts
@@ -5858,14 +5863,12 @@ ${body}
     /**
      * Is this step's product in the vault?
      *
-     * Two kinds of answer, because two kinds of thing. Credentials are asked of
-     * the stored *names* so the question survives a locked vault; Mastodon's
-     * server is an ordinary setting and is simply read.
+     * Delegated, because the settings row asks the same question and the two
+     * gave different answers for a release: the guide counted the Mastodon
+     * server as progress and the row that opens it did not.
      */
     proves(k) {
-      if (k === "mastodonHost")
-        return Boolean(normaliseHost(this.plugin.settings.mastodonHost));
-      return this.plugin.credentials.has(k);
+      return proves(this.plugin, k);
     }
     /**
      * Write the marks down.

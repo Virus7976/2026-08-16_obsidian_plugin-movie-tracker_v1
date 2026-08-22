@@ -41,13 +41,12 @@
 import { App, Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
 import type { FeatureSpec, SetupStep } from "../setup";
-import { isConfigured, isPartial } from "../setup";
+import { isConfigured, isPartial, proves } from "../setup";
 import { NEEDS_KEY_TO_CHECK, featureHealth } from "../health";
 import { checkFeature, checkable } from "../checks";
 import { setupFields } from "./fields";
 import { completedSteps } from "../setup";
 import type { StepProof } from "../setup";
-import { normaliseHost } from "../publish/mastodon";
 
 export class SetupSheet extends Modal {
 	private ticked = new Set<number>();
@@ -114,13 +113,12 @@ export class SetupSheet extends Modal {
 	/**
 	 * Is this step's product in the vault?
 	 *
-	 * Two kinds of answer, because two kinds of thing. Credentials are asked of
-	 * the stored *names* so the question survives a locked vault; Mastodon's
-	 * server is an ordinary setting and is simply read.
+	 * Delegated, because the settings row asks the same question and the two
+	 * gave different answers for a release: the guide counted the Mastodon
+	 * server as progress and the row that opens it did not.
 	 */
 	private proves(k: StepProof): boolean {
-		if (k === "mastodonHost") return Boolean(normaliseHost(this.plugin.settings.mastodonHost));
-		return this.plugin.credentials.has(k);
+		return proves(this.plugin, k);
 	}
 
 	/**

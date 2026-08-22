@@ -136,9 +136,18 @@ for (const f of FEATURES) {
 
 /* ---- State ---------------------------------------------------------- */
 
-function fake(present: KeyName[]): never {
+/*
+ * A vault, as much of one as these questions need.
+ *
+ * `settings` is here because "what is set up" stopped being a question purely
+ * about credentials. Mastodon's server address is an ordinary setting and it is
+ * the one piece of progress in that walkthrough Reel can observe, so a fixture
+ * that could only express stored keys could not express the state this file
+ * exists to describe.
+ */
+function fake(present: KeyName[], mastodonHost = ""): never {
 	const set = new Set(present);
-	return { credentials: { has: (k: KeyName) => set.has(k) } } as never;
+	return { credentials: { has: (k: KeyName) => set.has(k) }, settings: { mastodonHost } } as never;
 }
 
 const tmdb = FEATURES.find((f) => f.id === "tmdb")!;
@@ -423,6 +432,49 @@ ok(
 	/filter\(\(i\) => i >= proven\)/.test(sheetSrc),
 	"storing an inferred tick freezes it, so removing the key would leave the guide still claiming the step"
 );
+
+/* ---- one answer to "how far in am I" ---------------------------------- */
+
+/*
+ * The guide and the row that opens it were about to disagree.
+ *
+ * `isPartial` asked about credentials; the ticks asked about steps. That was
+ * the same question while a credential was the only observable thing, and
+ * stopped being so the moment Mastodon's server address could tick one — the
+ * guide showed five of six steps behind you while the settings row said "Not
+ * set up", both describing the same vault.
+ *
+ * Deriving both from the step list is what stops it recurring, so what is
+ * pinned here is the agreement rather than either answer.
+ */
+const mastoSpec = FEATURES.find((f) => f.id === "mastodon")!;
+
+ok("nothing typed is not half done", !isPartial(fake([]), mastoSpec));
+ok("a server alone is half done", isPartial(fake([], "mastodon.social"), mastoSpec));
+ok("and is not finished", !isConfigured(fake([], "mastodon.social"), mastoSpec));
+ok("the token finishes it", isConfigured(fake(["mastodon"], "mastodon.social"), mastoSpec));
+ok("and finished is not half done", !isPartial(fake(["mastodon"], "mastodon.social"), mastoSpec));
+
+/*
+ * The agreement itself: whatever ticks a step must also count as begun.
+ * Checked across every feature, so a seventh arrives held to the same rule.
+ */
+for (const f of FEATURES) {
+	const keyed = f.steps.filter((st) => st.key);
+	if (keyed.length < 2) continue;
+	const first = keyed[0].key!;
+	const vault = first === "mastodonHost" ? fake([], "mastodon.social") : fake([first as KeyName]);
+	ok(
+		`${f.id}: the first checkable step counts as begun`,
+		isPartial(vault, f) === !isConfigured(vault, f),
+		"the guide would tick a step the settings row calls untouched"
+	);
+	ok(`${f.id}: and the guide agrees`, completedSteps(f, (k) => k === first) > 0);
+}
+
+// Trakt still behaves exactly as it did; this was never meant to change it.
+ok("the Trakt application alone is still half done", isPartial(fake(["traktApp"]), trakt));
+ok("and Trakt with nothing is still untouched", !isPartial(fake([]), trakt));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);
