@@ -8992,7 +8992,7 @@ ${body}
       }
       el.createDiv({
         cls: "reel-settings-note",
-        text: "Each guide opens the pages you need, gives you the exact values to paste, and says what leaves your vault before you commit to anything."
+        text: "Each guide opens the pages you need, takes the key in the guide itself, and can check it works before you leave. Every one says what leaves your vault before you commit to anything."
       });
     }
     /**
@@ -9036,8 +9036,10 @@ ${body}
         top.createSpan({ cls: "reel-pill warn", text: "Half done" });
       else if (!done && spec.essential)
         top.createSpan({ cls: "reel-pill warn", text: "Required" });
-      if (!done)
+      if (!done) {
         body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+        body.createDiv({ cls: "reel-setup-row-effort", text: spec.effort });
+      }
       if (sick && health)
         body.createDiv({ cls: "reel-setup-row-warn", text: health.text });
       const chev = row.createSpan({ cls: "reel-setup-chev", text: "\u203A" });

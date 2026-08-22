@@ -692,8 +692,8 @@ export class ReelSettingTab extends PluginSettingTab {
 		el.createDiv({
 			cls: "reel-settings-note",
 			text:
-				"Each guide opens the pages you need, gives you the exact values to paste, and says what leaves " +
-				"your vault before you commit to anything.",
+				"Each guide opens the pages you need, takes the key in the guide itself, and can check it works " +
+				"before you leave. Every one says what leaves your vault before you commit to anything.",
 		});
 	}
 
@@ -774,7 +774,23 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * settled questions above the first thing you might actually want to
 		 * change. Done rows are one line; the guide is still a tap away.
 		 */
-		if (!done) body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+		if (!done) {
+			body.createDiv({ cls: "reel-setup-row-gives", text: spec.gives });
+			/*
+			 * How long, and whether it costs anything.
+			 *
+			 * `effort` existed on every feature and was only ever shown inside
+			 * the guide — which is one tap too late, because it is the fact
+			 * that decides whether you take the tap. "Publishing to a public
+			 * film profile" tells you what it does and nothing about whether
+			 * this is a two-minute job or an account you have to register.
+			 *
+			 * Undone rows only, following the same rule as the sentence above
+			 * it: this is a pitch, and a pitch is for something you have not
+			 * bought yet.
+			 */
+			body.createDiv({ cls: "reel-setup-row-effort", text: spec.effort });
+		}
 
 		/*
 		 * A configured feature that is failing says so here.

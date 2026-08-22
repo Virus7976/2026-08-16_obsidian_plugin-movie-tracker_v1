@@ -15228,6 +15228,19 @@ button.reel-facet-tab {
 	color: var(--text-normal);
 }
 
+/*
+ * "5 minutes, free" — quieter than the pitch above it and on its own line.
+ *
+ * It answers a different question from the description: not what this gives
+ * you but what it asks of you, which is the half that decides whether you tap.
+ * Muted and small because it is a caveat, not a sell.
+ */
+.reel-setup-row-effort {
+	margin-top: 2px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
 .reel-setup-row-gives {
 	font-size: var(--reel-text-caption);
 	line-height: var(--reel-leading-body);

@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.16",
+		date: "2026-08-22",
+		headline: "Getting started says what each feature will cost you, before you tap it.",
+		changes: [
+			{
+				kind: "new",
+				text: "Each feature you have not set up now shows how long it takes and whether it costs anything.",
+				note: "Every feature already carried that line and it was only ever shown inside the guide — one tap too late, because it is the fact that decides whether you take the tap. “Publishing to a public film profile” says what it does and nothing about whether it is two minutes or an account you have to register. OpenRouter says you pay per question; DoesTheDogDie says they approve by hand.",
+			},
+			{
+				kind: "better",
+				text: "The note under Getting started describes what a guide now actually does.",
+				note: "It still said guides give you values to paste somewhere else, which stopped being true when they started taking the key themselves and checking it works.",
+			},
+		],
+	},
+	{
 		version: "0.9.15",
 		date: "2026-08-22",
 		headline: "Every control on the settings screen says what it does.",
