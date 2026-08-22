@@ -62,6 +62,67 @@ Stated plainly, because a threat model that claims too much is worse than none:
 - **A weak passphrase.** PBKDF2 at 310k iterations raises the cost of a guess; it does not save `password1`. The setter enforces 8 characters, which is a floor, not a recommendation.
 - **Shoulder-surfing the settings screen** while you paste a key in.
 
+## Two kinds of credential
+
+Until 0.9.0 every key Reel held could only *read* a public catalogue. The worst
+case for a leaked TMDB key was somebody else looking up films on your quota.
+
+Publishing changes that, and the difference is worth naming rather than
+burying in a shared list of pills:
+
+| | **Read keys** | **Write credentials** |
+|---|---|---|
+| Which | TMDB, OMDb, DoesTheDogDie, OpenRouter | Trakt, Mastodon |
+| What it can do | Fetch public data | **Post publicly under your name** |
+| Worst case if leaked | Your quota is spent | Someone writes as you |
+| Storage | Same encrypted blob, same passphrase | Same encrypted blob, same passphrase |
+
+They share the blob because splitting them would mean two passphrase prompts
+and buy nothing — anything that can read one can read the other. What differs
+is what a leak costs, so rotate a write credential the moment you suspect one,
+and prefer it over a read key if you can only do one.
+
+### Trakt: you register the application, not Reel
+
+Trakt's device flow needs a client ID **and** a client secret. Reel is open
+source, so a secret shipped inside it would be printed in this repository —
+which is the definition of not a secret. Rather than ship one and call it
+secret, you register your own application at
+<https://trakt.tv/oauth/applications> and both halves live in your encrypted
+store. The same bargain as the TMDB key: the credential is yours.
+
+Signing out (Settings → Reel → Publishing) drops the access token immediately.
+Revoking the application at Trakt kills it from their side.
+
+### Mastodon: the narrowest token that works
+
+The access token needs `write:statuses` and nothing else. A token with `read`
+or `follow` scopes would let anything holding it read your timeline and follow
+list; Reel never asks for either, and neither should you when you create it.
+
+## What leaves the vault, and when
+
+Reel is offline-first and this is the short list of exceptions. Nothing here
+happens without a key you added and a switch you turned on.
+
+| Feature | What is sent | Where |
+|---|---|---|
+| Metadata | The title you searched for, or a TMDB id | TMDB, OMDb, DoesTheDogDie |
+| **Publishing** | One review: the text, your stars, the title's TMDB id | Trakt / your Mastodon instance |
+| **Ask** | Your question, plus a shortlist of titles — names, years, genres, runtimes, your ratings, seen or unseen | OpenRouter, and on to whichever model you picked |
+
+Ask deserves the detail because the honest answer is "quite a lot": that
+shortlist is your viewing history. So it is off by default, it sends no review
+text, no watch dates and no file paths, and the number of titles is bounded by
+the shortlist setting rather than being "the whole library". The sheet shows
+the token count after every question, because a feature that quietly bills you
+is one you are right not to trust.
+
+Publishing never happens as a side effect. There is no post-on-rate and no
+bulk publish: a review goes out because you looked at the exact text in the
+confirmation sheet and pressed the button under it. That sheet starts with no
+destination selected, so a mis-tap on Publish sends nothing anywhere.
+
 ## Rotating a key
 
 TMDB keys are free and revocable. If one is exposed:
@@ -71,6 +132,17 @@ TMDB keys are free and revocable. If one is exposed:
 3. Settings → Reel → paste → Save.
 
 Cached responses in `.obsidian/plugins/reel/cache/` contain no credential — only film and show metadata — so they don't need clearing.
+
+The same shape applies to the others: revoke at the source first, then replace
+in settings. For **Trakt**, revoke the application at
+<https://trakt.tv/oauth/applications>; signing out in Reel drops the token but
+does not invalidate it at Trakt's end. For **Mastodon**, delete the
+application under Preferences → Development. For **OpenRouter**, delete the key
+at <https://openrouter.ai/keys>.
+
+Note the ordering. Removing a credential from Reel is not revocation — it only
+stops Reel from using it. If a credential has actually been exposed, the copy
+that matters is the one that already left.
 
 ## Reporting a problem
 

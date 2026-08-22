@@ -14,6 +14,9 @@ import { UndoService } from "./undo";
 import { SwatchStore } from "./swatches";
 import { reportFailure, offline } from "./ui/failure";
 import { PeopleStore } from "./people";
+import { PublishService } from "./publish";
+import { OpenRouterClient } from "./ai/openrouter";
+import { AskSheet } from "./ui/askSheet";
 import { STARTER_BASES } from "./bases";
 import { SearchModal } from "./ui/searchModal";
 import { RecipeSheet } from "./ui/recipeSheet";
@@ -63,6 +66,10 @@ export default class ReelPlugin extends Plugin {
 	undo!: UndoService;
 	swatches!: SwatchStore;
 	people!: PeopleStore;
+	/** Sending a review out of the vault. Does nothing until configured. */
+	publish!: PublishService;
+	/** The one non-deterministic corner of the app. Off without a key. */
+	ai!: OpenRouterClient;
 
 
 	async onload(): Promise<void> {
@@ -80,6 +87,8 @@ export default class ReelPlugin extends Plugin {
 		this.discover = new DiscoverEngine(this);
 		this.swatches = new SwatchStore();
 		this.people = new PeopleStore(this);
+		this.publish = new PublishService(this);
+		this.ai = new OpenRouterClient(this);
 		this.undo = new UndoService(this);
 		// Steps hold a path, and a path stops meaning anything the moment the
 		// note behind it is renamed or deleted.
@@ -367,6 +376,22 @@ export default class ReelPlugin extends Plugin {
 		});
 
 		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });
+
+		/*
+		 * Ask is a command rather than a permanent tab.
+		 *
+		 * It costs money per use and depends on a key most installs will never
+		 * have, and a tab that is empty-or-broken for everybody who has not set it
+		 * up is worse than no tab. The Library toolbar grows a button once a key
+		 * exists; until then this is the only way in, and it is the right amount
+		 * of way in.
+		 */
+		this.addCommand({
+			id: "ask",
+			name: "Ask for something to watch",
+			icon: "sparkles",
+			callback: () => new AskSheet(this.app, this, (entry) => void this.openDetail(entry)).open(),
+		});
 
 		/*
 		 * What the layout thinks it is, on the device it is running on.

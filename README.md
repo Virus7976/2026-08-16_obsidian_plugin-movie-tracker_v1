@@ -149,6 +149,58 @@ you actually rate rather than merely watch, current streak, films per month, how
 long your watchlist is at your current pace, day-of-week patterns, superlatives,
 and series progress.
 
+### Ask
+
+Describe what you feel like watching and Reel finds it in what you already own.
+*“Something short and funny I haven't seen, nothing too bleak”* works, because
+there is no field in the vault called `bleak` — which is exactly the sort of
+question nothing else here could answer.
+
+The model does less of the work than you would expect, on purpose. It reads
+your sentence and says what it *means* — genres, a decade, a runtime ceiling,
+seen or unseen. Reel applies that to the library itself, locally and exactly,
+over every title with none skipped. Then the model ranks the shortlist that
+survives and says why each one fits.
+
+That split is what makes the answer checkable:
+
+- **It cannot invent a film you do not own.** The ranking only ever sees titles
+  that came out of your own library.
+- **The prompt is bounded** whatever your library's size, so the cost per
+  question does not grow with your collection.
+- **It shows its working** — what it understood you to mean, what it had to
+  give up on (*“nothing that short, so length was set aside”*), how many titles
+  it considered, and one line per result. When it reads “bleak” as “no horror”
+  you can see that, instead of shrugging at a black box.
+
+Needs an OpenRouter key and is **off until you add one**. See
+[what leaves the vault](SECURITY.md#what-leaves-the-vault-and-when).
+
+### Publishing
+
+A review lives in your note. If you want one to be public, the button beside it
+sends it to **Trakt** or **Mastodon** — one review, one tap, having read the
+exact text first.
+
+**IMDb isn't an option**, and it is the thing everyone asks for. It has no
+public API for posting a review, and the only alternative would be driving a
+login and a form as you, which is impersonation with extra steps. Trakt is the
+closest equivalent with a real door: a public profile carrying ratings and
+reviews.
+
+The confirmation sheet is deliberately unlike the rest of Reel, which spends
+its time removing steps:
+
+- **The real text, per destination.** Not a summary — the exact characters,
+  with the character count and the truncation if there is one.
+- **Nothing ticked to start with.** A reflex tap on Publish posts nowhere.
+- **The URL afterwards**, because the next question after “post this” is
+  “where is it”. A failure on one destination doesn't hide a success on the
+  other.
+
+Where a review went is recorded in its note, so the button knows it has been
+rather than quietly posting twice.
+
 ## Undo
 
 Every action in Reel is one tap, which is the point of it and also how you rate
@@ -222,12 +274,29 @@ Filterable fields: `status` `type` `title` `year` `decade` `rating`
 | Create starter Bases views | five `.base` files |
 | Import notes from another tracker | shows the count and rating scale, then asks before writing |
 | Start a rewatch of this series | records the completed run |
+| Ask for something to watch | needs an OpenRouter key; off by default |
 
 ## Setup
 
 1. Get a free TMDB key at <https://www.themoviedb.org/settings/api>. A **v4 read access token** (starts `eyJ`) is preferred — it goes in a header rather than the URL, so it can't end up in a log.
 2. Settings → Reel → paste it → Save. You'll be asked for a passphrase; the key is encrypted before it's written. See [SECURITY.md](SECURITY.md).
 3. Tap **Test** to confirm.
+
+Everything else is optional and off until you switch it on:
+
+| | Where the key comes from | What it gives you |
+|---|---|---|
+| OMDb | <https://omdbapi.com/apikey.aspx> | IMDb, Rotten Tomatoes, Metacritic scores |
+| DoesTheDogDie | <https://www.doesthedogdie.com/api> | content notes, voted on per topic |
+| OpenRouter | <https://openrouter.ai/keys> | **Ask** |
+| Trakt | your own app at <https://trakt.tv/oauth/applications> | **publishing** reviews and ratings |
+| Mastodon | your instance → Preferences → Development, scope `write:statuses` | **publishing** reviews |
+
+Trakt needs an application you register yourself, because its sign-in requires
+a client secret and a secret shipped inside an open-source plugin is printed in
+this repository. Yours stays yours. Reel then signs in with a short code you
+type on any device — nothing has to link back to the app, which is what makes
+it work on a phone at all.
 
 ## Install
 

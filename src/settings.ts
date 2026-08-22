@@ -3,7 +3,9 @@ import { confirm } from "./ui/confirm";
 import type ReelPlugin from "./main";
 import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
-import { KEY_LABELS, KeyBundle, KeyName } from "./credentials";
+import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credentials";
+import { normaliseHost } from "./publish/mastodon";
+import { TraktSignIn } from "./ui/traktSignIn";
 
 /** What you think of a person, used to weight what gets recommended. */
 import type { Recipe } from "./util/recipe";
@@ -97,6 +99,49 @@ export interface ReelSettings {
 	language: string;
 	/** Written into every new note's body so the file isn't empty. */
 	noteTemplate: string;
+
+	/* ---- Publishing --------------------------------------------------- */
+	/*
+	 * Nothing here turns anything on by itself.
+	 *
+	 * Every other setting in this file changes how your own vault looks to you.
+	 * These change what strangers can read, which is a different kind of thing,
+	 * and not one a default should decide. So the switches start off, the
+	 * confirm-before-posting switch starts on, and neither target can do
+	 * anything at all until you have gone and made a token for it yourself.
+	 */
+	publishTrakt: boolean;
+	publishMastodon: boolean;
+	/** Which instance to post to, e.g. "mastodon.social". Not a secret. */
+	mastodonHost: string;
+	/**
+	 * Show the exact text, and where it is going, before anything is sent.
+	 *
+	 * On by default and worth leaving on. A post is not undoable the way the
+	 * rest of Reel is: deleting it later does not un-read it.
+	 */
+	publishConfirm: boolean;
+	/** Send the star rating to Trakt alongside the review. */
+	publishRatings: boolean;
+	/** Appended to a Mastodon post, e.g. "#film #letterboxd". */
+	publishHashtags: string;
+	/**
+	 * Assume a review might spoil until told otherwise.
+	 *
+	 * Trakt requires every comment to declare this, and the honest default for
+	 * "I wrote down what I thought of a film I just finished" is yes.
+	 */
+	publishSpoilerDefault: boolean;
+
+	/* ---- Ask (OpenRouter) --------------------------------------------- */
+	/** Off until a key is added; no request is ever made without one. */
+	aiEnabled: boolean;
+	/** An OpenRouter model slug, e.g. "anthropic/claude-3.5-haiku". */
+	aiModel: string;
+	/** How many titles the shortlist hands the model. Bounds the cost. */
+	aiShortlist: number;
+	/** Remember what you asked, so a good question can be asked again. */
+	recentAsks: string[];
 }
 
 export const DEFAULT_SETTINGS: ReelSettings = {
@@ -142,6 +187,22 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	checkNewEpisodes: true,
 	language: "en-US",
 	noteTemplate: "\n## Notes\n\n",
+
+	publishTrakt: false,
+	publishMastodon: false,
+	mastodonHost: "",
+	publishConfirm: true,
+	publishRatings: true,
+	publishHashtags: "",
+	publishSpoilerDefault: true,
+
+	aiEnabled: false,
+	// Cheap, fast, and good enough to sort sixty one-line summaries by how well
+	// each answers a sentence, which is the whole of the job. A bigger model
+	// costs more per question without ranking a shortlist any better.
+	aiModel: "anthropic/claude-3.5-haiku",
+	aiShortlist: 60,
+	recentAsks: [],
 };
 
 const MODE_LABELS: Record<KeyMode, string> = {
@@ -164,6 +225,8 @@ export class ReelSettingTab extends PluginSettingTab {
 		this.renderFolders(containerEl);
 		this.renderMetadata(containerEl);
 		this.renderReviews(containerEl);
+		this.renderPublishing(containerEl);
+		this.renderAsk(containerEl);
 		this.renderContent(containerEl);
 		this.renderBehaviour(containerEl);
 	}
@@ -205,7 +268,7 @@ export class ReelSettingTab extends PluginSettingTab {
 				status.createSpan({ cls: "reel-pill warn", text: "No keys set" });
 			}
 			// Which services are configured, regardless of lock state.
-			for (const name of ["tmdb", "omdb", "dtdd"] as KeyName[]) {
+			for (const name of [...READ_KEYS, ...WRITE_KEYS]) {
 				if (store.has(name)) status.createSpan({ cls: "reel-pill ok", text: KEY_LABELS[name] });
 			}
 		};
@@ -225,52 +288,7 @@ export class ReelSettingTab extends PluginSettingTab {
 				});
 			});
 
-		const keyField = (name: KeyName, label: string, desc: string) => {
-			let input: HTMLInputElement | null = null;
-			const setting = new Setting(el)
-				.setName(label)
-				.setDesc(desc)
-				.addText((t) => {
-					t.setPlaceholder(store.has(name) ? "Saved — paste to replace" : "Paste key, then Save");
-					t.inputEl.type = "password";
-					t.inputEl.autocomplete = "off";
-					t.inputEl.spellcheck = false;
-					t.inputEl.addClass("reel-input");
-					input = t.inputEl;
-				})
-				.addButton((b) =>
-					b
-						.setButtonText("Save")
-						.setCta()
-						.onClick(async () => {
-							const value = input?.value ?? "";
-							if (!value.trim()) {
-								new Notice("Reel: nothing to save.");
-								return;
-							}
-							const ok = await this.plugin.credentials.store(name, value);
-							if (input) input.value = "";
-							new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
-							this.display();
-						})
-				);
-			if (store.has(name)) {
-				setting.addButton((b) =>
-					b.setButtonText("Remove").onClick(async () => {
-						const ok = await confirm(this.app, {
-							title: `Remove the ${KEY_LABELS[name]} key`,
-							body: "Reel cannot recover it. You would need the original key again to re-add it.",
-							confirmText: "Remove",
-							danger: true,
-						});
-						if (!ok) return;
-						await this.plugin.credentials.remove(name);
-						new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
-						this.display();
-					})
-				);
-			}
-		};
+		const keyField = (name: KeyName, label: string, desc: string) => this.keyField(el, name, label, desc);
 
 		keyField(
 			"tmdb",
@@ -374,6 +392,404 @@ export class ReelSettingTab extends PluginSettingTab {
 	}
 
 	private pendingKeyInput: HTMLInputElement | null = null;
+
+	/* ---------------------------------------------------------------- */
+
+	/**
+	 * One credential: a password field, a Save, and a Remove once there is
+	 * something to remove.
+	 *
+	 * A method rather than the closure it used to be inside the API-keys
+	 * section, because publishing needs exactly the same control and a second
+	 * copy of it would be a second place for the Remove confirmation to go
+	 * missing, or for "paste to replace" to quietly stop being true.
+	 */
+	private keyField(el: HTMLElement, name: KeyName, label: string, desc: string): void {
+		const store = this.plugin.credentials;
+		let input: HTMLInputElement | null = null;
+		const setting = new Setting(el)
+			.setName(label)
+			.setDesc(desc)
+			.addText((t) => {
+				t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
+				t.inputEl.type = "password";
+				t.inputEl.autocomplete = "off";
+				t.inputEl.spellcheck = false;
+				t.inputEl.addClass("reel-input");
+				input = t.inputEl;
+			})
+			.addButton((b) =>
+				b
+					.setButtonText("Save")
+					.setCta()
+					.onClick(async () => {
+						const value = input?.value ?? "";
+						if (!value.trim()) {
+							new Notice("Reel: nothing to save.");
+							return;
+						}
+						const ok = await this.plugin.credentials.store(name, value);
+						if (input) input.value = "";
+						new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
+						this.display();
+					})
+			);
+		if (store.has(name)) {
+			setting.addButton((b) =>
+				b.setButtonText("Remove").onClick(async () => {
+					const ok = await confirm(this.app, {
+						title: `Remove the ${KEY_LABELS[name]} key`,
+						body: "Reel cannot recover it. You would need the original key again to re-add it.",
+						confirmText: "Remove",
+						danger: true,
+					});
+					if (!ok) return;
+					await this.plugin.credentials.remove(name);
+					new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
+					this.display();
+				})
+			);
+		}
+	}
+
+	/* ---------------------------------------------------------------- */
+
+	/**
+	 * Publishing \u2014 the only part of Reel that writes outside your vault.
+	 *
+	 * Written to be read before it is used, which is unusual for a settings
+	 * section and correct for this one. The copy says what leaves, where it
+	 * goes and under whose name, because switching this on is agreeing to
+	 * something you cannot take back, and a toggle labelled "Trakt" with no
+	 * further explanation is not an informed decision.
+	 *
+	 * IMDb is named explicitly. It is what people ask for, it is not possible,
+	 * and leaving that unsaid means everyone who wants it goes hunting through
+	 * the settings for an option that was never there.
+	 */
+	private renderPublishing(el: HTMLElement): void {
+		new Setting(el).setName("Publishing").setHeading();
+
+		el.createDiv({
+			cls: "reel-settings-note",
+			text:
+				"Reviews stay in your vault unless you publish one, one at a time, from the button beside it. " +
+				"Nothing here posts automatically, and nothing posts without showing you the exact text first.",
+		});
+		el.createDiv({
+			cls: "reel-settings-note reel-dim",
+			text:
+				"IMDb isn't an option: it has no public way to post a review, and the only alternative would be " +
+				"driving a login and a form as you, which Reel won't do. Trakt is the closest equivalent with a " +
+				"real API \u2014 a public profile carrying ratings and reviews.",
+		});
+
+		new Setting(el)
+			.setName("Trakt")
+			.setDesc("A public film and TV profile. Reviews post as comments, with your star rating alongside.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.publishTrakt).onChange(async (v) => {
+					this.plugin.settings.publishTrakt = v;
+					await this.plugin.saveSettings();
+					this.display();
+				})
+			);
+
+		if (this.plugin.settings.publishTrakt) this.renderTraktApp(el);
+
+		new Setting(el)
+			.setName("Mastodon")
+			.setDesc("One public post per review, with the title, your stars and the text.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.publishMastodon).onChange(async (v) => {
+					this.plugin.settings.publishMastodon = v;
+					await this.plugin.saveSettings();
+					this.display();
+				})
+			);
+
+		if (this.plugin.settings.publishMastodon) {
+			new Setting(el)
+				.setName("Instance")
+				.setDesc("The server you post from, e.g. mastodon.social. Not a secret, so it isn't encrypted.")
+				.addText((t) =>
+					t
+						.setPlaceholder("mastodon.social")
+						.setValue(this.plugin.settings.mastodonHost)
+						.onChange(
+							debounce(async (v: string) => {
+								this.plugin.settings.mastodonHost = normaliseHost(v);
+								await this.plugin.saveSettings();
+							}, 500)
+						)
+				);
+
+			this.keyField(
+				el,
+				"mastodon",
+				"Access token",
+				"Your instance \u2192 Preferences \u2192 Development \u2192 New application. Tick write:statuses; nothing else is needed."
+			);
+		}
+
+		if (!this.plugin.publish.anyEnabled) return;
+
+		new Setting(el)
+			.setName("Confirm before posting")
+			.setDesc(
+				"Show the exact text, and where it's going, before anything is sent. Worth leaving on: deleting a post later doesn't un-read it."
+			)
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.publishConfirm).onChange(async (v) => {
+					this.plugin.settings.publishConfirm = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Publish ratings too")
+			.setDesc("Send the star rating to Trakt with the review. Your stars appear in the Mastodon text either way.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.publishRatings).onChange(async (v) => {
+					this.plugin.settings.publishRatings = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Assume spoilers")
+			.setDesc(
+				"Start each review marked as spoilers. Trakt requires the declaration either way, and on Mastodon it goes behind a content warning."
+			)
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.publishSpoilerDefault).onChange(async (v) => {
+					this.plugin.settings.publishSpoilerDefault = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Hashtags")
+			.setDesc("Added to the end of a Mastodon post. Reserved out of the character budget, so they never get cut.")
+			.addText((t) =>
+				t
+					.setPlaceholder("#film #tv")
+					.setValue(this.plugin.settings.publishHashtags)
+					.onChange(
+						debounce(async (v: string) => {
+							this.plugin.settings.publishHashtags = v.trim();
+							await this.plugin.saveSettings();
+						}, 500)
+					)
+			);
+	}
+
+	/**
+	 * Your own Trakt application, and then the sign-in that uses it.
+	 *
+	 * You register the app rather than Reel shipping one, and the reason is
+	 * worth stating in the UI as well as here: Trakt's device flow needs a
+	 * client secret, and a secret compiled into an open-source plugin is
+	 * printed in the repository for anyone to read. Shipping one and calling it
+	 * secret would be theatre. Yours stays yours, in the same encrypted store
+	 * as every other key.
+	 */
+	private renderTraktApp(el: HTMLElement): void {
+		const store = this.plugin.credentials;
+		const hasApp = store.has("traktApp");
+		const signedIn = store.has("trakt");
+
+		if (!hasApp) {
+			el.createDiv({
+				cls: "reel-settings-note",
+				text:
+					"Trakt needs an application of your own: trakt.tv/oauth/applications \u2192 New Application. " +
+					"Any name will do, and set the redirect URI to urn:ietf:wg:oauth:2.0:oob. " +
+					"Then paste its client ID and secret below.",
+			});
+		}
+
+		let idEl: HTMLInputElement | null = null;
+		let secretEl: HTMLInputElement | null = null;
+
+		const setting = new Setting(el)
+			.setName("Trakt application")
+			.setDesc(
+				hasApp
+					? "Saved. Paste both again to replace them."
+					: "From trakt.tv/oauth/applications. Both are stored with your other keys."
+			)
+			.addText((t) => {
+				t.setPlaceholder("Client ID");
+				t.inputEl.autocomplete = "off";
+				t.inputEl.spellcheck = false;
+				t.inputEl.addClass("reel-input");
+				idEl = t.inputEl;
+			})
+			.addText((t) => {
+				t.setPlaceholder("Client secret");
+				t.inputEl.type = "password";
+				t.inputEl.autocomplete = "off";
+				t.inputEl.spellcheck = false;
+				t.inputEl.addClass("reel-input");
+				secretEl = t.inputEl;
+			})
+			.addButton((b) =>
+				b
+					.setButtonText("Save")
+					.setCta()
+					.onClick(async () => {
+						const clientId = (idEl?.value ?? "").trim();
+						const clientSecret = (secretEl?.value ?? "").trim();
+						if (!clientId || !clientSecret) {
+							new Notice("Reel: both the client ID and the secret are needed.");
+							return;
+						}
+						const ok = await this.plugin.credentials.store(
+							"traktApp",
+							JSON.stringify({ id: clientId, secret: clientSecret })
+						);
+						if (idEl) idEl.value = "";
+						if (secretEl) secretEl.value = "";
+						new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
+						this.display();
+					})
+			);
+
+		if (hasApp) {
+			setting.addButton((b) =>
+				b.setButtonText("Remove").onClick(async () => {
+					const ok = await confirm(this.app, {
+						title: "Remove the Trakt application",
+						body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
+						confirmText: "Remove",
+						danger: true,
+					});
+					if (!ok) return;
+					await this.plugin.credentials.remove("traktApp");
+					await this.plugin.credentials.remove("trakt");
+					this.display();
+				})
+			);
+		}
+
+		if (!hasApp) return;
+
+		new Setting(el)
+			.setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt")
+			.setDesc(
+				signedIn
+					? "Reel can post reviews and ratings as you. Sign out to stop that immediately."
+					: "Trakt shows you a short code to type on any device. Nothing has to link back to this app."
+			)
+			.addButton((b) =>
+				signedIn
+					? b.setButtonText("Sign out").onClick(async () => {
+							await this.plugin.publish.signOut();
+							new Notice("Reel: signed out of Trakt.");
+							this.display();
+						})
+					: b
+							.setButtonText("Sign in")
+							.setCta()
+							.onClick(async () => {
+								const app = await this.plugin.publish.app();
+								if (!app) {
+									new Notice("Reel: couldn't read the Trakt application.");
+									return;
+								}
+								new TraktSignIn(this.app, this.plugin, app, (ok) => {
+									if (ok) this.display();
+								}).open();
+							})
+			);
+	}
+
+	/**
+	 * Ask \u2014 the one feature that sends your library somewhere else.
+	 *
+	 * The copy says exactly what goes and what doesn't, in the same words as
+	 * the sheet, and it sits above the toggle rather than under it. "Titles,
+	 * years, genres, runtimes and your ratings" is a specific enough claim to
+	 * be checked against the code; "some data about your library" would not be.
+	 */
+	private renderAsk(el: HTMLElement): void {
+		new Setting(el).setName("Ask").setHeading();
+
+		el.createDiv({
+			cls: "reel-settings-note",
+			text:
+				"Describe what you feel like watching and Reel finds it in your own library. " +
+				"A question sends your words, plus a short list of titles \u2014 names, years, genres, runtimes and " +
+				"your star ratings \u2014 to OpenRouter. Not your reviews, not your watch dates, not your file paths.",
+		});
+
+		new Setting(el)
+			.setName("Enable Ask")
+			.setDesc("Off by default. With this off, no request is ever made, key or no key.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.aiEnabled).onChange(async (v) => {
+					this.plugin.settings.aiEnabled = v;
+					await this.plugin.saveSettings();
+					this.display();
+				})
+			);
+
+		if (!this.plugin.settings.aiEnabled) return;
+
+		this.keyField(
+			el,
+			"openrouter",
+			"OpenRouter key",
+			"From openrouter.ai/keys. You pay OpenRouter directly; Reel shows what each question cost in tokens."
+		);
+
+		new Setting(el)
+			.setName("Model")
+			.setDesc(
+				"An OpenRouter model slug. The job is ranking sixty one-line summaries, which a small fast model does as well as a large one and far more cheaply."
+			)
+			.addText((t) =>
+				t
+					.setPlaceholder("anthropic/claude-3.5-haiku")
+					.setValue(this.plugin.settings.aiModel)
+					.onChange(
+						debounce(async (v: string) => {
+							this.plugin.settings.aiModel = v.trim() || DEFAULT_SETTINGS.aiModel;
+							await this.plugin.saveSettings();
+						}, 500)
+					)
+			);
+
+		new Setting(el)
+			.setName("Shortlist size")
+			.setDesc(
+				"How many titles get sent for ranking. Larger casts a wider net and costs more per question; the filtering that chooses them runs over your whole library either way."
+			)
+			.addSlider((sl) =>
+				sl
+					.setLimits(20, 150, 10)
+					.setValue(this.plugin.settings.aiShortlist)
+					.setDynamicTooltip()
+					.onChange(async (v) => {
+						this.plugin.settings.aiShortlist = v;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		if (this.plugin.settings.recentAsks.length) {
+			new Setting(el)
+				.setName("Forget past questions")
+				.setDesc(`${this.plugin.settings.recentAsks.length} remembered, shown as shortcuts in the Ask sheet.`)
+				.addButton((b) =>
+					b.setButtonText("Forget").onClick(async () => {
+						this.plugin.settings.recentAsks = [];
+						await this.plugin.saveSettings();
+						this.display();
+					})
+				);
+		}
+	}
 
 	/* ---------------------------------------------------------------- */
 

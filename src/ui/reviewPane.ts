@@ -31,6 +31,7 @@ import {
 } from "../reviews";
 import { prettyDate, todayISO } from "../util/dates";
 import { renderStars, renderStarsStatic } from "./stars";
+import { PublishSheet } from "./publishSheet";
 import { redact } from "../secrets";
 
 /** How much of a review a summary shows before it is worth opening. */
@@ -190,6 +191,39 @@ function draw(
 		if (review.rating != null) renderStarsStatic(head.createSpan({ cls: "reel-yours-stars" }), review.rating);
 
 		if (opts.editable) {
+			/*
+			 * Publish sits next to Edit, and only where Edit does.
+			 *
+			 * The two belong together — you re-read what you wrote, fix a
+			 * sentence, and then decide whether anybody else should see it —
+			 * and putting it anywhere else would mean a second place that
+			 * knows how to turn a note into a post. It appears only when a
+			 * destination is switched on, so an install that publishes nowhere
+			 * never grows a button that does nothing.
+			 */
+			if (plugin.publish.anyEnabled) {
+				const already = plugin.publish.publishedTo(entry);
+				const gone = Object.keys(already).length > 0;
+				const send = head.createEl("button", {
+					cls: `reel-yours-publish clickable-icon${gone ? " is-published" : ""}`,
+					attr: {
+						type: "button",
+						"aria-label": gone ? "Published — publish again" : "Publish this review",
+					},
+				});
+				setIcon(send, gone ? "check-circle-2" : "send");
+				send.addEventListener("click", (ev) => {
+					ev.stopPropagation();
+					new PublishSheet(plugin.app, plugin, {
+						entry,
+						date: review.date,
+						rating: review.rating ?? entry.rating,
+						text: review.text,
+						onDone: repaint,
+					}).open();
+				});
+			}
+
 			const edit = head.createEl("button", {
 				cls: "reel-yours-edit clickable-icon",
 				attr: { type: "button", "aria-label": "Edit this review" },

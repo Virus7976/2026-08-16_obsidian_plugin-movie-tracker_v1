@@ -52,6 +52,41 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.0",
+		date: "2026-08-21",
+		headline: "Your reviews can leave the vault, and you can ask for something to watch in your own words.",
+		changes: [
+			{
+				kind: "new",
+				text: "Publish a review to Trakt or Mastodon, one at a time, from the button beside it.",
+				note: "IMDb was the ask and IMDb has no way in \u2014 no public API for posting a review, and the only alternative would be driving a login and a form as you, which Reel won't do. Trakt is the closest thing with a real door: a public profile carrying ratings and reviews. Both are off until you switch them on.",
+			},
+			{
+				kind: "new",
+				text: "Nothing is sent until you have read the exact text that will be sent.",
+				note: "The sheet shows the real post, per destination, with the character count and the truncation if there is one. No destination is ticked to start with, so a reflex tap on Publish posts nowhere.",
+			},
+			{
+				kind: "better",
+				text: "A published review records where it went, so the button says so rather than quietly posting twice.",
+			},
+			{
+				kind: "new",
+				text: "Ask \u2014 describe what you feel like watching and Reel finds it in what you already own.",
+				note: "\u201cSomething short and funny I haven't seen, nothing too bleak\u201d works, because there is no field in the vault called bleak and that is exactly the kind of question nothing else in the app could answer.",
+			},
+			{
+				kind: "new",
+				text: "Ask shows its working: what it understood you to mean, what it had to give up on, how many titles it looked at, and one line on why each result is there.",
+				note: "It cannot recommend a film you do not own \u2014 the ranking only ever sees titles that came out of your own library \u2014 and it says what each question cost in tokens.",
+			},
+			{
+				kind: "better",
+				text: "Ask needs an OpenRouter key and is off until you add one. A question sends titles, years, genres, runtimes and your ratings \u2014 never your review text, your watch dates or your file paths.",
+			},
+		],
+	},
+	{
 		version: "0.8.40",
 		date: "2026-08-20",
 		headline: "The superlative rows read as one line again.",

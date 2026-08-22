@@ -908,9 +908,9 @@
   }
   function describe(el, entry) {
     const bits = [entry.title];
-    const year = entry.year ?? entry.firstAirYear;
-    if (year)
-      bits.push(String(year));
+    const year2 = entry.year ?? entry.firstAirYear;
+    if (year2)
+      bits.push(String(year2));
     if (entry.rating != null)
       bits.push(`rated ${entry.rating} out of 5`);
     if (entry.status === "watchlist")
@@ -952,9 +952,9 @@
     }
   }
   function renderRowList(plugin2, el, rows2, compact = false, onSelect) {
-    const list = el.createDiv({ cls: "reel-list" });
+    const list2 = el.createDiv({ cls: "reel-list" });
     for (const entry of rows2) {
-      const row = list.createDiv({ cls: "reel-row" });
+      const row = list2.createDiv({ cls: "reel-row" });
       describe(row, entry);
       if (!compact) {
         const thumb = row.createDiv({ cls: "reel-row-thumb" });
@@ -1026,19 +1026,19 @@
   }
 
   // src/render/diary.ts
-  function viewings(entries, year) {
+  function viewings(entries, year2) {
     const out = [];
     for (const entry of entries) {
       for (const w of entry.watched) {
         if (!w.date)
           continue;
-        if (year && !w.date.startsWith(String(year)))
+        if (year2 && !w.date.startsWith(String(year2)))
           continue;
         out.push({ entry, date: w.date, rating: w.rating ?? void 0, rewatch: w.rewatch === true });
       }
       if (entry.type === "tv" && entry.lastWatched?.date) {
         const date = entry.lastWatched.date;
-        if (!year || date.startsWith(String(year))) {
+        if (!year2 || date.startsWith(String(year2))) {
           out.push({
             entry,
             date,
@@ -1119,17 +1119,17 @@
         contentEl.createDiv({ cls: "reel-empty", text: "Nothing here yet." });
         return;
       }
-      const list = contentEl.createDiv({ cls: "reel-titles-list" });
+      const list2 = contentEl.createDiv({ cls: "reel-titles-list" });
       for (const entry of this.entries) {
-        const row = list.createDiv({ cls: "reel-titles-row" });
+        const row = list2.createDiv({ cls: "reel-titles-row" });
         const poster2 = row.createDiv({ cls: "reel-titles-poster" });
         this.plugin.posters.attach(poster2, entry);
         const body = row.createDiv({ cls: "reel-titles-body" });
         body.createDiv({ cls: "reel-titles-name", text: entry.title });
         const meta = body.createDiv({ cls: "reel-titles-meta" });
-        const year = entry.year ?? entry.firstAirYear;
-        if (year)
-          meta.createSpan({ cls: "reel-dim", text: String(year) });
+        const year2 = entry.year ?? entry.firstAirYear;
+        if (year2)
+          meta.createSpan({ cls: "reel-dim", text: String(year2) });
         if (entry.rating != null) {
           renderStarsStatic(meta.createDiv({ cls: "reel-titles-stars" }), entry.rating);
         }
@@ -1206,21 +1206,21 @@
     const years = [...new Set(allViewings.map((v) => v.date.slice(0, 4)))].sort().reverse();
     if (years.length > 1) {
       const bar = el.createDiv({ cls: "reel-chips reel-year-chips" });
-      const artFor = (year) => {
-        const pool2 = year == null ? allViewings : allViewings.filter((v) => v.date.startsWith(String(year)));
+      const artFor = (year2) => {
+        const pool2 = year2 == null ? allViewings : allViewings.filter((v) => v.date.startsWith(String(year2)));
         const pick = pool2.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
         return pick ? plugin2.posters.washUrl(pick.entry) : null;
       };
-      const chip = (label, active, year) => {
+      const chip = (label, active, year2) => {
         const b = bar.createEl("button", { cls: "reel-chip" });
-        const art = artFor(year);
+        const art = artFor(year2);
         if (art) {
           b.addClass("has-wash");
           b.createDiv({ cls: "reel-chip-wash" }).setCssProps({ "--reel-wash": `url("${art}")` });
         }
         b.createSpan({ cls: "reel-chip-text", text: label });
         setSelected(b, active);
-        b.addEventListener("click", () => paintStats(plugin2, el, { ...opts, year }));
+        b.addEventListener("click", () => paintStats(plugin2, el, { ...opts, year: year2 }));
       };
       chip("All time", opts.year == null, void 0);
       for (const y of years)
@@ -1771,17 +1771,17 @@
       for (const value of pick(e)) {
         if (!value)
           continue;
-        const list = held.get(value) ?? [];
-        list.push(e);
-        held.set(value, list);
+        const list2 = held.get(value) ?? [];
+        list2.push(e);
+        held.set(value, list2);
       }
     }
-    for (const list of held.values())
-      list.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-    const top = [...held.entries()].filter(([, list]) => list.length >= floor).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])).slice(0, limit).map(([label, list]) => ({
+    for (const list2 of held.values())
+      list2.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    const top = [...held.entries()].filter(([, list2]) => list2.length >= floor).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])).slice(0, limit).map(([label, list2]) => ({
       label,
-      n: list.length,
-      entries: list,
+      n: list2.length,
+      entries: list2,
       search: label,
       ...people ? { face: label, noPosters: true } : {},
       ...bare ? { noPosters: true } : {}
@@ -1801,13 +1801,13 @@
         cur.total += e.rating;
         cur.n++;
         sums.set(key, cur);
-        const list = held.get(key) ?? [];
-        list.push(e);
-        held.set(key, list);
+        const list2 = held.get(key) ?? [];
+        list2.push(e);
+        held.set(key, list2);
       }
     }
-    for (const list of held.values())
-      list.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    for (const list2 of held.values())
+      list2.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     const top = [...sums.entries()].filter(([, v]) => v.n >= min).map(([label, v]) => ({
       label: `${label} (${v.n})`,
       n: Math.round(v.total / v.n * 10) / 10,
@@ -1854,9 +1854,9 @@
   function paintHeatmap(plugin2, el, watched, opts, show) {
     const perDay = /* @__PURE__ */ new Map();
     for (const v of watched) {
-      const list = perDay.get(v.date);
-      if (list)
-        list.push(v.entry);
+      const list2 = perDay.get(v.date);
+      if (list2)
+        list2.push(v.entry);
       else
         perDay.set(v.date, [v.entry]);
     }
@@ -2330,18 +2330,18 @@
         });
         return;
       }
-      const list = el.createDiv({ cls: "reel-upnext" });
+      const list2 = el.createDiv({ cls: "reel-upnext" });
       if (hidden > 0) {
         const more = el.createDiv({ cls: "reel-block-count" });
         const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${hidden} more` });
         btn.addEventListener("click", () => {
           for (const entry of everything.slice(cap))
-            list.appendChild(this.row(entry));
+            list2.appendChild(this.row(entry));
           more.remove();
         });
       }
       for (const entry of rows2)
-        list.appendChild(this.row(entry));
+        list2.appendChild(this.row(entry));
     }
     /** One row. Detached, so it can be appended lazily by 'show more'. */
     row(entry) {
@@ -2433,9 +2433,9 @@
         return;
       }
       el.createDiv({ cls: "reel-block-title", text: "Upcoming" });
-      const list = el.createDiv({ cls: "reel-upnext" });
+      const list2 = el.createDiv({ cls: "reel-upnext" });
       for (const entry of rows2)
-        list.appendChild(this.row(entry, today));
+        list2.appendChild(this.row(entry, today));
     }
     row(entry, today) {
       const row = createDiv({ cls: "reel-upnext-row" });
@@ -2613,9 +2613,9 @@
       if (this.opts.entry?.watched.length) {
         const hist = detailsEl.createDiv({ cls: "reel-field" });
         hist.createDiv({ cls: "reel-field-label", text: "History" });
-        const list = hist.createDiv({ cls: "reel-history" });
+        const list2 = hist.createDiv({ cls: "reel-history" });
         for (const w of [...this.opts.entry.watched].reverse().slice(0, 5)) {
-          const row = list.createDiv({ cls: "reel-history-row" });
+          const row = list2.createDiv({ cls: "reel-history-row" });
           row.createSpan({ text: prettyDate(w.date) });
           if (w.rating != null)
             row.createSpan({ cls: "reel-dim", text: `\u2605 ${w.rating}` });
@@ -2767,7 +2767,7 @@
       el.addClass("reel-suggestion");
       const isTv = item.media_type === "tv";
       const title = isTv ? item.name ?? "Untitled" : item.title ?? "Untitled";
-      const year = yearOf(isTv ? item.first_air_date : item.release_date);
+      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
       const thumb = el.createDiv({ cls: "reel-suggestion-thumb" });
       const url = this.plugin.tmdb.posterUrl(item.poster_path, "w92");
       if (url) {
@@ -2782,8 +2782,8 @@
       const body = el.createDiv({ cls: "reel-suggestion-body" });
       const line = body.createDiv({ cls: "reel-suggestion-title" });
       line.createSpan({ text: title });
-      if (year)
-        line.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      if (year2)
+        line.createSpan({ cls: "reel-dim", text: ` ${year2}` });
       const meta = body.createDiv({ cls: "reel-suggestion-meta" });
       meta.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
       const existing = this.plugin.library.byTmdbId(item.id, isTv ? "tv" : "film");
@@ -2870,7 +2870,11 @@
   var KEY_LABELS = {
     tmdb: "TMDB",
     omdb: "OMDb",
-    dtdd: "DoesTheDogDie"
+    dtdd: "DoesTheDogDie",
+    openrouter: "OpenRouter",
+    trakt: "Trakt",
+    traktApp: "Trakt app",
+    mastodon: "Mastodon"
   };
   var MissingKeyError = class extends Error {
     constructor(key = "tmdb", msg) {
@@ -3180,9 +3184,9 @@
       posterEl.addEventListener("click", () => new PreviewSheet(this.plugin, item, () => this.render(container)).open());
       const head = card.createDiv({ cls: "reel-quickcard-head" });
       head.createSpan({ cls: "reel-quickcard-title", text: title });
-      const year = yearOf(isTv ? item.first_air_date : item.release_date);
-      if (year)
-        head.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
+      if (year2)
+        head.createSpan({ cls: "reel-dim", text: ` ${year2}` });
       const facts = card.createDiv({ cls: "reel-header-facts" });
       facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
       if (item.vote_average)
@@ -3458,8 +3462,8 @@
       });
       quick2.addClass("reel-chip-mode");
       if (!this.genres.length) {
-        void this.plugin.tmdb.genreList(this.filters.type).then((list) => {
-          this.genres = list;
+        void this.plugin.tmdb.genreList(this.filters.type).then((list2) => {
+          this.genres = list2;
           this.render(container);
         }).catch(() => {
         });
@@ -3512,8 +3516,8 @@
       if (f.genreId != null && !(item.genre_ids ?? []).includes(f.genreId))
         return false;
       if (f.decade != null) {
-        const year = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
-        if (!Number.isFinite(year) || year < f.decade || year >= f.decade + 10)
+        const year2 = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
+        if (!Number.isFinite(year2) || year2 < f.decade || year2 >= f.decade + 10)
           return false;
       }
       return true;
@@ -3963,7 +3967,7 @@
     card(item, container) {
       const isTv = item.media_type === "tv";
       const title = (isTv ? item.name : item.title) ?? "Untitled";
-      const year = yearOf(isTv ? item.first_air_date : item.release_date);
+      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
       const card = createDiv({ cls: "reel-dcard" });
       const posterEl = card.createDiv({ cls: "reel-dcard-poster" });
       posterEl.setAttr("role", "button");
@@ -3986,8 +3990,8 @@
           openPreview();
       });
       card.createDiv({ cls: "reel-dcard-title", text: title });
-      if (year)
-        card.createDiv({ cls: "reel-dcard-year", text: String(year) });
+      if (year2)
+        card.createDiv({ cls: "reel-dcard-year", text: String(year2) });
       const actions = card.createDiv({ cls: "reel-dcard-actions" });
       const button = (icon, label, cls, fn) => {
         const b = actions.createEl("button", { cls: `reel-dcard-btn ${cls}` });
@@ -4040,7 +4044,7 @@
       modalEl.addClass("reel-seensheet");
       const isTv = this.item.media_type === "tv";
       const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
-      const year = yearOf(this.item.release_date ?? this.item.first_air_date);
+      const year2 = yearOf(this.item.release_date ?? this.item.first_air_date);
       const head = contentEl.createDiv({ cls: "reel-seen-head" });
       const src = this.item.poster_path ? this.plugin.tmdb.posterUrl(this.item.poster_path, "w342") : null;
       if (src) {
@@ -4051,8 +4055,8 @@
       const who = head.createDiv({ cls: "reel-seen-who" });
       who.createDiv({ cls: "reel-seen-title", text: title });
       const meta = who.createDiv({ cls: "reel-seen-meta" });
-      if (year)
-        meta.createSpan({ text: String(year) });
+      if (year2)
+        meta.createSpan({ text: String(year2) });
       meta.createSpan({ cls: "reel-badge subtle", text: isTv ? "Series" : "Film" });
       if (this.item.vote_average)
         meta.createSpan({ cls: "reel-dim", text: `\u2605 ${this.item.vote_average.toFixed(1)}` });
@@ -4112,7 +4116,7 @@
       paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
       const isTv = this.item.media_type === "tv";
       const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
-      const year = yearOf(isTv ? this.item.first_air_date : this.item.release_date);
+      const year2 = yearOf(isTv ? this.item.first_air_date : this.item.release_date);
       if (this.role) {
         const r = contentEl.createDiv({ cls: "reel-preview-role" });
         r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
@@ -4126,8 +4130,8 @@
       const body = head.createDiv({ cls: "reel-preview-body" });
       const h = body.createDiv({ cls: "reel-preview-title" });
       h.createSpan({ text: title });
-      if (year)
-        h.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      if (year2)
+        h.createSpan({ cls: "reel-dim", text: ` ${year2}` });
       const facts = body.createDiv({ cls: "reel-header-facts" });
       facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
       if (this.item.vote_average)
@@ -4481,7 +4485,7 @@
         if (mine)
           poster2.createSpan({ cls: "reel-person-credit-tick", text: "\u2713" });
         card.createDiv({ cls: "reel-person-credit-title", text: c.title ?? c.name ?? "Untitled" });
-        const year = yearOf(c.release_date ?? c.first_air_date);
+        const year2 = yearOf(c.release_date ?? c.first_air_date);
         const character = (c.character ?? "").trim();
         const job = (c.job ?? "").trim();
         const role = character || job;
@@ -4492,8 +4496,8 @@
           });
         }
         const bits = [];
-        if (year)
-          bits.push(String(year));
+        if (year2)
+          bits.push(String(year2));
         if (c.media_type === "tv" && c.episode_count) {
           bits.push(c.episode_count === 1 ? "1 ep" : `${c.episode_count} eps`);
         }
@@ -4659,7 +4663,7 @@
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
       const title = this.credit.title ?? this.credit.name ?? "Untitled";
-      const year = yearOf(this.credit.release_date ?? this.credit.first_air_date);
+      const year2 = yearOf(this.credit.release_date ?? this.credit.first_air_date);
       const character = (this.credit.character ?? "").trim();
       const job = (this.credit.job ?? "").trim();
       const stage = contentEl.createDiv({ cls: "reel-role-stage" });
@@ -4697,8 +4701,8 @@
         body.createDiv({ cls: "reel-role-what", text: character ? "the character" : "their job" });
       }
       const facts = [this.credit.media_type === "tv" ? "Series" : "Film"];
-      if (year)
-        facts.push(String(year));
+      if (year2)
+        facts.push(String(year2));
       if (this.credit.episode_count) {
         facts.push(this.credit.episode_count === 1 ? "1 episode" : `${this.credit.episode_count} episodes`);
       }
@@ -4819,6 +4823,229 @@ ${body}
     return content.slice(0, lineStart) + heading + content.slice(review.from);
   }
 
+  // src/publish/compose.ts
+  var TRAKT_REVIEW_WORDS = 200;
+  function wordCount(text) {
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  // src/ui/publishSheet.ts
+  var PublishSheet = class extends Modal {
+    constructor(app2, plugin2, opts) {
+      super(app2);
+      this.plugin = plugin2;
+      this.opts = opts;
+      this.chosen = /* @__PURE__ */ new Set();
+      this.busy = false;
+      this.spoiler = plugin2.settings.publishSpoilerDefault;
+    }
+    get payload() {
+      return {
+        entry: this.opts.entry,
+        date: this.opts.date,
+        rating: this.opts.rating,
+        text: this.opts.text,
+        spoiler: this.spoiler
+      };
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-publish");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Publish review" });
+      const sub = contentEl.createDiv({ cls: "reel-publish-sub" });
+      sub.createSpan({ cls: "reel-publish-title", text: this.opts.entry.title });
+      if (this.opts.rating != null && this.opts.rating > 0) {
+        renderStarsStatic(sub.createSpan({ cls: "reel-publish-stars" }), this.opts.rating);
+      }
+      if (this.opts.date)
+        sub.createSpan({ cls: "reel-publish-date", text: prettyDate(this.opts.date) });
+      const targets = this.plugin.publish.targets();
+      if (!targets.length) {
+        this.renderNowhere(contentEl);
+        return;
+      }
+      this.renderTargets(contentEl, targets);
+      this.renderSpoiler(contentEl);
+      this.previewHost = contentEl.createDiv({ cls: "reel-publish-previews" });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+      this.goBtn = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Publish" });
+      this.goBtn.addEventListener("click", () => void this.run());
+      cancel.focus();
+      void this.repaint();
+    }
+    /** Publishing is on but nothing is configured — say what to do, not "error". */
+    renderNowhere(el) {
+      el.createDiv({
+        cls: "reel-publish-empty",
+        text: "No publishing destination is switched on yet. Settings \u2192 Reel \u2192 Publishing has Trakt and Mastodon."
+      });
+      const actions = el.createDiv({ cls: "reel-log-actions" });
+      const go = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open settings" });
+      go.addEventListener("click", () => {
+        this.close();
+        this.app.setting.open();
+        this.app.setting.openTabById("reel");
+      });
+    }
+    renderTargets(el, targets) {
+      const row = el.createDiv({ cls: "reel-publish-targets" });
+      for (const t of targets) {
+        const btn = row.createEl("button", { cls: "reel-publish-target" });
+        btn.createSpan({ cls: "reel-publish-target-name", text: t.label });
+        const already = this.plugin.publish.publishedTo(this.opts.entry)[t.id];
+        if (t.blocker) {
+          btn.addClass("is-blocked");
+          btn.createSpan({ cls: "reel-publish-target-note", text: t.blocker });
+          btn.disabled = true;
+          continue;
+        }
+        if (already) {
+          btn.createSpan({ cls: "reel-publish-target-note", text: "Already published once" });
+        }
+        btn.addEventListener("click", () => {
+          if (this.busy)
+            return;
+          if (this.chosen.has(t.id))
+            this.chosen.delete(t.id);
+          else
+            this.chosen.add(t.id);
+          btn.toggleClass("is-on", this.chosen.has(t.id));
+          void this.repaint();
+        });
+      }
+    }
+    renderSpoiler(el) {
+      const row = el.createDiv({ cls: "reel-publish-spoiler" });
+      const btn = row.createEl("button", { cls: "reel-publish-toggle" });
+      const paint = () => {
+        btn.empty();
+        btn.toggleClass("is-on", this.spoiler);
+        setIcon(btn.createSpan({ cls: "reel-publish-toggle-icon" }), this.spoiler ? "eye-off" : "eye");
+        btn.createSpan({ text: this.spoiler ? "Marked as spoilers" : "No spoilers" });
+      };
+      paint();
+      btn.addEventListener("click", () => {
+        this.spoiler = !this.spoiler;
+        paint();
+        void this.repaint();
+      });
+      row.createDiv({
+        cls: "reel-publish-hint",
+        text: "Trakt requires this either way. On Mastodon it goes behind a content warning."
+      });
+    }
+    /**
+     * Redraw the previews for whatever is currently ticked.
+     *
+     * Async because Mastodon's character limit is a property of the instance and
+     * has to be asked for. The sheet stays usable while that is in flight — a
+     * preview arriving a moment late is fine, a sheet that blocks on a network
+     * call before it will render is not.
+     */
+    async repaint() {
+      if (!this.previewHost)
+        return;
+      this.previewHost.empty();
+      this.goBtn.disabled = this.chosen.size === 0 || this.busy;
+      if (!this.chosen.size) {
+        this.previewHost.createDiv({
+          cls: "reel-publish-hint",
+          text: "Pick where this should go. Nothing is sent until you press Publish."
+        });
+        return;
+      }
+      for (const id of this.chosen) {
+        const box = this.previewHost.createDiv({ cls: "reel-publish-preview" });
+        const label = id === "trakt" ? "Trakt" : "Mastodon";
+        box.createDiv({ cls: "reel-publish-preview-head", text: label });
+        const complaint = this.plugin.publish.complaint(this.payload, id);
+        if (complaint) {
+          box.createDiv({ cls: "reel-publish-warn", text: complaint });
+          this.goBtn.disabled = true;
+          continue;
+        }
+        try {
+          const composed = await this.plugin.publish.preview(this.payload, id);
+          box.createDiv({ cls: "reel-publish-text", text: composed.text });
+          const meta = box.createDiv({ cls: "reel-publish-meta" });
+          meta.createSpan({ text: `${composed.text.length} characters` });
+          if (composed.truncated) {
+            box.createDiv({
+              cls: "reel-publish-warn",
+              text: "Too long for this instance \u2014 the post is cut where you see the ellipsis. The full review stays in your vault."
+            });
+          }
+          if (id === "trakt" && wordCount(this.opts.text) > TRAKT_REVIEW_WORDS) {
+            meta.createSpan({ text: " \xB7 filed as a review, not a shout" });
+          }
+        } catch (e) {
+          box.createDiv({ cls: "reel-publish-warn", text: redact(e) });
+        }
+      }
+    }
+    async run() {
+      if (this.busy || !this.chosen.size)
+        return;
+      this.busy = true;
+      this.goBtn.disabled = true;
+      this.goBtn.setText("Publishing\u2026");
+      let outcomes = [];
+      try {
+        outcomes = await this.plugin.publish.publish(this.payload, [...this.chosen]);
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`, 8e3);
+        this.busy = false;
+        this.goBtn.disabled = false;
+        this.goBtn.setText("Publish");
+        return;
+      }
+      this.opts.onDone?.();
+      this.renderOutcome(outcomes);
+    }
+    /**
+     * What happened, per destination, without closing the sheet.
+     *
+     * Closing on success and firing a toast was the first version, and it was
+     * wrong: a toast that says "published" and vanishes leaves you with no way
+     * to get to the thing that was published, and no way to read the one target
+     * that failed while the other worked.
+     */
+    renderOutcome(outcomes) {
+      const { contentEl } = this;
+      contentEl.empty();
+      const good = outcomes.filter((o) => o.ok);
+      contentEl.createEl("h3", {
+        cls: "reel-log-title",
+        text: good.length === outcomes.length ? "Published" : good.length ? "Partly published" : "Not published"
+      });
+      const list2 = contentEl.createDiv({ cls: "reel-publish-outcomes" });
+      for (const o of outcomes) {
+        const row = list2.createDiv({ cls: `reel-publish-outcome ${o.ok ? "is-ok" : "is-bad"}` });
+        setIcon(row.createSpan({ cls: "reel-publish-outcome-icon" }), o.ok ? "check" : "alert-triangle");
+        row.createSpan({ cls: "reel-publish-outcome-name", text: o.label });
+        if (o.ok && o.url) {
+          const link = row.createEl("a", { cls: "reel-publish-outcome-link", text: "View", href: o.url });
+          link.setAttr("target", "_blank");
+          link.setAttr("rel", "noopener");
+        } else if (!o.ok) {
+          row.createSpan({ cls: "reel-publish-outcome-why", text: o.error ?? "Failed." });
+        }
+      }
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const done = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
+      done.addEventListener("click", () => this.close());
+      done.focus();
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/ui/reviewPane.ts
   var EXCERPT = 220;
   function fileFor(plugin2, entry) {
@@ -4909,6 +5136,28 @@ ${body}
       if (review.rating != null)
         renderStarsStatic(head.createSpan({ cls: "reel-yours-stars" }), review.rating);
       if (opts.editable) {
+        if (plugin2.publish.anyEnabled) {
+          const already = plugin2.publish.publishedTo(entry);
+          const gone = Object.keys(already).length > 0;
+          const send = head.createEl("button", {
+            cls: `reel-yours-publish clickable-icon${gone ? " is-published" : ""}`,
+            attr: {
+              type: "button",
+              "aria-label": gone ? "Published \u2014 publish again" : "Publish this review"
+            }
+          });
+          setIcon(send, gone ? "check-circle-2" : "send");
+          send.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            new PublishSheet(plugin2.app, plugin2, {
+              entry,
+              date: review.date,
+              rating: review.rating ?? entry.rating,
+              text: review.text,
+              onDone: repaint
+            }).open();
+          });
+        }
         const edit = head.createEl("button", {
           cls: "reel-yours-edit clickable-icon",
           attr: { type: "button", "aria-label": "Edit this review" }
@@ -5111,9 +5360,9 @@ ${body}
       const body = hero.createDiv({ cls: "reel-hero-body" });
       const h = body.createDiv({ cls: "reel-hero-title" });
       h.createSpan({ text: e.title });
-      const year = e.year ?? e.firstAirYear;
-      if (year)
-        h.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const year2 = e.year ?? e.firstAirYear;
+      if (year2)
+        h.createSpan({ cls: "reel-dim", text: ` ${year2}` });
       const sub = body.createDiv({ cls: "reel-hero-sub" });
       const people = isTv ? e.creators : e.director;
       if (people.length)
@@ -5127,7 +5376,7 @@ ${body}
       if (e.certification)
         sub.createSpan({ cls: "reel-badge cert", text: e.certification });
       const scores = body.createDiv({ cls: "reel-scores" });
-      const score = (label, value, cls, outOf) => {
+      const score2 = (label, value, cls, outOf) => {
         const chip = scores.createDiv({ cls: `reel-score ${cls}` });
         const v = chip.createDiv({ cls: "reel-score-value", text: value });
         if (outOf)
@@ -5135,24 +5384,24 @@ ${body}
         chip.createDiv({ cls: "reel-score-label", text: label });
       };
       if (e.rating != null)
-        score("You", String(e.rating), "mine", "5");
+        score2("You", String(e.rating), "mine", "5");
       const epAvg = this.episodeAverage();
       if (epAvg != null)
-        score("Episodes", epAvg.toFixed(1), "mine", "5");
+        score2("Episodes", epAvg.toFixed(1), "mine", "5");
       if (e.imdbRating != null) {
-        score("IMDb", e.imdbRating.toFixed(1), "imdb", "10");
+        score2("IMDb", e.imdbRating.toFixed(1), "imdb", "10");
         if (e.imdbVotes) {
           const chip = scores.lastElementChild;
           chip?.createDiv({ cls: "reel-score-votes", text: compactCount(e.imdbVotes) });
         }
       }
       if (e.metacritic != null) {
-        score("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad", "100");
+        score2("Metacritic", String(e.metacritic), e.metacritic >= 61 ? "meta-good" : e.metacritic >= 40 ? "meta-mixed" : "meta-bad", "100");
       }
       if (e.rottenTomatoes != null)
-        score("Tomatoes", `${e.rottenTomatoes}%`, e.rottenTomatoes >= 60 ? "fresh" : "rotten");
+        score2("Tomatoes", `${e.rottenTomatoes}%`, e.rottenTomatoes >= 60 ? "fresh" : "rotten");
       if (e.tmdbRating != null)
-        score("TMDB", e.tmdbRating.toFixed(1), "", "10");
+        score2("TMDB", e.tmdbRating.toFixed(1), "", "10");
       if (e.rating != null) {
         const theirs = e.imdbRating ?? e.tmdbRating;
         const source = e.imdbRating != null ? "IMDb" : "TMDB";
@@ -5391,9 +5640,9 @@ ${body}
      * seen?" — rather than opening a biography you did not ask for.
      */
     renderPeople(el, people, asCast) {
-      const list = el.createDiv({ cls: "reel-people" });
+      const list2 = el.createDiv({ cls: "reel-people" });
       for (const p of people.slice(0, 40)) {
-        const row = list.createDiv({ cls: "reel-person" });
+        const row = list2.createDiv({ cls: "reel-person" });
         row.setAttr("role", "button");
         row.setAttr("tabindex", "0");
         row.setAttr("aria-label", `${p.name} \u2014 open their filmography`);
@@ -6085,9 +6334,9 @@ ${body}
         return;
       const wrap = main.createDiv({ cls: "reel-panel" });
       wrap.createDiv({ cls: "reel-panel-title", text: `Watch history \u2014 ${e.watched.length}` });
-      const list = wrap.createDiv({ cls: "reel-history" });
+      const list2 = wrap.createDiv({ cls: "reel-history" });
       for (const w of [...e.watched].reverse()) {
-        const row = list.createDiv({ cls: "reel-history-row" });
+        const row = list2.createDiv({ cls: "reel-history-row" });
         row.createSpan({ text: prettyDate(w.date) });
         if (w.rating != null)
           row.createSpan({ cls: "reel-dim", text: `\u2605 ${w.rating}` });
@@ -6104,16 +6353,16 @@ ${body}
   function becauseText(because, cap = 3) {
     const names = because.slice(0, cap);
     const extra = because.length - names.length;
-    let list;
+    let list2;
     if (names.length === 1)
-      list = names[0];
+      list2 = names[0];
     else if (names.length === 2)
-      list = `${names[0]} and ${names[1]}`;
+      list2 = `${names[0]} and ${names[1]}`;
     else
-      list = `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+      list2 = `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
     if (extra > 0)
-      list += ` and ${extra} more`;
-    return `Because it's like ${list}`;
+      list2 += ` and ${extra} more`;
+    return `Because it's like ${list2}`;
   }
 
   // src/util/recipe.ts
@@ -6744,9 +6993,9 @@ ${body}
       const body = card.createDiv({ cls: "reel-rate-body" });
       const title = body.createDiv({ cls: "reel-rate-title" });
       title.createSpan({ text: entry.title });
-      const year = entry.year ?? entry.firstAirYear;
-      if (year)
-        title.createSpan({ cls: "reel-dim", text: ` ${year}` });
+      const year2 = entry.year ?? entry.firstAirYear;
+      if (year2)
+        title.createSpan({ cls: "reel-dim", text: ` ${year2}` });
       const facts = body.createDiv({ cls: "reel-header-facts" });
       const people = entry.type === "tv" ? entry.creators : entry.director;
       if (people.length)
@@ -7053,6 +7302,564 @@ ${body}
     }
   };
 
+  // src/ai/find.ts
+  var EMPTY_CRITERIA = {
+    pool: "any",
+    type: "any",
+    genres: [],
+    excludeGenres: [],
+    yearFrom: null,
+    yearTo: null,
+    minRuntime: null,
+    maxRuntime: null,
+    minRating: null,
+    keywords: [],
+    restated: ""
+  };
+  function inPool(entry, pool2) {
+    if (pool2 === "any")
+      return true;
+    const seen = hasBeenWatched(entry);
+    if (pool2 === "watched")
+      return seen;
+    return !seen;
+  }
+  function effectiveRuntime(entry) {
+    const value = entry.type === "tv" ? entry.episodeRuntime : entry.runtime;
+    return value && value > 0 ? value : void 0;
+  }
+  function effectiveYear(entry) {
+    return entry.type === "tv" ? entry.firstAirYear : entry.year;
+  }
+  function gates(c) {
+    const out = [];
+    if (c.minRuntime != null || c.maxRuntime != null) {
+      out.push({
+        name: "length",
+        pass: (e) => {
+          const mins = effectiveRuntime(e);
+          if (mins == null)
+            return true;
+          if (c.minRuntime != null && mins < c.minRuntime)
+            return false;
+          if (c.maxRuntime != null && mins > c.maxRuntime)
+            return false;
+          return true;
+        }
+      });
+    }
+    if (c.yearFrom != null || c.yearTo != null) {
+      out.push({
+        name: "era",
+        pass: (e) => {
+          const y = effectiveYear(e);
+          if (y == null)
+            return true;
+          if (c.yearFrom != null && y < c.yearFrom)
+            return false;
+          if (c.yearTo != null && y > c.yearTo)
+            return false;
+          return true;
+        }
+      });
+    }
+    if (c.minRating != null) {
+      out.push({ name: "rating", pass: (e) => (e.rating ?? 0) >= c.minRating });
+    }
+    if (c.genres.length) {
+      const want = c.genres.map(lower);
+      out.push({ name: "genre", pass: (e) => e.genres.some((g) => want.includes(lower(g))) });
+    }
+    return out;
+  }
+  function shortlist(entries, c, limit) {
+    const pool2 = entries.filter((e) => inPool(e, c.pool));
+    const typed = c.type === "any" ? pool2 : pool2.filter((e) => e.type === c.type);
+    const excluded = c.excludeGenres.length ? typed.filter((e) => {
+      const no = c.excludeGenres.map(lower);
+      return !e.genres.some((g) => no.includes(lower(g)));
+    }) : typed;
+    const all2 = gates(c);
+    const relaxed = [];
+    for (let drop = 0; drop <= all2.length; drop++) {
+      const active = all2.slice(drop);
+      const kept = excluded.filter((e) => active.every((g) => g.pass(e)));
+      if (kept.length || drop === all2.length) {
+        const scored = kept.map((e) => ({ e, score: score(e, c) })).sort((a, b) => b.score - a.score || (a.e.title > b.e.title ? 1 : -1));
+        return { picked: scored.slice(0, limit).map((s) => s.e), relaxed };
+      }
+      relaxed.push(all2[drop].name);
+    }
+    return { picked: [], relaxed };
+  }
+  function score(entry, c) {
+    let n2 = 0;
+    const want = c.genres.map(lower);
+    for (const g of entry.genres)
+      if (want.includes(lower(g)))
+        n2 += 3;
+    if (c.keywords.length) {
+      const hay = [entry.title, ...entry.genres, ...entry.director, ...entry.creators, ...entry.cast.slice(0, 6)].join(" ").toLowerCase();
+      for (const k of c.keywords) {
+        const word = lower(k);
+        if (word.length > 2 && hay.includes(word))
+          n2 += 2;
+      }
+    }
+    if (entry.rating)
+      n2 += entry.rating * 0.4;
+    else if (entry.tmdbRating)
+      n2 += entry.tmdbRating * 0.05;
+    if (!entry.genres.length)
+      n2 -= 1;
+    return n2;
+  }
+  function digest(entry, index) {
+    const bits = [];
+    const year2 = effectiveYear(entry);
+    bits.push(`${index}. ${entry.title}${year2 ? ` (${year2})` : ""}`);
+    if (entry.type === "tv")
+      bits.push("series");
+    if (entry.genres.length)
+      bits.push(entry.genres.slice(0, 3).join("/"));
+    const mins = effectiveRuntime(entry);
+    if (mins)
+      bits.push(`${mins}m`);
+    const people = entry.type === "tv" ? entry.creators : entry.director;
+    if (people.length)
+      bits.push(`dir ${people[0]}`);
+    if (entry.rating)
+      bits.push(`you ${entry.rating}/5`);
+    bits.push(hasBeenWatched(entry) ? "seen" : "unseen");
+    return bits.join(" \xB7 ");
+  }
+  function lower(s) {
+    return s.trim().toLowerCase();
+  }
+  var CRITERIA_SCHEMA = {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "pool",
+      "type",
+      "genres",
+      "excludeGenres",
+      "yearFrom",
+      "yearTo",
+      "minRuntime",
+      "maxRuntime",
+      "minRating",
+      "keywords",
+      "restated"
+    ],
+    properties: {
+      pool: { type: "string", enum: ["watchlist", "watched", "any"] },
+      type: { type: "string", enum: ["film", "tv", "any"] },
+      genres: { type: "array", items: { type: "string" } },
+      excludeGenres: { type: "array", items: { type: "string" } },
+      yearFrom: { type: ["integer", "null"] },
+      yearTo: { type: ["integer", "null"] },
+      minRuntime: { type: ["integer", "null"] },
+      maxRuntime: { type: ["integer", "null"] },
+      minRating: { type: ["number", "null"] },
+      keywords: { type: "array", items: { type: "string" } },
+      restated: { type: "string" }
+    }
+  };
+  var PICKS_SCHEMA = {
+    type: "object",
+    additionalProperties: false,
+    required: ["picks"],
+    properties: {
+      picks: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["index", "why"],
+          properties: {
+            index: { type: "integer" },
+            why: { type: "string" }
+          }
+        }
+      }
+    }
+  };
+  var GENRES2 = [
+    "Action",
+    "Adventure",
+    "Animation",
+    "Comedy",
+    "Crime",
+    "Documentary",
+    "Drama",
+    "Family",
+    "Fantasy",
+    "History",
+    "Horror",
+    "Music",
+    "Mystery",
+    "Romance",
+    "Science Fiction",
+    "TV Movie",
+    "Thriller",
+    "War",
+    "Western",
+    "Action & Adventure",
+    "Kids",
+    "News",
+    "Reality",
+    "Sci-Fi & Fantasy",
+    "Soap",
+    "Talk",
+    "War & Politics"
+  ];
+  async function readCriteria(client, question, thisYear) {
+    const system = [
+      "You turn a sentence about what someone feels like watching into filter criteria for their own film and TV library.",
+      "",
+      `Use only these genre names, spelled exactly: ${GENRES2.join(", ")}.`,
+      "",
+      "Rules:",
+      `- "haven't seen", "something new", "what should I watch" means pool "watchlist". "again", "rewatch", "I loved" means "watched". Otherwise "any".`,
+      `- Runtimes are in minutes. "short" is about 100 max for a film, 35 for a series episode. "long" is 150 min.`,
+      `- Decades map to year ranges: "the nineties" is 1990 to 1999. "recent" is ${thisYear - 5} onwards.`,
+      `- minRating is the person's own 0-5 star rating, and only belongs when they ask for things they rated highly.`,
+      "- excludeGenres is for what they say they do NOT want. Read the mood: bleak, heavy or depressing usually means excluding Horror and War, not Drama.",
+      "- keywords are extra words worth matching against titles, directors and actors. Leave it empty when there are none. Do not put genres in it.",
+      "- Prefer fewer constraints. Every one you add can only remove titles from a library that may be small.",
+      `- restated: one short sentence saying what you understood, addressed to them, e.g. "Short comedies you haven't watched yet."`
+    ].join("\n");
+    const res = await client.json(
+      [
+        { role: "system", content: system },
+        { role: "user", content: question }
+      ],
+      CRITERIA_SCHEMA,
+      "criteria"
+    );
+    return {
+      criteria: sanitise(res.value),
+      promptTokens: res.promptTokens ?? 0,
+      completionTokens: res.completionTokens ?? 0
+    };
+  }
+  function sanitise(raw) {
+    const c = { ...EMPTY_CRITERIA, ...raw ?? {} };
+    const pools = ["watchlist", "watched", "any"];
+    c.pool = pools.includes(c.pool) ? c.pool : "any";
+    const types = ["film", "tv", "any"];
+    c.type = types.includes(c.type) ? c.type : "any";
+    c.genres = cleanList(c.genres);
+    c.excludeGenres = cleanList(c.excludeGenres);
+    c.keywords = cleanList(c.keywords).slice(0, 8);
+    c.yearFrom = year(c.yearFrom);
+    c.yearTo = year(c.yearTo);
+    if (c.yearFrom != null && c.yearTo != null && c.yearFrom > c.yearTo) {
+      [c.yearFrom, c.yearTo] = [c.yearTo, c.yearFrom];
+    }
+    c.minRuntime = minutes(c.minRuntime);
+    c.maxRuntime = minutes(c.maxRuntime);
+    if (c.minRuntime != null && c.maxRuntime != null && c.minRuntime > c.maxRuntime) {
+      [c.minRuntime, c.maxRuntime] = [c.maxRuntime, c.minRuntime];
+    }
+    const r = Number(c.minRating);
+    c.minRating = Number.isFinite(r) && r > 0 && r <= 5 ? r : null;
+    c.restated = typeof c.restated === "string" ? c.restated.trim().slice(0, 200) : "";
+    const wanted2 = c.genres.map(lower);
+    c.excludeGenres = c.excludeGenres.filter((g) => !wanted2.includes(lower(g)));
+    return c;
+  }
+  function cleanList(v) {
+    if (!Array.isArray(v))
+      return [];
+    const out = [];
+    for (const item of v) {
+      const s = String(item ?? "").trim();
+      if (s && !out.some((x) => lower(x) === lower(s)))
+        out.push(s);
+    }
+    return out;
+  }
+  function year(v) {
+    const n2 = Number(v);
+    if (!Number.isFinite(n2))
+      return null;
+    return n2 >= 1870 && n2 <= 2200 ? Math.round(n2) : null;
+  }
+  function minutes(v) {
+    const n2 = Number(v);
+    if (!Number.isFinite(n2))
+      return null;
+    return n2 > 0 && n2 <= 1200 ? Math.round(n2) : null;
+  }
+  async function rank(client, question, criteria, candidates, want) {
+    const lines = candidates.map((e, i) => digest(e, i)).join("\n");
+    const system = [
+      "You are choosing from someone's own film and TV library. Every candidate is numbered.",
+      "",
+      `Pick at most ${want}, best first, and give one short sentence for each saying why it answers what they asked.`,
+      "",
+      "Rules:",
+      "- Only ever use an index from the list. Never name a title that isn't there.",
+      "- If fewer than that genuinely fit, return fewer. A short honest answer beats a padded one.",
+      "- The reason must be about this title and their question, not a plot summary and not a restatement of the genre.",
+      "- Do not mention indexes, ratings out of five, or the word 'library' in the reasons."
+    ].join("\n");
+    const user = [
+      `They asked: ${question}`,
+      criteria.restated ? `Understood as: ${criteria.restated}` : "",
+      "",
+      "Candidates:",
+      lines
+    ].filter(Boolean).join("\n");
+    const res = await client.json(
+      [
+        { role: "system", content: system },
+        { role: "user", content: user }
+      ],
+      PICKS_SCHEMA,
+      "picks"
+    );
+    const seen = /* @__PURE__ */ new Set();
+    const picks = (res.value?.picks ?? []).filter((p) => Number.isInteger(p.index) && p.index >= 0 && p.index < candidates.length).filter((p) => !seen.has(p.index) && (seen.add(p.index), true)).slice(0, want).map((p) => ({ index: p.index, why: String(p.why ?? "").trim() }));
+    return {
+      picks,
+      promptTokens: res.promptTokens ?? 0,
+      completionTokens: res.completionTokens ?? 0
+    };
+  }
+  async function ask(client, entries, question, opts) {
+    const thisYear = opts.year ?? (/* @__PURE__ */ new Date()).getFullYear();
+    const first = await readCriteria(client, question, thisYear);
+    const { picked, relaxed } = shortlist(entries, first.criteria, opts.shortlistSize);
+    if (!picked.length) {
+      return {
+        criteria: first.criteria,
+        picks: [],
+        considered: 0,
+        relaxed,
+        promptTokens: first.promptTokens,
+        completionTokens: first.completionTokens
+      };
+    }
+    const second = await rank(client, question, first.criteria, picked, opts.want ?? 10);
+    return {
+      criteria: first.criteria,
+      picks: second.picks.map((p) => ({ entry: picked[p.index], why: p.why })),
+      considered: picked.length,
+      relaxed,
+      promptTokens: first.promptTokens + second.promptTokens,
+      completionTokens: first.completionTokens + second.completionTokens
+    };
+  }
+
+  // src/ui/askSheet.ts
+  var RECENT_LIMIT = 6;
+  var AskSheet = class extends Modal {
+    constructor(app2, plugin2, onOpenEntry, seed = "") {
+      super(app2);
+      this.plugin = plugin2;
+      this.onOpenEntry = onOpenEntry;
+      this.seed = seed;
+      this.busy = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-ask");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Ask" });
+      contentEl.createDiv({
+        cls: "reel-log-sub",
+        text: "Describe what you feel like. Reel searches what's already in your library."
+      });
+      if (!this.plugin.ai.configured) {
+        this.renderUnconfigured(contentEl);
+        return;
+      }
+      this.input = contentEl.createEl("textarea", {
+        cls: "reel-ask-input reel-input",
+        attr: {
+          rows: "3",
+          placeholder: "something short and funny I haven't seen, nothing too bleak"
+        }
+      });
+      this.input.value = this.seed;
+      this.input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && !ev.shiftKey) {
+          ev.preventDefault();
+          void this.run();
+        }
+      });
+      this.renderRecent(contentEl);
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Close" });
+      cancel.addEventListener("click", () => this.close());
+      this.goBtn = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Ask" });
+      this.goBtn.addEventListener("click", () => void this.run());
+      this.body = contentEl.createDiv({ cls: "reel-ask-body" });
+      window.setTimeout(() => this.input.focus(), 40);
+      if (this.seed)
+        void this.run();
+    }
+    renderUnconfigured(el) {
+      el.createDiv({
+        cls: "reel-ask-empty",
+        text: "Ask needs an OpenRouter key, and it's off until you add one. When it's on, a question sends a short list of titles from your library \u2014 names, years, genres, runtimes and your ratings \u2014 to OpenRouter. No review text, no dates, no file paths."
+      });
+      const actions = el.createDiv({ cls: "reel-log-actions" });
+      const go = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Open settings" });
+      go.addEventListener("click", () => {
+        this.close();
+        const setting = this.app.setting;
+        setting.open();
+        setting.openTabById("reel");
+      });
+    }
+    /**
+     * Questions you asked before, as one-tap buttons.
+     *
+     * A good question here is a reusable one — "something to fall asleep to" is
+     * a mood that recurs — and retyping it on a phone every time is exactly the
+     * friction that stops a feature from being used.
+     */
+    renderRecent(el) {
+      const recent = this.plugin.settings.recentAsks;
+      if (!recent.length)
+        return;
+      const row = el.createDiv({ cls: "reel-ask-recent" });
+      for (const q of recent.slice(0, RECENT_LIMIT)) {
+        const chip = row.createEl("button", { cls: "reel-ask-chip", text: q });
+        chip.addEventListener("click", () => {
+          this.input.value = q;
+          void this.run();
+        });
+      }
+    }
+    async run() {
+      const question = this.input.value.trim();
+      if (!question || this.busy)
+        return;
+      this.busy = true;
+      this.goBtn.disabled = true;
+      this.goBtn.setText("Thinking\u2026");
+      this.body.empty();
+      this.renderThinking();
+      try {
+        const entries = this.plugin.library.all();
+        const result = await ask(this.plugin.ai, entries, question, {
+          shortlistSize: this.plugin.settings.aiShortlist
+        });
+        await this.remember(question);
+        this.renderResult(result, entries.length);
+      } catch (e) {
+        this.body.empty();
+        this.body.createDiv({ cls: "reel-ask-error", text: redact(e) });
+      } finally {
+        this.busy = false;
+        this.goBtn.disabled = false;
+        this.goBtn.setText("Ask");
+      }
+    }
+    renderThinking() {
+      const box = this.body.createDiv({ cls: "reel-ask-thinking" });
+      box.createDiv({ cls: "reel-ask-spinner" });
+      box.createSpan({ text: "Reading the question, then your library\u2026" });
+    }
+    async remember(question) {
+      const list2 = this.plugin.settings.recentAsks.filter((q) => q.toLowerCase() !== question.toLowerCase());
+      list2.unshift(question);
+      this.plugin.settings.recentAsks = list2.slice(0, RECENT_LIMIT);
+      await this.plugin.saveSettings();
+    }
+    renderResult(result, libraryTotal) {
+      this.body.empty();
+      if (result.criteria.restated) {
+        const line = this.body.createDiv({ cls: "reel-ask-understood" });
+        setIcon(line.createSpan({ cls: "reel-ask-understood-icon" }), "quote");
+        line.createSpan({ text: result.criteria.restated });
+      }
+      if (result.relaxed.length) {
+        this.body.createDiv({
+          cls: "reel-ask-relaxed",
+          text: `Nothing in your library matched on ${list(result.relaxed)}, so that was set aside.`
+        });
+      }
+      if (!result.picks.length) {
+        this.body.createDiv({
+          cls: "reel-ask-empty",
+          text: result.considered === 0 ? "Nothing in your library fits that, even loosely. Try asking for less at once." : "Nothing came back. Try putting it a different way."
+        });
+        this.renderCost(result, libraryTotal);
+        return;
+      }
+      const list_ = this.body.createDiv({ cls: "reel-ask-results" });
+      for (const pick of result.picks) {
+        this.renderPick(list_, pick.entry, pick.why);
+      }
+      this.renderCost(result, libraryTotal);
+    }
+    renderPick(host, entry, why) {
+      const row = host.createDiv({ cls: "reel-ask-result" });
+      row.setAttr("role", "button");
+      row.setAttr("tabindex", "0");
+      row.setAttr("aria-label", `${entry.title}. ${why}`);
+      const thumb = row.createDiv({ cls: "reel-ask-thumb" });
+      this.plugin.posters.attach(thumb, entry);
+      const body = row.createDiv({ cls: "reel-ask-result-body" });
+      const title = body.createDiv({ cls: "reel-ask-result-title" });
+      title.createSpan({ text: entry.title });
+      const year2 = entry.type === "tv" ? entry.firstAirYear : entry.year;
+      if (year2)
+        title.createSpan({ cls: "reel-dim", text: ` ${year2}` });
+      if (why)
+        body.createDiv({ cls: "reel-ask-why", text: why });
+      const facts = body.createDiv({ cls: "reel-ask-facts" });
+      const mins = entry.type === "tv" ? entry.episodeRuntime : entry.runtime;
+      if (mins)
+        facts.createSpan({ text: formatMinutes(mins) });
+      if (entry.genres.length)
+        facts.createSpan({ text: entry.genres.slice(0, 2).join(", ") });
+      if (entry.rating != null)
+        renderStarsStatic(facts, entry.rating);
+      const open = () => {
+        this.close();
+        this.onOpenEntry(entry);
+      };
+      row.addEventListener("click", open);
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          open();
+        }
+      });
+    }
+    /**
+     * What it looked at and what it cost.
+     *
+     * Deliberately unglamorous and deliberately present. "62 of 431 considered"
+     * is the line that tells you whether the shortlist was the bottleneck, and
+     * the token count is the line that tells you this is not free.
+     */
+    renderCost(result, libraryTotal) {
+      const foot = this.body.createDiv({ cls: "reel-ask-cost" });
+      foot.createSpan({ text: `${result.considered} of ${libraryTotal} considered` });
+      const tokens = result.promptTokens + result.completionTokens;
+      if (tokens)
+        foot.createSpan({ text: `${tokens.toLocaleString()} tokens \xB7 ${this.plugin.settings.aiModel}` });
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+  function list(items) {
+    if (items.length === 1)
+      return items[0];
+    return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  }
+
   // src/settings.ts
   var DEFAULT_SETTINGS = {
     keyMode: "encrypted",
@@ -7091,7 +7898,21 @@ ${body}
     openNoteAfterCreate: true,
     checkNewEpisodes: true,
     language: "en-US",
-    noteTemplate: "\n## Notes\n\n"
+    noteTemplate: "\n## Notes\n\n",
+    publishTrakt: false,
+    publishMastodon: false,
+    mastodonHost: "",
+    publishConfirm: true,
+    publishRatings: true,
+    publishHashtags: "",
+    publishSpoilerDefault: true,
+    aiEnabled: false,
+    // Cheap, fast, and good enough to sort sixty one-line summaries by how well
+    // each answers a sentence, which is the whole of the job. A bigger model
+    // costs more per question without ranking a shortlist any better.
+    aiModel: "anthropic/claude-3.5-haiku",
+    aiShortlist: 60,
+    recentAsks: []
   };
 
   // harness/audit.ts
@@ -7712,6 +8533,33 @@ ${body}
     },
     visible: (rows2) => rows2,
     hiddenCount: () => 0,
+    /*
+     * Publishing, configured half-way on purpose.
+     *
+     * Trakt is ready and Mastodon is blocked, because the two states sit side
+     * by side in the same row and the blocked one is the easier of the pair to
+     * get wrong — it carries a second line of explanatory text inside a button
+     * that is otherwise one word tall.
+     */
+    publish: {
+      anyEnabled: true,
+      targets: () => [
+        { id: "trakt", label: "Trakt", enabled: true, blocker: null },
+        {
+          id: "mastodon",
+          label: "Mastodon",
+          enabled: true,
+          blocker: "No Mastodon access token \u2014 add one in Settings \u2192 Reel."
+        }
+      ],
+      publishedTo: () => ({}),
+      complaint: () => null,
+      preview: async () => ({
+        text: "\u2605\u2605\u2605\u2605\xBD\n\nA review long enough to wrap several times in the preview box, because a one-line sample would never show whether the text block scrolls, clips, or pushes the Publish button off the bottom of a phone screen.",
+        truncated: true
+      })
+    },
+    ai: { configured: true },
     posters: {
       attach(parent, entry) {
         parent.addClass("reel-poster-loading");
@@ -8118,9 +8966,9 @@ ${body}
       bar.createSpan({ cls: "reel-wn-date", text: date });
       if (summary)
         sec.createDiv({ cls: "reel-wn-relsummary", text: summary });
-      const list = sec.createDiv({ cls: "reel-wn-list" });
+      const list2 = sec.createDiv({ cls: "reel-wn-list" });
       for (const [kind, what, note] of changes) {
-        const row = list.createDiv({ cls: `reel-wn-item is-${kind}` });
+        const row = list2.createDiv({ cls: `reel-wn-item is-${kind}` });
         row.createSpan({ cls: "reel-wn-kind", text: kind === "new" ? "New" : kind === "better" ? "Better" : "Fixed" });
         const text = row.createDiv({ cls: "reel-wn-text" });
         text.createDiv({ cls: "reel-wn-what", text: what });
@@ -8289,6 +9137,32 @@ ${body}
     root.addClass("reel-view-body");
     mountSheet(root, new PersonSheet(plugin, 525, "Marguerite Vance-Ashworth"));
   }
+  function publishsheet(root) {
+    root.addClass("reel-view-body");
+    mountSheet(
+      root,
+      new PublishSheet(plugin.app, plugin, {
+        entry: LIBRARY[0],
+        date: "2026-08-20",
+        rating: 4.5,
+        text: "A review of the length people actually write, which is to say several sentences rather than one."
+      })
+    );
+    root.querySelector(".reel-publish-target")?.click();
+  }
+  function asksheet(root) {
+    root.addClass("reel-view-body");
+    mountSheet(
+      root,
+      new AskSheet(
+        plugin.app,
+        plugin,
+        () => {
+        },
+        ""
+      )
+    );
+  }
   var SCREENS = {
     library,
     libraryYear,
@@ -8316,6 +9190,8 @@ ${body}
     seasonsheet,
     personsheet,
     preview,
+    publishsheet,
+    asksheet,
     longshow,
     quick
   };
@@ -8400,7 +9276,9 @@ ${e?.stack ?? ""}` });
       "passphrase",
       "seasonsheet",
       "personsheet",
-      "preview"
+      "preview",
+      "publishsheet",
+      "asksheet"
     ]);
     const skipped = [];
     const results = [];

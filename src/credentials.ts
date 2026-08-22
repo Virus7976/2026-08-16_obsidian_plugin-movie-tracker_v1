@@ -24,13 +24,27 @@ import {
 } from "./secrets";
 import { PassphraseModal } from "./ui/passphraseModal";
 
-export type KeyName = "tmdb" | "omdb" | "dtdd";
+export type KeyName = "tmdb" | "omdb" | "dtdd" | "openrouter" | "trakt" | "traktApp" | "mastodon";
 
 export const KEY_LABELS: Record<KeyName, string> = {
 	tmdb: "TMDB",
 	omdb: "OMDb",
 	dtdd: "DoesTheDogDie",
+	openrouter: "OpenRouter",
+	trakt: "Trakt",
+	traktApp: "Trakt app",
+	mastodon: "Mastodon",
 };
+
+/**
+ * The keys that fetch data, as opposed to the ones that act on your behalf.
+ *
+ * Worth the distinction in the UI: a TMDB key can only ever read a public
+ * catalogue, while a Trakt token can post under your name. Grouping them
+ * together in one list of pills would flatten that difference into nothing.
+ */
+export const READ_KEYS: KeyName[] = ["tmdb", "omdb", "dtdd", "openrouter"];
+export const WRITE_KEYS: KeyName[] = ["trakt", "traktApp", "mastodon"];
 
 export type KeyBundle = Partial<Record<KeyName, string>>;
 
@@ -308,7 +322,11 @@ export function parseBundle(decrypted: string): KeyBundle {
 	try {
 		const parsed = JSON.parse(text) as Record<string, unknown>;
 		const out: KeyBundle = {};
-		for (const name of ["tmdb", "omdb", "dtdd"] as KeyName[]) {
+		// Every known name, derived from one list rather than a second
+		// hand-kept copy. A literal here would decrypt the bundle correctly and
+		// then drop any name added later on the way past — which presents as
+		// "the plugin forgot my token" and sends you looking at the crypto.
+		for (const name of [...READ_KEYS, ...WRITE_KEYS]) {
 			const v = parsed[name];
 			if (typeof v === "string" && v.trim()) out[name] = v.trim();
 		}

@@ -32,6 +32,8 @@ import { LogSheet } from "../src/ui/logSheet";
 import { FilterSheet, emptyFilters } from "../src/ui/filterSheet";
 import { SeasonSheet } from "../src/ui/seasonSheet";
 import { PersonSheet } from "../src/ui/personSheet";
+import { PublishSheet } from "../src/ui/publishSheet";
+import { AskSheet } from "../src/ui/askSheet";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { auditScreen, type Check } from "./audit";
 import { measure, stampWidth, stampChromeInsets, sizeBody, sheetFit } from "../src/util/panewidth";
@@ -268,6 +270,36 @@ const plugin = {
 	},
 	visible: (rows: Entry[]) => rows,
 	hiddenCount: () => 0,
+	/*
+	 * Publishing, configured half-way on purpose.
+	 *
+	 * Trakt is ready and Mastodon is blocked, because the two states sit side
+	 * by side in the same row and the blocked one is the easier of the pair to
+	 * get wrong — it carries a second line of explanatory text inside a button
+	 * that is otherwise one word tall.
+	 */
+	publish: {
+		anyEnabled: true,
+		targets: () => [
+			{ id: "trakt", label: "Trakt", enabled: true, blocker: null },
+			{
+				id: "mastodon",
+				label: "Mastodon",
+				enabled: true,
+				blocker: "No Mastodon access token — add one in Settings → Reel.",
+			},
+		],
+		publishedTo: () => ({}),
+		complaint: () => null,
+		preview: async () => ({
+			text:
+				"★★★★½\n\nA review long enough to wrap several times in the preview box, because a " +
+				"one-line sample would never show whether the text block scrolls, clips, or pushes the Publish " +
+				"button off the bottom of a phone screen.",
+			truncated: true,
+		}),
+	},
+	ai: { configured: true },
 	posters: {
 		attach(parent: HTMLElement, entry: { title: string }) {
 			parent.addClass("reel-poster-loading");
@@ -1135,6 +1167,59 @@ function personsheet(root: HTMLElement): void {
 	mountSheet(root, new PersonSheet(plugin, 525, "Marguerite Vance-Ashworth") as never);
 }
 
+/**
+ * The confirmation between a review and the internet.
+ *
+ * Mounted with a destination already chosen, because the sheet's whole reason
+ * to exist — the exact text, in a box, before it is sent — only appears once
+ * one is. An unticked sheet would audit the buttons and miss the thing they
+ * are there to gate.
+ *
+ * The truncation warning is on in the stub for the same reason: it is the one
+ * piece of copy in the sheet that appears only in a state that is awkward to
+ * reach by hand, which makes it exactly the piece that would rot unnoticed.
+ */
+function publishsheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(
+		root,
+		new PublishSheet(plugin.app, plugin as never, {
+			entry: LIBRARY[0],
+			date: "2026-08-20",
+			rating: 4.5,
+			text: "A review of the length people actually write, which is to say several sentences rather than one.",
+		}) as never
+	);
+	// `settled()` waits for the async preview, so the click below is enough to
+	// put the sheet into the state worth measuring.
+	(root.querySelector(".reel-publish-target") as HTMLElement | null)?.click();
+}
+
+/**
+ * Ask, at rest.
+ *
+ * Only the resting state: the box, the remembered questions and the buttons.
+ * Drawing a set of results would mean either reaching a private method or
+ * adding a seam that exists for the rig and nothing else, and the note above
+ * `SCREENS` about the Diary is the same judgement — changing the thing being
+ * measured to suit the measurement is not coverage.
+ *
+ * What that leaves uncovered is the result list, and it is listed in the
+ * audit's own skip line rather than left to be discovered.
+ */
+function asksheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(
+		root,
+		new AskSheet(
+			plugin.app,
+			plugin as never,
+			() => {},
+			""
+		) as never
+	);
+}
+
 /*
  * No diary screen.
  *
@@ -1172,6 +1257,8 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	seasonsheet,
 	personsheet,
 	preview,
+	publishsheet,
+	asksheet,
 	longshow,
 	quick,
 };
@@ -1466,6 +1553,8 @@ async function runAudit(app: HTMLElement): Promise<void> {
 		"seasonsheet",
 		"personsheet",
 		"preview",
+		"publishsheet",
+		"asksheet",
 	]);
 	const skipped: string[] = [];
 
