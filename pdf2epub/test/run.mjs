@@ -5,6 +5,7 @@
 
 import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -20,21 +21,41 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? '  ok  ' : ' FAIL '} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-function serve() {
-  // No fixed port: take whichever one Vite reports, so a stray server from an
-  // earlier run cannot wedge the suite.
-  const proc = spawn('npx', ['vite', 'preview', '--port', '0'], {
+/**
+ * Start `vite preview` on a port we choose, then wait for it to answer.
+ * Parsing the banner out of stdout was fragile — the format differs between
+ * a terminal and CI.
+ */
+async function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+async function serve() {
+  const port = await freePort();
+  baseUrl = `http://localhost:${port}/`;
+  const proc = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
     cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
   });
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('preview server did not start')), 30000);
-    proc.stdout.on('data', (d) => {
-      const m = String(d).match(/https?:\/\/localhost:(\d+)\S*/);
-      if (m) { baseUrl = `http://localhost:${m[1]}/`; clearTimeout(timer); resolve(proc); }
-    });
-    proc.stderr.on('data', (d) => process.stderr.write(d));
-    proc.on('exit', (code) => { clearTimeout(timer); reject(new Error(`preview exited ${code}`)); });
-  });
+  proc.stderr.on('data', (d) => process.stderr.write(d));
+
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    if (proc.exitCode !== null) throw new Error(`preview exited ${proc.exitCode}`);
+    try {
+      const res = await fetch(baseUrl);
+      if (res.ok) return proc;
+    } catch { /* not listening yet */ }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  proc.kill('SIGTERM');
+  throw new Error('preview server did not start');
 }
 
 const server = await serve();

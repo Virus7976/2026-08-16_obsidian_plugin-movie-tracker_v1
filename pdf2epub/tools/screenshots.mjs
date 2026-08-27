@@ -2,6 +2,7 @@
 // Captures the screenshots used in the README, on a phone-sized viewport.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -11,14 +12,28 @@ const out = path.join(root, 'docs/screenshots');
 fs.mkdirSync(out, { recursive: true });
 let baseUrl = '';
 
-const server = await new Promise((resolve, reject) => {
-  const proc = spawn('npx', ['vite', 'preview', '--port', '0'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
-  const timer = setTimeout(() => reject(new Error('no server')), 30000);
-  proc.stdout.on('data', (d) => {
-    const m = String(d).match(/https?:\/\/localhost:(\d+)/);
-    if (m) { baseUrl = `http://localhost:${m[1]}/`; clearTimeout(timer); resolve(proc); }
+async function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
   });
+}
+
+const port = await freePort();
+baseUrl = `http://localhost:${port}/`;
+const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
+  cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
 });
+for (let waited = 0; waited < 90000; waited += 300) {
+  try {
+    if ((await fetch(baseUrl)).ok) break;
+  } catch { /* not listening yet */ }
+  await new Promise((r) => setTimeout(r, 300));
+}
 
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch(fs.existsSync(CHROME) ? { executablePath: CHROME, args: ['--no-sandbox'] } : {});
