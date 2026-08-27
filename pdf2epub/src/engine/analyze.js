@@ -137,18 +137,28 @@ export function findRunningHeads(pages, stats) {
 /** Split a page into two columns when a clean, tall gutter runs down it. */
 function splitColumns(lines, stats, pageWidth) {
   if (lines.length < 8) return [lines];
-  const mid = [];
-  for (let x = pageWidth * 0.34; x <= pageWidth * 0.66; x += 2) {
-    const crossing = lines.filter((l) => l.x0 < x - 1 && l.x1 > x + 1).length;
-    mid.push([x, crossing]);
+
+  // Widest vertical strip in the middle of the page that no line crosses.
+  let best = null;
+  let run = null;
+  for (let x = Math.round(pageWidth * 0.3); x <= Math.round(pageWidth * 0.7); x++) {
+    const crossed = lines.some((l) => l.x0 < x - 0.5 && l.x1 > x + 0.5);
+    if (crossed) { run = null; continue; }
+    run = run ? { from: run.from, to: x } : { from: x, to: x };
+    if (!best || run.to - run.from > best.to - best.from) best = run;
   }
-  const clean = mid.filter(([, c]) => c === 0).map(([x]) => x);
-  if (clean.length < 6) return [lines];
-  const gutter = clean[Math.floor(clean.length / 2)];
+  if (!best || best.to - best.from < 6) return [lines];
+
+  const gutter = (best.from + best.to) / 2;
   const leftCol = lines.filter((l) => l.x1 <= gutter);
   const rightCol = lines.filter((l) => l.x0 >= gutter);
   if (leftCol.length < 4 || rightCol.length < 4) return [lines];
   if (leftCol.length + rightCol.length < lines.length * 0.9) return [lines];
+  // Two columns only if both actually run down the page, rather than one
+  // being a short caption beside a figure.
+  const span = (col) => Math.max(...col.map((l) => l.y)) - Math.min(...col.map((l) => l.y));
+  const pageSpan = Math.max(...lines.map((l) => l.y)) - Math.min(...lines.map((l) => l.y));
+  if (span(leftCol) < pageSpan * 0.5 || span(rightCol) < pageSpan * 0.5) return [lines];
   return [leftCol, rightCol];
 }
 
@@ -163,7 +173,14 @@ function buildBlocks(page, stats) {
       const prev = cur && cur.lines[cur.lines.length - 1];
       const sizeShift = prev ? Math.abs(line.size - prev.size) > Math.max(0.6, prev.size * 0.13) : false;
       const bigGap = prev ? gap > Math.max(stats.leading, prev.size * 1.15) * 1.5 : false;
-      if (!cur || bigGap || sizeShift) {
+      // A weight or slope change on a short line marks a heading or label,
+      // not emphasis inside a running paragraph.
+      const measure = Math.max(1, stats.right - stats.left);
+      const shortLine = (l) => l.x1 - l.x0 < measure * 0.75;
+      const styleShift = prev
+        && (prev.bold !== line.bold || prev.italic !== line.italic)
+        && (shortLine(prev) || shortLine(line));
+      if (!cur || bigGap || sizeShift || styleShift) {
         cur = { lines: [line], page: page.number };
         blocks.push(cur);
       } else {
@@ -174,8 +191,10 @@ function buildBlocks(page, stats) {
   for (const b of blocks) {
     b.x0 = Math.min(...b.lines.map((l) => l.x0));
     b.x1 = Math.max(...b.lines.map((l) => l.x1));
-    b.top = Math.min(...b.lines.map((l) => l.y));
-    b.bottom = Math.max(...b.lines.map((l) => l.y));
+    // Baselines alone give a block no height, which makes every overlap test
+    // against a figure meaningless; extend to the ascender and descender.
+    b.top = Math.min(...b.lines.map((l) => l.y - l.size * 0.85));
+    b.bottom = Math.max(...b.lines.map((l) => l.y + l.size * 0.25));
     b.size = median(b.lines.map((l) => l.size));
     b.text = b.lines.map((l) => l.text).join(' ');
     b.bold = b.lines.every((l) => l.bold);
@@ -237,10 +256,17 @@ function paragraphsOf(block, stats) {
   const baseX = percentile(lines.map((l) => l.x0), 0.2);
   const rightEdge = Math.max(...lines.map((l) => l.x1));
 
+  // Lines that wrap around a drop cap are indented for typographic reasons;
+  // they are continuations, not new paragraphs.
+  const cap = lines[0].spans.find((s) => s.size >= stats.body * 1.6 && s.text.trim().length <= 2);
+  const capRight = cap ? lines[0].x0 + cap.size * 1.2 : -Infinity;
+  const capBottom = cap ? lines[0].y + cap.size : -Infinity;
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     const prev = lines[i - 1];
-    const indented = line.x0 > baseX + stats.body * 0.55;
+    const besideCap = line.y <= capBottom && line.x0 <= capRight;
+    const indented = !besideCap && line.x0 > baseX + stats.body * 0.55;
     const prevShort = prev.x1 < rightEdge - stats.body * 2.2;
     const prevEnds = TERMINAL.test(prev.text);
     const gap = line.y - prev.y > stats.leading * 1.28;
@@ -261,7 +287,9 @@ function classify(block, stats, page, headingSizes) {
 
   if (SCENE_BREAK.test(block.text.trim()) && words.length <= 6) return { kind: 'break' };
 
-  if (short && (rel >= 1.12 || (block.bold && rel > 0.97) || (chaptery && (block.centered || rel > 1.02)))) {
+  const allCaps = /[A-Z]/.test(block.text) && !/[a-z]/.test(block.text);
+  if (short && (rel >= 1.12 || (block.bold && rel > 0.97) || (block.bold && allCaps && rel > 0.85)
+      || (chaptery && (block.centered || rel > 1.02)))) {
     if (!/[.!?]\s*$/.test(block.text) || chaptery || rel >= 1.3) {
       const rank = headingSizes.findIndex((s) => Math.abs(s - block.size) < 0.4);
       let level = rank < 0 ? 2 : Math.min(rank + 1, 4);
@@ -270,14 +298,15 @@ function classify(block, stats, page, headingSizes) {
     }
   }
 
+  // Footnotes are numbered too, so they have to be recognised before lists.
+  const bottomBand = block.top > page.height * 0.72;
+  if (block.size < stats.body * 0.88 && bottomBand && words.length > 2) return { kind: 'note' };
+
   if (BULLET.test(block.lines[0].text) || ORDERED.test(block.lines[0].text)) {
     return { kind: 'list', ordered: !BULLET.test(block.lines[0].text) };
   }
 
   if (CAPTION_WORD.test(block.text) && words.length < 60) return { kind: 'caption' };
-
-  const bottomBand = block.top > page.height * 0.72;
-  if (block.size < stats.body * 0.88 && bottomBand && words.length > 2) return { kind: 'note' };
 
   const indentedBoth = block.x0 > stats.left + stats.body * 1.6
     && block.x1 < stats.right - stats.body * 0.4;
@@ -333,8 +362,11 @@ export function buildDocument(pages, stats, options = {}) {
       // Text baked into a figure crop must not be repeated as prose.
       const covered = figures.some((f) => {
         if (f.area > 0.62) return false;
-        const ox = Math.min(block.x1, f.x1) - Math.max(block.x0, f.x0);
-        const oy = Math.min(block.bottom, f.y1) - Math.max(block.top, f.y0);
+        // Short fragments just outside the frame — axis labels, keys — belong
+        // to the picture; a full caption line does not.
+        const pad = block.text.length < 40 ? stats.body * 0.9 : 0;
+        const ox = Math.min(block.x1, f.x1 + pad) - Math.max(block.x0, f.x0 - pad);
+        const oy = Math.min(block.bottom, f.y1 + pad) - Math.max(block.top, f.y0 - pad);
         if (ox <= 0 || oy <= 0) return false;
         const blockArea = Math.max(1, (block.x1 - block.x0) * Math.max(1, block.bottom - block.top));
         return (ox * oy) / blockArea > 0.6;
@@ -509,7 +541,77 @@ export function chapterize(nodes, { outline = [], titleText = '' } = {}) {
     pendingHeading = null;
   }
 
-  return chapters.filter((c) => c.nodes.some((n) => n.type !== 'heading' || c.nodes.length === 1));
+  return splitOversized(
+    chapters.filter((c) => c.nodes.some((n) => n.type !== 'heading' || c.nodes.length === 1)),
+  );
+}
+
+const MAX_CHAPTER_CHARS = 120000;
+
+/**
+ * A single chapter holding half the book makes readers crawl and leaves the
+ * contents useless. Break long ones at their own subheadings.
+ */
+function splitOversized(chapters) {
+  const weigh = (nodes) => nodes.reduce((n, node) =>
+    n + stripTags(node.html || node.text || (node.items || []).join(' ')).length, 0);
+
+  const out = [];
+  for (const chapter of chapters) {
+    if (weigh(chapter.nodes) <= MAX_CHAPTER_CHARS) { out.push(chapter); continue; }
+
+    // Cut at the shallowest heading level that actually breaks this chapter up.
+    let cuts = [];
+    for (const level of [2, 3, 4]) {
+      cuts = chapter.nodes
+        .map((node, i) => ({ node, i }))
+        .filter(({ node, i }) => i > 0 && node.type === 'heading' && node.level <= level);
+      if (cuts.length) break;
+    }
+
+    if (!cuts.length) {
+      // Nothing to cut on: fall back to even slices at paragraph boundaries.
+      const parts = Math.ceil(weigh(chapter.nodes) / MAX_CHAPTER_CHARS);
+      const per = Math.ceil(chapter.nodes.length / parts);
+      for (let i = 0; i < parts; i++) {
+        const nodes = chapter.nodes.slice(i * per, (i + 1) * per);
+        if (nodes.length) out.push({ ...chapter, title: `${chapter.title} (${i + 1})`, nodes });
+      }
+      continue;
+    }
+
+    let start = 0;
+    for (const cut of [...cuts, { i: chapter.nodes.length, node: null }]) {
+      const nodes = chapter.nodes.slice(start, cut.i);
+      if (nodes.length) {
+        const heading = nodes.find((n) => n.type === 'heading');
+        out.push({
+          ...chapter,
+          title: start === 0 ? chapter.title : (heading?.text || chapter.title),
+          nodes,
+        });
+      }
+      start = cut.i;
+    }
+  }
+  // A part can still be too long if its own headings were sparse; slice those.
+  return out.flatMap((chapter) => {
+    if (weigh(chapter.nodes) <= MAX_CHAPTER_CHARS) return [chapter];
+    const parts = Math.ceil(weigh(chapter.nodes) / MAX_CHAPTER_CHARS);
+    const per = Math.ceil(chapter.nodes.length / parts);
+    return Array.from({ length: parts }, (_, i) => ({
+      ...chapter,
+      title: i === 0 ? chapter.title : `${chapter.title} (${i + 1})`,
+      nodes: chapter.nodes.slice(i * per, (i + 1) * per),
+    })).filter((c) => c.nodes.length);
+  });
 }
 
 export { escapeHtml, tidy, stripTags, median, percentile };
+
+/** Debug aid: the blocks and classifications a page produces. */
+export function inspectBlocks(page, stats) {
+  const blocks = buildBlocks(page, stats);
+  const ladder = headingSizeLadder(blocks, stats);
+  return blocks.map((b) => ({ ...b, kind: classify(b, stats, page, ladder).kind }));
+}

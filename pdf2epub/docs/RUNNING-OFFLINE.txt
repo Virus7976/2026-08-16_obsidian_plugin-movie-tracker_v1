@@ -1,0 +1,18 @@
+PDF to EPUB — offline copy
+==========================
+
+This folder is the whole app. It runs in a browser and converts PDFs on your
+own machine; nothing is uploaded anywhere.
+
+Browsers refuse to load a page like this straight off the disk (file://),
+because it uses modules and a service worker. Serve the folder over HTTP —
+any of these will do, run from inside this folder:
+
+    python3 -m http.server 8000
+    npx serve .
+    php -S localhost:8000
+
+Then open http://localhost:8000 in your browser.
+
+On a phone, the easier route is the hosted copy — open it once and use
+"Add to Home screen"; it then works offline like an installed app.

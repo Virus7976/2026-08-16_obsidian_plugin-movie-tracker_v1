@@ -39,15 +39,21 @@ export function figureRegions(graphics, page, { vectors = true, minArea = 0.005 
   const pageArea = page.width * page.height;
   const regions = mergeBoxes(graphics.images.map((i) => ({ ...i, parts: 1 })), PAD * 3);
 
-  if (vectors && graphics.paths.length > 12) {
+  if (vectors && graphics.paths.length >= 4) {
+    // Axis lines and rules are zero-height or zero-width, but they are part of
+    // the drawing, so length rather than area decides what counts.
     const meaningful = graphics.paths.filter((p) => {
       const w = p.x1 - p.x0;
       const h = p.y1 - p.y0;
-      return w > 6 && h > 6 && w < page.width * 0.98 && h < page.height * 0.98;
+      return Math.max(w, h) > 18 && w < page.width * 0.98 && h < page.height * 0.98;
     });
-    for (const cluster of mergeBoxes(meaningful, 8)) {
-      if ((cluster.parts || 1) < 8) continue;
-      if (areaOf(cluster) / pageArea < 0.04) continue;
+    // Bars, points and gridlines sit apart from each other, so the pad that
+    // gathers them into one figure scales with the page.
+    const pad = Math.min(page.width, page.height) * 0.045;
+    for (const cluster of mergeBoxes(meaningful, pad)) {
+      if ((cluster.parts || 1) < 4) continue;
+      const share = areaOf(cluster) / pageArea;
+      if (share < 0.04 || share > 0.85) continue;
       if (regions.some((r) => overlaps(r, cluster, 4))) continue;
       regions.push({ ...cluster, vector: true });
     }

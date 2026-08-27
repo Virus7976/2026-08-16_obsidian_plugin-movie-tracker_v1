@@ -1,12 +1,12 @@
 // Book identity: title, author, publisher, and the cover image.
 
-const JUNK_TITLE = /^(untitled|document\d*|microsoft word|print|output|scan(ned)?|book1|final|draft|new document|pdf ?document|.*\.(pdf|docx?|indd|tex|pages|odt|ps|qxd))$/i;
+const JUNK_TITLE = /^(untitled|document\d*|microsoft word|print|output|scan(ned)?|book1?|final|draft|new document|pdf ?document|.*\.(pdf|docx?|indd|tex|pages|odt|ps|qxd|html?|xhtml|epub|txt|rtf|md))$/i;
 
 export function cleanTitle(raw) {
   if (!raw) return '';
   let t = String(raw).trim()
     .replace(/^microsoft\s+word\s*[-–—]\s*/i, '')
-    .replace(/\.(pdf|docx?|indd|tex|pages|odt|ps|qxd)$/i, '')
+    .replace(/\.(pdf|docx?|indd|tex|pages|odt|ps|qxd|html?|xhtml|epub|txt|rtf|md)$/i, '')
     .replace(/[_]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
@@ -79,11 +79,23 @@ export function detectTitlePage(pages, stats) {
 }
 
 /** Merge every source of metadata, best evidence first. */
+const MACHINE_TITLE = /_|\b(final|draft|copy|rev|revised|v ?\d+|version ?\d+|untitled|new)\b|^[a-z0-9.\-]+$/i;
+
 export function resolveMetadata({ info, detected, filename, firstHeading }) {
   const fromInfo = cleanTitle(info?.Title);
   const fromFile = cleanTitle(filename?.replace(/\.pdf$/i, ''));
-  const title = fromInfo || cleanTitle(detected.title) || cleanTitle(firstHeading) || fromFile || 'Untitled';
-  const author = (info?.Author || '').trim() || detected.author || '';
+  // A Title field like "tidal_notes_FINAL_v3" is a save-as artefact; the words
+  // set in large type on the title page are the real title.
+  const weakInfo = fromInfo && MACHINE_TITLE.test(fromInfo);
+  const title = (weakInfo ? '' : fromInfo)
+    || cleanTitle(detected.title)
+    || fromInfo
+    || cleanTitle(firstHeading)
+    || fromFile
+    || 'Untitled';
+  const infoAuthor = (info?.Author || '').trim();
+  const junkAuthor = /^(anonymous|unknown|user|admin|owner|author|none|n\/?a|guest|windows user|microsoft office user|acrobat|pdf)$/i;
+  const author = (junkAuthor.test(infoAuthor) ? '' : infoAuthor) || detected.author || '';
   return {
     title,
     subtitle: detected.subtitle && detected.subtitle !== title ? detected.subtitle : '',

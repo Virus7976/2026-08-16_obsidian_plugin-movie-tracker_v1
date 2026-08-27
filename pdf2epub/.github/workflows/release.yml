@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to publish, e.g. v1.0.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Resolve version
+        id: v
+        run: echo "tag=${{ github.event.inputs.version || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+      # Built for a root path so the bundle runs from any static server.
+      - run: npm run build
+
+      - name: Package the app
+        run: |
+          cp docs/RUNNING-OFFLINE.txt dist/README.txt
+          cd dist && zip -qr "../pdf-to-epub-${{ steps.v.outputs.tag }}-web.zip" .
+
+      - name: Tag the release commit
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -f "${{ steps.v.outputs.tag }}"
+          git push -f origin "${{ steps.v.outputs.tag }}"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.v.outputs.tag }}" \
+            "pdf-to-epub-${{ steps.v.outputs.tag }}-web.zip" \
+            --title "PDF to EPUB ${{ steps.v.outputs.tag }}" \
+            --notes-file .github/RELEASE_NOTES.md \
+            --latest

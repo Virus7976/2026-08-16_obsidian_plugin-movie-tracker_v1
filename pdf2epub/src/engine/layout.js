@@ -19,6 +19,35 @@ export function fontTraits(rawName) {
   };
 }
 
+
+/**
+ * Vertical channels that no glyph on the page crosses — the gutters between
+ * columns. Only the middle of the page is considered, so ordinary margins and
+ * a ragged right edge are never mistaken for one.
+ */
+function findGutters(items, pageWidth) {
+  if (items.length < 24) return [];
+  const width = Math.ceil(pageWidth);
+  const covered = new Uint8Array(width + 2);
+  for (const item of items) {
+    const from = Math.max(0, Math.floor(item.x0));
+    const to = Math.min(width, Math.ceil(item.x1));
+    for (let x = from; x <= to; x++) covered[x] = 1;
+  }
+  const gutters = [];
+  let run = null;
+  const flush = () => {
+    if (run && run.to - run.from >= 8) gutters.push((run.from + run.to) / 2);
+    run = null;
+  };
+  for (let x = Math.floor(width * 0.25); x <= Math.ceil(width * 0.75); x++) {
+    if (covered[x]) flush();
+    else run = run ? { from: run.from, to: x } : { from: x, to: x };
+  }
+  flush();
+  return gutters;
+}
+
 /** Resolve a page font object (only populated once the operator list has run). */
 function resolveFont(page, fontName, cache) {
   if (cache.has(fontName)) return cache.get(fontName);
@@ -85,17 +114,40 @@ export async function extractLines(page, textContent, fontCache) {
   const flow = raw.filter((r) => !r.rotated);
   flow.sort((p, q) => (Math.abs(p.y - q.y) > 0.6 ? p.y - q.y : p.x0 - q.x0));
 
-  const lines = [];
+  const rows = [];
   let cur = null;
   for (const it of flow) {
     const tol = Math.max(1.1, it.size * 0.42);
     if (!cur || Math.abs(it.y - cur.y) > tol) {
       cur = { y: it.y, items: [] };
-      lines.push(cur);
+      rows.push(cur);
     } else {
       cur.y = (cur.y * cur.items.length + it.y) / (cur.items.length + 1);
     }
     cur.items.push(it);
+  }
+
+  // Text in adjacent columns shares a baseline, so a row of items can span two
+  // columns at once. Split rows at any vertical channel that no glyph on the
+  // page crosses, and at gaps far too wide to be a word space.
+  const gutters = findGutters(flow, viewport.width);
+  const columnOf = (x) => gutters.filter((g) => x > g).length;
+
+  const lines = [];
+  for (const row of rows) {
+    row.items.sort((p, q) => p.x0 - q.x0);
+    let segment = [row.items[0]];
+    for (let i = 1; i < row.items.length; i++) {
+      const item = row.items[i];
+      const prev = row.items[i - 1];
+      const gap = item.x0 - prev.x1;
+      const newColumn = columnOf((item.x0 + item.x1) / 2) !== columnOf((prev.x0 + prev.x1) / 2);
+      if (newColumn || gap > Math.max(item.size * 2.6, 14)) {
+        lines.push({ y: row.y, items: segment });
+        segment = [item];
+      } else segment.push(item);
+    }
+    lines.push({ y: row.y, items: segment });
   }
 
   return lines.map((line) => {
@@ -108,7 +160,10 @@ export async function extractLines(page, textContent, fontCache) {
       let piece = it.text;
       if (prev) {
         const gap = it.x0 - prev.x1;
-        const needsSpace = gap > it.size * 0.16 && !/\s$/.test(text) && !/^\s/.test(piece);
+        // A drop cap is a single outsized glyph set tight against the word it
+        // begins; the gap after it is typographic, not a space.
+        const dropCap = prev.size >= it.size * 1.5 && prev.text.trim().length <= 2;
+        const needsSpace = !dropCap && gap > it.size * 0.16 && !/\s$/.test(text) && !/^\s/.test(piece);
         if (needsSpace) piece = ' ' + piece;
       }
       const last = spans[spans.length - 1];

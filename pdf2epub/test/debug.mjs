@@ -35,6 +35,16 @@ if (process.argv.includes('--lines')) {
   }
 }
 
+if (process.argv.includes('--blocks')) {
+  const { inspectBlocks } = await import('../src/engine/analyze.js');
+  for (const page of pages) {
+    console.log(`\n--- page ${page.number}`);
+    for (const b of inspectBlocks(page, stats)) {
+      console.log(`  [${b.kind}] x=${b.x0.toFixed(0)}-${b.x1.toFixed(0)} y=${b.top.toFixed(0)}-${b.bottom.toFixed(0)} s=${b.size} ${b.bold?'B':''}${b.italic?'I':''} lines=${b.lines.length} | ${b.text.slice(0,70)}`);
+    }
+  }
+}
+
 const nodes = buildDocument(pages, stats, { dropCaps: true });
 console.log(`\n=== ${nodes.length} nodes ===`);
 for (const n of nodes) {

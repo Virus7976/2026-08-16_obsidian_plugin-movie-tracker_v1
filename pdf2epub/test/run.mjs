@@ -4,7 +4,7 @@
 // structured book.
 
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -60,7 +60,7 @@ try {
   check('app loads', await page.locator('.dropzone').isVisible());
 
   await page.setInputFiles('input[type=file]', fixture);
-  await page.waitForSelector('.job.done, .job.error', { timeout: 120000 });
+  await page.waitForSelector('.job.done, .job.error', { timeout: Number(process.env.CONVERT_TIMEOUT || 120000) });
 
   const failed = await page.locator('.job.error').count();
   check('conversion finished without error', failed === 0,
@@ -72,7 +72,7 @@ try {
     page.waitForEvent('download'),
     page.click('a.primary'),
   ]).then(([d]) => d);
-  const epubPath = path.join(outDir, 'sample.epub');
+  const epubPath = path.join(outDir, `${path.basename(fixture, '.pdf')}.epub`);
   await download.saveAs(epubPath);
   check('EPUB downloaded', fs.existsSync(epubPath) && fs.statSync(epubPath).size > 2000,
     `${Math.round(fs.statSync(epubPath).size / 1024)} KB`);
@@ -96,6 +96,13 @@ try {
 
   if (report) fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '));
+  // Structural and editorial checks on the file itself.
+  const profile = path.basename(fixture) === 'sample-book.pdf' ? 'sample' : '';
+  const verify = spawnSync('python3', [path.join(root, 'test/verify_epub.py'), epubPath, profile].filter(Boolean),
+    { cwd: root, encoding: 'utf8' });
+  if (verify.stdout) process.stdout.write(verify.stdout);
+  if (verify.error) console.log('  (skipped EPUB checks: python3 unavailable)');
+  else check('EPUB structure and content checks', verify.status === 0);
 } finally {
   await browser.close();
   server.kill('SIGTERM');

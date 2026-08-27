@@ -1,15 +1,28 @@
 {
   "name": "pdf-to-epub",
   "version": "1.0.0",
-  "description": "Turn a PDF into a properly typeset EPUB — chapters, figures and a real title page — entirely in the browser.",
+  "description": "Turn a PDF into a properly typeset EPUB \u2014 chapters, figures and a real title page \u2014 entirely in the browser.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",
-    "test": "node test/run.mjs",
-    "sample": "python3 tools/make_sample.py test/fixtures/sample-book.pdf"
+    "test": "node test/run.mjs test/fixtures/sample-book.pdf && node test/run.mjs test/fixtures/hard-sample.pdf",
+    "sample": "python3 tools/make_sample.py test/fixtures/sample-book.pdf && python3 tools/make_hard_sample.py test/fixtures/hard-sample.pdf",
+    "assets": "node tools/copy-pdfjs-assets.mjs",
+    "predev": "node tools/copy-pdfjs-assets.mjs",
+    "prebuild": "node tools/copy-pdfjs-assets.mjs",
+    "screenshots": "node tools/screenshots.mjs"
   },
-  "keywords": [],
+  "keywords": [
+    "pdf",
+    "epub",
+    "converter",
+    "ebook",
+    "pwa",
+    "offline",
+    "pdfjs",
+    "react"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -26,5 +39,9 @@
     "workbox-window": "^7.4.1"
   },
   "private": false,
-  "type": "module"
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Virus7976/pdf-to-epub.git"
+  }
 }
