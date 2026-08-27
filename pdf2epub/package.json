@@ -1,0 +1,30 @@
+{
+  "name": "pdf-to-epub",
+  "version": "1.0.0",
+  "description": "Turn a PDF into a properly typeset EPUB — chapters, figures and a real title page — entirely in the browser.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "test": "node test/run.mjs",
+    "sample": "python3 tools/make_sample.py test/fixtures/sample-book.pdf"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pdfjs-dist": "^4.10.38",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.0",
+    "playwright": "^1.62.1",
+    "vite": "^8.2.2",
+    "vite-plugin-pwa": "^1.3.0",
+    "workbox-precaching": "^7.4.1",
+    "workbox-window": "^7.4.1"
+  },
+  "private": false,
+  "type": "module"
+}
