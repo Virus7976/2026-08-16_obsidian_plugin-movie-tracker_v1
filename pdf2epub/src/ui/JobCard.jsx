@@ -67,6 +67,7 @@ export default function JobCard({ job, onRead }) {
               </ol>
             )}
 
+            {job.saveError && <p className="warn">{job.saveError}</p>}
             {report.warnings.map((w, i) => <p className="warn" key={i}>{w}</p>)}
           </div>
         </div>

@@ -14,7 +14,7 @@ const SHELL = `
   img { max-width: 100%; height: auto; }
 `;
 
-export default function Reader({ job, onClose }) {
+export default function Reader({ blob, onClose }) {
   const [book, setBook] = useState(null);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
@@ -22,11 +22,11 @@ export default function Reader({ job, onClose }) {
   useEffect(() => {
     let live = true;
     let opened = null;
-    openBook(job.result.blob)
+    openBook(blob)
       .then((b) => { if (live) { opened = b; setBook(b); } else b.release(); })
       .catch((e) => live && setError(e.message));
     return () => { live = false; if (opened) opened.release(); };
-  }, [job]);
+  }, [blob]);
 
   useEffect(() => {
     const onKey = (e) => {

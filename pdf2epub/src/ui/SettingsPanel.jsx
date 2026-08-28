@@ -10,7 +10,7 @@ const Row = ({ label, help, children }) => (
   </label>
 );
 
-export default function SettingsPanel({ settings, onChange, disabled }) {
+export default function SettingsPanel({ settings, onChange, disabled, lockSet, onSetLock, onRemoveLock }) {
   const [open, setOpen] = useState(false);
   const set = (key) => (value) => onChange({ ...settings, [key]: value });
 
@@ -79,6 +79,26 @@ export default function SettingsPanel({ settings, onChange, disabled }) {
           <Row label="Charts and diagrams" help="Also capture artwork drawn with vectors">
             <input type="checkbox" checked={settings.vectorFigures} disabled={disabled || !settings.includeImages}
               onChange={(e) => set('vectorFigures')(e.target.checked)} />
+          </Row>
+
+          <h3 className="settings-group">Your library</h3>
+
+          <Row label="Keep books for" help="Saved on this device, then cleared automatically">
+            <select value={settings.retention} disabled={disabled}
+              onChange={(e) => set('retention')(e.target.value)}>
+              <option value="6h">6 hours</option>
+              <option value="24h">A day</option>
+              <option value="3d">Three days</option>
+              <option value="never">Until I delete them</option>
+            </select>
+          </Row>
+
+          <Row label="Passcode lock" help={lockSet
+            ? 'Saved books are encrypted on this device'
+            : 'Encrypt saved books and ask for a passcode'}>
+            {lockSet
+              ? <button type="button" className="ghost small" onClick={onRemoveLock}>Turn off</button>
+              : <button type="button" className="ghost small" onClick={onSetLock}>Set up</button>}
           </Row>
         </div>
       )}

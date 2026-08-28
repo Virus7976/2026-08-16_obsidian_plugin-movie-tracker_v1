@@ -8,9 +8,9 @@ It runs entirely in the browser. Your file is never uploaded: the parsing, the
 layout analysis and the EPUB packaging all happen on your own device, and once
 the page has loaded it works with no network at all.
 
-| Pick a file | See what it found | Read it before you download |
+| See what it found | Waiting for you later | Read it before you download |
 |---|---|---|
-| ![The app on a phone](docs/screenshots/01-start.png) | ![Conversion result](docs/screenshots/02-result.png) | ![A converted chapter](docs/screenshots/03-chapter.png) |
+| ![Conversion result](docs/screenshots/02-result.png) | ![The library](docs/screenshots/05-library.png) | ![A converted chapter](docs/screenshots/03-chapter.png) |
 
 ## Use it on a phone
 
@@ -59,6 +59,34 @@ page the way a compositor laid it out.
 Scanned PDFs with no text layer are detected and turned into a page-image EPUB,
 with a note telling you to run OCR first if you want selectable text.
 
+## Your library
+
+Converted books are kept on the device, so the page can be closed as soon as a
+conversion finishes and the EPUB will still be there later. Each one shows how
+long it has left; by default they clear themselves after a day, and that can be
+set to six hours, three days, or never in **Book settings**.
+
+The conversion itself needs the page open — it runs in the browser, and takes
+seconds for a novel — but nothing after that does.
+
+### The passcode lock
+
+Switching on **Passcode lock** encrypts every saved book with a key derived from
+the passcode (PBKDF2-SHA256, 250,000 rounds → AES-GCM-256). The passcode is
+never stored: only a random salt and a short verifier are, so a wrong passcode is
+refused by the cipher itself rather than by a check that could be bypassed. With
+the lock on, the browser's own storage inspector shows nothing but ciphertext —
+no titles, no covers, no files.
+
+Two things this deliberately is not:
+
+- **It is not an account.** There is no server, so the library lives in this
+  browser on this device. It will not follow you to another phone or another
+  browser.
+- **It is not recoverable.** Nobody, including this app, can decrypt the books
+  without the passcode. Forget it and the only way forward is to clear the
+  library and convert again.
+
 ## Settings
 
 | Setting | What it changes |
@@ -68,6 +96,8 @@ with a note telling you to run OCR first if you want selectable text.
 | Chapters from | Automatic, the PDF's bookmarks, detected headings, or one long chapter |
 | Picture quality | Resolution figures are cut at — compact, standard or high |
 | Justified text, drop caps | Print conventions, on by default |
+| Keep books for | How long the library holds a book: 6 hours, a day, three days, or until deleted |
+| Passcode lock | Encrypts saved books on this device and asks for the passcode on return |
 | Include pictures / charts and diagrams | Photographs, and separately, vector artwork |
 
 ## Running it yourself
@@ -85,7 +115,8 @@ npm run build      # static site in dist/
 
 ```bash
 npm run sample     # regenerate the fixture PDFs (needs python3 + reportlab)
-npm test           # convert both fixtures in a real browser, then check the EPUBs
+npm test           # convert both fixtures in a real browser, check the EPUBs,
+                   # then exercise the library, the lock and expiry
 ```
 
 The suite drives the built app in headless Chromium, converts two deliberately
@@ -95,6 +126,11 @@ table of contents all resolve — and, on the reference fixture, that the title 
 author were recovered, running heads and page numbers are gone, lines were
 rejoined into paragraphs, hyphenation was repaired, and the figures arrived with
 their captions.
+
+The library suite converts a book, closes and reopens the page to prove it
+survives, downloads it again from storage, turns on the passcode lock and
+confirms the stored records hold no readable title or file, rejects a wrong
+passcode, accepts the right one, and checks that books past their time are gone.
 
 It has also been checked against a real 360-page book: 99.1% of the original
 text's five-word sequences survive the round trip, with every running head and
@@ -108,6 +144,9 @@ src/engine/     framework-free conversion pipeline
   analyze.js      lines -> blocks -> a semantic book (headings, paragraphs, ...)
   images.js       figure regions, rendering, de-duplication
   meta.js         title, author, publisher, generated cover
+  library.js      IndexedDB store for finished books, with expiry
+  vault.js        passcode -> AES-GCM key; encrypt/decrypt helpers
+  shelf.js        saving, listing and re-keying the library
   epub.js         EPUB 3 packaging
   zip.js          ZIP writer (stored mimetype, deflate for the rest)
   unzip.js        ZIP reader, used by the in-app preview

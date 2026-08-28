@@ -9,6 +9,19 @@ It then works offline and accepts PDFs shared from other apps.
 over HTTP (`python3 -m http.server 8000`, then open `http://localhost:8000`).
 Browsers will not run it directly from `file://`.
 
+### New in v1.1.0 — your library
+
+Converted books are now kept on the device. Start a conversion, and once it
+finishes you can close the page: the EPUB is waiting when you come back. Each
+book shows how long it has left — a day by default, or six hours, three days, or
+until you delete it.
+
+An optional **passcode lock** encrypts everything saved, with a key derived from
+your passcode (PBKDF2-SHA256 → AES-GCM-256). With it on, the browser's storage
+holds nothing readable: no titles, no covers, no files. It is a lock on this
+device, not an account — the library does not follow you to another phone, and a
+forgotten passcode cannot be recovered.
+
 ### What it does
 
 - Reads font size, weight and position to work out chapter titles, subheadings,

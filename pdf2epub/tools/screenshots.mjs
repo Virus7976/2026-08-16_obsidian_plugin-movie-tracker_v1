@@ -47,6 +47,10 @@ await page.waitForSelector('.job.done', { timeout: 180000 });
 await page.waitForTimeout(400);
 await page.screenshot({ path: path.join(out, '02-result.png') });
 
+await page.locator('.shelf').scrollIntoViewIfNeeded();
+await page.waitForTimeout(300);
+await page.screenshot({ path: path.join(out, '05-library.png') });
+
 await page.click('button:has-text("Preview the book")');
 await page.waitForSelector('.reader iframe');
 await page.waitForTimeout(600);

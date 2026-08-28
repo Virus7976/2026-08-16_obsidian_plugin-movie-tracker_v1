@@ -238,3 +238,92 @@ footer { margin-top: 2.5rem; color: var(--muted); font-size: 0.8rem; text-align:
   .result .cover { width: 108px; }
   .setting { flex-wrap: wrap; }
 }
+
+/* ---------------------------------------------------------------- library */
+
+.shelf { margin-top: 1.8rem; }
+.shelf-note { margin: 0 0 0.9rem; color: var(--muted); font-size: 0.85rem; }
+
+.shelf-item {
+  display: flex;
+  gap: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.85rem;
+  margin-bottom: 0.7rem;
+}
+
+.shelf-cover {
+  width: 62px;
+  flex: 0 0 62px;
+  height: 93px;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.shelf-cover.placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 1.6rem;
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+.shelf-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
+.shelf-body strong { overflow-wrap: anywhere; }
+.shelf-meta { color: var(--muted); font-size: 0.82rem; }
+.shelf-expiry { color: var(--accent); font-size: 0.78rem; margin-bottom: 0.5rem; }
+.locked-tag { font-size: 0.75rem; }
+
+.settings-group {
+  margin: 1.3rem 0 0.2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------- lock */
+
+.lock {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background: var(--bg);
+  z-index: 60;
+}
+
+.lock-card {
+  width: min(24rem, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.6rem 1.3rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.lock-glyph { font-size: 2rem; }
+.lock-card h2 { margin: 0; font-size: 1.15rem; }
+.lock-card p { margin: 0; color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+
+.lock-card input {
+  font: inherit;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: center;
+  letter-spacing: 0.15em;
+}
+
+.lock-actions { display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.3rem; }
+.lock-actions .primary { flex: 1; }
+.lock-note { font-size: 0.78rem; opacity: 0.8; }
