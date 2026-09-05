@@ -1972,7 +1972,9 @@
       box.toggleClass("is-open", open);
       toggle2.setAttr("aria-expanded", String(open));
     };
-    setOpen(false);
+    const view = el.closest(".reel-view");
+    const roomy = !!view && view.classList.contains("is-w700") && !view.classList.contains("is-phone");
+    setOpen(roomy);
     toggle2.addEventListener("click", () => setOpen(!box.hasClass("is-open")));
     for (const d of data) {
       const row = body.createDiv({ cls: "reel-chart-row" });

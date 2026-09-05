@@ -1621,6 +1621,28 @@ input.reel-input {
 }
 
 /*
+ * A pinned header pins to the top, not to 8px below it.
+ *
+ * `position: sticky` measures its offsets from the scrollport's *padding* box,
+ * and the body carries `padding-top: 8px`. So every sticky header in the app —
+ * the bar on a title's page, the month divider in the diary — settled 8px down
+ * from the edge, and the page kept scrolling through the band it left behind.
+ * Probed while scrolled: an 8px gap above the bar with `reel-hero-body`, the
+ * artwork, painted inside it. Posters slide through a slot above a bar that
+ * looks like it should have stopped them, which is the tell that the bar is
+ * floating rather than fixed to anything.
+ *
+ * Subtracting the padding puts the pinned edge back on the scrollport edge, so
+ * the header covers what passes under it. Read from the same variable the
+ * padding is written with, because two numbers that must agree should only be
+ * written once.
+ */
+.reel-view.is-w700 .reel-detail-bar,
+.reel-view.is-w700 .reel-diary-month {
+	top: calc(-1 * var(--reel-body-pad-top, 8px));
+}
+
+/*
  * A tab is a tab, not a balloon.
  *
  * The active tab was drawing a rounded outline around itself, which is not a
@@ -1694,7 +1716,12 @@ input.reel-input {
 	flex: none;
 	overflow-y: auto;
 	-webkit-overflow-scrolling: touch;
-	padding: 8px 12px calc(24px + env(safe-area-inset-bottom));
+	/* Named because a sticky child has to subtract it. `position: sticky` with
+	   `top: 0` pins to the scrollport's *padding* edge, so this number is also
+	   the size of the gap every pinned header would otherwise leave above
+	   itself — see the sticky rule that reads it back. */
+	--reel-body-pad-top: 8px;
+	padding: var(--reel-body-pad-top) 12px calc(24px + env(safe-area-inset-bottom));
 	padding-left: max(12px, env(safe-area-inset-left));
 	padding-right: max(12px, env(safe-area-inset-right));
 }
@@ -9693,10 +9720,22 @@ input.reel-input {
 	transition: opacity 160ms ease;
 }
 
+/*
+ * Gone, not merely invisible.
+ *
+ * `opacity: 0` with `height: 0` looks identical on screen and is not the same
+ * thing: the text is still rendered, still in the tree, and still something a
+ * contrast checker has to have an opinion about. It read as 1.00:1 — the
+ * colour of its own background — the moment anything opened a fold while the
+ * audit was watching, which nothing did until the desktop began opening them
+ * by default. A latent failure, surfaced rather than caused by that change.
+ *
+ * `display: none` says what the rule means. The transition above it stops
+ * applying, which costs nothing: `height: 0` was never going to animate a
+ * `nowrap` line into a smooth collapse anyway.
+ */
 .reel-fold.is-open .reel-fold-preview {
-	opacity: 0;
-	height: 0;
-	overflow: hidden;
+	display: none;
 }
 
 /* The count, given the accent it was always describing. A number in the same

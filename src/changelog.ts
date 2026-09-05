@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.39",
+		date: "2026-09-05",
+		headline: "Stats are on the page on a desktop, and pinned headers stay pinned.",
+		changes: [
+			{
+				kind: "better",
+				text: "On a desktop the charts on Stats start open, so your numbers are on the page instead of behind eleven chevrons.",
+				note: "Collapsing spends taps to buy back screen, which is the right trade on a phone and the wrong one where the room already exists: the page became eleven grey boxes holding one number each, nothing could be compared against anything else, and reading your own statistics cost eleven clicks. They still collapse — only the starting state changed. The phone is untouched.",
+			},
+			{
+				kind: "fixed",
+				text: "A pinned header — the bar on a title's page, the month divider in the diary — sits against the top edge instead of hovering a few pixels below it with content sliding through the gap.",
+				note: "A sticky element measures its offset from the scroll area's padding edge, and that padding is 8px. So every pinned header settled 8px down and the page kept scrolling through the band it left behind. Probed while scrolling: an 8px gap with the backdrop artwork painted inside it.",
+			},
+			{
+				kind: "fixed",
+				text: "The summary line above an open chart no longer sits there as invisible text.",
+				note: "It was hidden by being made transparent rather than removed, so it stayed on the page at the exact colour of its own background. Nothing showed this until the charts began opening by default and the contrast check finally had an open one to look at.",
+			},
+		],
+	},
+	{
 		version: "0.9.38",
 		date: "2026-09-05",
 		headline: "On a desktop, Reel is built like a tool.",

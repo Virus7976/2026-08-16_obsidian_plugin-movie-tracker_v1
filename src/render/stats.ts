@@ -1031,7 +1031,27 @@ function bars(el: HTMLElement, title: string, data: Bar[], suffix = "", plugin?:
 		box.toggleClass("is-open", open);
 		toggle.setAttr("aria-expanded", String(open));
 	};
-	setOpen(false);
+	/*
+	 * Closed on a phone, open where there is room to read them.
+	 *
+	 * Collapsing spends taps to buy back screen, and that is the right trade on
+	 * a phone: twelve charts open is a very long page to thumb through, which
+	 * is why the closed state was made worth reading — the preview names the
+	 * top three and the strip shows their posters.
+	 *
+	 * On a desktop the trade runs the other way. The room is already there, so
+	 * the page becomes twelve grey boxes each holding one number and a chevron:
+	 * reading your own statistics costs twelve clicks, and nothing can be
+	 * compared against anything else because only one is ever open at a time. A
+	 * tool puts the numbers on the page.
+	 *
+	 * They still collapse. The toggle, the count and the chevron behave exactly
+	 * as before — only the starting state differs, and only where the pane is
+	 * both wide and driven by a pointer.
+	 */
+	const view = el.closest(".reel-view");
+	const roomy = !!view && view.classList.contains("is-w700") && !view.classList.contains("is-phone");
+	setOpen(roomy);
 	toggle.addEventListener("click", () => setOpen(!box.hasClass("is-open")));
 	for (const d of data) {
 		const row = body.createDiv({ cls: "reel-chart-row" });
