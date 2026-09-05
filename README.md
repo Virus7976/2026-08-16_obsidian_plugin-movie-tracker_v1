@@ -372,7 +372,7 @@ Design-level, not afterthoughts:
 
 - `requestUrl` instead of `fetch` (CORS)
 - `isDesktopOnly: false`, zero Node APIs — the esbuild config lists every Node builtin as external so a stray dependency can't silently break the mobile build
-- 44 px minimum touch targets throughout; the star widget's glyph is small but its tap box isn't
+- 44 px minimum touch targets throughout; the star widget's glyph is small but its tap box isn't. On a pointer — a desktop pane with no touch device — the minimum is 28 px, above WCAG 2.5.8's 24 px for pointer inputs. The audit keys that off the device and never off the pane width: a phone held in landscape is wide and still has no cursor
 - no hover-only affordances — long-press for quick-rate, with a movement threshold so scrolling never triggers it
 - every colour from an Obsidian CSS variable, so an untested theme can't produce unreadable text
 - `safe-area-inset` on the sticky filter bar and the bottom sheets

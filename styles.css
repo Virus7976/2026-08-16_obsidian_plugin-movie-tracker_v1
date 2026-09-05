@@ -8656,6 +8656,40 @@ input.reel-input {
 	border-radius: var(--reel-radius-full);
 }
 
+/* ================================================================== *
+ * Pointer density                                                    *
+ * ================================================================== */
+
+/*
+ * A cursor lands where it is pointed; a thumb does not.
+ *
+ * Everything above holds controls at 44px, which is the touch figure — Apple's
+ * HIG, WCAG 2.5.5 at AAA. For a pointer the figure is WCAG 2.5.8's 24px at AA,
+ * and the audit now asks 28 on a pointer and 44 on a touch device rather than
+ * asking 44 of both. Holding a mouse-driven pane at thumb size is the thing
+ * the audit's own note warns about: an accessibility minimum quietly becoming
+ * a visual style. It is also most of why the desktop read as a phone app
+ * stretched wide — every control a third larger than the work needs.
+ *
+ * `:not(.is-phone)` rather than width alone. A phone in landscape clears 700px
+ * and still has no cursor, so keying density off the pane would hand a thumb
+ * the pointer's minimum. Width says how much room there is; only the device
+ * says what is pointing at it.
+ */
+.reel-view.is-w700:not(.is-phone) .reel-chip {
+	min-height: 30px;
+	padding: 0 10px;
+}
+
+.reel-view.is-w700:not(.is-phone) .reel-tab {
+	min-height: 34px;
+}
+
+.reel-view.is-w700:not(.is-phone) .reel-search-wrap,
+.reel-view.is-w700:not(.is-phone) .reel-select {
+	min-height: 32px;
+}
+
 /* The row has to be exactly as tall as the hit area it contains.
  *
  * The first attempt put a 44px overlay on a 32px chip and left the row at its

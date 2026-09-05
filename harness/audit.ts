@@ -373,11 +373,34 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	 * extends past it. `elementFromPoint` at the edges of the band is what a
 	 * finger would actually find there, so it measures the thing that matters.
 	 */
-	const reaches44 = (el: HTMLElement): boolean => {
+	/*
+	 * A finger's minimum, asked of fingers.
+	 *
+	 * 44px is the *touch* figure — Apple's HIG, and WCAG 2.5.5 at AAA. The
+	 * pointer figure is WCAG 2.5.8's 24px at AA, because a mouse lands where it
+	 * is pointed and a thumb does not. This check asked 44 of every run,
+	 * including the ones with no thumb anywhere near them, which is the failure
+	 * the note above already names: an accessibility minimum quietly becoming a
+	 * visual style. On the desktop it was doing exactly that — holding every
+	 * chip, tab and button at thumb size in a pane driven by a cursor, which is
+	 * the difference between a tool and a phone app stretched wide.
+	 *
+	 * So: 44 where the run models touch, 28 where it does not. 28 rather than
+	 * the bare 24 leaves room to be wrong and still clear AA.
+	 *
+	 * Keyed on `opts.phone`, the device, never on the width. A phone held in
+	 * landscape is over 700px wide and still has no cursor, so a width test
+	 * would hand a thumb the cursor's minimum — which is the one direction this
+	 * must never fail in.
+	 */
+	const minTarget = opts.phone ? 44 : 28;
+
+	const reachesMin = (el: HTMLElement): boolean => {
 		const r = el.getBoundingClientRect();
 		const cx = r.left + r.width / 2;
-		const top = r.top + r.height / 2 - 21;
-		const bottom = r.top + r.height / 2 + 21;
+		const reach = minTarget / 2 - 1;
+		const top = r.top + r.height / 2 - reach;
+		const bottom = r.top + r.height / 2 + reach;
 		const hits = (y: number): boolean => {
 			if (y < 0 || y > window.innerHeight || cx < 0 || cx > window.innerWidth) return false;
 			const hit = document.elementFromPoint(cx, y);
@@ -405,8 +428,8 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 		 */
 		if (h <= 0 || !shown(el) || el.closest(".reel-stars") || el.closest(".reel-episode-stars")) return false;
 		if (el.closest(".reel-heatmap-grid")) return false;
-		if (h >= 44) return false;
-		return !reaches44(el);
+		if (h >= minTarget) return false;
+		return !reachesMin(el);
 	});
 	/*
 	 * The height *and* where the thing is.
@@ -440,7 +463,13 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 				` at ${Math.round(r.left)},${Math.round(r.top)} in .${el.parentElement?.className.split(" ")[0] ?? "?"}`,
 		);
 	}
-	check("touchTargets44", small.length === 0, [...worst].map(([k, d]) => `${k} ${d}`).join(", "));
+	// Named for what it asks rather than for one of its two answers: the report
+	// has to say which minimum applied, or a desktop pass reads like a phone one.
+	check(
+		`targetSize${minTarget}`,
+		small.length === 0,
+		[...worst].map(([k, d]) => `${k} ${d}`).join(", ")
+	);
 
 	/*
 	 * Can you see the box you are typing into?

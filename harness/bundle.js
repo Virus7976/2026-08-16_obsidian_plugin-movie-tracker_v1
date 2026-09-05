@@ -3249,6 +3249,14 @@
       this.searchedFor = "";
       /** How many results were dropped for already being in your library. */
       this.searchOwned = 0;
+      /** The last page of results fetched; the sentinel asks for the next. */
+      this.searchPage = 0;
+      /** What TMDB says it holds for this query. 0 until the first page lands. */
+      this.searchPages = 0;
+      /** Titles TMDB claims to have, so the count can stop overstating one page. */
+      this.searchTotal = 0;
+      /** A page is in flight, so the sentinel must not ask for it twice. */
+      this.searchMore = false;
       this.profile = null;
       this.results = null;
       this.genres = [];
@@ -3315,6 +3323,9 @@
       this.mounting = false;
       this.searchResults = null;
       this.searchedFor = "";
+      this.searchPage = 0;
+      this.searchPages = 0;
+      this.searchMore = false;
       this.profile = null;
       this.results = null;
       this.error = null;
@@ -4096,17 +4107,24 @@
       if (this.searchedFor !== q) {
         this.searchResults = null;
         this.searchedFor = q;
+        this.searchPage = 0;
+        this.searchPages = 0;
+        this.searchTotal = 0;
+        this.searchMore = false;
       }
       if (!this.searchResults) {
         skeletonGrid(container, 12, "Searching");
         if (this.loading)
           return;
         this.loading = true;
-        void this.plugin.tmdb.searchMulti(q).then((items2) => {
-          const usable = items2.filter((i) => !i.adult && i.poster_path);
+        void this.plugin.tmdb.searchMultiPage(q, 1).then((res) => {
+          const usable = res.results.filter((i) => !i.adult && i.poster_path);
           const fresh = this.plugin.discover.filterOut(usable);
           this.searchOwned = usable.length - fresh.length;
           this.searchResults = fresh;
+          this.searchPage = res.page;
+          this.searchPages = res.totalPages;
+          this.searchTotal = res.totalResults;
         }).catch((e) => {
           this.error = diagnoseError(e).message;
         }).finally(() => {
@@ -4117,7 +4135,8 @@
       }
       const items = this.searchResults.filter((i) => !this.handled.has(i.id));
       const count = container.createDiv({ cls: "reel-block-count" });
-      count.setText(`${items.length} on TMDB for \u201C${q}\u201D`);
+      const more = this.searchTotal > items.length;
+      count.setText(more ? `${items.length} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${items.length} on TMDB for \u201C${q}\u201D`);
       if (this.searchOwned) {
         count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
       }
@@ -4131,6 +4150,85 @@
       const grid = container.createDiv({ cls: "reel-dgrid" });
       for (const item of items)
         grid.appendChild(this.card(item, container));
+      this.paintSearchSentinel(container, grid, count);
+    }
+    /**
+     * Keep the search going as you scroll, instead of stopping at page one.
+     *
+     * The same sentinel-and-observer shape as the feed, and for the same reason:
+     * an intersection is asked once and answered once, where a scroll handler on
+     * a measured, fixed-height body fires at whatever rate the device likes.
+     *
+     * Cards are appended to the grid that is already on screen rather than the
+     * screen being redrawn. A redraw would replace the scroller's children and
+     * throw the reader back to the top — the one thing an infinite scroll must
+     * never do.
+     */
+    paintSearchSentinel(container, grid, count) {
+      if (this.searchPage >= this.searchPages)
+        return;
+      const sentinel = container.createDiv({ cls: "reel-feed-end" });
+      sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
+      const scroller = container.closest(".reel-view-body") ?? null;
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting))
+            return;
+          void this.moreSearch(container, grid, sentinel, count);
+        },
+        { root: scroller, rootMargin: "600px 0px" }
+      );
+      io.observe(sentinel);
+      this.watchers.push(io);
+    }
+    /**
+     * One more page of search results, appended.
+     *
+     * A page can legitimately yield nothing to show — every title on it is
+     * already in your library, or has no poster, or the page was mostly people.
+     * Stopping there would end the search on a technicality while TMDB still
+     * holds hundreds of matches, so it walks on to the next page, up to a few
+     * per scroll so a run of empty pages cannot become an unbounded request
+     * loop.
+     */
+    async moreSearch(container, grid, sentinel, count) {
+      if (this.searchMore)
+        return;
+      this.searchMore = true;
+      const q = this.searchedFor;
+      try {
+        for (let tries = 0; tries < 3 && this.searchPage < this.searchPages; tries++) {
+          const res = await this.plugin.tmdb.searchMultiPage(q, this.searchPage + 1);
+          if (this.searchedFor !== q || !this.searchResults)
+            return;
+          this.searchPage = res.page;
+          if (res.totalPages)
+            this.searchPages = res.totalPages;
+          const usable = res.results.filter((i) => !i.adult && i.poster_path);
+          const fresh = this.plugin.discover.filterOut(usable);
+          this.searchOwned += usable.length - fresh.length;
+          const seen = new Set(this.searchResults.map((i) => i.id));
+          const added = fresh.filter((i) => !seen.has(i.id) && !this.handled.has(i.id));
+          this.searchResults.push(...added);
+          for (const item of added)
+            grid.appendChild(this.card(item, container));
+          if (added.length)
+            break;
+        }
+        const shown2 = this.searchResults?.filter((i) => !this.handled.has(i.id)).length ?? 0;
+        count.setText(
+          this.searchTotal > shown2 ? `${shown2} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${shown2} on TMDB for \u201C${q}\u201D`
+        );
+        if (this.searchOwned) {
+          count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
+        }
+        if (this.searchPage >= this.searchPages)
+          sentinel.remove();
+      } catch {
+        sentinel.remove();
+      } finally {
+        this.searchMore = false;
+      }
     }
     /* ------------------------------------------------------------------ */
     /* Filtered results                                                    */
@@ -10960,11 +11058,13 @@ ${body}
       const top = first.getBoundingClientRect().top;
       check("chromeUnderHalf", top < vh * 0.45, `${Math.round(top)}px, ${Math.round(top / vh * 100)}%`);
     }
-    const reaches44 = (el) => {
+    const minTarget = opts.phone ? 44 : 28;
+    const reachesMin = (el) => {
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2;
-      const top = r.top + r.height / 2 - 21;
-      const bottom = r.top + r.height / 2 + 21;
+      const reach = minTarget / 2 - 1;
+      const top = r.top + r.height / 2 - reach;
+      const bottom = r.top + r.height / 2 + reach;
       const hits = (y) => {
         if (y < 0 || y > window.innerHeight || cx < 0 || cx > window.innerWidth)
           return false;
@@ -10979,9 +11079,9 @@ ${body}
         return false;
       if (el.closest(".reel-heatmap-grid"))
         return false;
-      if (h >= 44)
+      if (h >= minTarget)
         return false;
-      return !reaches44(el);
+      return !reachesMin(el);
     });
     const worst = /* @__PURE__ */ new Map();
     for (const el of small) {
@@ -10996,7 +11096,11 @@ ${body}
         `${drawn}${used !== drawn ? ` (laid out ${used} \u2014 mid-transform?)` : ""} at ${Math.round(r.left)},${Math.round(r.top)} in .${el.parentElement?.className.split(" ")[0] ?? "?"}`
       );
     }
-    check("touchTargets44", small.length === 0, [...worst].map(([k, d]) => `${k} ${d}`).join(", "));
+    check(
+      `targetSize${minTarget}`,
+      small.length === 0,
+      [...worst].map(([k, d]) => `${k} ${d}`).join(", ")
+    );
     if (opts.keyboard) {
       const opensWith = (el, modal) => {
         let box = el.parentElement;
