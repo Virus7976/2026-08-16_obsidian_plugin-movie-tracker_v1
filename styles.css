@@ -1588,6 +1588,79 @@ input.reel-input {
 	font-size: var(--reel-text-caption);
 }
 
+/* ================================================================== *
+ * A desktop header, rather than a phone's header stretched wide.     *
+ * ================================================================== */
+
+/*
+ * Measured on a 1000px-tall pane: the search field (65px), the tabs (64px) and
+ * the filter rows (118px) took 247px before a single poster — a quarter of the
+ * screen spent on chrome every time the app opens.
+ *
+ * A tab stacks its icon above its label because that is what a phone's bottom
+ * bar does, and stacked is why it is 65px. Side by side costs one line instead
+ * of two and still clears 44px, which is the number `touchTargets44` holds
+ * every control to at every width — so this buys back the height by changing
+ * the shape, never by shrinking the target.
+ */
+.reel-view.is-w700 .reel-tab {
+	flex-direction: row;
+	gap: var(--reel-space-2);
+	min-height: 44px;
+	padding: 0 var(--reel-space-3);
+}
+
+.reel-view.is-w700 .reel-tab-label {
+	font-size: var(--font-ui-small);
+}
+
+/* Six tabs laid out in a row need more than the 620px a stacked six needed,
+   or the labels start fighting the icons for the same track. */
+.reel-view.is-w700 .reel-tabs {
+	max-width: 760px;
+}
+
+/*
+ * A tab is a tab, not a balloon.
+ *
+ * The active tab was drawing a rounded outline around itself, which is not a
+ * decision anyone made — it is two resets meeting. `:where(…) button` sets
+ * `border-color: currentcolor` with `border-width: medium` to strip the host
+ * theme's button skin, and `.reel-view .reel-tab` sets a pill radius. So an
+ * active tab, whose `currentcolor` is the accent, drew a 999px-radius accent
+ * border on three sides with the underline hanging off the fourth. Measured:
+ * `border-radius: 999px`, `border-top: 2px` in the accent.
+ *
+ * A tool says which view is open with one line under one word. Square, one
+ * edge, no outline.
+ */
+.reel-view.is-w700 .reel-tab {
+	border-radius: 0;
+	border-top: none;
+	border-left: none;
+	border-right: none;
+	border-bottom: 2px solid transparent;
+}
+
+.reel-view.is-w700 .reel-tab.is-active {
+	border-bottom-color: var(--interactive-accent);
+}
+
+/* The search field is 44px and needs no more than a hairline around it. Ten
+   pixels above and below was making a 65px band out of a 44px control. */
+.reel-view.is-w700 .reel-view-header {
+	padding-top: var(--reel-space-1);
+	padding-bottom: var(--reel-space-1);
+}
+
+/* Same again for the two filter rows: the chips are already 34px with their
+   own breathing room, and the row padding was doubling it. */
+.reel-view.is-w700 .reel-view-filters .reel-chips,
+.reel-view.is-w700 .reel-view-filters .reel-suggest {
+	padding-top: var(--reel-space-1);
+	padding-bottom: var(--reel-space-1);
+}
+
 .reel-view-filters {
 	flex: 0 0 auto;
 	padding: 0 12px;
@@ -2762,6 +2835,17 @@ input.reel-input {
  * the "lists read badly when very wide" decision and not this one to overturn. */
 .reel-view.is-w700 .reel-view-body > * {
 	width: 100%;
+	/*
+	 * Left, not centred. The search field and the filter rows sit above the
+	 * body and start at the pane's own inset; a centred block underneath them
+	 * starts somewhere else, and the page gains a second left edge halfway
+	 * down. Measured with the band capped to the grid's 1100px: chrome at 24px,
+	 * band and grid at 160px. Capping is what stops a block growing too wide —
+	 * centring the leftover space is a separate decision, and the wrong one
+	 * when everything above is left-aligned.
+	 */
+	margin-left: 0;
+	margin-right: auto;
 }
 
 .reel-tabs {
@@ -3017,6 +3101,91 @@ input.reel-input {
 .reel-view.is-w900 .reel-grid {
 	grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
 	justify-content: center;
+}
+
+/*
+ * Tracks start where the words above them start.
+ *
+ * Centring the tracks is what the rule above chose so that a two-title library
+ * would not sit in a corner, and on a phone-shaped column the difference is a
+ * few pixels. On a desktop it is 84: the heading read from 24 and the first
+ * poster from 108, so the one alignment a list has — its left edge — was the
+ * one thing the page would not commit to.
+ *
+ * A tool is read down its left edge. The leftover width goes to the right,
+ * where empty space is just space, rather than being split into two gutters
+ * that make every row start somewhere new.
+ */
+.reel-view.is-w700 .reel-grid,
+.reel-view.is-w700 .reel-dgrid {
+	justify-content: start;
+}
+
+/* The band over the grid belongs to the same column as the grid.
+ *
+ * Three things on this screen already agree on 1100px — the search header, the
+ * filter rows and the grid above. The band did not: it took the generic
+ * 1400px cap from `.reel-view-body > *` and a negative margin besides, so it
+ * ran 300px wider than the posters it introduces and started 391px to their
+ * left. Measured in a 1920px pane: band at 0 spanning 1400, grid at 391
+ * spanning 1100, with the count on the band's right edge floating over empty
+ * space no poster ever reaches.
+ *
+ * Matching the band to the grid rather than widening the grid to the band, so
+ * the decision above this — a narrower cap, centred, cells that stop at a
+ * sensible poster size — is left exactly as it was written. */
+/*
+ * On the desktop this is the tool, so the header of a list is a header, not a
+ * poster with the count written on it.
+ *
+ * The band is built to be atmospheric: 132px tall minimum, the poster behind
+ * it blurred to 28px as a texture, a gradient scrim over that, and negative
+ * side margins so the whole thing bleeds past the column. On a phone that is
+ * the app being pleasant in the one place it can afford to be. On a desktop it
+ * is 132px of blurred artwork introducing a row of the same artwork, sitting
+ * 379px left of the posters it belongs to, and it is the thing that reads as
+ * decoration rather than instrument.
+ *
+ * So on a wide pane: no texture, no scrim, no bleed. The label, the count and
+ * the recency line, on the column every other row uses.
+ */
+.reel-view.is-w700 .reel-view-body > .reel-hero-band {
+	min-height: 0;
+	margin-left: 0;
+	margin-right: auto;
+	margin-bottom: var(--reel-space-3);
+	width: 100%;
+	max-width: calc(1100px - var(--reel-gutter, 12px) * 2);
+	padding: var(--reel-space-2) 0;
+}
+
+.reel-view.is-w700 .reel-hero-art,
+.reel-view.is-w700 .reel-hero-band.has-backdrop::after {
+	display: none;
+}
+
+/* One column for the whole tool. The chrome above the body was running to the
+   full pane while the posters stopped at 1100, so the search field and the
+   filter rows overhung the content by whatever the pane had spare. */
+.reel-view.is-w700 .reel-view-header,
+.reel-view.is-w700 .reel-view-filters {
+	max-width: 1100px;
+	margin-left: 0;
+	margin-right: auto;
+}
+
+/*
+ * The same column, measured from the same place.
+ *
+ * The chrome is capped against the view, which starts at 0; the body's
+ * children are capped against the body, whose own inset has already moved them
+ * to 24. Give both the same 1100 and they agree on the left and miss by
+ * exactly that inset on the right — measured as the chrome ending at 1100 and
+ * the grid at 1124. Subtracting the inset the body has already spent is what
+ * makes one column out of two.
+ */
+.reel-view.is-w700 .reel-view-body > * {
+	max-width: calc(1100px - var(--reel-gutter, 12px) * 2);
 }
 
 /* The rating slab across the poster was the ugliest thing on screen.
@@ -8458,6 +8627,30 @@ input.reel-input {
    the earlier complaint was about lozenge *height*, which the row height now
    handles. */
 .reel-view:not(.is-w700) .reel-chip {
+	min-height: 44px;
+	padding: 0 14px;
+	border-radius: var(--reel-radius-full);
+}
+
+/* And the desktop, which had been left square.
+ *
+ * The rule above restores what the host-button reset takes away, and it was
+ * written `:not(.is-w700)` — so it reached the phone and nothing else. On a
+ * desktop pane `.reel-view .reel-chip` (0,2,0) kept winning with
+ * `border-radius: inherit; padding: 0`, and `inherit` on a chip resolves to
+ * its row's radius, which is zero. Every chip in the app therefore drew as a
+ * square, unpadded box, at whichever height its own rule happened to set.
+ *
+ * Measured in the filter bar before this: radii of 0px throughout with a 999px
+ * select sitting among them, padding 0 on every chip, and two heights in one
+ * row — 44px for the buttons and 30px for the active filter tags. That is the
+ * whole of why the bar reads as cheap: not one deliberate decision in it,
+ * just the reset showing through.
+ *
+ * The same three values as the phone, deliberately. A chip should not be a
+ * different shape depending on the width of the pane it is in, and 44px is
+ * what `touchTargets44` holds every control to at every width. */
+.reel-view.is-w700 .reel-chip {
 	min-height: 44px;
 	padding: 0 14px;
 	border-radius: var(--reel-radius-full);
