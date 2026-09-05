@@ -8681,13 +8681,38 @@ input.reel-input {
 	padding: 0 10px;
 }
 
+/*
+ * `border-box`, or the selected tab is 2px taller than the other five.
+ *
+ * The underline is a border, and a 34px `min-height` in the content box means
+ * 34 plus the border rather than 34 including it. Inactive tabs measured 34
+ * and the active one 36, so the row changed height every time you switched
+ * view — the sort of movement you feel before you can name it.
+ */
 .reel-view.is-w700:not(.is-phone) .reel-tab {
 	min-height: 34px;
+	height: 34px;
+	box-sizing: border-box;
 }
 
+/*
+ * One height for one row.
+ *
+ * The filter tags are built from two controls apiece — the label and its ×  —
+ * and neither was carried down with the chips, so an active filter stood 44px
+ * tall against 30px neighbours in the same row. The search field's clear
+ * button was the same, at 44 inside a 32px field.
+ */
 .reel-view.is-w700:not(.is-phone) .reel-search-wrap,
 .reel-view.is-w700:not(.is-phone) .reel-select {
-	min-height: 32px;
+	min-height: 30px;
+}
+
+.reel-view.is-w700:not(.is-phone) .reel-filter-tag-label,
+.reel-view.is-w700:not(.is-phone) .reel-filter-tag-x,
+.reel-view.is-w700:not(.is-phone) .reel-search-clear {
+	min-height: 30px;
+	height: 30px;
 }
 
 /* The row has to be exactly as tall as the hit area it contains.

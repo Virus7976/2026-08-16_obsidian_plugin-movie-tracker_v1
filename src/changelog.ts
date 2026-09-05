@@ -52,6 +52,38 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.38",
+		date: "2026-09-05",
+		headline: "On a desktop, Reel is built like a tool.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The filter chips are pills again on a desktop, at one height, with space around their labels.",
+				note: "The rule that restores a chip's shape after the host theme's button styling is stripped off it was written for the phone and only ever reached the phone. On a desktop pane every chip drew as a square, unpadded box: radii of 0 throughout with a single 999px dropdown sitting among them, and two heights in the same row — 44px and 30px.",
+			},
+			{
+				kind: "fixed",
+				text: "The open tab is marked with one line under one word, instead of a rounded outline around it.",
+				note: "Nobody chose that outline. The reset that strips the theme's buttons leaves a border in the current colour, and another rule gives tabs a pill radius, so the open tab — whose colour is the accent — drew a rounded accent border on three sides.",
+			},
+			{
+				kind: "fixed",
+				text: "Everything on a screen starts and ends at the same place. The search field, the filters, the heading and the posters each used to pick their own.",
+				note: "Measured in a 1920px pane: three different left edges at 24, 29 and 403, and two right edges. All of it now runs as one column.",
+			},
+			{
+				kind: "better",
+				text: "Controls are sized for a mouse on a desktop: smaller, denser, and closer to the work.",
+				note: "44px is the figure for a fingertip. A pointer's minimum is 24px, so holding a mouse-driven pane at thumb size was spending a quarter of the window on chrome. Reel now asks 44px where there is a touchscreen and 28px where there is a cursor, decided by the device and never by the width — a phone in landscape is wide and still has no cursor. The top of the window went from 247px to 174px, which is 73px more of your library on every screen.",
+			},
+			{
+				kind: "better",
+				text: "A list's heading is a heading, not a blurred poster with the count written across it.",
+				note: "132px of the artwork behind it, blurred, introducing a row of the same artwork. Pleasant on a phone; in the way on a desktop. Now 43px.",
+			},
+		],
+	},
+	{
 		version: "0.9.37",
 		date: "2026-09-05",
 		headline: "The desktop layout is tuned for a desktop, and a search keeps going as you scroll.",
