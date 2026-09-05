@@ -52,6 +52,38 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.37",
+		date: "2026-09-05",
+		headline: "The desktop layout is tuned for a desktop, and a search keeps going as you scroll.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "On a wide pane, the filter chips no longer squash into narrow boxes with their labels spilling out over the edges.",
+				note: "A chip is a button, and a button in a flex row is allowed to shrink below its own text where an ordinary element is not. The rule that prevents this was written for the phone and only ever applied there, so every width above it was unprotected. Measured at 900px: all twenty-four genre chips overflowed at once, and 'For you' was given 27px to draw 45px of text.",
+			},
+			{
+				kind: "better",
+				text: "On a wide pane the filter chips wrap onto a second row instead of scrolling sideways. The phone keeps its scrolling strip.",
+				note: "A strip whose scrollbar is deliberately hidden is easy to swipe and near-unreachable with a mouse, so a genre off the right-hand edge may as well not exist.",
+			},
+			{
+				kind: "fixed",
+				text: "Every block on a screen now starts at the same left edge. The filter bar, the heading and the results used to each pick their own.",
+				note: "The phone was fixed for this long ago, and its comment named the cause exactly: with blocks of differing intrinsic width, an automatic margin gives each one a different left edge. The desktop still had it. On Discover in a 1920px pane the filter bar was 537px starting at 388px, the head 327px starting at 493px, and the feed 1313px starting at 0.",
+			},
+			{
+				kind: "fixed",
+				text: "The back bar on a title's page is a bar again, rather than a small white island floating over the cast.",
+				note: "The same cause as the left edges above: it shrank to fit the two words inside it.",
+			},
+			{
+				kind: "new",
+				text: "Searching TMDB keeps loading results as you scroll, instead of stopping at the first page.",
+				note: "The count under the box said '15 on TMDB' and meant '15 on the first page of TMDB'. It now states both numbers, and pages in the rest as you reach them.",
+			},
+		],
+	},
+	{
 		version: "0.9.36",
 		date: "2026-09-05",
 		headline: "The passphrase on your keys can be changed.",

@@ -2740,6 +2740,30 @@ input.reel-input {
 	margin-right: auto;
 }
 
+/* One column, one left edge — the desktop half of the rule below.
+ *
+ * `:not(.is-w700)` already turns the auto-centring off on a phone, and its
+ * comment names the reason exactly: with blocks of differing intrinsic width,
+ * `margin: auto` gives each one a different left edge, and three of them ended
+ * up at 16, 24 and 37. The desktop was left with that same defect, at a scale
+ * that makes it much worse. Measured on Discover in a 1920px pane: the filter
+ * bar came out 537px wide starting at 388px, the head 327px starting at 493px,
+ * and the feed 1313px starting at 0 — three blocks on one screen, none of them
+ * agreeing on where the page begins.
+ *
+ * The body is a column flex container, so an auto margin on the cross axis
+ * suppresses `stretch` and each child shrinks to its own content. Asking for
+ * the full width restores the stretch that the auto margins took away, and the
+ * cap above still holds the column to 1400px and still centres it — so every
+ * block now shares one pair of edges instead of inventing its own.
+ *
+ * Blocks that deliberately sit narrower keep doing so: `.reel-tabs` at 900px
+ * and the lists at 920px cap themselves and centre inside the column, which is
+ * the "lists read badly when very wide" decision and not this one to overturn. */
+.reel-view.is-w700 .reel-view-body > * {
+	width: 100%;
+}
+
 .reel-tabs {
 	max-width: 900px;
 	margin: 0 auto;
@@ -6464,10 +6488,38 @@ input.reel-input {
 }
 
 /* A chip must not shrink below its own text, or a long director's name
-   compresses to an ellipsis while the row still scrolls. */
-.reel-view.is-narrow .reel-chips .reel-chip,
-.reel-view.is-narrow .reel-suggest .reel-chip {
+   compresses to an ellipsis while the row still scrolls.
+ *
+ * Every width, not just the narrow one. This guard was scoped to `is-narrow`,
+ * which left the desktop unprotected by exactly the rule that describes the
+ * bug: a chip is a `<button>`, a button in a flex row computes `min-width: 0`
+ * rather than min-content, and `.reel-chip` sets `white-space: nowrap` over
+ * visible overflow. So on any pane too narrow for the full genre list — 24
+ * chips wanting about 2000px — every chip compressed and every label spilled
+ * out past its own border. Measured at 900px: "For you" was given 27px to draw
+ * 45px of text, and all 24 overflowed at once.
+ *
+ * Mobile carried this rule already, so mobile is unchanged. */
+.reel-chips .reel-chip,
+.reel-suggest .reel-chip {
 	flex: 0 0 auto;
+}
+
+/* On a pointer, wrap; on a thumb, scroll.
+ *
+ * `NARROW_AT` exists because the filter stack wrapping onto four rows buried
+ * the content on a phone, and the fix there was a scrolling strip. That fix
+ * does not transfer to a mouse: a strip whose scrollbar is deliberately hidden
+ * is easy to swipe and near-unreachable with a wheel, so a genre off the right
+ * edge may as well not exist. Above the breakpoint there is width enough that
+ * wrapping costs a row rather than four, so the desktop wraps and every chip
+ * stays reachable without scrolling sideways. */
+.reel-view.is-wide .reel-view-filters .reel-chips,
+.reel-view.is-wide .reel-discover-filters .reel-chips,
+.reel-view.is-wide .reel-suggest {
+	flex-wrap: wrap;
+	overflow-x: visible;
+	row-gap: var(--reel-space-2);
 }
 
 /* The stack above the library was taller than the screen: search, tabs, two

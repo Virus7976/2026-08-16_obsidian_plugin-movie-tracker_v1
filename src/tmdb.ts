@@ -133,15 +133,51 @@ export class TmdbClient {
 
 	/** One command finds films and shows — two commands is more friction on a phone. */
 	async searchMulti(query: string): Promise<TmdbSearchResult[]> {
+		return (await this.searchMultiPage(query)).results;
+	}
+
+	/**
+	 * One page of a search, and whether there are more behind it.
+	 *
+	 * `searchMulti` asked for page one and only page one, which is why a search
+	 * stopped dead at fifteen results and looked like the whole of TMDB. The
+	 * count under the box said "15 on TMDB" and meant "15 on the first page of
+	 * TMDB" — a different claim, and the wrong one.
+	 *
+	 * `total_pages` is carried out rather than inferred, because the caller
+	 * cannot infer it. Every page is filtered twice on the way to the screen —
+	 * people and collections are dropped here, titles already in the library are
+	 * dropped after — so a page that yields nothing usable is routine and is not
+	 * the end of the results. Guessing "empty means finished" would stop the
+	 * feed on the first page of a popular actor's credits.
+	 */
+	async searchMultiPage(
+		query: string,
+		page = 1
+	): Promise<{ results: TmdbSearchResult[]; page: number; totalPages: number; totalResults: number }> {
 		const q = query.trim();
-		if (!q) return [];
-		const data = await this.request<{ results?: TmdbSearchResult[] }>("/search/multi", {
+		if (!q) return { results: [], page: 1, totalPages: 0, totalResults: 0 };
+
+		// TMDB serves at most 500 pages and rejects anything beyond it.
+		const n = Math.max(1, Math.min(500, Math.floor(page)));
+		const data = await this.request<{
+			results?: TmdbSearchResult[];
+			total_pages?: number;
+			total_results?: number;
+		}>("/search/multi", {
 			query: q,
 			include_adult: "false",
+			...(n > 1 ? { page: String(n) } : {}),
 		});
-		return (data.results ?? [])
-			.filter((r) => r.media_type === "movie" || r.media_type === "tv")
-			.slice(0, 20);
+
+		return {
+			results: (data.results ?? [])
+				.filter((r) => r.media_type === "movie" || r.media_type === "tv")
+				.slice(0, 20),
+			page: n,
+			totalPages: Math.min(500, Math.max(0, Math.floor(data.total_pages ?? 0))),
+			totalResults: Math.max(0, Math.floor(data.total_results ?? 0)),
+		};
 	}
 
 	/**

@@ -86,6 +86,14 @@ export class DiscoverScreen {
 	private searchedFor = "";
 	/** How many results were dropped for already being in your library. */
 	private searchOwned = 0;
+	/** The last page of results fetched; the sentinel asks for the next. */
+	private searchPage = 0;
+	/** What TMDB says it holds for this query. 0 until the first page lands. */
+	private searchPages = 0;
+	/** Titles TMDB claims to have, so the count can stop overstating one page. */
+	private searchTotal = 0;
+	/** A page is in flight, so the sentinel must not ask for it twice. */
+	private searchMore = false;
 
 	/**
 	 * The mounted rows, in the shape the rest of the screen already expects.
@@ -161,6 +169,9 @@ export class DiscoverScreen {
 		this.mounting = false;
 		this.searchResults = null;
 		this.searchedFor = "";
+		this.searchPage = 0;
+		this.searchPages = 0;
+		this.searchMore = false;
 		this.profile = null;
 		this.results = null;
 		this.error = null;
@@ -1108,6 +1119,10 @@ export class DiscoverScreen {
 		if (this.searchedFor !== q) {
 			this.searchResults = null;
 			this.searchedFor = q;
+			this.searchPage = 0;
+			this.searchPages = 0;
+			this.searchTotal = 0;
+			this.searchMore = false;
 		}
 
 		if (!this.searchResults) {
@@ -1115,12 +1130,15 @@ export class DiscoverScreen {
 			if (this.loading) return;
 			this.loading = true;
 			void this.plugin.tmdb
-				.searchMulti(q)
-				.then((items) => {
-					const usable = items.filter((i) => !i.adult && i.poster_path);
+				.searchMultiPage(q, 1)
+				.then((res) => {
+					const usable = res.results.filter((i) => !i.adult && i.poster_path);
 					const fresh = this.plugin.discover.filterOut(usable);
 					this.searchOwned = usable.length - fresh.length;
 					this.searchResults = fresh;
+					this.searchPage = res.page;
+					this.searchPages = res.totalPages;
+					this.searchTotal = res.totalResults;
 				})
 				.catch((e: unknown) => {
 					this.error = diagnoseError(e).message;
@@ -1134,7 +1152,14 @@ export class DiscoverScreen {
 
 		const items = this.searchResults.filter((i) => !this.handled.has(i.id));
 		const count = container.createDiv({ cls: "reel-block-count" });
-		count.setText(`${items.length} on TMDB for “${q}”`);
+		/*
+		 * "15 on TMDB" was a page-one count wearing a whole-catalogue label.
+		 * Stating both numbers is the honest version and it also explains the
+		 * scroll: there is visibly more to come, so the feed continuing is
+		 * expected rather than surprising.
+		 */
+		const more = this.searchTotal > items.length;
+		count.setText(more ? `${items.length} of ${this.searchTotal} on TMDB for “${q}”` : `${items.length} on TMDB for “${q}”`);
 		if (this.searchOwned) {
 			count.createSpan({ cls: "reel-dim", text: ` · ${this.searchOwned} already in your library` });
 		}
@@ -1151,6 +1176,105 @@ export class DiscoverScreen {
 
 		const grid = container.createDiv({ cls: "reel-dgrid" });
 		for (const item of items) grid.appendChild(this.card(item, container));
+		this.paintSearchSentinel(container, grid, count);
+	}
+
+	/**
+	 * Keep the search going as you scroll, instead of stopping at page one.
+	 *
+	 * The same sentinel-and-observer shape as the feed, and for the same reason:
+	 * an intersection is asked once and answered once, where a scroll handler on
+	 * a measured, fixed-height body fires at whatever rate the device likes.
+	 *
+	 * Cards are appended to the grid that is already on screen rather than the
+	 * screen being redrawn. A redraw would replace the scroller's children and
+	 * throw the reader back to the top — the one thing an infinite scroll must
+	 * never do.
+	 */
+	private paintSearchSentinel(container: HTMLElement, grid: HTMLElement, count: HTMLElement): void {
+		if (this.searchPage >= this.searchPages) return;
+
+		const sentinel = container.createDiv({ cls: "reel-feed-end" });
+		sentinel.createDiv({ cls: "reel-loading", text: "Loading more…" });
+
+		const scroller = container.closest(".reel-view-body") ?? null;
+		const io = new IntersectionObserver(
+			(entries) => {
+				if (!entries.some((e) => e.isIntersecting)) return;
+				void this.moreSearch(container, grid, sentinel, count);
+			},
+			{ root: scroller as Element | null, rootMargin: "600px 0px" }
+		);
+		io.observe(sentinel);
+		this.watchers.push(io);
+	}
+
+	/**
+	 * One more page of search results, appended.
+	 *
+	 * A page can legitimately yield nothing to show — every title on it is
+	 * already in your library, or has no poster, or the page was mostly people.
+	 * Stopping there would end the search on a technicality while TMDB still
+	 * holds hundreds of matches, so it walks on to the next page, up to a few
+	 * per scroll so a run of empty pages cannot become an unbounded request
+	 * loop.
+	 */
+	private async moreSearch(
+		container: HTMLElement,
+		grid: HTMLElement,
+		sentinel: HTMLElement,
+		count: HTMLElement
+	): Promise<void> {
+		if (this.searchMore) return;
+		this.searchMore = true;
+
+		const q = this.searchedFor;
+		try {
+			for (let tries = 0; tries < 3 && this.searchPage < this.searchPages; tries++) {
+				const res = await this.plugin.tmdb.searchMultiPage(q, this.searchPage + 1);
+
+				// The query moved on while this was in flight; this answer is stale.
+				if (this.searchedFor !== q || !this.searchResults) return;
+
+				this.searchPage = res.page;
+				if (res.totalPages) this.searchPages = res.totalPages;
+
+				const usable = res.results.filter((i) => !i.adult && i.poster_path);
+				const fresh = this.plugin.discover.filterOut(usable);
+				this.searchOwned += usable.length - fresh.length;
+
+				// TMDB repeats a title across pages often enough to matter, and a
+				// duplicate card means two notes for one film if both are tapped.
+				const seen = new Set(this.searchResults.map((i) => i.id));
+				const added = fresh.filter((i) => !seen.has(i.id) && !this.handled.has(i.id));
+				this.searchResults.push(...added);
+				// `container`, not `grid`: a card re-renders the screen into whatever
+				// it was handed, and handing it the grid would redraw the whole
+				// search inside one of its own cells.
+				for (const item of added) grid.appendChild(this.card(item, container));
+
+				if (added.length) break;
+			}
+
+			const shown = this.searchResults?.filter((i) => !this.handled.has(i.id)).length ?? 0;
+			count.setText(
+				this.searchTotal > shown
+					? `${shown} of ${this.searchTotal} on TMDB for “${q}”`
+					: `${shown} on TMDB for “${q}”`
+			);
+			if (this.searchOwned) {
+				count.createSpan({ cls: "reel-dim", text: ` · ${this.searchOwned} already in your library` });
+			}
+
+			if (this.searchPage >= this.searchPages) sentinel.remove();
+		} catch {
+			// A failed page is not a failed search: drop the sentinel so the
+			// results already on screen stay usable rather than sitting under a
+			// "Loading more…" that will never resolve.
+			sentinel.remove();
+		} finally {
+			this.searchMore = false;
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
