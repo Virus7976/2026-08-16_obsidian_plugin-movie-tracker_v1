@@ -2495,6 +2495,15 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	// render the desktop layout at phone width and report a fixed bug.
 	view.toggleClass("is-phone", phone);
 	view.toggleClass("is-mobile", phone);
+	// And the same two on `body`, because that is where Obsidian puts them and
+	// the settings tab is the reason it matters: it renders in the settings
+	// modal, not inside the view, so no class on the view can reach it. A rule
+	// hooked to `body` is the only one true both here and in the app — and until
+	// the harness stamped it, `body:not(.is-phone)` matched the phone pass too,
+	// which would have let a desktop-only rule apply to a phone and reported it
+	// green.
+	document.body.toggleClass("is-phone", !!phone);
+	document.body.toggleClass("is-mobile", !!phone);
 	// The classes the compact layout keys off, produced by the *same function*
 	// the plugin calls. The harness used to compute `is-narrow` from
 	// `window.innerWidth`, which meant it was testing its own arithmetic rather

@@ -472,6 +472,69 @@ export function auditScreen(view: HTMLElement, opts: { phone: boolean; keyboard?
 	);
 
 	/*
+	 * The other end of the same question: is anything still thumb-sized?
+	 *
+	 * `targetSize` only ever asks whether a control is too small, so for the
+	 * whole life of this file a desktop pass could be green with every control
+	 * on the screen at 44px. It was. Sizing the chips, the tabs and the row
+	 * actions by hand and then measuring all twenty-four screens found 44px
+	 * still sitting on twelve of them — the text field, every `.reel-btn`, the
+	 * facet tabs, the like button, the carousel arrows, and the entire settings
+	 * tab. Each was a rule written for a fingertip and applied unconditionally,
+	 * and not one of them could fail a check.
+	 *
+	 * Two scales are allowed and both are deliberate: 30 for a control, 34 for
+	 * a navigation tab. The ceiling is the larger of the two.
+	 *
+	 * Only where the desktop layout actually applies. Reel docked in a 375px
+	 * sidebar does not get `is-w700`, so its controls are correctly still at 44
+	 * and asking this of them would report a fault that is a decision.
+	 */
+	const POINTER_CEILING = 34;
+	/*
+	 * Things that are taller because of what they contain, not because of a
+	 * thumb. A settings section header, a chart's fold header, a crew member's
+	 * name, and the model chip that wraps a full slug onto two lines are all
+	 * sized by their content; a settings row and a poster card are not controls
+	 * at all. Each is listed rather than inferred from height, because "tall
+	 * enough to be exempt" is the rule that would have exempted every fault
+	 * above.
+	 */
+	const BY_CONTENT = [
+		".reel-section-head",
+		".reel-fold-toggle",
+		".reel-credit-name",
+		".reel-model-field",
+		".reel-setup-row",
+		".reel-dcard-btn",
+	];
+	if (!opts.phone && view.classList.contains("is-w700")) {
+		const oversize = [...view.querySelectorAll<HTMLElement>("button, select, input, [role=\"button\"]")].filter(
+			(el) => {
+				const h = el.getBoundingClientRect().height;
+				if (h <= POINTER_CEILING || !shown(el)) return false;
+				// A tall box here is a panel or a card, not a control that
+				// missed the memo.
+				if (h >= 60) return false;
+				if (el.closest(".reel-stars") || el.closest(".reel-episode-stars")) return false;
+				if (el.closest(".reel-heatmap-grid")) return false;
+				return !BY_CONTENT.some((sel) => el.matches(sel) || el.closest(sel));
+			},
+		);
+		const seen = new Map<string, string>();
+		for (const el of oversize) {
+			const k = el.className.split(" ")[0] || el.tagName;
+			if (seen.has(k)) continue;
+			seen.set(k, `${Math.round(el.getBoundingClientRect().height)}px`);
+		}
+		check(
+			`pointerScale${POINTER_CEILING}`,
+			oversize.length === 0,
+			[...seen].map(([k, d]) => `${k} ${d}`).join(", "),
+		);
+	}
+
+	/*
 	 * Can you see the box you are typing into?
 	 *
 	 * Four bugs of this exact shape have shipped — the passphrase prompt twice,

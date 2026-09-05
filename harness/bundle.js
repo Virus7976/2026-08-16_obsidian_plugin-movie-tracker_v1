@@ -11103,6 +11103,43 @@ ${body}
       small.length === 0,
       [...worst].map(([k, d]) => `${k} ${d}`).join(", ")
     );
+    const POINTER_CEILING = 34;
+    const BY_CONTENT = [
+      ".reel-section-head",
+      ".reel-fold-toggle",
+      ".reel-credit-name",
+      ".reel-model-field",
+      ".reel-setup-row",
+      ".reel-dcard-btn"
+    ];
+    if (!opts.phone && view.classList.contains("is-w700")) {
+      const oversize = [...view.querySelectorAll('button, select, input, [role="button"]')].filter(
+        (el) => {
+          const h = el.getBoundingClientRect().height;
+          if (h <= POINTER_CEILING || !shown(el))
+            return false;
+          if (h >= 60)
+            return false;
+          if (el.closest(".reel-stars") || el.closest(".reel-episode-stars"))
+            return false;
+          if (el.closest(".reel-heatmap-grid"))
+            return false;
+          return !BY_CONTENT.some((sel) => el.matches(sel) || el.closest(sel));
+        }
+      );
+      const seen = /* @__PURE__ */ new Map();
+      for (const el of oversize) {
+        const k = el.className.split(" ")[0] || el.tagName;
+        if (seen.has(k))
+          continue;
+        seen.set(k, `${Math.round(el.getBoundingClientRect().height)}px`);
+      }
+      check(
+        `pointerScale${POINTER_CEILING}`,
+        oversize.length === 0,
+        [...seen].map(([k, d]) => `${k} ${d}`).join(", ")
+      );
+    }
     if (opts.keyboard) {
       const opensWith = (el, modal) => {
         let box = el.parentElement;
@@ -13001,6 +13038,8 @@ ${body}
     const view = app2.createDiv({ cls: "view-content reel-view" });
     view.toggleClass("is-phone", phone2);
     view.toggleClass("is-mobile", phone2);
+    document.body.toggleClass("is-phone", !!phone2);
+    document.body.toggleClass("is-mobile", !!phone2);
     stampWidth(view, measure(view) || window.innerWidth);
     const FULL_VIEW = /* @__PURE__ */ new Set(["library", "libraryYear", "searching"]);
     const target = FULL_VIEW.has(name) ? view : view.createDiv({ cls: "reel-view-body" });

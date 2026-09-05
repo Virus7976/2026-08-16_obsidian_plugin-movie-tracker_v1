@@ -52,6 +52,28 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.41",
+		date: "2026-09-05",
+		headline: "Every control on a desktop is now one size, and a check that says so.",
+		changes: [
+			{
+				kind: "better",
+				text: "On a desktop the text fields, the buttons, the facet tabs, the like button, the carousel arrows, the whole settings tab and every sheet are at the same size as the rest of the interface.",
+				note: "Each of these was sized for a fingertip by a rule with no condition on it, so the desktop got thumb sizing by default. Measured across all twenty-four screens, 44px controls were still sitting on twelve of them after the chips and tabs had been done by hand. Several were stranger than that: the episode tick is written as 26×26, the link as 32 and the recipe step as 36, and all three were pushed back up to 44 further down the file — the desktop size was already there, nothing was letting it through.",
+			},
+			{
+				kind: "fixed",
+				text: "The search box on Library and in Settings is the same height as the controls beside it.",
+				note: "It was reported as fixed a release ago and was not. Its wrapper had been given a 30px minimum and duly measured 30 — but the field inside it declares a 44px minimum, and a child's minimum is not something a parent's minimum can overrule. The wrapper had been 44 the whole time.",
+			},
+			{
+				kind: "new",
+				text: "The release checks now fail if a control on a desktop is too big, not only if it is too small.",
+				note: "The size check only ever asked one of the two questions, so a desktop screen could be entirely at phone scale and still pass. That is how all of the above stayed invisible for as long as it did. It caught fifteen more the moment it existed, on the sheets — and one it could not see at all: a step number that had gone from a 44px circle to a 44×30 oval, because a height check has nothing to say about width.",
+			},
+		],
+	},
+	{
 		version: "0.9.40",
 		date: "2026-09-05",
 		headline: "The last of the phone-sized controls come down to desktop size.",

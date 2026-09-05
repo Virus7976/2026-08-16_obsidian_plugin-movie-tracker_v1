@@ -8743,6 +8743,75 @@ input.reel-input {
 	height: 30px;
 }
 
+/* The three shared primitives, at pointer scale.
+ *
+ * Sizing the chips, the tabs and the row actions left the parts they sit
+ * beside untouched, so a swept measurement of every desktop screen still found
+ * 44px on twelve of them: the text field on Library and in Settings, every
+ * `.reel-btn` on a title's page, and the facet tabs above the cast list. These
+ * three classes are most of what is left.
+ *
+ * The search field is worth naming, because it looked fixed and was not. Its
+ * wrapper was given `min-height: 30px` and duly reports 30 — but the input
+ * inside it declares `min-height: 44px`, and a child's minimum is not something
+ * a parent's minimum can argue with. The wrapper measured 44 the whole time.
+ * Sizing the wrapper without sizing what it wraps proves nothing.
+ *
+ * The 16px font goes with it. That number is not a design choice — it is the
+ * threshold below which iOS zooms the page when you focus a field. There is no
+ * page-zoom-on-focus on a machine with a cursor, so on the desktop it is just a
+ * field two points larger than every label around it. */
+.reel-view.is-w700:not(.is-phone) .reel-input,
+.reel-view.is-w700:not(.is-phone) input.reel-input {
+	min-height: 30px;
+	font-size: var(--font-ui-small);
+}
+
+.reel-view.is-w700:not(.is-phone) .reel-btn,
+.reel-view.is-w700:not(.is-phone) button.reel-btn {
+	min-height: 30px;
+	padding: 0 12px;
+}
+
+/* The facet tabs carry vertical padding, which the others do not. Left in
+ * place against a 30px minimum it would out-measure the minimum and hold the
+ * row at 39px — the box is border-box, so padding eats the height rather than
+ * adding to it, and 30 less 24 leaves ten pixels for a nineteen-pixel line. */
+.reel-view.is-w700:not(.is-phone) .reel-facet-tab,
+.reel-view.is-w700:not(.is-phone) button.reel-facet-tab {
+	min-height: 30px;
+	padding: 0 var(--reel-space-3);
+}
+
+/* The last of them, found by measuring rather than by looking.
+ *
+ * Each of these is a control that a rule deliberately grew to 44px for a
+ * fingertip and then applied everywhere. `.reel-drow-arrow` is the clearest:
+ * it is declared 30×30 where it is defined and pushed back to 44×44 six
+ * thousand lines later, unconditionally, so the base size it already had was
+ * the desktop size all along and nothing was reaching it. */
+.reel-view.is-w700:not(.is-phone) .reel-drow-arrow,
+.reel-view.is-w700:not(.is-phone) .reel-heart,
+.reel-view.is-w700:not(.is-phone) .reel-yours-edit {
+	min-width: 30px;
+	width: 30px;
+	min-height: 30px;
+	height: 30px;
+}
+
+/* The glyph was sized against a 44px circle. */
+.reel-view.is-w700:not(.is-phone) .reel-heart {
+	font-size: 15px;
+}
+
+/* Borderless, so its height is entirely its own padding — which was written as
+ * "whatever makes the target 44" and has to be re-read as the same sentence
+ * about 30. */
+.reel-view.is-w700:not(.is-phone) .reel-yours-add {
+	min-height: 30px;
+	padding: 0;
+}
+
 /* The row actions, on the same scale as everything else.
  *
  * The tick and the ⋯ on a list row are 44×44 — a square sized for a fingertip,
@@ -15440,6 +15509,106 @@ button.reel-facet-tab {
 /* The toggle is a fixed-size pill; the target around it is what grows. */
 :is(.reel-settings, .reel-setup) .setting-item-control .checkbox-container {
 	margin: 11px 0;
+}
+
+/* The same controls, at pointer scale, on a machine with a cursor.
+ *
+ * The 44px above is thumb sizing and it is unconditional, so the settings tab
+ * on a desktop is a column of finger-sized fields, dropdowns and buttons —
+ * every one of them a third taller than the same control on any other plugin's
+ * settings tab, and taller than every control Reel draws in its own view.
+ *
+ * `body` is the hook rather than the view, and that is forced rather than
+ * chosen: the settings tab renders in Obsidian's settings modal, which is not
+ * inside `.reel-view`, so none of the `is-w700` rules can see it. Obsidian puts
+ * `is-phone` on `body`, which is true in the app and — since the harness now
+ * stamps it too — true where it is checked.
+ *
+ * Width is deliberately not part of this. A phone in landscape is wide and
+ * still has no cursor, and the container query below still gives a narrow pane
+ * its stacked layout at any density. */
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control input[type="text"],
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control input[type="password"],
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control textarea,
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control select,
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control button {
+	min-height: 30px;
+}
+
+/* The toggle's breathing room was half the difference between 44 and the pill
+ * itself; at 30 that same margin is most of the row. */
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control .checkbox-container {
+	margin: 4px 0;
+}
+
+/* Obsidian's own buttons carry vertical padding, and a border-box height is
+ * spent on padding before it is spent on the label. Dropping the minimum to 30
+ * alone left them at 37 — measured, not assumed. */
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control button,
+body:not(.is-phone) :is(.reel-settings, .reel-setup) .setting-item-control select {
+	padding-block: 0;
+}
+
+body:not(.is-phone) .reel-settings .reel-folder-chip {
+	min-height: 30px;
+}
+
+/* The sheets, at pointer scale.
+ *
+ * A sheet is a `Modal`, so in the app it renders under `document.body` and not
+ * inside `.reel-view` — which means every `is-w700` rule in this file is
+ * invisible to it, and a sheet rule written that way would pass the harness
+ * (where the shell is mounted inside the view) and do nothing in Obsidian.
+ * `body` is the hook for the same reason it is the hook for settings.
+ *
+ * No width test, and here that is not a compromise: a modal is full-window on a
+ * desktop whatever the pane beneath it is doing, so the pointer is the only
+ * thing worth asking about.
+ *
+ * Several of these already declare the right size and are overruled. The
+ * episode tick is 26×26 where it is defined, the link is 32, the recipe step
+ * is 36 — and all three are pushed to 44 further down the file by rules with
+ * no condition on them. The desktop size was already written; nothing was
+ * letting it through. */
+body:not(.is-phone) .reel-modal .reel-setup-tick,
+body:not(.is-phone) .reel-modal .reel-setup-copy,
+body:not(.is-phone) .reel-modal .reel-recipe-step,
+body:not(.is-phone) .reel-modal .reel-seg-btn,
+body:not(.is-phone) .reel-modal .reel-episode-tick,
+body:not(.is-phone) .reel-modal .reel-link,
+body:not(.is-phone) .reel-modal .reel-person-fold,
+body:not(.is-phone) .reel-modal .reel-publish-toggle {
+	min-height: 30px;
+}
+
+/* Padding is height on a border-box, so a minimum alone leaves these where
+ * they were. */
+body:not(.is-phone) .reel-modal .reel-recipe-step,
+body:not(.is-phone) .reel-modal .reel-person-fold,
+body:not(.is-phone) .reel-modal .reel-publish-toggle,
+body:not(.is-phone) .reel-modal .reel-link {
+	padding-block: 0;
+}
+
+body:not(.is-phone) .reel-modal .reel-setup-tick,
+body:not(.is-phone) .reel-modal .reel-episode-tick {
+	height: 30px;
+}
+
+/* Width with it, or the step number stops being round. Both ticks are declared
+ * as squares with an explicit width, and a rule that brings only the height
+ * down turns a circle into an oval — which a height check cannot see, and
+ * which nearly shipped. */
+body:not(.is-phone) .reel-modal .reel-setup-tick,
+body:not(.is-phone) .reel-modal .reel-episode-tick {
+	width: 30px;
+	min-width: 30px;
+}
+
+/* The copy-me row's padding, for the same border-box reason as the three
+ * above; without it the minimum lands and the row still measures 38. */
+body:not(.is-phone) .reel-modal .reel-setup-copy {
+	padding-block: 0;
 }
 
 /*
