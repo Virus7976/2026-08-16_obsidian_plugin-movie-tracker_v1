@@ -3,7 +3,7 @@ import { confirm } from "./ui/confirm";
 import type ReelPlugin from "./main";
 import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
-import { KEY_LABELS, KeyBundle, KeyName, READ_KEYS, WRITE_KEYS } from "./credentials";
+import { KEY_LABELS, KeyBundle, KeyName, PassphraseChange, READ_KEYS, WRITE_KEYS } from "./credentials";
 import { TraktSignIn } from "./ui/traktSignIn";
 import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, partialPhrase, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
@@ -1273,6 +1273,65 @@ export class ReelSettingTab extends PluginSettingTab {
 						store.lock();
 						new Notice("Reel: keys locked.");
 						this.display();
+					})
+				);
+		}
+
+		/*
+		 * The one decision about encrypted storage that could not be revisited.
+		 *
+		 * Everything else on this screen can be changed after the fact: which
+		 * mode, which keys, whether to keep any at all. The passphrase was fixed
+		 * at whatever was typed the first time a key was saved — usually during
+		 * setup, in a hurry, before anyone had decided how much this vault was
+		 * worth protecting — and the documented answer to wanting a different
+		 * one was to delete every key and fetch them all again from six
+		 * services. So a passphrase you regret stayed in use.
+		 *
+		 * Shown while locked as well as unlocked, since the flow asks for the
+		 * current phrase either way, and being locked is when you are most
+		 * likely to be thinking about it.
+		 */
+		if (this.plugin.settings.keyMode === "encrypted" && this.plugin.settings.keyBlob) {
+			new Setting(el)
+				.setName("Change passphrase")
+				.setDesc(
+					"Asks for your current passphrase, then seals the same keys with a new one. The keys themselves are " +
+						"unchanged, so nothing needs re-issuing. Forgotten the current one? Nothing here can recover it — " +
+						"remove every key below and enter them again."
+				)
+				.addButton((b) =>
+					b.setButtonText("Change").onClick(async () => {
+						// Disabled but not relabelled. Every other button here
+						// says "…ing" while it works; this one spends its whole
+						// life waiting behind a modal for someone to type, and
+						// "Changing…" under a prompt that has not been answered
+						// yet would be claiming something that has not happened.
+						b.setDisabled(true);
+						let outcome: PassphraseChange;
+						try {
+							outcome = await store.changePassphrase();
+						} catch (e) {
+							// A reseal that could not be read back, or WebCrypto
+							// missing. Either way the old passphrase still works,
+							// and saying so is the useful half of the message.
+							new Notice(`Reel: ${redact(e)} Your keys are unchanged, and the old passphrase still works.`);
+							b.setDisabled(false);
+							return;
+						}
+						b.setDisabled(false);
+						if (outcome === "changed") {
+							new Notice("Reel: passphrase changed. Your keys are unlocked for this session.");
+							// The change unlocks, which moves the pills, the
+							// Lock row and the health lines.
+							this.display();
+							return;
+						}
+						if (outcome === "wrong-passphrase") {
+							new Notice("Reel: that passphrase didn't unlock the keys, so nothing was changed.");
+							return;
+						}
+						if (outcome === "cancelled") new Notice("Reel: passphrase unchanged.");
 					})
 				);
 		}

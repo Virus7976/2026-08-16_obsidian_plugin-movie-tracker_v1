@@ -279,7 +279,7 @@ Filterable fields: `status` `type` `title` `year` `decade` `rating`
 ## Setup
 
 1. Get a free TMDB key at <https://www.themoviedb.org/settings/api>. A **v4 read access token** (starts `eyJ`) is preferred — it goes in a header rather than the URL, so it can't end up in a log.
-2. Settings → Reel → paste it → Save. You'll be asked for a passphrase; the key is encrypted before it's written. See [SECURITY.md](SECURITY.md).
+2. Settings → Reel → paste it → Save. You'll be asked for a passphrase; the key is encrypted before it's written. It can be changed later — Settings → Reel → **Change passphrase** — without touching the keys themselves. See [SECURITY.md](SECURITY.md).
 3. Tap **Test** to confirm.
 
 Everything else is optional and off until you switch it on:

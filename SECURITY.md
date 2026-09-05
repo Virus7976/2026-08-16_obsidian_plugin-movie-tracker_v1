@@ -43,6 +43,8 @@ You enter the passphrase once per Obsidian session. GCM's authentication tag mea
 
 310 000 iterations is deliberately slow. It runs once per session, not per request, so even on a phone you pay it once.
 
+**You can change it.** Settings → Reel → Change passphrase asks for the current one, unwraps the blob and seals the same keys under a new phrase with a fresh salt and IV. The keys are not re-issued and nothing else moves. The current passphrase is required every time, including when the session is already unlocked: re-encrypting is the one action that can lock the owner out of their own keys, so an unattended unlocked vault must not hand it to whoever walks past. The new blob is decrypted once before it replaces the old one — a ciphertext that seals but will not open would be indistinguishable from a forgotten passphrase afterwards.
+
 **There is no recovery.** Forget the passphrase and you re-enter the TMDB key. That is the intended trade: no recovery mechanism means no second copy of the key to protect.
 
 ### `session`

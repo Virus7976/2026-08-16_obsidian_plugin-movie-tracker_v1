@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.36",
+		date: "2026-09-05",
+		headline: "The passphrase on your keys can be changed.",
+		changes: [
+			{
+				kind: "new",
+				text: "Settings → Reel → Change passphrase re-seals your saved keys under a new passphrase.",
+				note: "It asks for the current one first, then the new one twice. The keys themselves don't change, so nothing needs re-issuing at TMDB or anywhere else. Until now the only way to a different passphrase was to delete every key and fetch them all again.",
+			},
+			{
+				kind: "better",
+				text: "The change works while the keys are locked, and leaves them unlocked afterwards.",
+				note: "The current passphrase is asked for either way — even when the session is already unlocked — because a changed passphrase you didn't choose would lock you out of your own keys for good.",
+			},
+		],
+	},
+	{
 		version: "0.9.35",
 		date: "2026-08-22",
 		headline: "The settings screen stops borrowing Obsidian's button styling.",

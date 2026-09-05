@@ -9457,6 +9457,35 @@ ${body}
           })
         );
       }
+      if (this.plugin.settings.keyMode === "encrypted" && this.plugin.settings.keyBlob) {
+        new Setting(el).setName("Change passphrase").setDesc(
+          "Asks for your current passphrase, then seals the same keys with a new one. The keys themselves are unchanged, so nothing needs re-issuing. Forgotten the current one? Nothing here can recover it \u2014 remove every key below and enter them again."
+        ).addButton(
+          (b) => b.setButtonText("Change").onClick(async () => {
+            b.setDisabled(true);
+            let outcome;
+            try {
+              outcome = await store.changePassphrase();
+            } catch (e) {
+              new Notice(`Reel: ${redact(e)} Your keys are unchanged, and the old passphrase still works.`);
+              b.setDisabled(false);
+              return;
+            }
+            b.setDisabled(false);
+            if (outcome === "changed") {
+              new Notice("Reel: passphrase changed. Your keys are unlocked for this session.");
+              this.display();
+              return;
+            }
+            if (outcome === "wrong-passphrase") {
+              new Notice("Reel: that passphrase didn't unlock the keys, so nothing was changed.");
+              return;
+            }
+            if (outcome === "cancelled")
+              new Notice("Reel: passphrase unchanged.");
+          })
+        );
+      }
       if (store.hasStoredKey) {
         new Setting(el).setName("Remove all keys").setDesc("Deletes every saved key from your vault. Reel cannot recover them; you would need each original key again.").addButton((b) => {
           b.buttonEl.addClass("reel-btn-danger");
@@ -11709,6 +11738,7 @@ ${body}
       store: async () => true,
       remove: async () => void 0,
       migrateTo: async () => void 0,
+      changePassphrase: async () => "cancelled",
       lock: () => void 0
     },
     posters: {

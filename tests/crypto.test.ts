@@ -6,7 +6,8 @@
  * Node's WebCrypto, which is the same API the Obsidian renderer exposes.
  */
 
-import { encryptSecret, decryptSecret, guardSecret, forgetGuarded, redact, maskSecret, WrongPassphraseError } from "../src/secrets";
+import { encryptSecret, encryptSecretVerified, decryptSecret, guardSecret, forgetGuarded, redact, maskSecret, ResealError, WrongPassphraseError } from "../src/secrets";
+import { parseBundle } from "../src/credentials";
 
 let pass = 0;
 let fail = 0;
@@ -103,6 +104,39 @@ async function main() {
 	eq(await decryptSecret(await encryptSecret(odd, PASS), PASS), odd, "unicode round trip");
 	const long = "x".repeat(4096);
 	eq(await decryptSecret(await encryptSecret(long, PASS), PASS), long, "long key round trip");
+
+	/* ---- changing the passphrase ---- */
+	/*
+	 * The settings screen does this by unwrapping the blob with the old phrase
+	 * and sealing the same bundle with the new one. What matters is not that
+	 * the new phrase works — that is just encryption — but that the old one
+	 * stops working and that the keys inside survive the trip unchanged. A
+	 * rotation that quietly kept both phrases valid, or that lost a key that
+	 * was not TMDB, would look identical on screen.
+	 */
+	const BUNDLE = JSON.stringify({ tmdb: KEY, omdb: "omdb-test-key-000000", trakt: "trakt-test-token-000000" });
+	const NEXT = "a different passphrase entirely";
+	const before = await encryptSecret(BUNDLE, PASS);
+	const after = await encryptSecretVerified(await decryptSecret(before, PASS), NEXT);
+
+	eq(await decryptSecret(after, NEXT), BUNDLE, "the new passphrase opens the resealed blob");
+	eq(parseBundle(await decryptSecret(after, NEXT)), parseBundle(BUNDLE), "every key survives the change, not just TMDB");
+	threw = null;
+	try {
+		await decryptSecret(after, PASS);
+	} catch (e) {
+		threw = e;
+	}
+	ok(threw instanceof WrongPassphraseError, "the old passphrase no longer opens the keys");
+	ok(after.salt !== before.salt, "resealing draws a fresh salt");
+	ok(after.iv !== before.iv, "resealing draws a fresh iv");
+	ok(!JSON.stringify(after).includes(KEY), "the resealed blob is still opaque");
+
+	// The verified seal exists so a blob that will not open is never written
+	// over the only copy of a key. It has to actually read back, not merely
+	// return what encryptSecret returned.
+	eq(await decryptSecret(await encryptSecretVerified(KEY, PASS), PASS), KEY, "verified seal round trips");
+	ok(new ResealError() instanceof Error, "ResealError is throwable");
 
 	/* ---- redaction ---- */
 	forgetGuarded();

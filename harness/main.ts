@@ -559,6 +559,7 @@ const plugin = {
 		store: async () => true,
 		remove: async () => undefined,
 		migrateTo: async () => undefined,
+		changePassphrase: async () => "cancelled" as const,
 		lock: () => undefined,
 	},
 	posters: {

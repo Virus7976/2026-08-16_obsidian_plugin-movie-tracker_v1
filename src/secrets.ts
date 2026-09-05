@@ -114,6 +114,38 @@ export async function decryptSecret(blob: SecretBlob, passphrase: string): Promi
 	}
 }
 
+/**
+ * Encrypt, then immediately read the result back.
+ *
+ * `encryptSecret` alone is enough everywhere the plaintext is still on screen:
+ * if the write went wrong you retype the key you just pasted. Re-encrypting an
+ * existing blob under a new passphrase has no such second copy — the keys come
+ * out of the old blob, the old blob is overwritten, and a ciphertext that seals
+ * but will not open takes every key with it and cannot be told from a forgotten
+ * passphrase afterwards.
+ *
+ * One extra derivation, once, on the rarest operation in the plugin.
+ */
+export async function encryptSecretVerified(plaintext: string, passphrase: string): Promise<SecretBlob> {
+	const blob = await encryptSecret(plaintext, passphrase);
+	let readBack: string;
+	try {
+		readBack = await decryptSecret(blob, passphrase);
+	} catch {
+		throw new ResealError();
+	}
+	if (readBack !== plaintext) throw new ResealError();
+	return blob;
+}
+
+/** The new blob would not open. Raised before anything is written. */
+export class ResealError extends Error {
+	constructor() {
+		super("The re-encrypted keys could not be read back.");
+		this.name = "ResealError";
+	}
+}
+
 export class WrongPassphraseError extends Error {
 	constructor() {
 		super("That passphrase didn't unlock the key.");

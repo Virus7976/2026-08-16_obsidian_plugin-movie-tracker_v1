@@ -16,6 +16,7 @@ import type ReelPlugin from "./main";
 import {
 	decryptSecret,
 	encryptSecret,
+	encryptSecretVerified,
 	guardSecret,
 	forgetGuarded,
 	KeyMode,
@@ -47,6 +48,16 @@ export const READ_KEYS: KeyName[] = ["tmdb", "omdb", "dtdd", "openrouter"];
 export const WRITE_KEYS: KeyName[] = ["trakt", "traktApp", "mastodon"];
 
 export type KeyBundle = Partial<Record<KeyName, string>>;
+
+/**
+ * How a passphrase change ended.
+ *
+ * A cancelled prompt and a wrong passphrase are both ordinary answers rather
+ * than errors, and they need different sentences on screen: one of them means
+ * you changed your mind, the other means your keys are still sealed with a
+ * phrase you could not produce.
+ */
+export type PassphraseChange = "changed" | "cancelled" | "wrong-passphrase" | "no-keys" | "unsupported";
 
 export class MissingKeyError extends Error {
 	constructor(readonly key: KeyName = "tmdb", msg?: string) {
@@ -325,6 +336,77 @@ export class CredentialStore {
 		}
 
 		if (!hadKey) await this.plugin.saveSettings();
+	}
+
+	/**
+	 * Re-encrypt the stored keys under a different passphrase.
+	 *
+	 * The passphrase was the one thing about encrypted storage you could not
+	 * change. Every other decision here is revisable — the mode, each key, all
+	 * of them at once — but the phrase protecting them was fixed at whatever you
+	 * typed the first time you saved a key, and the only way past it was to
+	 * delete every key and enter them all again from their services.
+	 *
+	 * That is the wrong price for the two reasons this actually comes up: you
+	 * chose something weak while getting started, or you typed it somewhere it
+	 * was seen. Both are moments where the answer has to be quick, or it does
+	 * not happen at all.
+	 *
+	 * The current passphrase is checked against the blob every time, including
+	 * when the session is already unlocked. Not ceremony: re-encrypting is the
+	 * one action here that can lock the owner out of their own keys with no
+	 * recovery, so it cannot be something an unattended session hands to whoever
+	 * walks past. It also means this works while locked, and leaves the keys
+	 * unlocked afterwards, because the passphrase has just been proved.
+	 */
+	async changePassphrase(): Promise<PassphraseChange> {
+		const s = this.plugin.settings;
+		if (s.keyMode !== "encrypted") return "unsupported";
+		const blob = s.keyBlob;
+		if (!blob) return "no-keys";
+
+		let bundle: KeyBundle | null = null;
+		for (let attempt = 0; attempt < 3 && !bundle; attempt++) {
+			const current = await PassphraseModal.prompt(this.plugin.app, {
+				title: "Change passphrase",
+				body:
+					attempt === 0
+						? "Enter your current passphrase. Your keys are unwrapped and sealed again under the new one; the keys themselves don't change."
+						: "That didn't unlock them. Try again.",
+				placeholder: "Current passphrase",
+				cta: "Continue",
+				password: true,
+			});
+			if (!current) return "cancelled";
+			try {
+				bundle = parseBundle(await decryptSecret(blob, current));
+			} catch (e) {
+				if (!(e instanceof WrongPassphraseError)) throw e;
+			}
+		}
+		if (!bundle) return "wrong-passphrase";
+
+		const next = await PassphraseModal.prompt(this.plugin.app, {
+			title: "New passphrase",
+			body:
+				"Everything Reel has stored is re-encrypted with this, and you'll enter it once per session from now on. " +
+				"There is still no recovery — if you forget it, you re-enter the keys instead.",
+			placeholder: "New passphrase",
+			cta: "Change passphrase",
+			password: true,
+			confirm: true,
+		});
+		if (!next) return "cancelled";
+
+		// Sealed and read back before it replaces the only copy. If this throws,
+		// `s.keyBlob` is untouched and the old passphrase still works.
+		const resealed = await encryptSecretVerified(JSON.stringify(bundle), next);
+		s.keyBlob = resealed;
+		s.keysPlain = null;
+		s.keyNames = Object.keys(bundle) as KeyName[];
+		this.adopt(bundle);
+		await this.plugin.saveSettings();
+		return "changed";
 	}
 
 	async clear(): Promise<void> {
