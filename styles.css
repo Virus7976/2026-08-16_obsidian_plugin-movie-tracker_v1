@@ -3272,6 +3272,27 @@ input.reel-input {
 	max-width: calc(1100px - var(--reel-gutter, 12px) * 2);
 }
 
+/*
+ * Discover starts where Library starts.
+ *
+ * `.reel-discover` is the body element on that screen, not a block inside it,
+ * and it carries `max-width: 1400px; margin: … auto`. Auto margins centre it,
+ * so its content ran 95–1171 while every other screen ran 24–1100 — the
+ * whole page sliding 71px sideways and 71px wider on one tab out of six, which
+ * is the most visible kind of misalignment there is because it happens while
+ * you watch.
+ *
+ * The cap is dropped rather than reduced. Capping the body would put its
+ * children inside a column inside a column; the rule directly above already
+ * caps every body child at 1076, and with the body full width and its own 12px
+ * inset that lands them on 24–1100 — the same arithmetic, by the same rule,
+ * as Library. */
+.reel-view.is-w700:not(.is-phone) .reel-discover {
+	max-width: none;
+	margin-left: 0;
+	margin-right: auto;
+}
+
 /* The rating slab across the poster was the ugliest thing on screen.
    Smaller, tucked into the corner, and only as wide as its stars. */
 .reel-cell-rating {

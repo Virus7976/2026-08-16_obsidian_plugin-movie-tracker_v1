@@ -52,6 +52,18 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.43",
+		date: "2026-09-05",
+		headline: "Discover lines up with the rest of the tabs.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "On a desktop, moving between Library and Discover no longer shifts the whole page sideways.",
+				note: "Discover's page is centred where every other screen's is left-aligned, so its content sat at 95–1171 against 24–1100 everywhere else — 71px across and 71px wider, on one tab out of six. It is the most visible sort of misalignment because it happens while you are looking at it. Both now measure 24–1100.",
+			},
+		],
+	},
+	{
 		version: "0.9.42",
 		date: "2026-09-05",
 		headline: "On a desktop everything on the page starts and ends in the same place.",
