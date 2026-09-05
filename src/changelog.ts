@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.42",
+		date: "2026-09-05",
+		headline: "On a desktop everything on the page starts and ends in the same place.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "The posters reach the same right-hand edge as the search box and the filter row above them.",
+				note: "A column was capped at 170px, so on a 1280px window the grid's own box ran to 1100 and the posters stopped at 930 — 170px of empty track sitting under a search field that ran the full width. The columns now divide the room instead of ignoring it: six of them, about 168px each, which is within two pixels of the width they already were.",
+			},
+			{
+				kind: "fixed",
+				text: "The tab strip starts at the left edge, in line with everything else, instead of floating in the middle of the window.",
+				note: "It was capped at 760px with automatic side margins, which centres it — so the tabs sat at 260–1020 while the search field, the filters, the count line and the grid all ran 24–1100. One row out of five, 236px inboard of the other four. The tabs are now their own width at the start of the row, with the strip's rule running behind them.",
+			},
+		],
+	},
+	{
 		version: "0.9.41",
 		date: "2026-09-05",
 		headline: "Every control on a desktop is now one size, and a check that says so.",

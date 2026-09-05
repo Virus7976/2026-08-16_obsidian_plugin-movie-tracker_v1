@@ -1621,6 +1621,41 @@ input.reel-input {
 }
 
 /*
+ * The tab row starts where every other row starts.
+ *
+ * `max-width: 760px` with automatic side margins centres it, so on a 1280px
+ * window the tabs ran 260–1020 while the search field, the filters, the
+ * grid and the count line all ran 24–1100. One row out of five sitting
+ * 236px inboard of the other four is the "nothing lines up" that a screenshot
+ * shows immediately and no check was asking about.
+ *
+ * Widening the row is not the fix on its own — each tab is `flex: 1 1 0`, so
+ * a full-width row would simply spread six tabs across 1076px. They become
+ * natural-width and left-aligned, and the row's own bottom border runs the
+ * full width behind them, which is what a tab strip on a desktop looks like:
+ * the rule spans the pane, the tabs sit at its start, the active one marks
+ * itself against it. */
+.reel-view.is-w700:not(.is-phone) .reel-tabs {
+	/* 1100 and not `none`. The tab row is a direct child of the view, so a
+	 * full-width row runs the whole pane — 12 to 1268 on a 1280px window —
+	 * and overshoots the 1100 column the header, the filters and the grid all
+	 * share. Same maximum, same left edge, same 12px inset on the contents:
+	 * the row's box lands on 12–1112 and the tabs inside it start at 24,
+	 * which is exactly what `.reel-view-filters` above it already does. */
+	max-width: 1100px;
+	width: 100%;
+	margin-left: 0;
+	margin-right: auto;
+	padding-inline: 12px;
+	justify-content: flex-start;
+	gap: var(--reel-space-2);
+}
+
+.reel-view.is-w700:not(.is-phone) .reel-tab {
+	flex: 0 0 auto;
+}
+
+/*
  * A pinned header pins to the top, not to 8px below it.
  *
  * `position: sticky` measures its offsets from the scrollport's *padding* box,
@@ -3129,6 +3164,27 @@ input.reel-input {
 .reel-view.is-w900 .reel-grid {
 	grid-template-columns: repeat(auto-fill, minmax(150px, 170px));
 	justify-content: center;
+}
+
+/*
+ * The posters reach the same right edge as everything above them.
+ *
+ * `minmax(150px, 170px)` caps a column at 170px, so the grid's box ran to
+ * 1100 and its contents stopped at 930 — 170px of empty track on the right,
+ * under a search field and a filter row that both ran the full width. That
+ * gap is the one thing about this screen that was reported by eye rather than
+ * found by measuring: the search bar and the filter tags going further than
+ * the films.
+ *
+ * `1fr` for the maximum instead of a second fixed number. Auto-fill still
+ * decides the count from the 150px minimum — six columns in a 1076px row
+ * — and the columns then divide what is actually there, landing at about
+ * 168px each. Almost exactly the width they were, with the row ending where
+ * the rest of the page ends. */
+.reel-view.is-w700:not(.is-phone) .reel-grid,
+.reel-view.is-w900:not(.is-phone) .reel-grid {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	justify-content: stretch;
 }
 
 /*
