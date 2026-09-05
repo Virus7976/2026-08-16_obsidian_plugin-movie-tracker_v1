@@ -1638,7 +1638,8 @@ input.reel-input {
  * written once.
  */
 .reel-view.is-w700 .reel-detail-bar,
-.reel-view.is-w700 .reel-diary-month {
+.reel-view.is-w700 .reel-diary-month,
+.reel-view.is-w700 .reel-view-body .reel-chips {
 	top: calc(-1 * var(--reel-body-pad-top, 8px));
 }
 
@@ -8740,6 +8741,29 @@ input.reel-input {
 .reel-view.is-w700:not(.is-phone) .reel-search-clear {
 	min-height: 30px;
 	height: 30px;
+}
+
+/* The row actions, on the same scale as everything else.
+ *
+ * The tick and the ⋯ on a list row are 44×44 — a square sized for a fingertip,
+ * and the only controls on Up next, so that screen was still entirely at thumb
+ * scale while the rest of the desktop had come down to 30. Square either way;
+ * it is the number that changes.
+ *
+ * The centring is not decoration. These were never centred — the glyph sat 1px
+ * from the left edge and 14.6px from the right, which the 44px box was wide
+ * enough to hide. Taking the padding out to reach 30px exposed it. */
+.reel-view.is-w700:not(.is-phone) .reel-tick,
+.reel-view.is-w700:not(.is-phone) .reel-more {
+	box-sizing: border-box;
+	min-height: 30px;
+	height: 30px;
+	min-width: 30px;
+	width: 30px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 
 /* The row has to be exactly as tall as the hit area it contains.

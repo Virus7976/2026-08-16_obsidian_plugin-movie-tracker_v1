@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.40",
+		date: "2026-09-05",
+		headline: "The last of the phone-sized controls come down to desktop size.",
+		changes: [
+			{
+				kind: "better",
+				text: "On a desktop the tick and the ⋯ on a list row are the same size as every other control, and their marks sit in the middle of them.",
+				note: "They were 44×44 — squares sized for a fingertip — and they are the only controls on Up next, so that screen was still entirely at thumb scale after the rest of the desktop had come down to 30. Taking them in showed something the larger box had been hiding: the mark inside was never centred, sitting 1px from the left edge and 14.6px from the right. Both are fixed. The phone keeps its 44px.",
+			},
+			{
+				kind: "fixed",
+				text: "The row of years on Stats sits against the top edge while you scroll, instead of floating a few pixels below it.",
+				note: "The same 8px offset that had been fixed on a title's page and in the diary — a pinned element measures from the scroll area's padding edge — and this was the third place it showed up. Measured while scrolling: the gap is now 0.",
+			},
+		],
+	},
+	{
 		version: "0.9.39",
 		date: "2026-09-05",
 		headline: "Stats are on the page on a desktop, and pinned headers stay pinned.",
