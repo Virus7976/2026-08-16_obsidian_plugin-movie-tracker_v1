@@ -4671,6 +4671,48 @@ input.reel-input {
 	align-items: start;
 }
 
+/*
+ * The charts pack instead of sitting in rows padded to their tallest member.
+ *
+ * As a grid every row is as tall as the tallest chart in it, and these are
+ * nothing like the same height — measured across eleven of them: 303, 142,
+ * 375, 492, 303, 508, 303, 702, 403, 259, 220. The 142 sat in a row 375 tall
+ * and left 233px of nothing under it, three times over. That is most of what
+ * "this just doesn't look good" is pointing at on this screen: not the charts
+ * themselves, the holes between them.
+ *
+ * Multi-column rather than a grid, because this is the one layout that packs
+ * by height. Reading order becomes column-major, which is the trade and the
+ * right one here: nobody reads a wall of charts in sequence, and a chart
+ * stranded above a void is harder to read than one below a different chart.
+ */
+.reel-view.is-w700:not(.is-phone) .reel-stats .reel-chart-grid {
+	display: block;
+	columns: 3;
+	column-gap: var(--reel-space-3);
+}
+
+/* A chart may not be split down the middle by a column break, and the bottom
+ * margin is the vertical gap — `gap` means nothing outside a grid. */
+.reel-view.is-w700:not(.is-phone) .reel-stats .reel-chart {
+	break-inside: avoid;
+	margin-bottom: var(--reel-space-3);
+}
+
+/*
+ * The three highlights sit in one row.
+ *
+ * The row was two fixed 513px columns, and there are three highlights —
+ * highest rated, lowest rated, longest — so the third dropped to a second
+ * row and left a 513px hole beside it. `auto-fit` divides the row by however
+ * many there actually are, which is the honest version of the same rule: three
+ * at ~349px today, and still a full row if a highlight is ever added or a
+ * library is too small to have one.
+ */
+.reel-view.is-w700:not(.is-phone) .reel-stats .reel-facts {
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .reel-stats .reel-chart {
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);

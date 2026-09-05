@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.44",
+		date: "2026-09-05",
+		headline: "Stats packs, instead of leaving holes.",
+		changes: [
+			{
+				kind: "better",
+				text: "On a desktop the charts on Stats sit directly under one another instead of leaving gaps where a short chart shares a row with a tall one.",
+				note: "They were laid out as a grid, and a grid row is as tall as the tallest thing in it. Measured across eleven charts: 303, 142, 375, 492, 303, 508, 303, 702, 403, 259, 220. The 142 sat in a row 375 tall and left 233px of nothing beneath it, three times over. Most of what looked wrong on this screen was not the charts, it was the space between them.",
+			},
+			{
+				kind: "fixed",
+				text: "Highest rated, lowest rated and longest sit in one row.",
+				note: "The row was two fixed columns and there are three highlights, so the third dropped underneath and left an empty half-row beside it. The row now divides by however many there are.",
+			},
+		],
+	},
+	{
 		version: "0.9.43",
 		date: "2026-09-05",
 		headline: "Discover lines up with the rest of the tabs.",
