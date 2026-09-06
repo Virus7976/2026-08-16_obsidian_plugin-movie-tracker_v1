@@ -11530,6 +11530,25 @@ input.reel-input {
 	word-break: break-word;
 }
 
+/*
+ * The people a search found, which is not a cast list.
+ *
+ * A cast cell is 76px with the name clamped to one line, and that is right
+ * where it is used: the face is the subject, the row is long, and a clipped
+ * surname still reads because you are looking at a picture of the person.
+ * In a search result the name *is* the answer — "Jake Gyllenhaal" clamped
+ * into 76px renders as "Jake…", which is the one word the search already
+ * knew. Wider cells, and two lines before anything is cut.
+ */
+.reel-caststrip.is-people .reel-caststrip-cell {
+	flex: 0 0 108px;
+	width: 108px;
+}
+
+.reel-caststrip.is-people .reel-caststrip-name {
+	-webkit-line-clamp: 2;
+}
+
 .reel-caststrip-role {
 	display: -webkit-box;
 	-webkit-line-clamp: 2;

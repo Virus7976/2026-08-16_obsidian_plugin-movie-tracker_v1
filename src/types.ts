@@ -155,6 +155,16 @@ export interface TmdbSearchResult {
 	genre_ids?: number[];
 	/** TMDB sends this on every result; only /discover lets us exclude it up front. */
 	adult?: boolean;
+	/**
+	 * A person's headshot, and what they are known for.
+	 *
+	 * `/search/multi` answers with people as well as titles, and these are the
+	 * two fields only a person carries. The type not declaring them is why every
+	 * person result had to be discarded to keep the compiler happy — searching
+	 * an actor's name returned nothing at all, for a query TMDB had answered.
+	 */
+	profile_path?: string | null;
+	known_for_department?: string;
 }
 
 export interface TmdbCrew {

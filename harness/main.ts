@@ -658,6 +658,33 @@ const plugin = {
 		getImages: async () => ({ backdrops: [], posters: [] }),
 		getSeason: async () => SEASON_META,
 		getPerson: async () => PERSON_META,
+		/*
+		 * Searching a person's name, which is the case that used to render
+		 * nothing.
+		 *
+		 * Absent from this stub until now — and per the note on `getFilm`
+		 * above, a missing stub is not a neutral omission: the search path would
+		 * have thrown, drawn one line of error text, and passed every check.
+		 *
+		 * People and no titles, because that is exactly what TMDB answers for an
+		 * actor's name. `/search/multi` matches a title's *name*, not its cast,
+		 * so "Jake Gyllenhaal" matches one person and no films whatsoever. A
+		 * fixture that returned titles alongside would model the easy case and
+		 * miss the one that was broken.
+		 */
+		searchMultiPage: async (query: string, page = 1) => ({
+			results: [],
+			people:
+				page === 1
+					? [
+							{ id: 131, name: "Jake Gyllenhaal", media_type: "person", known_for_department: "Acting", profile_path: "/jake.jpg" },
+							{ id: 1810, name: "Maggie Gyllenhaal", media_type: "person", known_for_department: "Acting", profile_path: "/maggie.jpg" },
+						]
+					: [],
+			page,
+			totalPages: 1,
+			totalResults: 2,
+		}),
 	},
 	openSearch: () => {},
 	openDetail: () => {},
@@ -1406,6 +1433,20 @@ function quick(root: HTMLElement): void {
 function discover(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	const screen = new DiscoverScreen(plugin);
+	screen.render(root);
+}
+
+/**
+ * Discover, with a person's name typed into it.
+ *
+ * The screen that answered an actor's name with an empty result for as long as
+ * it existed: `/search/multi` returns people, and the filter that kept only
+ * movies and television threw every one of them away.
+ */
+function discoverPerson(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const screen = new DiscoverScreen(plugin);
+	screen.query = "Jake Gyllenhaal";
 	screen.render(root);
 }
 
@@ -2270,6 +2311,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	detailFilm,
 	detailremove,
 	discover,
+	discoverPerson,
 	recipe,
 	quickrate,
 	logsheet,

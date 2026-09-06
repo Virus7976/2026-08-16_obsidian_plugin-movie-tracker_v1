@@ -94,6 +94,8 @@ export class DiscoverScreen {
 	private searchTotal = 0;
 	/** A page is in flight, so the sentinel must not ask for it twice. */
 	private searchMore = false;
+	/** The people the query matched, drawn above the titles. Page one only. */
+	private searchPeople: TmdbSearchResult[] = [];
 
 	/**
 	 * The mounted rows, in the shape the rest of the screen already expects.
@@ -1123,6 +1125,7 @@ export class DiscoverScreen {
 			this.searchPages = 0;
 			this.searchTotal = 0;
 			this.searchMore = false;
+			this.searchPeople = [];
 		}
 
 		if (!this.searchResults) {
@@ -1139,6 +1142,7 @@ export class DiscoverScreen {
 					this.searchPage = res.page;
 					this.searchPages = res.totalPages;
 					this.searchTotal = res.totalResults;
+					this.searchPeople = res.people;
 				})
 				.catch((e: unknown) => {
 					this.error = diagnoseError(e).message;
@@ -1159,12 +1163,33 @@ export class DiscoverScreen {
 		 * expected rather than surprising.
 		 */
 		const more = this.searchTotal > items.length;
-		count.setText(more ? `${items.length} of ${this.searchTotal} on TMDB for “${q}”` : `${items.length} on TMDB for “${q}”`);
+		/*
+		 * `searchTotal` is everything TMDB matched, people included, so counting
+		 * titles against it reads as nonsense in the case this screen now has to
+		 * handle: an actor's name matches one person and no titles at all, and
+		 * the honest-looking "0 of 1 on TMDB" is the least useful true sentence
+		 * available. When the answer is people, say so and let the faces below
+		 * be the answer.
+		 */
+		if (!items.length && this.searchPeople.length) {
+			const n = this.searchPeople.length;
+			count.setText(`${n} ${n === 1 ? "person" : "people"} on TMDB for “${q}”`);
+		} else {
+			count.setText(
+				more ? `${items.length} of ${this.searchTotal} on TMDB for “${q}”` : `${items.length} on TMDB for “${q}”`,
+			);
+		}
 		if (this.searchOwned) {
 			count.createSpan({ cls: "reel-dim", text: ` · ${this.searchOwned} already in your library` });
 		}
 
+		// Before the empty check, deliberately. Searching an actor's name is the
+		// case where there are no matching *titles* at all, and returning "nothing
+		// matches" over the top of a person TMDB did find is the whole bug.
+		this.paintSearchPeople(container);
+
 		if (!items.length) {
+			if (this.searchPeople.length) return;
 			const none = container.createDiv({ cls: "reel-empty" });
 			none.createDiv({
 				text: this.searchOwned
@@ -1177,6 +1202,47 @@ export class DiscoverScreen {
 		const grid = container.createDiv({ cls: "reel-dgrid" });
 		for (const item of items) grid.appendChild(this.card(item, container));
 		this.paintSearchSentinel(container, grid, count);
+	}
+
+	/**
+	 * The people the search matched.
+	 *
+	 * Same cell as the cast strip on a title's preview, because it is the same
+	 * thing being offered and a second way of drawing a face would be a second
+	 * thing to keep consistent. Tapping one opens their filmography, which is
+	 * what you were after when you typed their name.
+	 */
+	private paintSearchPeople(container: HTMLElement): void {
+		if (!this.searchPeople.length) return;
+		container.createDiv({ cls: "reel-block-title", text: "People" });
+		const strip = container
+			.createDiv({ cls: "reel-caststrip is-people" })
+			.createDiv({ cls: "reel-caststrip-track" });
+		for (const p of this.searchPeople) {
+			const name = (p.name ?? "").trim();
+			if (!name) continue;
+			const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+			const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+			this.plugin.people.attach(shot, name, p.id);
+			badgePerson(this.plugin, shot, p.id);
+			cell.createDiv({ cls: "reel-caststrip-name", text: name });
+			const known = (p.known_for_department ?? "").trim();
+			if (known) cell.createDiv({ cls: "reel-caststrip-role", text: known });
+			cell.setAttr("role", "button");
+			cell.setAttr("tabindex", "0");
+			cell.setAttr("aria-label", `${name} — open their filmography`);
+			const open = (): void => {
+				new PersonSheet(this.plugin, p.id, name).open();
+			};
+			cell.addEventListener("click", open);
+			// A cell that answers the mouse and not the keyboard is not a button,
+			// whatever its role says.
+			cell.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key !== "Enter" && ev.key !== " ") return;
+				ev.preventDefault();
+				open();
+			});
+		}
 	}
 
 	/**

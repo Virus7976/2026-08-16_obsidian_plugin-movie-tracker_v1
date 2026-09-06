@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.45",
+		date: "2026-09-05",
+		headline: "Searching an actor or director finds them.",
+		changes: [
+			{
+				kind: "fixed",
+				text: "Typing a person's name into Discover now shows the person. Tap them for everything they have been in.",
+				note: "TMDB answers a search with people as well as titles, and Discover threw every person away before drawing anything — so a name could only ever match a film *called* that, and “Jake Gyllenhaal” returned an empty screen for a question that had been answered correctly. The odd part is that the machinery behind it was already built and connected to nothing: the filmography sheet, the person lookup, and a search-by-cast query were all sitting there unused.",
+			},
+			{
+				kind: "fixed",
+				text: "A person's full name is shown under their photo instead of being cut after the first word.",
+				note: "The row reuses the cast strip from a title's page, where a cell is 76px and a name is clipped to one line — fine beside a photograph in a list of a film's cast, useless in a search result, where clipping “Jake Gyllenhaal” to “Jake…” returns the one word you had already typed.",
+			},
+		],
+	},
+	{
 		version: "0.9.44",
 		date: "2026-09-05",
 		headline: "Stats packs, instead of leaving holes.",

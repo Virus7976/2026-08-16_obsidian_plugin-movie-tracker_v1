@@ -3259,6 +3259,8 @@
       this.searchTotal = 0;
       /** A page is in flight, so the sentinel must not ask for it twice. */
       this.searchMore = false;
+      /** The people the query matched, drawn above the titles. Page one only. */
+      this.searchPeople = [];
       this.profile = null;
       this.results = null;
       this.genres = [];
@@ -4113,6 +4115,7 @@
         this.searchPages = 0;
         this.searchTotal = 0;
         this.searchMore = false;
+        this.searchPeople = [];
       }
       if (!this.searchResults) {
         skeletonGrid(container, 12, "Searching");
@@ -4127,6 +4130,7 @@
           this.searchPage = res.page;
           this.searchPages = res.totalPages;
           this.searchTotal = res.totalResults;
+          this.searchPeople = res.people;
         }).catch((e) => {
           this.error = diagnoseError(e).message;
         }).finally(() => {
@@ -4138,11 +4142,21 @@
       const items = this.searchResults.filter((i) => !this.handled.has(i.id));
       const count = container.createDiv({ cls: "reel-block-count" });
       const more = this.searchTotal > items.length;
-      count.setText(more ? `${items.length} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${items.length} on TMDB for \u201C${q}\u201D`);
+      if (!items.length && this.searchPeople.length) {
+        const n2 = this.searchPeople.length;
+        count.setText(`${n2} ${n2 === 1 ? "person" : "people"} on TMDB for \u201C${q}\u201D`);
+      } else {
+        count.setText(
+          more ? `${items.length} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${items.length} on TMDB for \u201C${q}\u201D`
+        );
+      }
       if (this.searchOwned) {
         count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
       }
+      this.paintSearchPeople(container);
       if (!items.length) {
+        if (this.searchPeople.length)
+          return;
         const none = container.createDiv({ cls: "reel-empty" });
         none.createDiv({
           text: this.searchOwned ? "Everything matching is already in your library." : "Nothing on TMDB matches that."
@@ -4153,6 +4167,46 @@
       for (const item of items)
         grid.appendChild(this.card(item, container));
       this.paintSearchSentinel(container, grid, count);
+    }
+    /**
+     * The people the search matched.
+     *
+     * Same cell as the cast strip on a title's preview, because it is the same
+     * thing being offered and a second way of drawing a face would be a second
+     * thing to keep consistent. Tapping one opens their filmography, which is
+     * what you were after when you typed their name.
+     */
+    paintSearchPeople(container) {
+      if (!this.searchPeople.length)
+        return;
+      container.createDiv({ cls: "reel-block-title", text: "People" });
+      const strip = container.createDiv({ cls: "reel-caststrip is-people" }).createDiv({ cls: "reel-caststrip-track" });
+      for (const p of this.searchPeople) {
+        const name = (p.name ?? "").trim();
+        if (!name)
+          continue;
+        const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+        const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+        this.plugin.people.attach(shot, name, p.id);
+        badgePerson(this.plugin, shot, p.id);
+        cell.createDiv({ cls: "reel-caststrip-name", text: name });
+        const known = (p.known_for_department ?? "").trim();
+        if (known)
+          cell.createDiv({ cls: "reel-caststrip-role", text: known });
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-label", `${name} \u2014 open their filmography`);
+        const open = () => {
+          new PersonSheet(this.plugin, p.id, name).open();
+        };
+        cell.addEventListener("click", open);
+        cell.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ")
+            return;
+          ev.preventDefault();
+          open();
+        });
+      }
     }
     /**
      * Keep the search going as you scroll, instead of stopping at page one.
@@ -11986,7 +12040,31 @@ ${body}
       getShow: async () => FILM_META,
       getImages: async () => ({ backdrops: [], posters: [] }),
       getSeason: async () => SEASON_META,
-      getPerson: async () => PERSON_META
+      getPerson: async () => PERSON_META,
+      /*
+       * Searching a person's name, which is the case that used to render
+       * nothing.
+       *
+       * Absent from this stub until now — and per the note on `getFilm`
+       * above, a missing stub is not a neutral omission: the search path would
+       * have thrown, drawn one line of error text, and passed every check.
+       *
+       * People and no titles, because that is exactly what TMDB answers for an
+       * actor's name. `/search/multi` matches a title's *name*, not its cast,
+       * so "Jake Gyllenhaal" matches one person and no films whatsoever. A
+       * fixture that returned titles alongside would model the easy case and
+       * miss the one that was broken.
+       */
+      searchMultiPage: async (query, page = 1) => ({
+        results: [],
+        people: page === 1 ? [
+          { id: 131, name: "Jake Gyllenhaal", media_type: "person", known_for_department: "Acting", profile_path: "/jake.jpg" },
+          { id: 1810, name: "Maggie Gyllenhaal", media_type: "person", known_for_department: "Acting", profile_path: "/maggie.jpg" }
+        ] : [],
+        page,
+        totalPages: 1,
+        totalResults: 2
+      })
     },
     openSearch: () => {
     },
@@ -12434,6 +12512,12 @@ ${body}
   function discover(root) {
     root.addClass("reel-view-body");
     const screen = new DiscoverScreen(plugin);
+    screen.render(root);
+  }
+  function discoverPerson(root) {
+    root.addClass("reel-view-body");
+    const screen = new DiscoverScreen(plugin);
+    screen.query = "Jake Gyllenhaal";
     screen.render(root);
   }
   function recipe(root) {
@@ -12945,6 +13029,7 @@ ${body}
     detailFilm,
     detailremove,
     discover,
+    discoverPerson,
     recipe,
     quickrate,
     logsheet,

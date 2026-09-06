@@ -154,9 +154,24 @@ export class TmdbClient {
 	async searchMultiPage(
 		query: string,
 		page = 1
-	): Promise<{ results: TmdbSearchResult[]; page: number; totalPages: number; totalResults: number }> {
+	): Promise<{
+		results: TmdbSearchResult[];
+		/**
+		 * The people the same query matched.
+		 *
+		 * Separate from `results` rather than mixed into it, for two reasons.
+		 * `searchMulti` above feeds the add-a-title flow, where a person is not a
+		 * thing you can add and would be noise. And the caller pages `results` on
+		 * scroll — people belong to the query, not to page four of it, so
+		 * folding them in would append the same faces every time you scrolled.
+		 */
+		people: TmdbSearchResult[];
+		page: number;
+		totalPages: number;
+		totalResults: number;
+	}> {
 		const q = query.trim();
-		if (!q) return { results: [], page: 1, totalPages: 0, totalResults: 0 };
+		if (!q) return { results: [], people: [], page: 1, totalPages: 0, totalResults: 0 };
 
 		// TMDB serves at most 500 pages and rejects anything beyond it.
 		const n = Math.max(1, Math.min(500, Math.floor(page)));
@@ -170,10 +185,25 @@ export class TmdbClient {
 			...(n > 1 ? { page: String(n) } : {}),
 		});
 
+		const all = data.results ?? [];
 		return {
-			results: (data.results ?? [])
-				.filter((r) => r.media_type === "movie" || r.media_type === "tv")
-				.slice(0, 20),
+			results: all.filter((r) => r.media_type === "movie" || r.media_type === "tv").slice(0, 20),
+			/*
+			 * People, which this used to throw away.
+			 *
+			 * `/search/multi` returns actors and directors alongside titles, and
+			 * the filter above dropped every one of them — so searching a name
+			 * could only ever match a title *called* that, and an actor's name
+			 * returned an empty screen for a query TMDB had answered correctly.
+			 *
+			 * Only on the first page. Relevance puts the person you meant at the
+			 * top, and the pages after the first are the scroll asking for more
+			 * titles, not more faces.
+			 */
+			people:
+				n === 1
+					? all.filter((r) => r.media_type === "person" && !r.adult).slice(0, 12)
+					: [],
 			page: n,
 			totalPages: Math.min(500, Math.max(0, Math.floor(data.total_pages ?? 0))),
 			totalResults: Math.max(0, Math.floor(data.total_results ?? 0)),
