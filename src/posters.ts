@@ -14,7 +14,7 @@ import { Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type { Vault } from "obsidian";
 import type ReelPlugin from "./main";
 import { redact } from "./secrets";
-import { orphanedPosters } from "./util/prune";
+import { isReelPoster, orphanedPosters } from "./util/prune";
 
 export class PosterStore {
 	constructor(private plugin: ReelPlugin) {}
@@ -45,8 +45,19 @@ export class PosterStore {
 	 * frontmatter. Returns null if posters are off, there is no poster, or the
 	 * download failed — a missing poster must never block note creation.
 	 */
-	async cache(tmdbId: number, type: "film" | "tv", posterPath: string | null | undefined): Promise<string | null> {
-		if (!this.plugin.settings.downloadPosters || !posterPath) return null;
+	/** Does the "Save posters for" setting want a file for a title in this state? */
+	wanted(started: boolean): boolean {
+		const s = this.plugin.settings;
+		return s.downloadPosters && (s.posterScope === "all" || started);
+	}
+
+	async cache(
+		tmdbId: number,
+		type: "film" | "tv",
+		posterPath: string | null | undefined,
+		started = true
+	): Promise<string | null> {
+		if (!posterPath || !this.wanted(started)) return null;
 
 		const dest = this.vaultPath(tmdbId, type);
 		const existing = this.plugin.app.vault.getAbstractFileByPath(dest);
@@ -134,6 +145,8 @@ export class PosterStore {
 		const fallback = () => {
 			parent.addClass("is-empty");
 			parent.createSpan({ cls: "reel-placeholder-text", text: entry.title.slice(0, 2) });
+			// Cards show the whole title, centred, instead of two letters.
+			parent.createSpan({ cls: "reel-placeholder-title", text: entry.title });
 		};
 
 		if (!src) {
@@ -228,7 +241,7 @@ export class PosterStore {
 						type === "tv"
 							? await this.plugin.tmdb.getShow(entry.tmdbId)
 							: await this.plugin.tmdb.getFilm(entry.tmdbId);
-					const stored = await this.cache(entry.tmdbId, type, meta.poster_path);
+					const stored = await this.cache(entry.tmdbId, type, meta.poster_path, entry.status !== "watchlist");
 					if (stored) {
 						const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
 						if (file instanceof TFile) {
@@ -279,6 +292,56 @@ export class PosterStore {
 			})
 		);
 		return files.filter((f) => doomed.has(f.path));
+	}
+
+	private syncing = false;
+	private tried = new Set<string>();
+
+	/**
+	 * Save the poster for every title you have started, when the setting is
+	 * "only titles I have watched". A watchlist title shows its poster from the
+	 * internet; the moment it is watched, this turns it into a file.
+	 */
+	async syncWatched(): Promise<void> {
+		const s = this.plugin.settings;
+		if (this.syncing || this.backfilling || !s.downloadPosters || s.posterScope !== "watched") return;
+		this.syncing = true;
+		try {
+			for (const e of this.plugin.library.all()) {
+				if (e.status === "watchlist" || this.tried.has(e.path)) continue;
+				if (e.poster && this.plugin.app.vault.getAbstractFileByPath(normalizePath(e.poster))) continue;
+				const m = /\/t\/p\/[^/]+(\/[^/?#]+)/.exec(e.posterUrl ?? "");
+				if (!m) continue;
+				this.tried.add(e.path);
+				const stored = await this.cache(e.tmdbId, e.type === "tv" ? "tv" : "film", m[1], true);
+				const file = this.plugin.app.vault.getAbstractFileByPath(e.path);
+				if (stored && file instanceof TFile) {
+					await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
+						fm.poster = stored;
+					});
+				}
+			}
+		} finally {
+			this.syncing = false;
+		}
+	}
+
+	/**
+	 * A note was deleted: trash its poster too, unless another note still uses
+	 * it. Only files Reel itself named are ever touched.
+	 */
+	async removeFor(poster: string | undefined): Promise<void> {
+		if (!poster || !this.plugin.settings.deletePosterWithTitle) return;
+		const path = normalizePath(poster);
+		if (!isReelPoster(path) || !path.startsWith(this.folder + "/")) return;
+		if (this.plugin.library.all().some((e) => e.poster && normalizePath(e.poster) === path)) return;
+		const file = this.plugin.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) return;
+		try {
+			await this.plugin.app.fileManager.trashFile(file);
+		} catch (e) {
+			console.warn("Reel: could not remove poster", path, redact(e));
+		}
 	}
 
 	/** Move the given posters to the system trash, so a wrong call is undoable. */

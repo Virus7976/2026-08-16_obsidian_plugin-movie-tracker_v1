@@ -575,8 +575,15 @@ const plugin = {
 		// most entries will actually take, since backdrop_path is the field
 		// most often missing.
 		washUrl: (e: { title: string }) => poster(e.title),
+		syncWatched: async () => undefined,
 	},
+	// Settings asks where the images live; a sentence long enough to wrap, since
+	// that is the case that widens a pane.
+	imageStorageReport: async () =>
+		"Images live in Movies/_posters, not your attachments folder. Hidden from the phone gallery. 0 cast photos saved (0 KB).",
 	people: {
+		clearCache: async () => 0,
+		cacheStats: () => ({ count: 0, bytes: 0 }),
 		attach(parent: HTMLElement, name: string) {
 			parent.addClass("is-empty");
 			parent.createSpan({
@@ -715,6 +722,10 @@ function library(root: HTMLElement, rows: Entry[] = all): void {
 	navBtn.createSpan({ cls: "reel-nav-icon", text: "▣" });
 	navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
 	navBtn.createSpan({ cls: "reel-nav-chevron", text: "▾" });
+	// Reel's own search button, which view.ts draws beside the navigation.
+	const omniBar = header.createEl("button", { cls: "reel-omni-bar", attr: { "aria-label": "Search everything" } });
+	omniBar.createSpan({ cls: "reel-omni-bar-icon", text: "⌕" });
+	omniBar.createSpan({ cls: "reel-omni-bar-text", text: "Search titles, people, #tags…" });
 	/*
 	 * No `search-input-container` here, matching what the app does once the
 	 * field docks.
@@ -755,21 +766,23 @@ function library(root: HTMLElement, rows: Entry[] = all): void {
 	// The bar as it ships now: what is set, and a button for everything else.
 	// Long labels on purpose — a director's name and a list called something
 	// unreasonable are the cases that used to widen the whole pane.
-	filterBar(filters, ["Films", "Science Fiction", "☰ Christmas with the family"]);
+	const libBar = filterBar(filters, ["Films", "Science Fiction", "☰ Christmas with the family"]);
+	libBar.createSpan({ cls: "reel-bar-sep" });
+	for (const t of ["#favourites", "#rewatch-pile", "#action", "#drama", "#science-fiction"]) {
+		libBar.createEl("button", { cls: `reel-tag${t === "#action" ? " is-active" : ""}`, text: t });
+	}
 
 	const body = root.createDiv({ cls: "reel-view-body" });
 	// The band replaced the bare "39 titles" line: the count is its headline, and
 	// two of them would be one more row of chrome on the screen that has fought
 	// hardest for its vertical space. A deliberately long subtitle, because it is
 	// the part that must ellipsise rather than wrap or widen the pane.
-	heroBand(body, {
-		label: "Your library",
-		title: `${rows.length} titles`,
-		sub: `Most recently — ${rows[0].title} · 14 to watch · 2 hidden by content filter`,
-		art: false,
-		compact: true,
-	});
-	renderPosterGrid(plugin, body, rows);
+	const strip = body.createDiv({ cls: "reel-summary" });
+	strip.createSpan({ cls: "reel-summary-label", text: "Library" });
+	strip.createSpan({ text: `${rows.length} titles` });
+	strip.createSpan({ text: "14 to watch" });
+	strip.createSpan({ text: "avg 4.4 ★" });
+	renderPosterGrid(plugin, body.createDiv({ cls: "reel-gridwrap" }), rows);
 }
 
 /**
@@ -798,6 +811,10 @@ function libraryYear(root: HTMLElement): void {
  */
 function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElement {
 	const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
+	if (sort) {
+		const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg" });
+		["▦", "▪", "☰"].forEach((g, i) => seg.createEl("button", { cls: `reel-seg-btn${i === 0 ? " is-active" : ""}`, text: g }));
+	}
 	const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
 	open.createSpan({ cls: "reel-filter-btn-icon", text: "⚙" });
 	open.createSpan({ text: "Filters" });
@@ -812,9 +829,7 @@ function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElemen
 	 * it drifted again the day Ask shipped, and a replica nobody updates is a
 	 * green tick for a layout that no longer exists.
 	 */
-	const ask = bar.createEl("button", { cls: "reel-chip reel-ask-btn" });
-	ask.createSpan({ cls: "reel-filter-btn-icon", text: "✦" });
-	ask.createSpan({ text: "Ask" });
+
 
 	// Sort and layout share the row rather than owning one each. Three stacked
 	// rows of controls above two posters is a control panel with a preview pane
@@ -822,10 +837,11 @@ function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElemen
 	if (sort) {
 		const sel = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
 		sel.createEl("option", { text: "Recently watched" });
-		const layout = bar.createEl("button", { cls: "reel-chip reel-layout-btn" });
-		layout.createSpan({ cls: "reel-layout-icon", text: "▦" });
-		layout.createSpan({ cls: "reel-layout-label", text: "Posters" });
+		bar.createEl("button", { cls: "reel-chip reel-sort-dir", text: "↓", attr: { "aria-label": "Tap to reverse the order" } });
 	}
+	const ask = bar.createEl("button", { cls: "reel-chip reel-ask-btn" });
+	ask.createSpan({ cls: "reel-filter-btn-icon", text: "✦" });
+	ask.createSpan({ text: "Ask" });
 
 	/*
 	 * The two-part tag the view now builds: a label that opens the sheet and an

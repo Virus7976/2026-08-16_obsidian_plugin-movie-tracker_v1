@@ -39,7 +39,11 @@ export class Library extends Events {
 		);
 		this.plugin.registerEvent(
 			vault.on("delete", (file: TAbstractFile) => {
-				if (this.entries.delete(file.path)) this.emitChange();
+				const gone = this.entries.get(file.path);
+				if (this.entries.delete(file.path)) {
+					this.emitChange();
+					void this.plugin.posters.removeFor(gone?.poster);
+				}
 			})
 		);
 		this.plugin.registerEvent(

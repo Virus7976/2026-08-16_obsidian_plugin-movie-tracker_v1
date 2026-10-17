@@ -16989,3 +16989,914 @@ body:not(.is-phone) .reel-modal .reel-setup-copy {
 	color: var(--text-normal);
 	overflow-wrap: anywhere;
 }
+
+/* ==================================================================== */
+/* Typing in a sheet: pinned to the top so the keyboard cannot cover it  */
+/* ==================================================================== */
+.reel-modal.reel-sheet.is-typing {
+	inset: 0 0 auto 0;
+	bottom: auto;
+	max-height: var(--reel-typing-max, 50dvh);
+	border-radius: 0 0 16px 16px;
+	animation: none;
+}
+
+/* ==================================================================== */
+/* Omni search                                                           */
+/* ==================================================================== */
+.reel-omni-chips {
+	display: flex;
+	gap: var(--reel-space-2, 8px);
+	padding: 8px 12px;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+
+.reel-omni-chips .reel-chip {
+	flex: none;
+	min-height: 36px;
+}
+
+.reel-omni-head {
+	font-size: var(--font-ui-smaller);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+	pointer-events: none;
+	padding-top: 10px;
+}
+
+/* Reel's own search button: shown where the inline field is collapsed. */
+.reel-omni-btn {
+	margin-left: auto;
+	min-width: 44px;
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-view.is-w700 .reel-omni-btn {
+	display: none;
+}
+
+/* ==================================================================== */
+/* Filters sheet: the foot sits below the list instead of over it         */
+/* ==================================================================== */
+/*
+ * The foot was `position: sticky` inside a sheet that itself scrolls, so its
+ * opaque band was painted across the last row of chips and cut the button's
+ * label in half. Here the sheet is a column: head, then a body that scrolls on
+ * its own, then the foot. Nothing is layered, so nothing can overlap.
+ */
+.reel-modal.reel-sheet.reel-filter-sheet {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.reel-modal.reel-sheet.reel-filter-sheet .reel-filter-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.reel-modal.reel-sheet.reel-filter-sheet .reel-filter-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	max-height: none;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.reel-modal.reel-sheet.reel-filter-sheet .reel-filter-actions {
+	position: static;
+	flex: none;
+	box-shadow: none;
+	border-top: 1px solid var(--background-modifier-border);
+	padding-bottom: calc(var(--reel-space-2) + env(safe-area-inset-bottom));
+}
+
+/* ==================================================================== */
+/* Pinned headers pin to the edge on every width, not only wide panes     */
+/* ==================================================================== */
+/*
+ * The rule that cancels the body's top padding was scoped to `.is-w700`, so on
+ * a phone the "August 2026" divider stopped 8px below the bar, and the row
+ * scrolling past showed through the strip above it. Same fix, no scope.
+ */
+.reel-view .reel-detail-bar,
+.reel-view .reel-diary-month,
+.reel-view .reel-view-body .reel-chips {
+	top: calc(-1 * var(--reel-body-pad-top, 8px));
+}
+
+.reel-view .reel-diary-month {
+	/* Cover the strip the negative offset opens up. */
+	padding-top: calc(10px + var(--reel-body-pad-top, 8px));
+	margin-top: calc(-1 * var(--reel-body-pad-top, 8px));
+}
+
+/* ==================================================================== */
+/* Phones: see more at once                                              */
+/* ==================================================================== */
+/* Three posters across instead of two, and the library banner is one line
+   rather than a card taller than a poster. */
+.reel-view:not(.is-w700) .reel-gridwrap:not(.is-dense) .reel-grid {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reel-view:not(.is-w700) .reel-hero-band.is-compact {
+	min-height: 0;
+	padding-block: var(--reel-space-2);
+}
+
+.reel-view:not(.is-w700) .reel-hero-band.is-compact .reel-hero-sub {
+	display: none;
+}
+
+/* ==================================================================== */
+/* Phone polish: search button, 3-up captions, a sort row that fits       */
+/* ==================================================================== */
+.reel-omni-btn {
+	flex: none;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border-radius: 12px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	box-shadow: none;
+}
+
+.reel-omni-btn svg {
+	width: 20px;
+	height: 20px;
+}
+
+.reel-omni-btn:active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-view:not(.is-w700) .reel-hero-band.is-compact .reel-hero-band-sub {
+	display: none;
+}
+
+/* Three across leaves about 110px a poster: the caption has to be a caption. */
+.reel-view:not(.is-w700) .reel-gridwrap:not(.is-dense) .reel-cell-title {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.2;
+}
+
+.reel-view:not(.is-w700) .reel-gridwrap:not(.is-dense) .reel-cell-year {
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view:not(.is-w700) .reel-gridwrap:not(.is-dense) .reel-cell-stars,
+.reel-view:not(.is-w700) .reel-gridwrap:not(.is-dense) .reel-cell-rating {
+	transform: scale(0.8);
+	transform-origin: left bottom;
+}
+
+/* Everything in the filter row reachable without scrolling sideways. */
+.reel-view:not(.is-w700) .reel-sort-select {
+	max-width: 8.5em;
+}
+
+.reel-view:not(.is-w700) .reel-layout-btn .reel-layout-label {
+	display: none;
+}
+
+.reel-sort-dir {
+	flex: none;
+	min-width: 36px;
+	height: 32px;
+	padding: 0 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.reel-sort-row {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+}
+
+.reel-sort-row .reel-select {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.reel-sort-row .reel-sort-flip {
+	flex: none;
+}
+
+.reel-filter-done {
+	justify-content: center;
+	text-align: center;
+}
+
+/* ==================================================================== */
+/* Vault look: one search bar, one control row, flat summary, tidy cards  */
+/* ==================================================================== */
+/* Only theme variables below, so it follows whatever theme is installed,
+   light or dark. */
+
+/* ---- top bar ------------------------------------------------------- */
+.reel-omni-btn {
+	display: none;
+}
+
+.reel-omni-bar {
+	order: 1;
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+	padding: 0 var(--reel-space-3);
+	text-align: left;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-radius, 12px);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.reel-omni-bar:active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-omni-bar-icon {
+	display: inline-flex;
+	flex: none;
+}
+
+.reel-omni-bar-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-view.is-w700 .reel-omni-bar {
+	display: none;
+}
+
+/* The section switcher shrinks to an icon and a chevron beside the bar. */
+.reel-view:not(.is-w700) .reel-nav-btn {
+	order: 2;
+}
+
+.reel-view:not(.is-w700) .reel-nav-btn .reel-nav-label {
+	display: none;
+}
+
+/* ---- control row ---------------------------------------------------- */
+.reel-seg {
+	display: inline-flex;
+	flex: none;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-radius-sm, 8px);
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.reel-seg-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 32px;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-muted);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.reel-seg-btn.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-seg-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* ---- tags ----------------------------------------------------------- */
+.reel-tagrow {
+	display: flex;
+	gap: var(--reel-space-2);
+	overflow-x: auto;
+	scrollbar-width: none;
+	padding: var(--reel-space-1) 0 var(--reel-space-2);
+}
+
+.reel-tag {
+	flex: none;
+	min-height: 32px;
+	padding: 0 var(--reel-space-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-radius-full, 999px);
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.reel-tag.is-active {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+/* ---- summary -------------------------------------------------------- */
+.reel-summary {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--reel-space-1) var(--reel-space-2);
+	margin: 0 0 var(--reel-space-3);
+	padding: var(--reel-space-2) 0;
+	border-top: 1px solid var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.reel-summary-label {
+	color: var(--text-normal);
+	font-weight: 700;
+}
+
+.reel-summary > span + span::before {
+	content: "•";
+	margin-right: var(--reel-space-2);
+	color: var(--text-faint);
+}
+
+/* ---- cards ---------------------------------------------------------- */
+/* Four corners: rating top left, liked or watchlist top right, score bottom
+   left, times watched bottom right. */
+.reel-cell-poster .reel-cell-heart,
+.reel-cell-poster .reel-cell-flag {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	left: auto;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.6);
+	color: #fff;
+	text-shadow: none;
+	line-height: 1;
+}
+
+.reel-cell-poster .reel-cell-heart {
+	color: var(--color-red);
+}
+
+.reel-cell-poster:has(.reel-cell-cert) .reel-cell-flag {
+	top: 4px;
+	border-radius: 50%;
+}
+
+.reel-cell-flag svg {
+	width: 13px;
+	height: 13px;
+}
+
+.reel-cell-poster .reel-cell-score,
+.reel-cell-poster .reel-cell-count {
+	position: absolute;
+	bottom: 4px;
+	padding: 1px 6px;
+	border-radius: var(--reel-radius-sm, 6px);
+	background: rgba(0, 0, 0, 0.62);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.5;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	transform: none;
+}
+
+.reel-cell-poster .reel-cell-score {
+	left: 4px;
+}
+
+.reel-cell-poster .reel-cell-count {
+	right: 4px;
+}
+
+/* Title: two lines at most. Year and facts: quiet, one line. */
+.reel-view .reel-cell-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.reel-view .reel-cell-year {
+	opacity: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-variant-numeric: tabular-nums;
+}
+
+/* No artwork yet: a quiet gradient and the title, centred. */
+.reel-placeholder-title {
+	display: none;
+}
+
+.reel-cell-poster.is-empty {
+	flex-direction: column;
+	padding: var(--reel-space-3);
+	text-align: center;
+	background: linear-gradient(
+		160deg,
+		color-mix(in srgb, var(--text-muted) 22%, var(--background-secondary)),
+		var(--background-secondary)
+	);
+	color: var(--text-muted);
+	text-transform: none;
+}
+
+.reel-cell-poster.is-empty .reel-placeholder-text {
+	display: none;
+}
+
+.reel-cell-poster.is-empty .reel-placeholder-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 4;
+	line-clamp: 4;
+	overflow: hidden;
+	font-weight: 600;
+	font-size: var(--font-ui-small);
+	line-height: 1.25;
+}
+
+/* ==================================================================== */
+/* Filters sheet: centred title, option rows, pills, a real footer        */
+/* ==================================================================== */
+.reel-filter-sheet .reel-filter-head {
+	justify-content: center;
+	text-align: center;
+	padding-bottom: var(--reel-space-2);
+}
+
+.reel-filter-sheet .reel-filter-head .reel-log-title {
+	margin: 0;
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+}
+
+.reel-filter-sheet .reel-filter-label {
+	margin: 0 0 var(--reel-space-2);
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.reel-filter-sheet .reel-filter-section {
+	margin-bottom: var(--reel-space-4, 20px);
+}
+
+/* Type and status: a radio-style list, two to a row. */
+.reel-opts {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0 var(--reel-space-3);
+}
+
+.reel-opt {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-2);
+	min-height: 44px;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	text-align: left;
+	cursor: pointer;
+}
+
+.reel-opt-mark {
+	flex: none;
+	width: 18px;
+	height: 18px;
+	border: 1.5px solid var(--text-faint);
+	border-radius: 50%;
+	box-sizing: border-box;
+}
+
+.reel-opt.is-active .reel-opt-mark {
+	border-color: var(--interactive-accent);
+	background: var(--interactive-accent);
+	box-shadow: inset 0 0 0 3px var(--background-primary);
+}
+
+.reel-opt-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-opt .reel-chip-count {
+	margin-left: auto;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Genre and lists: pills; the picked ones are solid. */
+.reel-filter-chips .reel-chip.is-folded {
+	display: none;
+}
+
+.reel-filter-more {
+	margin-top: var(--reel-space-2);
+	padding: 0;
+	min-height: 44px;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+/* Footer: Clear all on the left, the result on the right. */
+.reel-modal.reel-sheet.reel-filter-sheet .reel-filter-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-3);
+}
+
+.reel-filter-actions .reel-filter-clear {
+	flex: none;
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	color: var(--text-muted);
+}
+
+.reel-filter-actions .reel-filter-done {
+	flex: 1 1 auto;
+	border-radius: var(--reel-radius-full, 999px);
+}
+
+.reel-seg .reel-seg-btn {
+	margin: 0;
+	min-height: 0;
+	height: 32px;
+	width: 34px;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.reel-modal .reel-filter-body .reel-opt,
+.reel-modal .reel-filter-body .reel-filter-more,
+.reel-modal .reel-filter-actions .reel-filter-clear {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+}
+
+.reel-modal .reel-filter-body .reel-opt {
+	padding: 0;
+}
+
+.reel-modal .reel-filter-body .reel-filter-more {
+	padding: 0;
+	justify-content: flex-start;
+}
+
+/* ---- sizes: thumb on a phone, pointer on a wide pane ----------------- */
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn {
+	height: 44px;
+	width: 40px;
+}
+
+.reel-view:not(.is-w700) .reel-tag {
+	min-height: 44px;
+}
+
+.reel-view.is-w700 .reel-seg .reel-seg-btn {
+	height: 30px;
+	width: 32px;
+}
+
+.reel-view.is-w700 .reel-tag {
+	min-height: 28px;
+}
+
+.reel-view.is-w700 .reel-opt,
+.reel-view.is-w700 .reel-filter-more {
+	min-height: 32px;
+}
+
+.reel-seg .reel-seg-btn:not(.is-active) {
+	color: var(--text-normal);
+}
+
+/* The dense grid is posters and nothing else. */
+.reel-gridwrap.is-dense .reel-cell-score,
+.reel-gridwrap.is-dense .reel-cell-count {
+	display: none;
+}
+
+.reel-view.is-w700 .reel-tag {
+	height: 30px;
+	padding-block: 0;
+}
+
+/* A short screen means the keyboard is up: tags can wait. */
+@media (max-height: 520px) {
+	.reel-tagrow {
+		display: none;
+	}
+}
+
+/* Layout, Filters and Sort all fit one phone-width row. */
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn {
+	width: 36px;
+}
+
+.reel-view:not(.is-w700) .reel-filter-btn {
+	padding-inline: 10px;
+}
+
+.reel-view:not(.is-w700) .reel-sort-select {
+	max-width: 7.5em;
+}
+
+/* ==================================================================== */
+/* Slim top: one search bar, one control row. Looks small, taps big.      */
+/* ==================================================================== */
+/* Every control is drawn at 32px or less and reaches 44px with an invisible
+   pad, so the screen is spent on posters and the thumb still lands. */
+
+.reel-view:not(.is-w700) .reel-view-header {
+	padding-top: var(--reel-space-1);
+	padding-bottom: var(--reel-space-1);
+	gap: var(--reel-space-2);
+}
+
+.reel-view:not(.is-w700) .reel-omni-bar {
+	min-height: 40px;
+	height: 40px;
+	padding: 0 var(--reel-space-3);
+	font-size: var(--font-ui-small);
+	border-radius: var(--reel-radius-sm, 10px);
+	background: var(--background-secondary);
+	border-color: transparent;
+}
+
+.reel-view:not(.is-w700) .reel-nav-btn {
+	flex: none;
+	width: 48px;
+	min-width: 48px;
+	min-height: 40px;
+	height: 40px;
+	padding: 0;
+	justify-content: center;
+	gap: 2px;
+	border-radius: var(--reel-radius-sm, 10px);
+	background: var(--background-secondary);
+}
+
+.reel-view:not(.is-w700) .reel-nav-btn .reel-nav-chevron svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* the control row */
+.reel-view:not(.is-w700) .reel-filterbar {
+	gap: var(--reel-space-2);
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view:not(.is-w700) .reel-filterbar .reel-chip,
+.reel-view:not(.is-w700) .reel-filterbar .reel-select {
+	min-height: 32px;
+	height: 32px;
+	padding: 0 10px;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view:not(.is-w700) .reel-filterbar .reel-seg {
+	height: 32px;
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn {
+	height: 30px;
+	width: 32px;
+	position: relative;
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn::after,
+.reel-view:not(.is-w700) .reel-tag::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	height: 44px;
+	transform: translateY(-50%);
+}
+
+.reel-view:not(.is-w700) .reel-tag {
+	position: relative;
+	min-height: 28px;
+	height: 28px;
+	padding: 0 10px;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-bar-sep {
+	flex: none;
+	align-self: center;
+	width: 1px;
+	height: 18px;
+	background: var(--background-modifier-border);
+}
+
+.reel-view:not(.is-w700) .reel-sort-select {
+	max-width: 6.5em;
+}
+
+.reel-view:not(.is-w700) .reel-filter-btn-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* the summary: smaller still, it is only a caption */
+.reel-summary {
+	margin-bottom: var(--reel-space-2);
+	padding: var(--reel-space-1) 0;
+	font-size: 11px;
+}
+
+.reel-view:not(.is-w700) .reel-filterbar {
+	margin: 0;
+	padding-left: 0;
+	padding-right: 0;
+	min-height: 44px;
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn {
+	min-width: 0;
+	margin: 0;
+}
+
+.reel-view:not(.is-w700) .reel-seg {
+	box-sizing: border-box;
+	align-items: stretch;
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn {
+	height: auto;
+}
+
+/* ==================================================================== */
+/* Final top-bar pass: real 44px hit areas, drawn light                   */
+/* ==================================================================== */
+.reel-view:not(.is-w700) .reel-omni-bar,
+.reel-view:not(.is-w700) .reel-nav-btn {
+	height: 44px;
+	min-height: 44px;
+	border: 0;
+	border-radius: 12px;
+	background: var(--background-secondary);
+}
+
+.reel-view:not(.is-w700) .reel-nav-btn {
+	width: 52px;
+	min-width: 52px;
+}
+
+/* View switch: three bare icons, the current one lit. */
+.reel-view:not(.is-w700) .reel-filterbar .reel-seg {
+	height: 44px;
+	border: 0;
+	background: transparent;
+	border-radius: 0;
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn {
+	width: 40px;
+	height: 44px;
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn.is-active {
+	background: transparent;
+	color: var(--interactive-accent);
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn:not(.is-active) {
+	color: var(--text-muted);
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn.is-active svg {
+	stroke-width: 2.6;
+}
+
+/* Filters, sort, Ask, direction: flat fills, no outlines. */
+.reel-view:not(.is-w700) .reel-filterbar .reel-chip,
+.reel-view:not(.is-w700) .reel-filterbar .reel-select {
+	height: 44px;
+	min-height: 44px;
+	padding: 0 12px;
+	border: 0;
+	box-shadow: none;
+}
+
+.reel-view:not(.is-w700) .reel-filterbar .reel-chip:not(.is-active),
+.reel-view:not(.is-w700) .reel-filterbar .reel-select {
+	background: var(--background-secondary);
+}
+
+/* Tags: plain text; the chosen ones are lit and underlined. */
+.reel-view:not(.is-w700) .reel-tag {
+	height: 44px;
+	min-height: 44px;
+	padding: 0 4px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.reel-view:not(.is-w700) .reel-tag.is-active {
+	background: transparent;
+	color: var(--interactive-accent);
+	font-weight: 600;
+	box-shadow: inset 0 -2px 0 var(--interactive-accent);
+}
+
+.reel-view:not(.is-w700) .reel-tag::after {
+	display: none;
+}
+
+.reel-summary,
+.reel-summary-label {
+	font-size: 12px;
+}
+
+/* Quiet does not mean faint: inactive icons and tags use the normal text colour. */
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn,
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn:not(.is-active),
+.reel-view:not(.is-w700) .reel-tag {
+	color: var(--text-normal);
+}
+
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn.is-active,
+.reel-view:not(.is-w700) .reel-tag.is-active {
+	color: var(--text-normal);
+	box-shadow: inset 0 -2px 0 var(--interactive-accent);
+}
+
+.reel-seg .reel-seg-btn.is-active {
+	color: var(--text-normal);
+}
+
+/* The current view is a lit tile, not just a different icon. */
+.reel-seg .reel-seg-btn.is-active,
+.reel-view:not(.is-w700) .reel-seg .reel-seg-btn.is-active {
+	background: var(--background-modifier-hover);
+	box-shadow: none;
+	border-radius: 10px;
+}

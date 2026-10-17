@@ -47,6 +47,8 @@ export interface FilterState {
 	statuses: string[];
 	lists: string[];
 	sort: string;
+	/** Reverse the sort's natural direction. Remembered with the sort. */
+	sortFlip: boolean;
 	/** Applied where the primary ties. Empty means no tiebreaker. */
 	sort2: string;
 	/**
@@ -69,7 +71,7 @@ export const LAYOUTS: { id: LibraryLayout; label: string; icon: string }[] = [
 ];
 
 export function emptyFilters(): FilterState {
-	return { type: "all", genres: [], statuses: [], lists: [], sort: "watched", sort2: "", layout: "grid" };
+	return { type: "all", genres: [], statuses: [], lists: [], sort: "watched", sortFlip: false, sort2: "", layout: "grid" };
 }
 
 /** Add or remove one value from a set, in place. */
@@ -215,15 +217,9 @@ export class FilterSheet extends Modal {
 		modalEl.addClass("reel-filter-sheet");
 		if (Platform.isPhone) modalEl.addClass("reel-sheet");
 
+		contentEl.addClass("reel-filter-content");
 		const head = contentEl.createDiv({ cls: "reel-filter-head" });
 		head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
-		const clear = head.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all" });
-		clear.addEventListener("click", () => {
-			const { sort, sort2, layout } = this.filters;
-			Object.assign(this.filters, emptyFilters(), { sort, sort2, layout });
-			this.opts.onChange();
-			this.redraw();
-		});
 
 		this.body = contentEl.createDiv({ cls: "reel-filter-body" });
 		this.redraw();
@@ -242,6 +238,13 @@ export class FilterSheet extends Modal {
 		 * empty screen.
 		 */
 		const foot = contentEl.createDiv({ cls: "reel-log-actions reel-filter-actions" });
+		const clear = foot.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all", attr: { type: "button" } });
+		clear.addEventListener("click", () => {
+			const { sort, sortFlip, sort2, layout } = this.filters;
+			Object.assign(this.filters, emptyFilters(), { sort, sortFlip, sort2, layout });
+			this.opts.onChange();
+			this.redraw();
+		});
 		const done = foot.createEl("button", { cls: "reel-btn mod-cta reel-filter-done" });
 		this.countEl = done.createSpan();
 		done.addEventListener("click", () => this.close());
@@ -266,10 +269,29 @@ export class FilterSheet extends Modal {
 		const keepScroll = el.scrollTop;
 		el.empty();
 
-		const section = (label: string): HTMLElement => {
+		const section = (label: string, asOptions = false): HTMLElement => {
 			const box = el.createDiv({ cls: "reel-filter-section" });
 			box.createDiv({ cls: "reel-filter-label", text: label });
-			return box.createDiv({ cls: "reel-chips reel-filter-chips" });
+			return box.createDiv({ cls: asOptions ? "reel-opts" : "reel-chips reel-filter-chips" });
+		};
+
+		/** Long lists show their first few and fold the rest behind one button. */
+		const fold = (group: HTMLElement, limit: number): void => {
+			const all = Array.from(group.children) as HTMLElement[];
+			const hidden = all.slice(limit).filter((c) => !c.hasClass("is-active"));
+			if (!hidden.length) return;
+			hidden.forEach((c) => c.addClass("is-folded"));
+			const more = group.parentElement?.createEl("button", {
+				cls: "reel-filter-more",
+				text: `Show ${hidden.length} more`,
+				attr: { type: "button", "aria-expanded": "false" },
+			});
+			more?.addEventListener("click", () => {
+				const open = more.getAttr("aria-expanded") !== "true";
+				hidden.forEach((c) => c.toggleClass("is-folded", !open));
+				more.setAttr("aria-expanded", String(open));
+				more.setText(open ? "Show less" : `Show ${hidden.length} more`);
+			});
 		};
 
 		/**
@@ -286,7 +308,10 @@ export class FilterSheet extends Modal {
 		 * being able to see it without asking.
 		 */
 		const withCount = (b: HTMLElement, label: string, n: number | undefined): void => {
-			b.setText(label);
+			if (b.hasClass("reel-opt")) {
+				b.createSpan({ cls: "reel-opt-mark" });
+				b.createSpan({ cls: "reel-opt-label", text: label });
+			} else b.setText(label);
 			if (n == null) return;
 			b.createSpan({ cls: "reel-chip-count", text: String(n) });
 			b.setAttr("aria-label", `${label}, ${n} title${n === 1 ? "" : "s"}`);
@@ -300,7 +325,7 @@ export class FilterSheet extends Modal {
 			onClick: () => void,
 			count?: number
 		): void => {
-			const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+			const b = into.createEl("button", { cls: into.hasClass("reel-opts") ? "reel-opt" : "reel-chip", attr: { type: "button" } });
 			withCount(b, label, count);
 			setSelected(b, active);
 			b.addEventListener("click", () => {
@@ -325,18 +350,31 @@ export class FilterSheet extends Modal {
 			value: string,
 			count?: number
 		): void => {
-			const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+			const b = into.createEl("button", { cls: into.hasClass("reel-opts") ? "reel-opt" : "reel-chip", attr: { type: "button" } });
 			withCount(b, label, count);
 			setSelected(b, set.includes(value));
 			b.addEventListener("click", () => {
 				toggle(set, value);
+				// "Watchlist" means not seen yet, and "watched" means seen: ticking
+				// both returned everything and read as the watchlist showing other
+				// films. Choosing one of them drops the other.
+				if (set === this.filters.statuses && set.includes(value)) {
+					const clash = value === "watchlist" ? "watched" : value === "watched" ? "watchlist" : "";
+					const at = clash ? set.indexOf(clash) : -1;
+					if (at >= 0) {
+						set.splice(at, 1);
+						this.opts.onChange();
+						this.redraw();
+						return;
+					}
+				}
 				setSelected(b, set.includes(value));
 				this.opts.onChange();
 				this.paintCount();
 			});
 		};
 
-		const kinds = section("Type");
+		const kinds = section("Type", true);
 		for (const [value, label] of [
 			["all", "Everything"],
 			["film", "Films"],
@@ -380,7 +418,7 @@ export class FilterSheet extends Modal {
 
 		const statuses = [...new Set(pool.map((e) => e.status))].filter(Boolean).sort();
 		if (statuses.length > 1) {
-			const row = section("Status");
+			const row = section("Status", true);
 			/*
 			 * Counted with `matchesStatus`, not `e.status === s`.
 			 *
@@ -402,19 +440,30 @@ export class FilterSheet extends Modal {
 			// Every genre, not the first fourteen. The cap existed because the
 			// bar was one line; a sheet scrolls.
 			for (const g of genres) many(row, g, this.filters.genres, g);
+			fold(row, 8);
 		}
 
 		if (this.opts.lists.length) {
 			const row = section("Lists");
 			for (const name of this.opts.lists) many(row, name, this.filters.lists, name);
+			fold(row, 6);
 		}
 
 		if (this.opts.showSort) {
 			const sortBox = el.createDiv({ cls: "reel-filter-section" });
 			sortBox.createDiv({ cls: "reel-filter-label", text: "Sort" });
-			const first = sortBox.createEl("select", { cls: "reel-select dropdown" });
+			const firstRow = sortBox.createDiv({ cls: "reel-sort-row" });
+			const first = firstRow.createEl("select", { cls: "reel-select dropdown" });
 			for (const [value, label] of SORT_OPTIONS) first.createEl("option", { value, text: label });
 			first.value = this.filters.sort;
+			const flip = firstRow.createEl("button", { cls: "reel-chip reel-sort-flip", attr: { type: "button" } });
+			setSelected(flip, this.filters.sortFlip);
+			flip.setText("Reverse");
+			flip.addEventListener("click", () => {
+				this.filters.sortFlip = !this.filters.sortFlip;
+				setSelected(flip, this.filters.sortFlip);
+				this.opts.onChange();
+			});
 			first.addEventListener("change", () => {
 				this.filters.sort = first.value;
 				this.opts.onChange();

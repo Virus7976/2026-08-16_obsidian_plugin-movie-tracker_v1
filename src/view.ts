@@ -66,6 +66,12 @@ function ascending(field: string): 1 | -1 {
 	return field === "title" || field === "year" || field === "certification" ? 1 : -1;
 }
 
+/** The natural direction, reversed when the user has flipped it. */
+function direction(field: string, flip: boolean): 1 | -1 {
+	const d = ascending(field);
+	return flip ? (d === 1 ? -1 : 1) : d;
+}
+
 export class ReelView extends ItemView {
 	private tab: Tab = "library";
 	private query = "";
@@ -132,6 +138,7 @@ export class ReelView extends ItemView {
 		const layout = this.plugin.settings.libraryLayout;
 		if (layout === "grid" || layout === "dense" || layout === "list") this.filters.layout = layout;
 		if (this.plugin.settings.librarySort) this.filters.sort = this.plugin.settings.librarySort;
+		this.filters.sortFlip = this.plugin.settings.librarySortFlip === true;
 
 		this.contentEl.empty();
 		this.contentEl.addClass("reel-view");
@@ -215,7 +222,7 @@ export class ReelView extends ItemView {
 		// Search lives in Obsidian's header, next to its own controls. It was
 		// briefly in Reel's row instead, which put two magnifiers a centimetre
 		// apart; the top bar is the one that reads as part of the app.
-		this.addAction("search", "Search your library", () => this.toggleSearch());
+		this.addAction("search", "Search everything", () => this.openOmni());
 
 		this.build();
 		this.registerEvent(this.plugin.library.on("changed", () => this.paint()));
@@ -255,6 +262,20 @@ export class ReelView extends ItemView {
 		this.navEl = nav;
 		nav.addEventListener("click", (ev) => this.openNav(ev));
 
+		/*
+		 * A search button in Reel's own row, not only in Obsidian's header.
+		 * On a small phone the header's actions can be squeezed out or hidden
+		 * behind its menu, and then there was no search at all. This one is
+		 * ours, so it cannot be taken away by the bar above it.
+		 */
+		const omni = header.createEl("button", {
+			cls: "reel-omni-bar",
+			attr: { type: "button", "aria-label": "Search everything" },
+		});
+		setIcon(omni.createSpan({ cls: "reel-omni-bar-icon" }), "search");
+		omni.createSpan({ cls: "reel-omni-bar-text", text: "Search titles, people, #tags…" });
+		omni.addEventListener("click", () => this.openOmni());
+
 		const searchWrap = header.createDiv({ cls: "reel-search-wrap search-input-container" });
 		setIcon(searchWrap.createSpan({ cls: "reel-search-icon" }), "search");
 		const search = searchWrap.createEl("input", {
@@ -275,6 +296,15 @@ export class ReelView extends ItemView {
 			this.paint();
 		});
 		this.searchEl = search;
+		// On a phone the field is a doorway to the shared search rather than a
+		// second search of its own. Click, not focus: closing the modal returns
+		// focus here, and focus would open it again.
+		search.addEventListener("click", () => {
+			if (!this.contentEl.hasClass("is-w700")) {
+				search.blur();
+				this.openOmni();
+			}
+		});
 		const clear = searchWrap.createEl("button", {
 			cls: "reel-search-clear clickable-icon",
 			text: "×",
@@ -826,6 +856,11 @@ export class ReelView extends ItemView {
 		this.measureWidth();
 	}
 
+	/** The one search, started from wherever you are: Discover looks outward, the rest inward. */
+	private openOmni(): void {
+		this.plugin.openOmni(this.query, this.tab === "discover" ? "new" : "all");
+	}
+
 	private toggleSearch(): void {
 		const open = this.headerEl.hasClass("is-open");
 		this.headerEl.toggleClass("is-open", !open);
@@ -948,6 +983,8 @@ export class ReelView extends ItemView {
 		const bar = this.filterEl.createDiv({ cls: "reel-chips reel-filterbar" });
 		const set = activeFilters(this.filters);
 
+		if (showSort) this.paintLayoutControl(bar);
+
 		const open = bar.createEl("button", {
 			cls: "reel-chip reel-filter-btn",
 			attr: { type: "button", "aria-label": "Filters" },
@@ -969,6 +1006,8 @@ export class ReelView extends ItemView {
 		 * cannot work is worse than no chip, and Filters is not a shelf for
 		 * advertising features you have not set up.
 		 */
+		if (showSort) this.paintSortControls(bar);
+
 		if (this.plugin.ai.configured) {
 			const askBtn = bar.createEl("button", {
 				cls: "reel-chip reel-ask-btn",
@@ -979,10 +1018,6 @@ export class ReelView extends ItemView {
 			askBtn.addEventListener("click", () => openAsk(this.plugin, (entry) => this.openDetail(entry)));
 		}
 
-		if (showSort) {
-			this.paintSortControls(bar);
-			this.paintLayoutControl(bar);
-		}
 
 		/*
 		 * The search reads as a filter, because it is one.
@@ -1020,7 +1055,9 @@ export class ReelView extends ItemView {
 		 * the same two choices the thumb does — and a button cannot be nested
 		 * inside another button, so the pill is a group holding both.
 		 */
+		const tagged = this.tab === "library" && showSort ? this.paintTags(bar) : new Set<string>();
 		for (const f of set) {
+			if (tagged.has(`${f.key}:${f.value}`)) continue;
 			const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
 			tag.setAttr("role", "group");
 			tag.setAttr("aria-label", `${f.label} filter`);
@@ -1044,6 +1081,40 @@ export class ReelView extends ItemView {
 		}
 
 		return bar;
+	}
+
+	/**
+	 * Your lists and most-used genres as #tags, in the same scrolling row as the
+	 * controls: one tap to narrow, one to undo. Only what exists in the library,
+	 * so there is never a tag that finds nothing. Returns what it drew, so the
+	 * same filter is not also shown as an active chip.
+	 */
+	private paintTags(bar: HTMLElement): Set<string> {
+		const shown = new Set<string>();
+		const slug = (t: string): string => `#${t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+		const counts = new Map<string, number>();
+		for (const e of this.pool()) for (const g of e.genres) counts.set(g, (counts.get(g) ?? 0) + 1);
+		const genres = [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 6).map(([g]) => g);
+		const lists = this.plugin.library.lists().slice(0, 6);
+		if (!lists.length && !genres.length) return shown;
+
+		bar.createSpan({ cls: "reel-bar-sep", attr: { "aria-hidden": "true" } });
+		const chip = (key: "lists" | "genres", value: string): void => {
+			const set = this.filters[key];
+			const on = set.includes(value);
+			shown.add(`${key}:${value}`);
+			const b = bar.createEl("button", { cls: "reel-tag", text: slug(value), attr: { type: "button" } });
+			setSelected(b, on);
+			b.addEventListener("click", () => {
+				const at = set.indexOf(value);
+				if (at >= 0) set.splice(at, 1);
+				else set.push(value);
+				this.paint();
+			});
+		};
+		for (const l of lists) chip("lists", l);
+		for (const g of genres) chip("genres", g);
+		return shown;
 	}
 
 	/** The one place the filter sheet is opened from. */
@@ -1077,6 +1148,21 @@ export class ReelView extends ItemView {
 			this.paint();
 		});
 
+		// Up or down: one tap reverses the order, and it is remembered.
+		const dir = bar.createEl("button", {
+			cls: "reel-chip reel-sort-dir",
+			attr: {
+				type: "button",
+				"aria-label": this.filters.sortFlip ? "Order reversed. Tap to restore." : "Tap to reverse the order",
+			},
+		});
+		setIcon(dir, direction(this.filters.sort, this.filters.sortFlip) === 1 ? "arrow-up" : "arrow-down");
+		dir.addEventListener("click", () => {
+			this.filters.sortFlip = !this.filters.sortFlip;
+			void this.persistLayout();
+			this.paint();
+		});
+
 		// The tiebreaker lives in the sheet. It is a real feature and a rare one,
 		// and it was costing a phone a permanent dropdown.
 		if (this.filters.sort2) {
@@ -1094,27 +1180,35 @@ export class ReelView extends ItemView {
 	 * are in, and the label says what the next tap gives you.
 	 */
 	private paintLayoutControl(bar: HTMLElement): void {
-		const current = LAYOUTS.find((l) => l.id === this.filters.layout) ?? LAYOUTS[0];
-		const next = LAYOUTS[(LAYOUTS.indexOf(current) + 1) % LAYOUTS.length];
-		const b = bar.createEl("button", {
-			cls: "reel-chip reel-layout-btn",
-			attr: { type: "button", "aria-label": `View: ${current.label}. Switch to ${next.label}.` },
-		});
-		setIcon(b.createSpan({ cls: "reel-layout-icon" }), current.icon);
-		b.createSpan({ cls: "reel-layout-label", text: current.label });
-		b.addEventListener("click", () => {
-			this.filters.layout = next.id;
-			void this.persistLayout();
-			this.paint();
-		});
+		// One control showing all three, so the choice is visible and one tap away.
+		const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg", attr: { role: "group", "aria-label": "View" } });
+		for (const l of LAYOUTS) {
+			const b = seg.createEl("button", {
+				cls: "reel-seg-btn",
+				attr: { type: "button", "aria-label": l.label, "aria-pressed": String(l.id === this.filters.layout) },
+			});
+			b.toggleClass("is-active", l.id === this.filters.layout);
+			setIcon(b, l.icon);
+			b.addEventListener("click", () => {
+				if (this.filters.layout === l.id) return;
+				this.filters.layout = l.id;
+				void this.persistLayout();
+				this.paint();
+			});
+		}
 	}
 
 	/** Remember the view you chose, so opening Reel does not undo it. */
 	private async persistLayout(): Promise<void> {
 		const s = this.plugin.settings;
-		if (s.libraryLayout === this.filters.layout && s.librarySort === this.filters.sort) return;
+		if (
+			s.libraryLayout === this.filters.layout &&
+			s.librarySort === this.filters.sort &&
+			s.librarySortFlip === this.filters.sortFlip
+		) return;
 		s.libraryLayout = this.filters.layout;
 		s.librarySort = this.filters.sort;
+		s.librarySortFlip = this.filters.sortFlip;
 		await this.plugin.saveSettings();
 	}
 
@@ -1182,7 +1276,7 @@ export class ReelView extends ItemView {
 		// earlier order within ties, so sorting by the tiebreaker first is what
 		// makes it act as a tiebreaker.
 		if (this.filters.sort2) rows = sortEntries(rows, this.filters.sort2, ascending(this.filters.sort2));
-		rows = sortEntries(rows, this.filters.sort, ascending(this.filters.sort));
+		rows = sortEntries(rows, this.filters.sort, direction(this.filters.sort, this.filters.sortFlip));
 
 		const hiddenCount = this.plugin.hiddenCount(this.plugin.library.all());
 
@@ -1199,19 +1293,17 @@ export class ReelView extends ItemView {
 		 * reads as missing data.
 		 */
 		if (rows.length) {
-			const watchlist = rows.filter((e) => e.status === "watchlist").length;
-			const parts: string[] = [];
-			if (watchlist) parts.push(`${watchlist} to watch`);
-			if (hiddenCount) parts.push(`${hiddenCount} hidden by content filter`);
-			const newest = heroSubject(rows);
-			if (newest && !parts.length) parts.push(`Most recently — ${newest.title}`);
-			paintHero(this.plugin, this.bodyEl, {
-				label: this.narrowed() ? "Filtered" : "Your library",
-				title: `${rows.length} title${rows.length === 1 ? "" : "s"}`,
-				sub: parts.join(" · ") || undefined,
-				subject: newest,
-				compact: true,
-			});
+			const toWatch = rows.filter((e) => e.status === "watchlist").length;
+			const rated = rows.filter((e) => e.rating != null);
+			const avg = rated.length ? rated.reduce((n, e) => n + (e.rating ?? 0), 0) / rated.length : null;
+			// A flat line of numbers, not a banner: it is a summary, and the posters
+			// under it are the content.
+			const strip = this.bodyEl.createDiv({ cls: "reel-summary" });
+			strip.createSpan({ cls: "reel-summary-label", text: this.narrowed() ? "Filtered" : "Library" });
+			strip.createSpan({ text: `${rows.length} title${rows.length === 1 ? "" : "s"}` });
+			if (toWatch) strip.createSpan({ text: `${toWatch} to watch` });
+			if (avg != null) strip.createSpan({ text: `avg ${avg.toFixed(1)} ★` });
+			if (hiddenCount) strip.createSpan({ cls: "reel-dim", text: `${hiddenCount} hidden` });
 		} else if (hiddenCount) {
 			const count = this.bodyEl.createDiv({ cls: "reel-block-count" });
 			count.createSpan({ cls: "reel-dim", text: `${hiddenCount} hidden by content filter` });

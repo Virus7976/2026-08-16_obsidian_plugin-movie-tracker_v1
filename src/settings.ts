@@ -138,6 +138,8 @@ export interface ReelSettings {
 	 */
 	libraryLayout: "grid" | "dense" | "list";
 	librarySort: string;
+	/** Reverse the library sort's natural direction. */
+	librarySortFlip: boolean;
 	/** Newest-first, capped. Offered under an empty search box. */
 	recentSearches: string[];
 	/** Named discovery recipes, newest first. A mood you built once. */
@@ -151,6 +153,14 @@ export interface ReelSettings {
 	/* Behaviour */
 	posterQuality: "w185" | "w342" | "w500";
 	downloadPosters: boolean;
+	/** Which titles get a poster file in the vault. */
+	posterScope: "all" | "watched";
+	/** Move a title's poster to the trash when its note is deleted. */
+	deletePosterWithTitle: boolean;
+	/** Keep cast and crew photos on disk. Off: shown from the network, never saved. */
+	savePortraits: boolean;
+	/** Most cast photos kept on disk. The oldest are deleted past this. */
+	portraitCacheMax: number;
 	cacheResponses: boolean;
 	cacheTtlDays: number;
 	openNoteAfterCreate: boolean;
@@ -246,6 +256,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	lastSeenVersion: "",
 	libraryLayout: "grid",
 	librarySort: "watched",
+	librarySortFlip: false,
 	recentSearches: [],
 	recipes: [],
 
@@ -255,6 +266,10 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 
 	posterQuality: "w342",
 	downloadPosters: true,
+	posterScope: "all",
+	deletePosterWithTitle: true,
+	savePortraits: false,
+	portraitCacheMax: 150,
 	cacheResponses: true,
 	cacheTtlDays: 30,
 	openNoteAfterCreate: true,
@@ -2360,6 +2375,70 @@ export class ReelSettingTab extends PluginSettingTab {
 				t.setValue(this.plugin.settings.downloadPosters).onChange(async (v) => {
 					this.plugin.settings.downloadPosters = v;
 					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Save posters for")
+			.setDesc(
+				"Titles you have not watched yet still show their poster, loaded from the internet. The file is saved when you start watching."
+			)
+			.addDropdown((d) =>
+				d
+					.addOptions({ all: "Every title", watched: "Only titles I have watched" })
+					.setValue(this.plugin.settings.posterScope)
+					.onChange(async (v) => {
+						this.plugin.settings.posterScope = v as ReelSettings["posterScope"];
+						await this.plugin.saveSettings();
+						void this.plugin.posters.syncWatched();
+					})
+			);
+
+		new Setting(el)
+			.setName("Delete the poster with the title")
+			.setDesc("When you delete a film or series note, its saved poster goes to the trash too.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.deletePosterWithTitle).onChange(async (v) => {
+					this.plugin.settings.deletePosterWithTitle = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Save cast photos")
+			.setDesc(
+				"Off by default. Cast and crew photos then load from the internet and are not saved, so they cannot pile up on your phone."
+			)
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.savePortraits).onChange(async (v) => {
+					this.plugin.settings.savePortraits = v;
+					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(el)
+			.setName("Most cast photos to keep")
+			.setDesc("Only used when saving is on. The oldest photos are deleted past this number.")
+			.addText((t) =>
+				t.setValue(String(this.plugin.settings.portraitCacheMax)).onChange(async (v) => {
+					const n = Math.round(Number(v));
+					if (!Number.isFinite(n) || n < 0) return;
+					this.plugin.settings.portraitCacheMax = Math.min(n, 5000);
+					await this.plugin.saveSettings();
+				})
+			);
+
+		const imageInfo = el.createDiv({ cls: "reel-key-status", text: "Checking image storage…" });
+		void this.plugin.imageStorageReport().then((t) => imageInfo.setText(t));
+
+		new Setting(el)
+			.setName("Delete saved cast photos")
+			.setDesc("Removes every saved cast photo. Posters stay. They are fetched again only if saving is on.")
+			.addButton((b) =>
+				b.setButtonText("Delete").onClick(async () => {
+					const n = await this.plugin.people.clearCache();
+					new Notice(`Reel: deleted ${n} cast photo${n === 1 ? "" : "s"}.`);
+					imageInfo.setText(await this.plugin.imageStorageReport());
 				})
 			);
 

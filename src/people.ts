@@ -73,7 +73,7 @@ export class PeopleStore {
 	 * placeholder is a perfectly good answer and always available.
 	 */
 	async cache(personId: number): Promise<string | null> {
-		if (!personId || !this.plugin.settings.downloadPosters) return null;
+		if (!personId || !this.plugin.settings.downloadPosters || !this.plugin.settings.savePortraits) return null;
 
 		const existing = this.localPath(personId);
 		if (existing) return existing;
@@ -109,6 +109,7 @@ export class PeopleStore {
 			// Re-check: a concurrent render of the same person may have won.
 			if (this.plugin.app.vault.getAbstractFileByPath(dest) instanceof TFile) return dest;
 			await this.plugin.app.vault.createBinary(dest, bytes);
+			void this.trim();
 			return dest;
 		} catch (e) {
 			console.warn("Reel: headshot fetch failed —", redact(e));
@@ -150,6 +151,23 @@ export class PeopleStore {
 		this.placeholder(parent, name);
 		if (!personId) return;
 
+		// Not saving: show the photo straight from the network and keep nothing.
+		if (!this.plugin.settings.savePortraits) {
+			if (!this.plugin.settings.downloadPosters || this.missing.has(personId)) return;
+			void this.plugin.tmdb
+				.getPerson(personId)
+				.then((person) => {
+					const url = this.plugin.tmdb.posterUrl(person?.profile_path, "w185");
+					if (!url) {
+						this.missing.add(personId);
+						return;
+					}
+					if (parent.isConnected) draw(url);
+				})
+				.catch(() => undefined);
+			return;
+		}
+
 		void this.cache(personId).then((path) => {
 			// The screen may have been repainted or navigated away from while
 			// the request was in the air.
@@ -157,6 +175,46 @@ export class PeopleStore {
 			const src = this.resourcePath(personId);
 			if (src) draw(src);
 		});
+	}
+
+	private cachedFiles(): TFile[] {
+		const folder = this.plugin.app.vault.getAbstractFileByPath(this.folder);
+		if (!(folder instanceof TFolder)) return [];
+		return folder.children.filter((c): c is TFile => c instanceof TFile && /^person-\d+\.jpg$/.test(c.name));
+	}
+
+	/** Delete the oldest saved photos until the cap is met. */
+	async trim(): Promise<void> {
+		const max = Math.max(0, this.plugin.settings.portraitCacheMax);
+		const files = this.cachedFiles();
+		if (files.length <= max) return;
+		files.sort((a, b) => a.stat.ctime - b.stat.ctime);
+		for (const f of files.slice(0, files.length - max)) {
+			try {
+				await this.plugin.app.vault.delete(f);
+			} catch {
+				/* already gone */
+			}
+		}
+	}
+
+	/** Delete every saved cast photo. Returns how many. */
+	async clearCache(): Promise<number> {
+		const files = this.cachedFiles();
+		for (const f of files) {
+			try {
+				await this.plugin.app.vault.delete(f);
+			} catch {
+				/* already gone */
+			}
+		}
+		return files.length;
+	}
+
+	/** How many cast photos are saved, and how many bytes they take. */
+	cacheStats(): { count: number; bytes: number } {
+		const files = this.cachedFiles();
+		return { count: files.length, bytes: files.reduce((n, f) => n + f.stat.size, 0) };
 	}
 
 	/** Initials, which is what every contacts app falls back to and reads fine. */

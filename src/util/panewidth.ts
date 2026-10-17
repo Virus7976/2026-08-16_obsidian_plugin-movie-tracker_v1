@@ -307,6 +307,57 @@ export function sheetFit(): () => void {
 }
 
 /**
+ * Keep the field you are typing into on screen, whatever the keyboard does.
+ *
+ * Sheets are pinned to the bottom. Some phones draw the keyboard over the page
+ * without shrinking the layout viewport and without telling `visualViewport`,
+ * so the sheet's lower half sits under the keys and the review box with it.
+ * Measuring a keyboard that never reports itself cannot work.
+ *
+ * So the sheet stops being bottom-anchored while a text field has focus: it is
+ * pinned to the top instead, capped at what is certainly above any keyboard.
+ * When the viewport did shrink, the cap is that real height.
+ */
+export function typingLift(): () => void {
+	const isField = (el: EventTarget | null): el is HTMLElement =>
+		el instanceof HTMLElement && (el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
+
+	const setCap = (): void => {
+		const vv = window.visualViewport;
+		const full = window.innerHeight;
+		const shrunk = vv && vv.height < full * 0.9 ? vv.height : 0;
+		const cap = shrunk ? shrunk - 16 : full * 0.5;
+		document.body.setCssProps({ "--reel-typing-max": `${Math.round(cap)}px` });
+	};
+
+	const onIn = (ev: FocusEvent): void => {
+		if (!isField(ev.target)) return;
+		const sheet = ev.target.closest<HTMLElement>(".reel-modal.reel-sheet");
+		if (!sheet) return;
+		setCap();
+		sheet.addClass("is-typing");
+		window.setTimeout(() => ev.target instanceof HTMLElement && ev.target.scrollIntoView({ block: "center" }), 60);
+	};
+	const onOut = (ev: FocusEvent): void => {
+		const sheet = (ev.target as HTMLElement | null)?.closest?.<HTMLElement>(".reel-modal.reel-sheet");
+		if (!sheet) return;
+		// Moving between two fields fires out then in; wait to see if focus stayed.
+		window.setTimeout(() => {
+			if (!isField(document.activeElement) || !sheet.contains(document.activeElement)) sheet.removeClass("is-typing");
+		}, 120);
+	};
+	document.addEventListener("focusin", onIn);
+	document.addEventListener("focusout", onOut);
+	window.visualViewport?.addEventListener("resize", setCap);
+	return () => {
+		document.removeEventListener("focusin", onIn);
+		document.removeEventListener("focusout", onOut);
+		window.visualViewport?.removeEventListener("resize", setCap);
+		document.body.style.removeProperty("--reel-typing-max");
+	};
+}
+
+/**
  * Give a view's scrolling body an explicit height.
  *
  * `.reel-view-body` has `overflow-y: auto`, which makes it a scroll container,

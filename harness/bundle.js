@@ -1187,15 +1187,20 @@
       describe(cell, entry);
       const posterEl = cell.createDiv({ cls: "reel-cell-poster" });
       plugin2.posters.attach(posterEl, entry);
-      if (entry.rating != null) {
-        renderStarsStatic(posterEl.createDiv({ cls: "reel-cell-rating" }), entry.rating);
-      }
-      if (entry.liked)
-        posterEl.createDiv({ cls: "reel-cell-heart", text: "\u2665" });
-      if (entry.status === "watchlist")
-        posterEl.createDiv({ cls: "reel-cell-flag", text: "Watchlist" });
       if (entry.certification)
         posterEl.createDiv({ cls: "reel-cell-cert", text: entry.certification });
+      if (entry.liked)
+        posterEl.createDiv({ cls: "reel-cell-heart", text: "\u2665" });
+      else if (entry.status === "watchlist") {
+        const flag = posterEl.createDiv({ cls: "reel-cell-flag", attr: { "aria-hidden": "true" } });
+        setIcon(flag, "bookmark");
+      }
+      if (entry.rating != null) {
+        posterEl.createDiv({ cls: "reel-cell-score", text: `${entry.rating} \u2605` });
+      }
+      const times = entry.watched?.length ?? 0;
+      if (times > 1)
+        posterEl.createDiv({ cls: "reel-cell-count", text: `${times}\xD7` });
       if (entry.type === "tv") {
         const total = entry.totalEpisodes ?? 0;
         const seen = entry.seasons.reduce((n2, s) => n2 + rangeCount(s.watched), 0);
@@ -1207,8 +1212,16 @@
       const caption = cell.createDiv({ cls: "reel-cell-caption" });
       caption.createDiv({ cls: "reel-cell-title", text: entry.title });
       const y = entry.year ?? entry.firstAirYear;
+      const facts = [];
       if (y)
-        caption.createDiv({ cls: "reel-cell-year", text: String(y) });
+        facts.push(String(y));
+      if (entry.type === "film" && entry.runtime)
+        facts.push(formatMinutes(entry.runtime));
+      else if (entry.type === "tv" && entry.seasons.length) {
+        facts.push(`${entry.seasons.length} season${entry.seasons.length === 1 ? "" : "s"}`);
+      }
+      if (facts.length)
+        caption.createDiv({ cls: "reel-cell-year", text: facts.join(" \u2022 ") });
       wireCell(plugin2, cell, entry, onSelect);
     }
   }
@@ -8638,7 +8651,7 @@ ${body}
 
   // src/ui/filterSheet.ts
   function emptyFilters() {
-    return { type: "all", genres: [], statuses: [], lists: [], sort: "watched", sort2: "", layout: "grid" };
+    return { type: "all", genres: [], statuses: [], lists: [], sort: "watched", sortFlip: false, sort2: "", layout: "grid" };
   }
   function toggle(set, value) {
     const at = set.indexOf(value);
@@ -8687,18 +8700,19 @@ ${body}
       modalEl.addClass("reel-filter-sheet");
       if (Platform.isPhone)
         modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-filter-content");
       const head = contentEl.createDiv({ cls: "reel-filter-head" });
       head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
-      const clear = head.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all" });
-      clear.addEventListener("click", () => {
-        const { sort, sort2, layout } = this.filters;
-        Object.assign(this.filters, emptyFilters(), { sort, sort2, layout });
-        this.opts.onChange();
-        this.redraw();
-      });
       this.body = contentEl.createDiv({ cls: "reel-filter-body" });
       this.redraw();
       const foot = contentEl.createDiv({ cls: "reel-log-actions reel-filter-actions" });
+      const clear = foot.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all", attr: { type: "button" } });
+      clear.addEventListener("click", () => {
+        const { sort, sortFlip, sort2, layout } = this.filters;
+        Object.assign(this.filters, emptyFilters(), { sort, sortFlip, sort2, layout });
+        this.opts.onChange();
+        this.redraw();
+      });
       const done = foot.createEl("button", { cls: "reel-btn mod-cta reel-filter-done" });
       this.countEl = done.createSpan();
       done.addEventListener("click", () => this.close());
@@ -8721,20 +8735,42 @@ ${body}
       const el = this.body;
       const keepScroll = el.scrollTop;
       el.empty();
-      const section = (label) => {
+      const section = (label, asOptions = false) => {
         const box = el.createDiv({ cls: "reel-filter-section" });
         box.createDiv({ cls: "reel-filter-label", text: label });
-        return box.createDiv({ cls: "reel-chips reel-filter-chips" });
+        return box.createDiv({ cls: asOptions ? "reel-opts" : "reel-chips reel-filter-chips" });
+      };
+      const fold = (group, limit) => {
+        const all2 = Array.from(group.children);
+        const hidden = all2.slice(limit).filter((c) => !c.hasClass("is-active"));
+        if (!hidden.length)
+          return;
+        hidden.forEach((c) => c.addClass("is-folded"));
+        const more = group.parentElement?.createEl("button", {
+          cls: "reel-filter-more",
+          text: `Show ${hidden.length} more`,
+          attr: { type: "button", "aria-expanded": "false" }
+        });
+        more?.addEventListener("click", () => {
+          const open = more.getAttr("aria-expanded") !== "true";
+          hidden.forEach((c) => c.toggleClass("is-folded", !open));
+          more.setAttr("aria-expanded", String(open));
+          more.setText(open ? "Show less" : `Show ${hidden.length} more`);
+        });
       };
       const withCount = (b, label, n2) => {
-        b.setText(label);
+        if (b.hasClass("reel-opt")) {
+          b.createSpan({ cls: "reel-opt-mark" });
+          b.createSpan({ cls: "reel-opt-label", text: label });
+        } else
+          b.setText(label);
         if (n2 == null)
           return;
         b.createSpan({ cls: "reel-chip-count", text: String(n2) });
         b.setAttr("aria-label", `${label}, ${n2} title${n2 === 1 ? "" : "s"}`);
       };
       const one = (into, label, active, onClick, count) => {
-        const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        const b = into.createEl("button", { cls: into.hasClass("reel-opts") ? "reel-opt" : "reel-chip", attr: { type: "button" } });
         withCount(b, label, count);
         setSelected(b, active);
         b.addEventListener("click", () => {
@@ -8744,17 +8780,27 @@ ${body}
         });
       };
       const many = (into, label, set, value, count) => {
-        const b = into.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        const b = into.createEl("button", { cls: into.hasClass("reel-opts") ? "reel-opt" : "reel-chip", attr: { type: "button" } });
         withCount(b, label, count);
         setSelected(b, set.includes(value));
         b.addEventListener("click", () => {
           toggle(set, value);
+          if (set === this.filters.statuses && set.includes(value)) {
+            const clash = value === "watchlist" ? "watched" : value === "watched" ? "watchlist" : "";
+            const at = clash ? set.indexOf(clash) : -1;
+            if (at >= 0) {
+              set.splice(at, 1);
+              this.opts.onChange();
+              this.redraw();
+              return;
+            }
+          }
           setSelected(b, set.includes(value));
           this.opts.onChange();
           this.paintCount();
         });
       };
-      const kinds = section("Type");
+      const kinds = section("Type", true);
       for (const [value, label] of [
         ["all", "Everything"],
         ["film", "Films"],
@@ -8771,7 +8817,7 @@ ${body}
       const pool2 = narrow(this.opts.pool, { ...this.filters, statuses: [], genres: [], lists: [] });
       const statuses = [...new Set(pool2.map((e) => e.status))].filter(Boolean).sort();
       if (statuses.length > 1) {
-        const row = section("Status");
+        const row = section("Status", true);
         for (const s of statuses) {
           many(row, s, this.filters.statuses, s, pool2.filter((e) => matchesStatus(e, s)).length);
         }
@@ -8781,19 +8827,30 @@ ${body}
         const row = section("Genre");
         for (const g of genres)
           many(row, g, this.filters.genres, g);
+        fold(row, 8);
       }
       if (this.opts.lists.length) {
         const row = section("Lists");
         for (const name of this.opts.lists)
           many(row, name, this.filters.lists, name);
+        fold(row, 6);
       }
       if (this.opts.showSort) {
         const sortBox = el.createDiv({ cls: "reel-filter-section" });
         sortBox.createDiv({ cls: "reel-filter-label", text: "Sort" });
-        const first = sortBox.createEl("select", { cls: "reel-select dropdown" });
+        const firstRow = sortBox.createDiv({ cls: "reel-sort-row" });
+        const first = firstRow.createEl("select", { cls: "reel-select dropdown" });
         for (const [value, label] of SORT_OPTIONS)
           first.createEl("option", { value, text: label });
         first.value = this.filters.sort;
+        const flip = firstRow.createEl("button", { cls: "reel-chip reel-sort-flip", attr: { type: "button" } });
+        setSelected(flip, this.filters.sortFlip);
+        flip.setText("Reverse");
+        flip.addEventListener("click", () => {
+          this.filters.sortFlip = !this.filters.sortFlip;
+          setSelected(flip, this.filters.sortFlip);
+          this.opts.onChange();
+        });
         first.addEventListener("change", () => {
           this.filters.sort = first.value;
           this.opts.onChange();
@@ -9020,6 +9077,7 @@ ${body}
     lastSeenVersion: "",
     libraryLayout: "grid",
     librarySort: "watched",
+    librarySortFlip: false,
     recentSearches: [],
     recipes: [],
     hideFlags: [],
@@ -9027,6 +9085,10 @@ ${body}
     hideUnrated: false,
     posterQuality: "w342",
     downloadPosters: true,
+    posterScope: "all",
+    deletePosterWithTitle: true,
+    savePortraits: false,
+    portraitCacheMax: 150,
     cacheResponses: true,
     cacheTtlDays: 30,
     openNoteAfterCreate: true,
@@ -10304,6 +10366,47 @@ ${body}
         (t) => t.setValue(this.plugin.settings.downloadPosters).onChange(async (v) => {
           this.plugin.settings.downloadPosters = v;
           await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Save posters for").setDesc(
+        "Titles you have not watched yet still show their poster, loaded from the internet. The file is saved when you start watching."
+      ).addDropdown(
+        (d) => d.addOptions({ all: "Every title", watched: "Only titles I have watched" }).setValue(this.plugin.settings.posterScope).onChange(async (v) => {
+          this.plugin.settings.posterScope = v;
+          await this.plugin.saveSettings();
+          void this.plugin.posters.syncWatched();
+        })
+      );
+      new Setting(el).setName("Delete the poster with the title").setDesc("When you delete a film or series note, its saved poster goes to the trash too.").addToggle(
+        (t) => t.setValue(this.plugin.settings.deletePosterWithTitle).onChange(async (v) => {
+          this.plugin.settings.deletePosterWithTitle = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Save cast photos").setDesc(
+        "Off by default. Cast and crew photos then load from the internet and are not saved, so they cannot pile up on your phone."
+      ).addToggle(
+        (t) => t.setValue(this.plugin.settings.savePortraits).onChange(async (v) => {
+          this.plugin.settings.savePortraits = v;
+          await this.plugin.saveSettings();
+        })
+      );
+      new Setting(el).setName("Most cast photos to keep").setDesc("Only used when saving is on. The oldest photos are deleted past this number.").addText(
+        (t) => t.setValue(String(this.plugin.settings.portraitCacheMax)).onChange(async (v) => {
+          const n2 = Math.round(Number(v));
+          if (!Number.isFinite(n2) || n2 < 0)
+            return;
+          this.plugin.settings.portraitCacheMax = Math.min(n2, 5e3);
+          await this.plugin.saveSettings();
+        })
+      );
+      const imageInfo = el.createDiv({ cls: "reel-key-status", text: "Checking image storage\u2026" });
+      void this.plugin.imageStorageReport().then((t) => imageInfo.setText(t));
+      new Setting(el).setName("Delete saved cast photos").setDesc("Removes every saved cast photo. Posters stay. They are fetched again only if saving is on.").addButton(
+        (b) => b.setButtonText("Delete").onClick(async () => {
+          const n2 = await this.plugin.people.clearCache();
+          new Notice(`Reel: deleted ${n2} cast photo${n2 === 1 ? "" : "s"}.`);
+          imageInfo.setText(await this.plugin.imageStorageReport());
         })
       );
       new Setting(el).setName("Poster size").setDesc("w342 is about 30 KB per title and is what the grid is tuned for.").addDropdown(
@@ -11950,9 +12053,15 @@ ${body}
       // no backdrops, so this exercises the fallback path — which is the one
       // most entries will actually take, since backdrop_path is the field
       // most often missing.
-      washUrl: (e) => poster(e.title)
+      washUrl: (e) => poster(e.title),
+      syncWatched: async () => void 0
     },
+    // Settings asks where the images live; a sentence long enough to wrap, since
+    // that is the case that widens a pane.
+    imageStorageReport: async () => "Images live in Movies/_posters, not your attachments folder. Hidden from the phone gallery. 0 cast photos saved (0 KB).",
     people: {
+      clearCache: async () => 0,
+      cacheStats: () => ({ count: 0, bytes: 0 }),
       attach(parent, name) {
         parent.addClass("is-empty");
         parent.createSpan({
@@ -12085,6 +12194,9 @@ ${body}
     navBtn.createSpan({ cls: "reel-nav-icon", text: "\u25A3" });
     navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
     navBtn.createSpan({ cls: "reel-nav-chevron", text: "\u25BE" });
+    const omniBar = header.createEl("button", { cls: "reel-omni-bar", attr: { "aria-label": "Search everything" } });
+    omniBar.createSpan({ cls: "reel-omni-bar-icon", text: "\u2315" });
+    omniBar.createSpan({ cls: "reel-omni-bar-text", text: "Search titles, people, #tags\u2026" });
     const wrap = header.createDiv({ cls: "reel-search-wrap" });
     wrap.createSpan({ cls: "reel-search-icon", text: "\u2315" });
     wrap.createEl("input", {
@@ -12106,37 +12218,41 @@ ${body}
     for (const s of ["Inside Man", "Christopher Nolan", "Denis Villeneuve", "Action", "Crime", "2010s"]) {
       suggest.createEl("button", { cls: "reel-chip reel-suggest-chip", text: s });
     }
-    filterBar(filters, ["Films", "Science Fiction", "\u2630 Christmas with the family"]);
+    const libBar = filterBar(filters, ["Films", "Science Fiction", "\u2630 Christmas with the family"]);
+    libBar.createSpan({ cls: "reel-bar-sep" });
+    for (const t of ["#favourites", "#rewatch-pile", "#action", "#drama", "#science-fiction"]) {
+      libBar.createEl("button", { cls: `reel-tag${t === "#action" ? " is-active" : ""}`, text: t });
+    }
     const body = root.createDiv({ cls: "reel-view-body" });
-    heroBand(body, {
-      label: "Your library",
-      title: `${rows2.length} titles`,
-      sub: `Most recently \u2014 ${rows2[0].title} \xB7 14 to watch \xB7 2 hidden by content filter`,
-      art: false,
-      compact: true
-    });
-    renderPosterGrid(plugin, body, rows2);
+    const strip = body.createDiv({ cls: "reel-summary" });
+    strip.createSpan({ cls: "reel-summary-label", text: "Library" });
+    strip.createSpan({ text: `${rows2.length} titles` });
+    strip.createSpan({ text: "14 to watch" });
+    strip.createSpan({ text: "avg 4.4 \u2605" });
+    renderPosterGrid(plugin, body.createDiv({ cls: "reel-gridwrap" }), rows2);
   }
   function libraryYear(root) {
     withPool(YEAR, () => library(root, YEAR));
   }
   function filterBar(into, active, sort = true) {
     const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
+    if (sort) {
+      const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg" });
+      ["\u25A6", "\u25AA", "\u2630"].forEach((g, i) => seg.createEl("button", { cls: `reel-seg-btn${i === 0 ? " is-active" : ""}`, text: g }));
+    }
     const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
     open.createSpan({ cls: "reel-filter-btn-icon", text: "\u2699" });
     open.createSpan({ text: "Filters" });
     if (active.length)
       open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
-    const ask2 = bar.createEl("button", { cls: "reel-chip reel-ask-btn" });
-    ask2.createSpan({ cls: "reel-filter-btn-icon", text: "\u2726" });
-    ask2.createSpan({ text: "Ask" });
     if (sort) {
       const sel = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
       sel.createEl("option", { text: "Recently watched" });
-      const layout = bar.createEl("button", { cls: "reel-chip reel-layout-btn" });
-      layout.createSpan({ cls: "reel-layout-icon", text: "\u25A6" });
-      layout.createSpan({ cls: "reel-layout-label", text: "Posters" });
+      bar.createEl("button", { cls: "reel-chip reel-sort-dir", text: "\u2193", attr: { "aria-label": "Tap to reverse the order" } });
     }
+    const ask2 = bar.createEl("button", { cls: "reel-chip reel-ask-btn" });
+    ask2.createSpan({ cls: "reel-filter-btn-icon", text: "\u2726" });
+    ask2.createSpan({ text: "Ask" });
     for (const label of active) {
       const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
       tag.setAttr("role", "group");

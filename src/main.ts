@@ -1,7 +1,9 @@
-import { Notice, Plugin, TFile, WorkspaceLeaf, addIcon } from "obsidian";
+import { Notice, Plugin, TFile, WorkspaceLeaf, addIcon, debounce, normalizePath } from "obsidian";
 import { DEFAULT_SETTINGS, ReelSettingTab, ReelSettings } from "./settings";
 import { canPersist, mergeForSave } from "./util/settingsguard";
-import { keyboardInset, sheetFit } from "./util/panewidth";
+import { hideFromGallery } from "./posters";
+import { OmniSearch, type OmniScope } from "./ui/omniSearch";
+import { keyboardInset, sheetFit, typingLift } from "./util/panewidth";
 import { CredentialStore, MissingKeyError } from "./credentials";
 import { TmdbClient } from "./tmdb";
 import { Library } from "./library";
@@ -102,6 +104,9 @@ export default class ReelPlugin extends Plugin {
 		// than asked of a viewport unit that may or may not know about the
 		// keyboard. See sheetFit().
 		this.register(sheetFit());
+		// And while a field has focus, pin the sheet to the top so the keys
+		// cannot cover what is being typed. See typingLift().
+		this.register(typingLift());
 
 		addIcon("reel", REEL_ICON);
 
@@ -126,6 +131,13 @@ export default class ReelPlugin extends Plugin {
 			 * screen.
 			 */
 			void showWhatsNewIfUpdated(this);
+			// Keep the saved cast photos under their cap, and the folder hidden from the gallery.
+			if (this.settings.savePortraits) void this.people.trim();
+			// Titles that become watched get their poster saved, when that is the setting.
+			const sync = debounce(() => void this.posters.syncWatched(), 3000, true);
+			this.registerEvent(this.library.on("changed", sync));
+			sync();
+			void hideFromGallery(this.app.vault, normalizePath(this.settings.posterFolder));
 		});
 
 		registerHeaderProcessor(this);
@@ -289,6 +301,40 @@ export default class ReelPlugin extends Plugin {
 		new RecipeSheet(this, saved).open();
 	}
 
+	/**
+	 * Where the images live, whether the gallery can see them, and whether they
+	 * share a folder with Obsidian's attachments. Also re-stamps `.nomedia`:
+	 * it used to be written only when a new image was saved, so a folder that
+	 * already existed was never checked.
+	 */
+	async imageStorageReport(): Promise<string> {
+		const vault = this.app.vault;
+		const folder = normalizePath(this.settings.posterFolder);
+		await hideFromGallery(vault, folder);
+		let hidden = false;
+		try {
+			hidden = await vault.adapter.exists(normalizePath(`${folder}/.nomedia`));
+		} catch {
+			/* unknown */
+		}
+		const attach = String(
+			(vault as unknown as { getConfig?: (k: string) => unknown }).getConfig?.("attachmentFolderPath") ?? ""
+		).replace(/^\.?\//, "");
+		const clash = attach && attach !== "/" && (folder === normalizePath(attach) || folder.startsWith(normalizePath(attach) + "/"));
+		const stats = this.people.cacheStats();
+		const kb = Math.round(stats.bytes / 1024);
+		return [
+			`Images live in ${folder}, not your attachments folder${clash ? " — WARNING: that folder is inside it. Pick another." : ""}.`,
+			hidden ? "Hidden from the phone gallery." : "NOT hidden from the gallery: could not write .nomedia.",
+			`${stats.count} cast photos saved (${kb} KB).`,
+		].join(" ");
+	}
+
+	/** One box for the library and TMDB. See OmniSearch. */
+	openOmni(query = "", scope: OmniScope = "all"): void {
+		new OmniSearch(this.app, this, query, scope).open();
+	}
+
 	openSearch(opts: { watchlist?: boolean; query?: string } = {}): void {
 		if (!this.credentials.hasStoredKey && this.settings.keyMode !== "session") {
 			new Notice("Reel: add a TMDB key in Settings → Reel first.", 6000);
@@ -375,6 +421,7 @@ export default class ReelPlugin extends Plugin {
 			callback: () => this.openRecipe(),
 		});
 
+		this.addCommand({ id: "search-all", name: "Search everything", icon: "search", callback: () => this.openOmni() });
 		this.addCommand({ id: "log", name: "Log a film or series", icon: "reel", callback: () => this.openSearch() });
 
 		/*

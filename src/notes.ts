@@ -52,10 +52,16 @@ export class NoteWriter {
 	/* Creation                                                            */
 	/* ------------------------------------------------------------------ */
 
+	/** No file saved: keep the internet address, so the grid still has a picture. */
+	private remotePoster(fm: Record<string, unknown>, path: string | null | undefined): void {
+		const url = this.plugin.tmdb.posterUrl(path);
+		if (url && !fm.poster && !fm.poster_url) fm.poster_url = url;
+	}
+
 	async createFilm(meta: TmdbFilm, log: LogPayload): Promise<TFile> {
 		const year = yearOf(meta.release_date);
 		const path = await this.uniquePath(this.plugin.settings.filmFolder, this.filmBasename(meta.title, year));
-		const poster = await this.plugin.posters.cache(meta.id, "film", meta.poster_path);
+		const poster = await this.plugin.posters.cache(meta.id, "film", meta.poster_path, !log.watchlist);
 
 		const file = await this.createNote(path);
 		await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
@@ -65,6 +71,7 @@ export class NoteWriter {
 			if (year) fm.year = year;
 			applyFields(fm, filmFields(meta, this.extractOpts));
 			if (poster) fm.poster = poster;
+			else this.remotePoster(fm, meta.poster_path);
 
 			if (log.watchlist) {
 				fm.status = "watchlist";
@@ -96,7 +103,7 @@ export class NoteWriter {
 
 	async createShow(meta: TmdbShow, log: LogPayload): Promise<TFile> {
 		const path = await this.uniquePath(this.plugin.settings.seriesFolder, sanitize(meta.name));
-		const poster = await this.plugin.posters.cache(meta.id, "tv", meta.poster_path);
+		const poster = await this.plugin.posters.cache(meta.id, "tv", meta.poster_path, !log.watchlist);
 
 		const seasons = (meta.seasons ?? []).filter((s) => this.plugin.settings.includeSpecials || s.season_number > 0);
 
@@ -109,6 +116,7 @@ export class NoteWriter {
 			if (fay) fm.first_air_year = fay;
 			applyFields(fm, showFields(meta, this.extractOpts));
 			if (poster) fm.poster = poster;
+			else this.remotePoster(fm, meta.poster_path);
 			fm.status = log.watchlist ? "watchlist" : "watching";
 			fm.seasons = seasons.map((s) => ({ n: s.season_number, watched: "", total: s.episode_count ?? 0 }));
 			if (log.liked) fm.liked = true;
@@ -686,7 +694,7 @@ export class NoteWriter {
 
 		if (entry.type === "tv") {
 			const meta = await this.plugin.tmdb.refreshShow(entry.tmdbId);
-			const poster = await this.plugin.posters.cache(meta.id, "tv", meta.poster_path);
+			const poster = await this.plugin.posters.cache(meta.id, "tv", meta.poster_path, entry.status !== "watchlist");
 			await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
 				applyFields(fm, showFields(meta, this.extractOpts), { preserve });
 				if (!meta.next_episode_to_air?.air_date) delete fm.next_air_date;
@@ -703,7 +711,7 @@ export class NoteWriter {
 			});
 		} else {
 			const meta = await this.plugin.tmdb.getFilm(entry.tmdbId);
-			const poster = await this.plugin.posters.cache(meta.id, "film", meta.poster_path);
+			const poster = await this.plugin.posters.cache(meta.id, "film", meta.poster_path, entry.status !== "watchlist");
 			await this.plugin.app.fileManager.processFrontMatter(file, (fm) => {
 				applyFields(fm, filmFields(meta, this.extractOpts), { preserve });
 				if (poster && !fm.poster) fm.poster = poster;

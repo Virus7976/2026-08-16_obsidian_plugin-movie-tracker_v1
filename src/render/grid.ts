@@ -6,7 +6,7 @@
  * both, instead of drifting until they behave subtly differently.
  */
 
-import { Menu, Notice, TFile } from "obsidian";
+import { Menu, Notice, TFile, setIcon } from "obsidian";
 import { redact } from "../secrets";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
@@ -236,12 +236,26 @@ export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entr
 		const posterEl = cell.createDiv({ cls: "reel-cell-poster" });
 		plugin.posters.attach(posterEl, entry);
 
-		if (entry.rating != null) {
-			renderStarsStatic(posterEl.createDiv({ cls: "reel-cell-rating" }), entry.rating);
-		}
-		if (entry.liked) posterEl.createDiv({ cls: "reel-cell-heart", text: "♥" });
-		if (entry.status === "watchlist") posterEl.createDiv({ cls: "reel-cell-flag", text: "Watchlist" });
+		/*
+		 * Four fixed corners, the same on every card.
+		 *   top left      content rating
+		 *   top right     liked, or on the watchlist
+		 *   bottom left   your score
+		 *   bottom right  how many times you have watched it
+		 * A card then reads the same whatever is on it, and a missing piece
+		 * leaves its corner empty rather than moving another one.
+		 */
 		if (entry.certification) posterEl.createDiv({ cls: "reel-cell-cert", text: entry.certification });
+		if (entry.liked) posterEl.createDiv({ cls: "reel-cell-heart", text: "♥" });
+		else if (entry.status === "watchlist") {
+			const flag = posterEl.createDiv({ cls: "reel-cell-flag", attr: { "aria-hidden": "true" } });
+			setIcon(flag, "bookmark");
+		}
+		if (entry.rating != null) {
+			posterEl.createDiv({ cls: "reel-cell-score", text: `${entry.rating} ★` });
+		}
+		const times = entry.watched?.length ?? 0;
+		if (times > 1) posterEl.createDiv({ cls: "reel-cell-count", text: `${times}×` });
 
 		if (entry.type === "tv") {
 			const total = entry.totalEpisodes ?? 0;
@@ -255,7 +269,13 @@ export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entr
 		const caption = cell.createDiv({ cls: "reel-cell-caption" });
 		caption.createDiv({ cls: "reel-cell-title", text: entry.title });
 		const y = entry.year ?? entry.firstAirYear;
-		if (y) caption.createDiv({ cls: "reel-cell-year", text: String(y) });
+		const facts: string[] = [];
+		if (y) facts.push(String(y));
+		if (entry.type === "film" && entry.runtime) facts.push(formatMinutes(entry.runtime));
+		else if (entry.type === "tv" && entry.seasons.length) {
+			facts.push(`${entry.seasons.length} season${entry.seasons.length === 1 ? "" : "s"}`);
+		}
+		if (facts.length) caption.createDiv({ cls: "reel-cell-year", text: facts.join(" • ") });
 
 		wireCell(plugin, cell, entry, onSelect);
 	}
