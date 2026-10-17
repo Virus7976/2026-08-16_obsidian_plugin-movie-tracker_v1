@@ -19702,3 +19702,183 @@ body.is-mobile .modal-container .modal.reel-modal.reel-person-sheet {
 .reel-person-sheet .reel-person-hint {
 	color: var(--text-muted);
 }
+
+/* ==================================================================== */
+/* Title detail: clean reference sections                                */
+/* ==================================================================== */
+.reel-facets .reel-facet-tabwrap.has-wash {
+	background: none;
+}
+
+.reel-facets .reel-facet-tabwrap.has-wash::before,
+.reel-facets .reel-facet-tabwrap.has-wash::after {
+	display: none;
+}
+
+.reel-facets .reel-facet-tabs {
+	gap: var(--reel-space-1);
+	padding: 0;
+	background: none;
+}
+
+.reel-facets .reel-facet-tab {
+	padding: 0 var(--reel-space-3);
+	font-weight: 500;
+}
+
+.reel-facets .reel-facet-tab.is-active {
+	font-weight: 650;
+}
+
+/* The one list shape: a small caps title, then quiet label/value rows. */
+.reel-fl {
+	margin: 0 0 var(--reel-space-5, 20px);
+}
+
+.reel-fl-title {
+	font-size: var(--font-ui-smaller);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: var(--text-muted);
+	margin-bottom: var(--reel-space-1, 4px);
+}
+
+.reel-fl-row {
+	display: grid;
+	grid-template-columns: minmax(96px, 36%) 1fr;
+	gap: var(--reel-space-3, 12px);
+	align-items: baseline;
+	padding: 10px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-small);
+	line-height: 1.4;
+}
+
+.reel-fl-row:last-child {
+	border-bottom: none;
+}
+
+.reel-fl-label {
+	color: var(--text-muted);
+}
+
+.reel-fl-value {
+	color: var(--text-normal);
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.reel-fl .reel-chips {
+	padding: var(--reel-space-1, 4px) 0 0;
+	flex-wrap: wrap;
+	overflow: visible;
+}
+
+.reel-fl-note {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.4;
+	margin-top: var(--reel-space-2, 8px);
+}
+
+/* Box office: three plain figures and one comparison */
+.reel-money {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--reel-space-3, 12px);
+	margin-bottom: var(--reel-space-4, 16px);
+}
+
+.reel-money-tile {
+	padding: var(--reel-space-3, 12px);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-card-radius, 12px);
+	min-width: 0;
+}
+
+.reel-money-value {
+	font-size: var(--font-ui-large, 18px);
+	font-weight: 650;
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+
+.reel-money-tile.is-up .reel-money-value {
+	color: var(--color-green, var(--text-normal));
+}
+
+.reel-money-tile.is-down .reel-money-value {
+	color: var(--color-red, var(--text-normal));
+}
+
+.reel-money-label {
+	margin-top: 2px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-money-bars {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2, 8px);
+	margin-bottom: var(--reel-space-5, 20px);
+}
+
+.reel-money-bar {
+	display: grid;
+	grid-template-columns: 56px 1fr;
+	align-items: center;
+	gap: var(--reel-space-3, 12px);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-money-track {
+	height: 8px;
+	border-radius: 4px;
+	background: var(--background-modifier-border);
+	overflow: hidden;
+}
+
+.reel-money-fill {
+	height: 100%;
+	width: calc(var(--reel-fill, 0) * 100%);
+	border-radius: 4px;
+	background: var(--interactive-accent);
+}
+
+/* Similar titles: a wrapping grid, not a strip you have to hunt along */
+.reel-facet-body .reel-related {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--reel-space-4, 16px) var(--reel-space-3, 12px);
+	overflow: visible;
+	scroll-snap-type: none;
+}
+
+.reel-facet-body .reel-related-card {
+	flex: none;
+	width: auto;
+	min-width: 0;
+	gap: 6px;
+}
+
+.reel-related-title {
+	color: var(--text-normal);
+	font-weight: 600;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-related-sub {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-top: -4px;
+}
+
+.reel-facets .reel-facet-tab,
+.reel-facets .reel-facet-tab:hover {
+	background: transparent;
+}

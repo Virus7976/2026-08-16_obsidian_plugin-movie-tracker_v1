@@ -258,7 +258,7 @@ export class LogSheet extends Modal {
 			this.close();
 
 			if (file && this.opts.pending && this.plugin.settings.openNoteAfterCreate) {
-				await this.app.workspace.getLeaf(false).openFile(file);
+				await this.plugin.openAfterCreate(file);
 			}
 		} catch (e) {
 			new Notice(`Reel: ${redact(e)}`, 8000);

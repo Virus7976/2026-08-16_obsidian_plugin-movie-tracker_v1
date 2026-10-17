@@ -396,14 +396,14 @@ export class TmdbClient {
 	 */
 	async getFilm(id: number): Promise<TmdbFilm> {
 		return this.cached(
-			`movie-${id}`,
+			`movie2-${id}`,
 			() =>
 				this.request<TmdbFilm>(`/movie/${id}`, {
 					// recommendations and alternative_titles ride along for free:
 					// append_to_response is still a single HTTP request, and
 					// the detail screen wants both the moment it opens.
 					append_to_response:
-						"credits,watch/providers,keywords,videos,release_dates,external_ids,recommendations,alternative_titles,reviews",
+						"credits,watch/providers,keywords,videos,release_dates,external_ids,recommendations,similar,alternative_titles,reviews",
 				}),
 			true // a released film's credits and runtime don't change
 		);
@@ -413,10 +413,10 @@ export class TmdbClient {
 		const fetcher = () =>
 			this.request<TmdbShow>(`/tv/${id}`, {
 				append_to_response:
-					"aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids,recommendations,alternative_titles,reviews",
+					"aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids,recommendations,similar,alternative_titles,reviews",
 			});
 		// A returning series gains episodes, so its record must expire.
-		const cacheKey = `tv-${id}`;
+		const cacheKey = `tv2-${id}`;
 		const hit = await this.readCache<TmdbShow>(cacheKey);
 		if (hit) return hit;
 		const data = await fetcher();
@@ -475,9 +475,10 @@ export class TmdbClient {
 	/** Force a refresh, bypassing the cache — used by the new-episode check. */
 	async refreshShow(id: number): Promise<TmdbShow> {
 		const data = await this.request<TmdbShow>(`/tv/${id}`, {
-			append_to_response: "aggregate_credits,watch/providers,keywords,videos,content_ratings",
+			append_to_response:
+				"aggregate_credits,watch/providers,keywords,videos,content_ratings,external_ids,recommendations,similar,alternative_titles,reviews",
 		});
-		await this.writeCache(`tv-${id}`, data, data.status === "Ended" || data.status === "Canceled");
+		await this.writeCache(`tv2-${id}`, data, data.status === "Ended" || data.status === "Canceled");
 		return data;
 	}
 

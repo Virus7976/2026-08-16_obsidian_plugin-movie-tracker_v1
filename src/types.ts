@@ -266,7 +266,10 @@ export interface TmdbFilm {
 	/** The wide still, used as the detail screen's hero image. */
 	backdrop_path?: string | null;
 	vote_average?: number;
+	vote_count?: number;
 	popularity?: number;
+	status?: string;
+	original_title?: string;
 	original_language?: string;
 	overview?: string;
 	budget?: number;
@@ -285,6 +288,7 @@ export interface TmdbFilm {
 	tagline?: string;
 	alternative_titles?: { titles?: { iso_3166_1?: string; title?: string }[] };
 	recommendations?: { results?: TmdbSearchResult[] };
+	similar?: { results?: TmdbSearchResult[] };
 	homepage?: string;
 	reviews?: { results?: TmdbReview[]; total_results?: number };
 }
@@ -307,6 +311,13 @@ export interface TmdbShow {
 	/** The wide still, used as the detail screen's hero image. */
 	backdrop_path?: string | null;
 	vote_average?: number;
+	vote_count?: number;
+	number_of_seasons?: number;
+	last_air_date?: string;
+	type?: string;
+	in_production?: boolean;
+	networks?: { name: string }[];
+	origin_country?: string[];
 	overview?: string;
 	status?: string;
 	seasons?: TmdbSeason[];
@@ -322,6 +333,7 @@ export interface TmdbShow {
 	external_ids?: { imdb_id?: string | null };
 	"watch/providers"?: TmdbProviderBlock;
 	recommendations?: { results?: TmdbSearchResult[] };
+	similar?: { results?: TmdbSearchResult[] };
 	alternative_titles?: { results?: { iso_3166_1?: string; title?: string }[] };
 	homepage?: string;
 	tagline?: string;

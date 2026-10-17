@@ -2492,8 +2492,8 @@ export class ReelSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(el)
-			.setName("Open the note after adding")
-			.setDesc("Jump straight to a title's note once it is created, instead of staying where you are.")
+			.setName("Open the title after adding")
+			.setDesc("Jump straight to the title's screen once it is created, instead of staying where you are.")
 			.addToggle((t) =>
 				t.setValue(this.plugin.settings.openNoteAfterCreate).onChange(async (v) => {
 					this.plugin.settings.openNoteAfterCreate = v;

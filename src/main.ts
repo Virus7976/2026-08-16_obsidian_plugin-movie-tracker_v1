@@ -222,6 +222,23 @@ export default class ReelPlugin extends Plugin {
 		if (view instanceof ReelView) view.openDetail(entry);
 	}
 
+	/**
+	 * Show a title that was just created, on its Reel screen rather than as a
+	 * raw note full of properties. The index learns about a new file a moment
+	 * after it exists, so wait for it; if it never shows, fall back to the note.
+	 */
+	async openAfterCreate(file: TFile): Promise<void> {
+		for (let i = 0; i < 30; i++) {
+			const entry = this.library.byPath(file.path);
+			if (entry) {
+				await this.openDetail(entry);
+				return;
+			}
+			await new Promise((r) => window.setTimeout(r, 100));
+		}
+		await this.app.workspace.getLeaf(false).openFile(file);
+	}
+
 	/** Open the Reel view on a named tab. */
 	async openTab(tab: string): Promise<void> {
 		await this.openView();

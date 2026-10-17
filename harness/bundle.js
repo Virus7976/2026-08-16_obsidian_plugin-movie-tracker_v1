@@ -3513,7 +3513,7 @@
         }
         this.close();
         if (file && this.opts.pending && this.plugin.settings.openNoteAfterCreate) {
-          await this.app.workspace.getLeaf(false).openFile(file);
+          await this.plugin.openAfterCreate(file);
         }
       } catch (e) {
         new Notice(`Reel: ${redact(e)}`, 8e3);
@@ -7846,33 +7846,40 @@ ${body}
       const film2 = isTv ? void 0 : meta;
       const cast = (isTv ? meta.aggregate_credits?.cast : film2?.credits?.cast) ?? [];
       const crew = (isTv ? meta.aggregate_credits?.crew : film2?.credits?.crew) ?? [];
-      const related = meta.recommendations?.results ?? [];
+      const related = [];
+      for (const r of [...meta.recommendations?.results ?? [], ...meta.similar?.results ?? []]) {
+        if (r.id === this.entry.tmdbId || related.some((x) => x.id === r.id))
+          continue;
+        related.push(r);
+      }
       if (cast.length)
         this.renderCastStrip(wrap, cast);
       this.renderCreditRows(wrap, cast, crew, isTv);
       const tabs = [];
+      tabs.push({ id: "about", label: "About", render: (el) => this.renderAbout(el, meta) });
+      tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
+      if (film2 && (film2.budget || film2.revenue)) {
+        tabs.push({ id: "money", label: "Box office", render: (el) => this.renderMoney(el, film2) });
+      }
+      tabs.push({ id: "stats", label: "Stats", render: (el) => this.renderStats(el, meta, isTv) });
       if (cast.length)
         tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
       if (crew.length)
         tabs.push({ id: "crew", label: "Crew", render: (el) => this.renderPeople(el, crew, false) });
-      tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
-      tabs.push({ id: "story", label: "Storyline", render: (el) => this.renderStoryline(el, meta) });
-      if (this.entry.contentTopics.length || this.entry.certification) {
-        tabs.push({ id: "content", label: "Content", render: (el) => this.renderContent(el) });
-      }
-      if (meta.genres?.length)
-        tabs.push({ id: "genre", label: "Genre", render: (el) => this.renderGenres(el, meta.genres ?? []) });
       if (film2?.release_dates?.results?.length) {
         tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film2) });
       }
+      if (this.entry.contentTopics.length || this.entry.certification) {
+        tabs.push({ id: "content", label: "Content", render: (el) => this.renderContent(el) });
+      }
       if (related.length)
-        tabs.push({ id: "related", label: "Related", render: (el) => this.renderRelated(el, related) });
+        tabs.push({ id: "related", label: "Similar", render: (el) => this.renderRelated(el, related) });
       tabs.push({ id: "photos", label: "Photos", render: (el) => void this.renderPhotos(el, isTv) });
       const reviews2 = meta.reviews?.results ?? [];
       if (reviews2.length) {
         tabs.push({
           id: "reviews",
-          label: `Other reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
+          label: `Reviews${meta.reviews?.total_results ? ` ${meta.reviews.total_results}` : ""}`,
           render: (el) => this.renderReviews(el, reviews2)
         });
       }
@@ -8043,59 +8050,199 @@ ${body}
       }
     }
     /** Studios, country, language, alternative titles, and the money. */
-    renderFacts(el, meta, isTv) {
-      const film2 = isTv ? void 0 : meta;
-      const group = (label, values) => {
-        if (!values.length)
-          return;
-        const box = el.createDiv({ cls: "reel-facet-group" });
-        box.createDiv({ cls: "reel-facet-label", text: label });
-        for (const v of values)
-          box.createDiv({ cls: "reel-facet-value", text: v });
-      };
-      group("Studios", (meta.production_companies ?? []).map((c) => c.name).filter(Boolean));
-      group("Country", (film2?.production_countries ?? []).map((c) => c.name ?? "").filter(Boolean));
-      group(
-        "Language",
-        (film2?.spoken_languages ?? []).map((l) => l.english_name ?? l.name ?? "").filter(Boolean)
-      );
-      if (film2 && (film2.budget || film2.revenue)) {
-        const money = (n2) => n2 ? `$${n2.toLocaleString()}` : "not reported";
-        const box = el.createDiv({ cls: "reel-facet-group" });
-        box.createDiv({ cls: "reel-facet-label", text: "Box office" });
-        box.createDiv({ cls: "reel-facet-value", text: `Budget \u2014 ${money(film2.budget)}` });
-        box.createDiv({ cls: "reel-facet-value", text: `Revenue \u2014 ${money(film2.revenue)}` });
-        if (film2.budget && film2.revenue) {
-          const x = film2.revenue / film2.budget;
-          box.createDiv({ cls: "reel-facet-value", text: `Returned ${x.toFixed(1)}\xD7 its budget` });
-        }
+    /** A quiet label-and-value list: the one shape every reference section uses. */
+    factList(el, title, rows2) {
+      const shown2 = rows2.filter(([, v]) => v != null && v !== "");
+      if (!shown2.length)
+        return;
+      const box = el.createDiv({ cls: "reel-fl" });
+      if (title)
+        box.createDiv({ cls: "reel-fl-title", text: title });
+      for (const [label, value] of shown2) {
+        const row = box.createDiv({ cls: "reel-fl-row" });
+        row.createDiv({ cls: "reel-fl-label", text: label });
+        const v = row.createDiv({ cls: "reel-fl-value" });
+        if (typeof value === "string")
+          v.setText(value);
+        else if (value)
+          v.appendChild(value);
       }
-      if (meta.homepage) {
-        const box = el.createDiv({ cls: "reel-facet-group" });
-        box.createDiv({ cls: "reel-facet-label", text: "Official site" });
-        const a = box.createEl("a", { cls: "reel-facet-value reel-link", text: meta.homepage, href: meta.homepage });
-        a.setAttr("target", "_blank");
-        a.setAttr("rel", "noopener");
-      }
-      const alts = (film2?.alternative_titles?.titles ?? []).filter((t) => t.title).slice(0, 8).map((t) => t.iso_3166_1 ? `${t.title} (${t.iso_3166_1})` : t.title ?? "");
-      group("Also known as", alts);
     }
-    /** Tagline, full overview, and the keywords TMDB tags a title with. */
-    renderStoryline(el, meta) {
+    /** Tagline, the full overview, genres and keywords: what it is about. */
+    renderAbout(el, meta) {
       if (meta.tagline)
         el.createDiv({ cls: "reel-tagline", text: meta.tagline });
       if (this.entry.overview)
         el.createDiv({ cls: "reel-facet-prose", text: this.entry.overview });
-      const keywords = keywordNames(meta);
-      if (keywords.length) {
-        const box = el.createDiv({ cls: "reel-facet-group" });
-        box.createDiv({ cls: "reel-facet-label", text: "Keywords" });
+      const chipGroup = (label, names) => {
+        if (!names.length)
+          return;
+        const box = el.createDiv({ cls: "reel-fl" });
+        box.createDiv({ cls: "reel-fl-title", text: label });
         const chips = box.createDiv({ cls: "reel-chips" });
-        for (const k of keywords.slice(0, 24)) {
-          const chip = chips.createEl("button", { cls: "reel-chip", text: k, attr: { type: "button" } });
-          chip.addEventListener("click", () => void this.plugin.openViewWithSearch(k));
+        for (const n2 of names) {
+          const chip = chips.createEl("button", { cls: "reel-chip", text: n2, attr: { type: "button" } });
+          chip.addEventListener("click", () => void this.plugin.openViewWithSearch(n2));
+        }
+      };
+      chipGroup("Genres", (meta.genres ?? []).map((g) => g.name));
+      chipGroup("Keywords", keywordNames(meta).slice(0, 24));
+    }
+    renderFacts(el, meta, isTv) {
+      const film2 = isTv ? void 0 : meta;
+      const show = isTv ? meta : void 0;
+      const lang = (code) => {
+        if (!code)
+          return void 0;
+        try {
+          return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
+        } catch {
+          return code;
+        }
+      };
+      const list2 = (names) => names.filter(Boolean).join(", ");
+      const date = film2?.release_date ?? show?.first_air_date;
+      this.factList(el, "Title", [
+        ["Released", date ? prettyDate(date.slice(0, 10)) : void 0],
+        [
+          "Runtime",
+          film2?.runtime ? formatMinutes(film2.runtime) : show?.episode_run_time?.[0] ? `${show.episode_run_time[0]} min per episode` : void 0
+        ],
+        ["Status", film2?.status ?? show?.status],
+        ["Original title", film2?.original_title && film2.original_title !== film2.title ? film2.original_title : void 0],
+        ["Original language", lang(meta.original_language)],
+        ["Part of", film2?.belongs_to_collection?.name],
+        ["Type", show?.type]
+      ]);
+      this.factList(el, "Made by", [
+        ["Studios", list2((meta.production_companies ?? []).map((c) => c.name))],
+        ["Networks", list2((show?.networks ?? []).map((n2) => n2.name))],
+        ["Countries", list2((film2?.production_countries ?? []).map((c) => c.name)) || list2(show?.origin_country ?? [])],
+        ["Languages", list2((film2?.spoken_languages ?? []).map((l) => l.english_name ?? l.name))]
+      ]);
+      let site = null;
+      if (meta.homepage) {
+        site = createEl("a", { cls: "reel-link", text: meta.homepage.replace(/^https?:\/\//, "").replace(/\/$/, ""), href: meta.homepage });
+        site.setAttr("target", "_blank");
+        site.setAttr("rel", "noopener");
+      }
+      const alts = (film2?.alternative_titles?.titles ?? []).filter((t) => t.title).slice(0, 8).map((t) => t.iso_3166_1 ? `${t.title} (${t.iso_3166_1})` : t.title ?? "");
+      this.factList(el, "More", [
+        ["Official site", site],
+        ["Also known as", alts.join(", ")]
+      ]);
+    }
+    /**
+     * Budget, takings and what is left over, drawn as one comparison.
+     *
+     * TMDB reports a budget and a worldwide gross and nothing finer: how a
+     * budget was split between cast, effects and marketing is not published
+     * anywhere an API can reach, so none of that is invented here.
+     */
+    renderMoney(el, film2) {
+      const budget = film2.budget ?? 0;
+      const revenue = film2.revenue ?? 0;
+      const money = (n2) => {
+        if (n2 >= 1e9)
+          return `$${(n2 / 1e9).toFixed(2)}B`;
+        if (n2 >= 1e6)
+          return `$${(n2 / 1e6).toFixed(n2 >= 1e8 ? 0 : 1)}M`;
+        return `$${n2.toLocaleString()}`;
+      };
+      const tiles = el.createDiv({ cls: "reel-money" });
+      const tile = (label, value, cls = "") => {
+        const t = tiles.createDiv({ cls: `reel-money-tile ${cls}`.trim() });
+        t.createDiv({ cls: "reel-money-value", text: value });
+        t.createDiv({ cls: "reel-money-label", text: label });
+      };
+      tile("Budget", budget ? money(budget) : "Not reported");
+      tile("Worldwide gross", revenue ? money(revenue) : "Not reported");
+      if (budget && revenue) {
+        const net = revenue - budget;
+        tile(net >= 0 ? "Gross profit" : "Gross loss", `${net < 0 ? "\u2212" : ""}${money(Math.abs(net))}`, net >= 0 ? "is-up" : "is-down");
+      }
+      if (budget && revenue) {
+        const top = Math.max(budget, revenue);
+        const bars2 = el.createDiv({ cls: "reel-money-bars" });
+        for (const [label, v] of [
+          ["Budget", budget],
+          ["Gross", revenue]
+        ]) {
+          const row = bars2.createDiv({ cls: "reel-money-bar" });
+          row.createSpan({ cls: "reel-money-bar-label", text: label });
+          const track = row.createDiv({ cls: "reel-money-track" });
+          track.createDiv({ cls: "reel-money-fill" }).setCssProps({ "--reel-fill": String(v / top) });
         }
       }
+      const rows2 = [];
+      if (budget && revenue) {
+        rows2.push(["Returned", `${(revenue / budget).toFixed(1)}\xD7 its budget`]);
+        rows2.push([
+          "Break-even",
+          revenue >= budget * 2 ? "Cleared the usual 2\xD7 theatrical break-even" : "Short of the usual 2\xD7 theatrical break-even"
+        ]);
+      }
+      if (film2.runtime && budget)
+        rows2.push(["Budget per minute", money(Math.round(budget / film2.runtime))]);
+      this.factList(el, "The numbers", rows2);
+      el.createDiv({
+        cls: "reel-dim reel-fl-note",
+        text: "Budget and gross come from TMDB, are in US dollars and are not adjusted for inflation. How a budget was split is not published."
+      });
+    }
+    /** Ratings, scale and how this title sits against the rest of your library. */
+    renderStats(el, meta, isTv) {
+      const film2 = isTv ? void 0 : meta;
+      const show = isTv ? meta : void 0;
+      const e = this.entry;
+      const mine = this.plugin.library.all().filter((x) => x.type === e.type && x.path !== e.path);
+      const rows2 = [];
+      if (meta.vote_average) {
+        rows2.push(["TMDB score", `${meta.vote_average.toFixed(1)} of 10${meta.vote_count ? ` \xB7 ${meta.vote_count.toLocaleString()} votes` : ""}`]);
+        const scored = mine.filter((x) => x.tmdbRating);
+        if (scored.length >= 5) {
+          const below = scored.filter((x) => (x.tmdbRating ?? 0) < (meta.vote_average ?? 0)).length;
+          rows2.push(["In your library", `Scores higher than ${Math.round(below / scored.length * 100)}% of your ${isTv ? "series" : "films"}`]);
+        }
+      }
+      if (e.rating != null && meta.vote_average) {
+        const diff = e.rating * 2 - meta.vote_average;
+        const how = Math.abs(diff) < 0.3 ? "level with" : diff > 0 ? `${diff.toFixed(1)} above` : `${(-diff).toFixed(1)} below`;
+        rows2.push(["You vs TMDB", `You gave it ${e.rating} of 5, ${how} TMDB`]);
+      }
+      if (meta.popularity)
+        rows2.push(["Popularity", meta.popularity.toFixed(0)]);
+      this.factList(el, "Reception", rows2);
+      const scale = [];
+      if (film2?.runtime) {
+        const lens = mine.map((x) => x.runtime).filter((n2) => !!n2);
+        scale.push(["Runtime", formatMinutes(film2.runtime)]);
+        if (lens.length >= 5) {
+          const avg = Math.round(lens.reduce((a, b) => a + b, 0) / lens.length);
+          const d = film2.runtime - avg;
+          scale.push(["Against your average", `${formatMinutes(avg)}, so this is ${Math.abs(d)} min ${d >= 0 ? "longer" : "shorter"}`]);
+        }
+      }
+      if (show) {
+        scale.push(["Seasons", show.number_of_seasons ? String(show.number_of_seasons) : void 0]);
+        scale.push(["Episodes", show.number_of_episodes ? String(show.number_of_episodes) : void 0]);
+        scale.push(["Episode length", show.episode_run_time?.[0] ? `${show.episode_run_time[0]} min` : void 0]);
+        if (show.number_of_episodes && show.episode_run_time?.[0]) {
+          const mins = show.number_of_episodes * show.episode_run_time[0];
+          scale.push(["Time to watch it all", `${Math.round(mins / 60)} hours`]);
+        }
+        scale.push(["First aired", show.first_air_date ? prettyDate(show.first_air_date.slice(0, 10)) : void 0]);
+        scale.push(["Last aired", show.last_air_date ? prettyDate(show.last_air_date.slice(0, 10)) : void 0]);
+        const avg = this.episodeAverage();
+        if (avg != null)
+          scale.push(["Your episode average", `${avg.toFixed(1)} of 5`]);
+      }
+      this.factList(el, isTv ? "Scale" : "Length", scale);
+      const watched = e.watched?.length ?? 0;
+      this.factList(el, "You", [
+        ["Watched", watched ? `${watched} time${watched === 1 ? "" : "s"}` : void 0],
+        ["Last watched", watched ? prettyDate(String(e.watched[watched - 1].date).slice(0, 10)) : void 0]
+      ]);
     }
     /**
      * The parents-guide substitute.
@@ -8146,15 +8293,6 @@ ${body}
           cls: "reel-dim",
           text: "No community content notes yet \u2014 add a DoesTheDogDie key in settings to fetch them."
         });
-      }
-    }
-    renderGenres(el, genres) {
-      const box = el.createDiv({ cls: "reel-facet-group" });
-      box.createDiv({ cls: "reel-facet-label", text: "Genre" });
-      const chips = box.createDiv({ cls: "reel-chips" });
-      for (const g of genres) {
-        const chip = chips.createEl("button", { cls: "reel-chip", text: g.name, attr: { type: "button" } });
-        chip.addEventListener("click", () => void this.plugin.openViewWithSearch(g.name));
       }
     }
     /** Per-country release dates, grouped by kind, as TMDB reports them. */
@@ -8317,7 +8455,7 @@ ${body}
     /** Titles TMDB associates with this one — the "what next" question. */
     renderRelated(el, rows2) {
       const strip = el.createDiv({ cls: "reel-related" });
-      for (const r of rows2.slice(0, 20)) {
+      for (const r of rows2.slice(0, 30)) {
         const card = strip.createDiv({ cls: "reel-related-card" });
         card.setAttr("role", "button");
         card.setAttr("tabindex", "0");
@@ -8328,6 +8466,10 @@ ${body}
           title: r.title ?? r.name ?? ""
         });
         card.createDiv({ cls: "reel-related-title", text: r.title ?? r.name ?? "Untitled" });
+        const year2 = (r.release_date ?? r.first_air_date ?? "").slice(0, 4);
+        const bits = [year2, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
+        if (bits.length)
+          card.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
         const open2 = () => {
           const mine = this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film");
           if (mine)
@@ -11286,7 +11428,7 @@ ${body}
           await this.plugin.saveSettings();
         })
       );
-      new Setting(el).setName("Open the note after adding").setDesc("Jump straight to a title's note once it is created, instead of staying where you are.").addToggle(
+      new Setting(el).setName("Open the title after adding").setDesc("Jump straight to the title's screen once it is created, instead of staying where you are.").addToggle(
         (t) => t.setValue(this.plugin.settings.openNoteAfterCreate).onChange(async (v) => {
           this.plugin.settings.openNoteAfterCreate = v;
           await this.plugin.saveSettings();
