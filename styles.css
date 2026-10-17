@@ -19909,3 +19909,48 @@ body.is-mobile .modal-container .modal.reel-modal.reel-person-sheet {
 		height: 34px;
 	}
 }
+
+/* ==================================================================== */
+/* Desktop: rows in columns, quiet card buttons                           */
+/* ==================================================================== */
+/* A full-width row puts the title and its tick a thousand pixels apart.
+   Wide panes lay the rows out in columns instead. */
+.reel-view.is-w700 .reel-upnext {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+	gap: var(--reel-space-3, 12px);
+	align-items: stretch;
+}
+
+.reel-view.is-w700 .reel-upnext > .reel-upnext-row {
+	margin: 0;
+	min-width: 0;
+}
+
+.reel-view.is-w700 .reel-dcard-actions {
+	gap: 6px;
+	padding: 6px 0 0;
+	background: transparent;
+}
+
+.reel-view.is-w700 .reel-dcard-btn {
+	border: none;
+	border-radius: 8px;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	box-shadow: none;
+}
+
+.reel-view.is-w700 .reel-dcard-btn:hover {
+	background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+	color: var(--text-normal);
+}
+
+.reel-view.is-w700 .reel-dcard-btn.add {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-view.is-w700 .reel-dcard-btn.add:hover {
+	background: var(--interactive-accent-hover, var(--interactive-accent));
+}
