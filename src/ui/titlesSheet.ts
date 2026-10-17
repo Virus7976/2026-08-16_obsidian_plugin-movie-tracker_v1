@@ -14,6 +14,7 @@
 
 import { Modal, Platform } from "obsidian";
 import type ReelPlugin from "../main";
+import { onHold } from "./titleMenu";
 import type { Entry } from "../types";
 import { renderStarsStatic } from "./stars";
 import { prettyDate } from "../util/dates";
@@ -51,6 +52,7 @@ export class TitlesSheet extends Modal {
 		const list = contentEl.createDiv({ cls: "reel-titles-list" });
 		for (const entry of this.entries) {
 			const row = list.createDiv({ cls: "reel-titles-row" });
+			onHold(this.plugin, row, entry);
 
 			const poster = row.createDiv({ cls: "reel-titles-poster" });
 			this.plugin.posters.attach(poster, entry);

@@ -34,12 +34,12 @@ import { renderStars } from "./stars";
 import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
-import { PreviewSheet } from "./discoverView";
+import { paintRelatedFeed } from "./relatedFeed";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { paintTrailerFor } from "./titleExtras";
 import { unlink } from "../library";
 import { compactCount } from "../util/format";
-import { ContentFlag, FLAG_LABELS } from "../content";
+import { ContentFlag, FLAG_LABELS, certificationFromContentRatings, certificationFromReleaseDates, flagsFromKeywords, estimateGuide, GUIDE_LEVELS } from "../content";
 import { haptic } from "../util/haptics";
 import { badgePerson } from "./personBadge";
 import { ReviewEditor, paintReviews, readReviews } from "./reviewPane";
@@ -311,6 +311,11 @@ export class DetailScreen {
 	 * response the rest of the plugin uses, so opening this costs nothing
 	 * after the first time.
 	 */
+	/** The reference tabs on their own, for a title that is not in the library. */
+	renderReference(main: HTMLElement, isTv: boolean): Promise<void> {
+		return this.renderFacets(main, isTv);
+	}
+
 	private async renderFacets(main: HTMLElement, isTv: boolean): Promise<void> {
 		const wrap = main.createDiv({ cls: "reel-facets" });
 		wrap.createDiv({ cls: "reel-loading", text: "Loading details…", attr: { role: "status" } });
@@ -367,8 +372,17 @@ export class DetailScreen {
 		if (film?.release_dates?.results?.length) {
 			tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film) });
 		}
-		if (this.entry.contentTopics.length || this.entry.certification) {
-			tabs.push({ id: "content", label: "Content", render: (el) => this.renderContent(el) });
+		// A parents-guide view for every title, not only ones with community
+		// notes: the rating, flags estimated from TMDB's keywords, and one tap
+		// to IMDb's own guide.
+		const region = (this.plugin.settings.region || "US").toUpperCase();
+		const cert =
+			this.entry.certification ??
+			(isTv ? certificationFromContentRatings((meta as TmdbShow).content_ratings, region) : certificationFromReleaseDates(film?.release_dates, region));
+		const flags = this.entry.contentFlags.length ? this.entry.contentFlags : flagsFromKeywords(keywordNames(meta));
+		const imdbId = this.entry.imdbId ?? meta.external_ids?.imdb_id ?? film?.imdb_id ?? undefined;
+		if (this.entry.contentTopics.length || cert || flags.length || imdbId) {
+			tabs.push({ id: "content", label: "Parents guide", render: (el) => this.renderContent(el, { cert, flags, imdbId, guide: estimateGuide(keywordNames(meta), (meta.genres ?? []).map((g) => g.name), cert) }) });
 		}
 		if (related.length) tabs.push({ id: "related", label: "Similar", render: (el) => this.renderRelated(el, related) });
 
@@ -804,13 +818,54 @@ export class DetailScreen {
 	 * one deserve different amounts of trust, and the link to IMDb's fuller
 	 * guide sits alongside.
 	 */
-	private renderContent(el: HTMLElement): void {
+	private renderContent(el: HTMLElement, info: { cert?: string; flags: string[]; imdbId?: string; guide: ReturnType<typeof estimateGuide> }): void {
 		const e = this.entry;
 
-		if (e.certification) {
-			const box = el.createDiv({ cls: "reel-facet-group" });
-			box.createDiv({ cls: "reel-facet-label", text: "Certificate" });
-			box.createDiv({ cls: "reel-facet-value", text: e.certification });
+		if (info.cert) {
+			const CERT_NOTE: Record<string, string> = {
+				G: "Suitable for all ages.",
+				PG: "Some material may not suit young children.",
+				"PG-13": "May be inappropriate under 13: action violence, some language, mild sexual content.",
+				R: "Restricted: expect strong language, violence or sexual content.",
+				"NC-17": "Adults only: explicit sexual content or extreme violence.",
+				"TV-Y": "Made for very young children.",
+				"TV-G": "Suitable for all ages.",
+				"TV-PG": "Parental guidance suggested.",
+				"TV-14": "May be unsuitable under 14: stronger language, violence or sexual content.",
+				"TV-MA": "Mature audiences only: graphic content likely.",
+			};
+			const box = el.createDiv({ cls: "reel-fl" });
+			box.createDiv({ cls: "reel-fl-title", text: "Rating" });
+			const row = box.createDiv({ cls: "reel-fl-row" });
+			row.createDiv({ cls: "reel-fl-label", text: info.cert });
+			row.createDiv({ cls: "reel-fl-value", text: CERT_NOTE[info.cert.toUpperCase()] ?? "As rated in your region." });
+		}
+
+		// Category by category, like IMDb's guide: a four-step meter per category and
+		// what the estimate rests on. Tap a row for the reasons.
+		if (info.guide.some((g) => g.level > 0)) {
+			const box = el.createDiv({ cls: "reel-fl reel-guide" });
+			box.createDiv({ cls: "reel-fl-title", text: "Estimated guide" });
+			for (const g of info.guide) {
+				const row = box.createDiv({ cls: `reel-guide-row level-${g.level}` });
+				const head = row.createDiv({ cls: "reel-guide-head" });
+				head.createSpan({ cls: "reel-guide-name", text: g.category });
+				head.createSpan({ cls: "reel-guide-level", text: GUIDE_LEVELS[g.level] });
+				const meter = row.createDiv({ cls: "reel-guide-meter" });
+				for (let i = 1; i <= 3; i++) meter.createSpan({ cls: i <= g.level ? "is-on" : "" });
+				if (g.because.length) row.createDiv({ cls: "reel-guide-because reel-dim", text: g.because.join(" · ") });
+			}
+			box.createDiv({
+				cls: "reel-dim reel-fl-note",
+				text: "An estimate from the rating, TMDB keywords and genres. IMDb's guide, written by viewers, grades each category; it opens below.",
+			});
+		} else if (info.flags.length) {
+			const box = el.createDiv({ cls: "reel-fl" });
+			box.createDiv({ cls: "reel-fl-title", text: "Likely contains" });
+			const chips = box.createDiv({ cls: "reel-chips" });
+			for (const f of info.flags) {
+				chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f as ContentFlag] ?? f });
+			}
 		}
 
 		if (e.contentTopics.length) {
@@ -832,26 +887,17 @@ export class DetailScreen {
 			}
 		}
 
-		if (e.contentFlags.length) {
-			const box = el.createDiv({ cls: "reel-facet-group" });
-			box.createDiv({ cls: "reel-facet-label", text: "Flags on this note" });
-			const chips = box.createDiv({ cls: "reel-chips" });
-			for (const f of e.contentFlags) {
-				chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f as ContentFlag] ?? f });
-			}
-		}
-
-		const imdb = imdbUrl(e.imdbId);
+		const imdb = imdbUrl(info.imdbId);
 		if (imdb) {
 			const a = el.createEl("a", { cls: "reel-btn", text: "Full parents guide on IMDb", href: `${imdb}parentalguide` });
 			a.setAttr("target", "_blank");
 			a.setAttr("rel", "noopener");
 		}
 
-		if (!e.contentTopics.length) {
+		if (!e.contentTopics.length && e.path) {
 			el.createDiv({
 				cls: "reel-dim",
-				text: "No community content notes yet — add a DoesTheDogDie key in settings to fetch them.",
+				text: "No community content notes yet. Add a DoesTheDogDie key in settings to fetch them.",
 			});
 		}
 	}
@@ -1025,54 +1071,12 @@ export class DetailScreen {
 
 	/** Titles TMDB associates with this one — the "what next" question. */
 	private renderRelated(el: HTMLElement, rows: TmdbSearchResult[]): void {
-		const strip = el.createDiv({ cls: "reel-related" });
-		for (const r of rows.slice(0, 30)) {
-			const card = strip.createDiv({ cls: "reel-related-card" });
-			card.setAttr("role", "button");
-			card.setAttr("tabindex", "0");
-			card.setAttr("aria-label", `${r.title ?? r.name ?? "Untitled"} — see details`);
-			const poster = card.createDiv({ cls: "reel-related-poster" });
-			this.plugin.posters.attach(poster, {
-				posterUrl: this.plugin.tmdb.posterUrl(r.poster_path, "w342") ?? undefined,
-				title: r.title ?? r.name ?? "",
-			});
-			card.createDiv({ cls: "reel-related-title", text: r.title ?? r.name ?? "Untitled" });
-			const year = (r.release_date ?? r.first_air_date ?? "").slice(0, 4);
-			const bits = [year, r.vote_average ? `★ ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
-			if (bits.length) card.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
-
-			// Already yours? Open it. Otherwise offer to add it — the two
-			// things you might want, without a third screen in between.
-			const open = () => {
-				const mine = this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film");
-				if (mine) void this.plugin.openDetail(mine);
-				else new PreviewSheet(this.plugin, { ...r, media_type: r.media_type ?? (r.name && !r.title ? "tv" : "movie") }, () => {}).open();
-			};
-			holdAt(card, (x, y) =>
-				showResultMenu(
-					this.plugin,
-					{ id: r.id, title: r.title ?? r.name ?? "", year: (r.release_date ?? r.first_air_date ?? "").slice(0, 4), isTv: r.media_type === "tv" || (!!r.name && !r.title) },
-					x,
-					y,
-					open,
-					this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film")
-						? undefined
-						: () => {
-								void this.plugin.notes
-									.createFromResult(r, { date: todayISO(), watchlist: true })
-									.then(() => this.plugin.undo.offer(`Added ${r.title ?? r.name ?? "it"} to your watchlist`))
-									.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
-							}
-				)
-			);
-			card.addEventListener("click", open);
-			card.addEventListener("keydown", (ev: KeyboardEvent) => {
-				if (ev.key === "Enter" || ev.key === " ") {
-					ev.preventDefault();
-					open();
-				}
-			});
-		}
+		paintRelatedFeed(this.plugin, el, {
+			tmdbId: this.entry.tmdbId,
+			isTv: this.entry.type === "tv",
+			seed: rows,
+			layout: "grid",
+		});
 	}
 
 	/** Mean of every episode rating across all seasons, or null if none. */

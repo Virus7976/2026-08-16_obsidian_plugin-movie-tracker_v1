@@ -13,6 +13,7 @@
 import { Notice, Platform, TFile } from "obsidian";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
+import { onHold } from "./titleMenu";
 import { redact } from "../secrets";
 import { renderStars } from "./stars";
 import { paintWash } from "./titleExtras";
@@ -131,6 +132,7 @@ export class RateScreen {
 		container.createDiv({ cls: "reel-rate-count", text: `${this.index + 1} of ${rows.length}` });
 
 		const card = container.createDiv({ cls: "reel-rate-card" });
+		onHold(this.plugin, card, entry);
 		// The whole screen is one film, so it should look like that film. Same
 		// two layers as the sheets: its colour behind, the theme's scrim over.
 		paintWash(card, this.plugin.posters.displayUrl(entry));

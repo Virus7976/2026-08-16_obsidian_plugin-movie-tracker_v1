@@ -31,6 +31,7 @@ import { QuickRate } from "../src/ui/quickRate";
 import { RateScreen } from "../src/ui/rate";
 import { LogSheet } from "../src/ui/logSheet";
 import { FilterSheet, emptyFilters } from "../src/ui/filterSheet";
+import { TitlePage } from "../src/ui/titlePage";
 import { SeasonSheet } from "../src/ui/seasonSheet";
 import { PersonSheet } from "../src/ui/personSheet";
 import { ReelSettingTab } from "../src/settings";
@@ -1501,6 +1502,14 @@ function reviewsheet(root: HTMLElement): void {
 	mountSheet(root, new ReviewEditor(plugin, LIBRARY[0], null, () => {}) as never);
 }
 
+function titlepage(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(
+		root,
+		new TitlePage(plugin, { id: 120, media_type: "movie", title: "A Title You Do Not Own", release_date: "2011-03-04", poster_path: "/p.jpg", vote_average: 7.4, overview: "A film from TMDB that is not in the library yet, opened on its own page." }) as never
+	);
+}
+
 function logsheet(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	mountSheet(root, new LogSheet(plugin.app, plugin, { entry: LIBRARY[0], file: {} as never }) as never);
@@ -2342,6 +2351,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	filterSheet,
 	reviews,
 	reviewsheet,
+	titlepage,
 	rows,
 	rate,
 	stats,

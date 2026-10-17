@@ -25,6 +25,7 @@ import { trailerUrl, providerNames, imdbUrl, tmdbUrl } from "../extract";
 import { formatMinutes } from "../util/dates";
 import { PersonSheet } from "./personSheet";
 import { holdAt, showResultMenu } from "./titleMenu";
+import { paintRelatedFeed } from "./relatedFeed";
 import { badgePerson } from "./personBadge";
 import { skeletonCards, skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
@@ -41,7 +42,8 @@ interface Filters {
 	type: "movie" | "tv";
 }
 
-const EMPTY: Filters = { genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" };
+/** A fresh set each time: the genre lists are mutated in place, so copies must not share them. */
+const emptyFilters = (): Filters => ({ genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" });
 
 /** A mounted shelf: what it holds, how deep it has been read, and whether it is spent. */
 interface FeedRow {
@@ -113,7 +115,7 @@ export class DiscoverScreen {
 	private profile: TasteProfile | null = null;
 	private results: TmdbSearchResult[] | null = null;
 	private genres: { id: number; name: string }[] = [];
-	private filters: Filters = { ...EMPTY };
+	private filters: Filters = emptyFilters();
 	private filterSheet: DiscoverFilterSheet | null = null;
 	private loading = false;
 	private error: string | null = null;
@@ -688,7 +690,7 @@ export class DiscoverScreen {
 				clearSeed: () => (this.seed = null),
 				clearAll: () => {
 					this.seed = null;
-					this.filters = { ...EMPTY, type: this.filters.type };
+					this.filters = { ...emptyFilters(), type: this.filters.type };
 					apply();
 				},
 			});
@@ -1067,13 +1069,22 @@ export class DiscoverScreen {
 
 		if (!Platform.isMobile) {
 			const nav = head.createDiv({ cls: "reel-drow-nav" });
-			const by = (delta: number) => strip.scrollBy({ left: delta, behavior: "smooth" });
-			const left = nav.createEl("button", { cls: "reel-drow-arrow" });
+			// A whole page of cards per press, landing on a card edge so the next
+			// titles start at the left, not mid-poster.
+			const by = (dir: 1 | -1) => {
+				const first = strip.querySelector<HTMLElement>(".reel-dcard");
+				const gap = parseFloat(getComputedStyle(strip).columnGap || "0") || 0;
+				const step = first ? first.getBoundingClientRect().width + gap : 160;
+				const fit = Math.max(1, Math.floor(strip.clientWidth / step));
+				const target = Math.round(strip.scrollLeft / step + dir * fit) * step;
+				strip.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+			};
+			const left = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Previous titles" } });
 			setIcon(left, "chevron-left");
-			left.addEventListener("click", () => by(-600));
-			const right = nav.createEl("button", { cls: "reel-drow-arrow" });
+			left.addEventListener("click", () => by(-1));
+			const right = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Next titles" } });
 			setIcon(right, "chevron-right");
-			right.addEventListener("click", () => by(600));
+			right.addEventListener("click", () => by(1));
 		}
 	}
 
@@ -1447,7 +1458,7 @@ export class DiscoverScreen {
 			});
 			const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
 			reset.addEventListener("click", () => {
-				this.filters = { ...EMPTY, type: this.filters.type };
+				this.filters = { ...emptyFilters(), type: this.filters.type };
 				this.render(container);
 			});
 			return;
@@ -2031,56 +2042,14 @@ export class PreviewSheet extends Modal {
 		if (!rows.length) return;
 
 		slot.createDiv({ cls: "reel-block-title", text: "More like this" });
-		const strip = slot.createDiv({ cls: "reel-related reel-morelike" });
-		for (const r of rows.slice(0, 20)) {
-			const rTv = r.media_type === "tv";
-			const rTitle = (rTv ? r.name : r.title) ?? "Untitled";
-			const card = strip.createDiv({ cls: "reel-related-card" });
-			card.setAttr("role", "button");
-			card.setAttr("tabindex", "0");
-			card.setAttr("aria-label", `${rTitle} — see details`);
-			const poster = card.createDiv({ cls: "reel-related-poster" });
-			const src = this.plugin.tmdb.posterUrl(r.poster_path, "w342");
-			if (src) poster.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-			card.createDiv({ cls: "reel-related-title", text: rTitle });
-			const year = String(yearOf(rTv ? r.first_air_date : r.release_date) ?? "");
-			const bits = [year, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
-			if (bits.length) card.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
-
-			const open = (): void => {
-				const mine = this.plugin.library.byTmdbId(r.id, rTv ? "tv" : "film");
-				if (mine) {
-					this.close();
-					void this.plugin.openDetail(mine);
-				} else {
-					new PreviewSheet(this.plugin, r, this.onAdded).open();
-				}
-			};
-			holdAt(card, (x, y) =>
-				showResultMenu(
-					this.plugin,
-					{ id: r.id, title: rTitle, year, isTv: rTv },
-					x,
-					y,
-					open,
-					this.plugin.library.byTmdbId(r.id, rTv ? "tv" : "film")
-						? undefined
-						: () => {
-								void this.plugin.notes
-									.createFromResult(r, { date: todayISO(), watchlist: true })
-									.then(() => this.plugin.undo.offer(`Added ${rTitle} to your watchlist`))
-									.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
-							}
-				)
-			);
-			card.addEventListener("click", open);
-			card.addEventListener("keydown", (ev: KeyboardEvent) => {
-				if (ev.key === "Enter" || ev.key === " ") {
-					ev.preventDefault();
-					open();
-				}
-			});
-		}
+		paintRelatedFeed(this.plugin, slot, {
+			tmdbId: this.item.id,
+			isTv,
+			seed: rows,
+			layout: "strip",
+			beforeOpenMine: () => this.close(),
+			onAdded: this.onAdded,
+		});
 	}
 
 	/**

@@ -20224,3 +20224,389 @@ body:not(.is-phone) .reel-filter-sheet .reel-filter-clear {
 	top: var(--reel-space-4, 16px);
 	right: var(--reel-space-4, 16px);
 }
+
+/* ==================================================================== */
+/* Title page for a title you do not own                                  */
+/* ==================================================================== */
+.reel-titlepage-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--reel-space-2, 8px);
+	margin: var(--reel-space-3, 12px) 0;
+}
+
+.reel-titlepage-actions .reel-btn {
+	min-height: 44px;
+	border-radius: var(--radius-m, 8px);
+}
+
+.reel-titlepage-main {
+	margin-top: var(--reel-space-3, 12px);
+}
+
+body:not(.is-phone) .modal.reel-titlepage {
+	width: min(980px, 94vw);
+	max-width: 980px;
+	max-height: 90vh;
+	overflow-y: auto;
+}
+
+body:not(.is-phone) .reel-titlepage .reel-facet-body {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+	gap: 0 var(--reel-space-8, 40px);
+	align-items: start;
+}
+
+body:not(.is-phone) .reel-titlepage .reel-facet-body > .reel-money,
+body:not(.is-phone) .reel-titlepage .reel-facet-body > .reel-money-bars,
+body:not(.is-phone) .reel-titlepage .reel-facet-body > .reel-fl-note,
+body:not(.is-phone) .reel-titlepage .reel-facet-body > .reel-related,
+body:not(.is-phone) .reel-titlepage .reel-facet-body > .reel-people,
+body:not(.is-phone) .reel-titlepage .reel-facet-body > .reel-tagline,
+body:not(.is-phone) .reel-titlepage .reel-facet-body > .reel-facet-prose {
+	grid-column: 1 / -1;
+}
+
+body:not(.is-phone) .reel-titlepage .reel-facet-body .reel-related {
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+body:not(.is-phone) .reel-titlepage .reel-money {
+	grid-template-columns: repeat(3, minmax(0, 220px));
+}
+
+/* ==================================================================== */
+/* Quick-switcher list for Discover search (desktop)                      */
+/* ==================================================================== */
+.reel-search-wrap {
+	position: relative;
+}
+
+.reel-suggest-pop {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	right: 0;
+	z-index: 40;
+	max-height: min(70vh, 640px);
+	overflow-y: auto;
+	padding: 6px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	box-shadow: var(--shadow-l, 0 12px 32px rgba(0, 0, 0, 0.35));
+	transform-origin: top center;
+}
+
+.reel-suggest-row {
+	position: relative;
+	display: grid;
+	grid-template-columns: 36px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 12px;
+	padding: 6px 10px;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.reel-suggest-row.is-selected {
+	background: var(--background-modifier-hover);
+}
+
+.reel-suggest-thumb {
+	width: 36px;
+	height: 54px;
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--background-secondary);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-faint);
+}
+
+.reel-suggest-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-suggest-title {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-suggest-sub {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-suggest-add {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border-radius: 50%;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	box-shadow: none;
+}
+
+.reel-suggest-add:hover {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-suggest-hint {
+	padding: 8px 10px 4px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	border-top: 1px solid var(--background-modifier-border);
+	margin-top: 4px;
+}
+
+/* ==================================================================== */
+/* Subtle motion for what is new: short, one property or two, no delays   */
+/* ==================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+	/* The suggestion list drops in from the field it belongs to. */
+	.reel-suggest-pop {
+		animation: reel-drop 120ms cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	/* The row you are on gains a small accent bar, sliding in from the side. */
+	.reel-suggest-row::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 8px;
+		bottom: 8px;
+		width: 3px;
+		border-radius: 2px;
+		background: var(--interactive-accent);
+		transform: scaleY(0);
+		transition: transform 100ms ease-out;
+	}
+
+	.reel-suggest-row.is-selected::before {
+		transform: scaleY(1);
+	}
+
+	/* A tab's contents arrive together, a few pixels up, in one short beat. */
+	.reel-facet-body > * {
+		animation: reel-arrive 130ms cubic-bezier(0.2, 0, 0, 1) both;
+	}
+
+	.reel-facet-tab {
+		transition: color 120ms ease, border-color 120ms ease;
+	}
+
+	/* Box office: the bars fill from the left like a gauge. */
+	.reel-money-fill {
+		transform-origin: left center;
+		animation: reel-fill 320ms cubic-bezier(0.2, 0, 0, 1) both;
+	}
+
+	/* Similar titles lift a little under the pointer. */
+	.reel-related-card .reel-related-poster {
+		transition: transform 120ms ease, box-shadow 120ms ease;
+	}
+
+	@media (hover: hover) {
+		.reel-related-card:hover .reel-related-poster {
+			transform: translateY(-2px);
+			box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+		}
+
+		.reel-tile.is-clickable:hover {
+			transform: translateY(-1px);
+		}
+	}
+
+	.reel-tile {
+		transition: transform 120ms ease, border-color 120ms ease;
+	}
+
+	/* An episode's tick draws in when you mark it. */
+	.reel-episode-tick span {
+		transition: transform 140ms cubic-bezier(0.2, 0, 0, 1), opacity 140ms ease;
+	}
+
+	.reel-episode:not(.is-watched) .reel-episode-tick span {
+		transform: scale(0.6);
+		opacity: 0;
+	}
+
+	.reel-episode-review {
+		transition: transform 100ms ease, color 100ms ease;
+	}
+
+	.reel-episode-review:active {
+		transform: scale(0.88);
+	}
+
+	/* Anything with a hold menu shrinks slowly under the press. */
+	.reel-upnext-row.is-holding,
+	.reel-diary-row.is-holding,
+	.reel-titles-row.is-holding,
+	.reel-related-card.is-holding,
+	.reel-caststrip-cell.is-holding,
+	.reel-episode.is-holding,
+	.reel-rate-card.is-holding,
+	.reel-credit-name.is-holding {
+		transform: scale(0.985);
+		transition: transform 500ms cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	/* The review box's border warms to the accent as you focus it. */
+	.reel-review-body .reel-review-box {
+		transition: border-color 120ms ease;
+	}
+}
+
+@keyframes reel-drop {
+	from { opacity: 0; transform: translateY(-4px) scale(0.99); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes reel-arrive {
+	from { opacity: 0; transform: translateY(4px); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes reel-fill {
+	from { transform: scaleX(0); }
+	to { transform: scaleX(1); }
+}
+
+/* ==================================================================== */
+/* Discover on desktop: actions appear over the poster on hover           */
+/* ==================================================================== */
+/* Three squares under every poster was a row of buttons to look at before a
+   single one was needed. Now the poster is the card: hover (or focus) it and
+   three round buttons appear in its corner. Right-click still opens the full
+   menu. A touch screen with a wide window keeps them visible. */
+.reel-view.is-w700 .reel-dcard {
+	position: relative;
+}
+
+.reel-view.is-w700 .reel-dcard .reel-dcard-actions {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 3;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: auto;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	opacity: 0;
+	transform: translateX(4px);
+	pointer-events: none;
+	transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.reel-view.is-w700 .reel-dcard:hover .reel-dcard-actions,
+.reel-view.is-w700 .reel-dcard:focus-within .reel-dcard-actions {
+	opacity: 1;
+	transform: none;
+	pointer-events: auto;
+}
+
+@media (hover: none) {
+	.reel-view.is-w700 .reel-dcard .reel-dcard-actions {
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
+	}
+}
+
+.reel-view.is-w700 .reel-dcard .reel-dcard-btn {
+	flex: none;
+	width: 34px;
+	height: 34px;
+	min-height: 34px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: rgba(20, 20, 24, 0.78);
+	color: #fff;
+	box-shadow: none;
+}
+
+.reel-view.is-w700 .reel-dcard .reel-dcard-btn:hover {
+	background: rgba(20, 20, 24, 0.95);
+}
+
+.reel-view.is-w700 .reel-dcard .reel-dcard-btn.add:hover {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-view.is-w700 .reel-dcard .reel-dcard-btn.seen:hover {
+	background: var(--color-green, #2f9e44);
+	color: #fff;
+}
+
+.reel-view.is-w700 .reel-dcard .reel-dcard-btn.skip:hover {
+	background: var(--color-red, #c92a2a);
+	color: #fff;
+}
+
+.reel-view.is-w700 .reel-dcard .reel-dcard-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* Estimated parents guide: one row per category with a three-step meter. */
+.reel-guide-row {
+	padding: 10px 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.reel-guide-row:first-of-type {
+	border-top: 0;
+}
+.reel-guide-head {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	font-size: var(--font-ui-small);
+}
+.reel-guide-name {
+	font-weight: 600;
+	color: var(--text-normal);
+}
+.reel-guide-level {
+	color: var(--text-muted);
+}
+.reel-guide-meter {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 4px;
+	margin-top: 6px;
+}
+.reel-guide-meter span {
+	height: 6px;
+	border-radius: 3px;
+	background: var(--background-modifier-border);
+}
+.reel-guide-meter span.is-on {
+	background: var(--color-green);
+}
+.reel-guide-row.level-2 .reel-guide-meter span.is-on {
+	background: var(--color-yellow);
+}
+.reel-guide-row.level-3 .reel-guide-meter span.is-on {
+	background: var(--color-red);
+}
+.reel-guide-because {
+	margin-top: 4px;
+	font-size: 12px;
+}

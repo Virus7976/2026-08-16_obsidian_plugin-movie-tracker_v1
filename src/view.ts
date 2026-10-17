@@ -8,6 +8,7 @@
  * as you move between them.
  */
 
+import { DiscoverSuggest } from "./ui/discoverSuggest";
 import { ItemView, Menu, Platform, WorkspaceLeaf, setIcon } from "obsidian";
 import type ReelPlugin from "./main";
 import type { Entry } from "./types";
@@ -305,6 +306,9 @@ export class ReelView extends ItemView {
 			this.paint();
 		});
 		this.searchEl = search;
+		// On a wide window, Discover's search is a quick-switcher list under the
+		// field: type, arrow, Enter.
+		new DiscoverSuggest(this.plugin, search, searchWrap, () => this.tab === "discover" && this.contentEl.hasClass("is-w700"));
 		// On a phone the field is a doorway to the shared search rather than a
 		// second search of its own. Click, not focus: closing the modal returns
 		// focus here, and focus would open it again.

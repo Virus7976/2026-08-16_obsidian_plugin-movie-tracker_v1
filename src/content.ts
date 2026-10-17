@@ -167,3 +167,89 @@ export function policyBreach(
 
 	return null;
 }
+
+
+/* ------------------------------------------------------------------ */
+/* Estimated parents guide                                             */
+/* ------------------------------------------------------------------ */
+
+export type GuideLevel = 0 | 1 | 2 | 3;
+export const GUIDE_LEVELS = ["None", "Mild", "Moderate", "Severe"] as const;
+
+export interface GuideRow {
+	category: string;
+	level: GuideLevel;
+	/** What the estimate rests on, in words, so it can be checked. */
+	because: string[];
+}
+
+interface CategoryRule {
+	category: string;
+	/** Keyword patterns that count as evidence. */
+	keywords: RegExp[];
+	/** Genres that count as weaker evidence. */
+	genres?: string[];
+	/** The floor a rating implies: index by certificationRank (0 to 5). */
+	floor: GuideLevel[];
+}
+
+const CATEGORY_RULES: CategoryRule[] = [
+	{
+		category: "Sex and nudity",
+		keywords: [/nudity/, /\bnude\b/, /\bsex\b/, /sex scene/, /sexual/, /erotic/, /topless/, /strip/, /prostitut/, /seduc/, /affair/, /lust/],
+		floor: [0, 0, 0, 1, 2, 3],
+	},
+	{
+		category: "Violence and gore",
+		keywords: [/violence/, /violent/, /gore\b/, /gory/, /brutal/, /torture/, /massacre/, /murder/, /serial killer/, /shootout/, /war crime/, /dismember/, /decapitat/, /mutilat/, /splatter/, /blood/],
+		genres: ["War", "Crime", "Action"],
+		floor: [0, 0, 1, 2, 3, 3],
+	},
+	{
+		category: "Profanity",
+		keywords: [/profan/, /swear/, /\bf-word\b/, /vulgar/, /crude/],
+		floor: [0, 0, 1, 2, 3, 3],
+	},
+	{
+		category: "Alcohol, drugs and smoking",
+		keywords: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/, /alcohol/, /drunk/, /smoking/, /cartel/, /overdose/],
+		floor: [0, 0, 0, 1, 2, 3],
+	},
+	{
+		category: "Frightening and intense scenes",
+		keywords: [/horror/, /slasher/, /haunting/, /demonic/, /zombie/, /supernatural/, /jump scare/, /terror/, /psychological thriller/, /disturbing/],
+		genres: ["Horror", "Thriller"],
+		floor: [0, 0, 1, 2, 2, 3],
+	},
+];
+
+/**
+ * A parents guide for any title, with no source that grades one.
+ *
+ * IMDb's guide is written by contributors and is not offered to anything that
+ * is not IMDb; scraping it breaks its terms and its bot checks, so this does
+ * not. What can be said honestly from what TMDB gives for every title is an
+ * estimate: the rating sets a floor for each category (an R rarely means no
+ * strong language), and keywords and genres push it up. Each row says what it
+ * rests on, and the whole is labelled an estimate wherever it is shown.
+ */
+export function estimateGuide(keywords: string[], genres: string[], cert: string | undefined): GuideRow[] {
+	const rank = certificationRank(cert);
+	const lower = keywords.map((k) => k.toLowerCase());
+	const rows: GuideRow[] = [];
+	for (const rule of CATEGORY_RULES) {
+		const hits = lower.filter((k) => rule.keywords.some((re) => re.test(k)));
+		const genreHits = (rule.genres ?? []).filter((g) => genres.includes(g));
+		let level: GuideLevel = rank == null ? 0 : rule.floor[Math.min(rank, rule.floor.length - 1)];
+		const because: string[] = [];
+		if (rank != null && level > 0 && cert) because.push(`rated ${cert}`);
+		// Evidence moves it up: one keyword is a hint, three is a pattern.
+		const evidence = hits.length + (genreHits.length ? 0.5 : 0);
+		const fromEvidence: GuideLevel = evidence >= 3 ? 3 : evidence >= 1.5 ? 2 : evidence > 0 ? 1 : 0;
+		if (fromEvidence > level) level = fromEvidence;
+		if (hits.length) because.push(`tagged ${hits.slice(0, 3).join(", ")}`);
+		if (genreHits.length) because.push(genreHits.join(", ").toLowerCase());
+		rows.push({ category: rule.category, level, because });
+	}
+	return rows;
+}

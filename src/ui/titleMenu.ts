@@ -288,9 +288,12 @@ export function holdAt(el: HTMLElement, cb: (x: number, y: number) => void): voi
 	let held = false;
 	let sx = 0;
 	let sy = 0;
+	// A slow shrink under the finger while the wait runs, so the press visibly
+	// "takes" instead of feeling like a delay before a surprise.
 	const cancel = (): void => {
 		if (timer != null) window.clearTimeout(timer);
 		timer = null;
+		el.removeClass("is-holding");
 	};
 	const open = (x: number, y: number): void => {
 		held = true;
@@ -302,6 +305,7 @@ export function holdAt(el: HTMLElement, cb: (x: number, y: number) => void): voi
 		held = false;
 		sx = e.clientX;
 		sy = e.clientY;
+		el.addClass("is-holding");
 		timer = window.setTimeout(() => open(e.clientX, e.clientY), 500);
 	});
 	el.addEventListener("pointermove", (e) => {

@@ -52,6 +52,20 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.55",
+		date: "2026-10-17",
+		headline: "Press and hold everywhere, a full page for any title, and a parents guide.",
+		changes: [
+			{ kind: "new", text: "Press and hold (or right-click) titles, people, episodes and picks for a menu: Open, Write a review, Log a viewing, Tags and lists. On desktop, sub-menus open when you hover." },
+			{ kind: "new", text: "Any title you do not own now has a full page with the same tabs as your own, and More like this keeps loading as you scroll." },
+			{ kind: "new", text: "The Parents guide tab is on every title: the rating, plus an estimate for sex and nudity, violence, profanity, drugs and frightening scenes, with the reasons. It is an estimate from TMDB data, not IMDb's own guide, which opens with one tap." },
+			{ kind: "new", text: "On desktop, typing in Discover search opens a quick-switcher list. Use the arrow keys and Enter." },
+			{ kind: "better", text: "Discover cards show their buttons when you hover on desktop. The Filters sheet and Up Next use the wide layout on desktop." },
+			{ kind: "better", text: "The arrows on a Discover shelf move a full page of titles and stop on a card edge." },
+			{ kind: "fixed", text: "Filters no longer carry over between Discover screens." },
+		],
+	},
+	{
 		version: "0.9.54",
 		date: "2026-10-17",
 		headline: "Episode reviews, a richer title screen, and a faster feel.",

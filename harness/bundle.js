@@ -873,6 +873,26 @@
     drugs: "Drugs",
     horror: "Horror"
   };
+  var KEYWORD_RULES = {
+    sex: [/\bsex\b/, /sex scene/, /sexual/, /erotic/, /lovemaking/, /seduction/, /prostitut/, /brothel/, /orgy/, /affair/],
+    nudity: [/nudity/, /nude/, /topless/, /full frontal/, /strip club/, /stripper/],
+    profanity: [/profanity/, /swearing/, /obscenit/, /f-word/, /foul language/, /strong language/],
+    violence: [/violence/, /violent/, /brutal/, /torture/, /massacre/, /shootout/, /war crime/],
+    gore: [/gore\b/, /gory/, /dismember/, /decapitat/, /mutilat/, /splatter/, /body horror/],
+    drugs: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/],
+    horror: [/horror/, /slasher/, /supernatural/, /haunting/, /demonic/, /zombie/]
+  };
+  function flagsFromKeywords(keywords) {
+    const found = /* @__PURE__ */ new Set();
+    for (const raw of keywords) {
+      const k = raw.toLowerCase();
+      for (const flag of CONTENT_FLAGS) {
+        if (KEYWORD_RULES[flag].some((re) => re.test(k)))
+          found.add(flag);
+      }
+    }
+    return CONTENT_FLAGS.filter((f) => found.has(f));
+  }
   var CERT_RANK = {
     G: 0,
     "TV-Y": 0,
@@ -887,8 +907,82 @@
     "NC-17": 5,
     X: 5
   };
+  function certificationRank(cert) {
+    if (!cert)
+      return null;
+    const rank2 = CERT_RANK[cert.toUpperCase().trim()];
+    return rank2 == null ? null : rank2;
+  }
   function knownCertifications() {
     return Object.keys(CERT_RANK);
+  }
+  function certificationFromReleaseDates(data, region = "US") {
+    const results = data?.results;
+    if (!Array.isArray(results))
+      return void 0;
+    const row = results.find((r) => r.iso_3166_1 === region);
+    const cert = row?.release_dates?.map((d) => d.certification).find((c) => c && c.trim());
+    return cert?.trim() || void 0;
+  }
+  function certificationFromContentRatings(data, region = "US") {
+    const results = data?.results;
+    if (!Array.isArray(results))
+      return void 0;
+    const row = results.find((r) => r.iso_3166_1 === region);
+    return row?.rating?.trim() || void 0;
+  }
+  var GUIDE_LEVELS = ["None", "Mild", "Moderate", "Severe"];
+  var CATEGORY_RULES = [
+    {
+      category: "Sex and nudity",
+      keywords: [/nudity/, /\bnude\b/, /\bsex\b/, /sex scene/, /sexual/, /erotic/, /topless/, /strip/, /prostitut/, /seduc/, /affair/, /lust/],
+      floor: [0, 0, 0, 1, 2, 3]
+    },
+    {
+      category: "Violence and gore",
+      keywords: [/violence/, /violent/, /gore\b/, /gory/, /brutal/, /torture/, /massacre/, /murder/, /serial killer/, /shootout/, /war crime/, /dismember/, /decapitat/, /mutilat/, /splatter/, /blood/],
+      genres: ["War", "Crime", "Action"],
+      floor: [0, 0, 1, 2, 3, 3]
+    },
+    {
+      category: "Profanity",
+      keywords: [/profan/, /swear/, /\bf-word\b/, /vulgar/, /crude/],
+      floor: [0, 0, 1, 2, 3, 3]
+    },
+    {
+      category: "Alcohol, drugs and smoking",
+      keywords: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/, /alcohol/, /drunk/, /smoking/, /cartel/, /overdose/],
+      floor: [0, 0, 0, 1, 2, 3]
+    },
+    {
+      category: "Frightening and intense scenes",
+      keywords: [/horror/, /slasher/, /haunting/, /demonic/, /zombie/, /supernatural/, /jump scare/, /terror/, /psychological thriller/, /disturbing/],
+      genres: ["Horror", "Thriller"],
+      floor: [0, 0, 1, 2, 2, 3]
+    }
+  ];
+  function estimateGuide(keywords, genres, cert) {
+    const rank2 = certificationRank(cert);
+    const lower2 = keywords.map((k) => k.toLowerCase());
+    const rows2 = [];
+    for (const rule of CATEGORY_RULES) {
+      const hits = lower2.filter((k) => rule.keywords.some((re) => re.test(k)));
+      const genreHits = (rule.genres ?? []).filter((g) => genres.includes(g));
+      let level = rank2 == null ? 0 : rule.floor[Math.min(rank2, rule.floor.length - 1)];
+      const because = [];
+      if (rank2 != null && level > 0 && cert)
+        because.push(`rated ${cert}`);
+      const evidence = hits.length + (genreHits.length ? 0.5 : 0);
+      const fromEvidence = evidence >= 3 ? 3 : evidence >= 1.5 ? 2 : evidence > 0 ? 1 : 0;
+      if (fromEvidence > level)
+        level = fromEvidence;
+      if (hits.length)
+        because.push(`tagged ${hits.slice(0, 3).join(", ")}`);
+      if (genreHits.length)
+        because.push(genreHits.join(", ").toLowerCase());
+      rows2.push({ category: rule.category, level, because });
+    }
+    return rows2;
   }
 
   // src/render/query.ts
@@ -3284,6 +3378,7 @@ ${body}
       if (timer != null)
         window.clearTimeout(timer);
       timer = null;
+      el.removeClass("is-holding");
     };
     const open2 = (x, y) => {
       held = true;
@@ -3295,6 +3390,7 @@ ${body}
       held = false;
       sx = e.clientX;
       sy = e.clientY;
+      el.addClass("is-holding");
       timer = window.setTimeout(() => open2(e.clientX, e.clientY), 500);
     });
     el.addEventListener("pointermove", (e) => {
@@ -3633,6 +3729,7 @@ ${body}
       const list2 = contentEl.createDiv({ cls: "reel-titles-list" });
       for (const entry of this.entries) {
         const row = list2.createDiv({ cls: "reel-titles-row" });
+        onHold(this.plugin, row, entry);
         const poster2 = row.createDiv({ cls: "reel-titles-poster" });
         this.plugin.posters.attach(poster2, entry);
         const body = row.createDiv({ cls: "reel-titles-body" });
@@ -3762,8 +3859,8 @@ ${body}
         text: `${all2.length} ${all2.length === 1 ? "title" : "titles"}`
       });
       const strip = found.createDiv({ cls: "reel-found-strip" });
-      const CAP = 12;
-      for (const e of all2.slice(0, CAP)) {
+      const CAP2 = 12;
+      for (const e of all2.slice(0, CAP2)) {
         const cell = strip.createDiv({ cls: "reel-found-cell" });
         const art = cell.createDiv({ cls: "reel-found-art" });
         plugin2.posters.attach(art, e);
@@ -3782,10 +3879,10 @@ ${body}
           open2();
         });
       }
-      if (all2.length > CAP) {
+      if (all2.length > CAP2) {
         found.createDiv({
           cls: "reel-found-more",
-          text: `and ${all2.length - CAP} more \u2014 the numbers below count all ${all2.length}.`
+          text: `and ${all2.length - CAP2} more \u2014 the numbers below count all ${all2.length}.`
         });
       }
     }
@@ -5612,6 +5709,241 @@ ${body}
     }
   };
 
+  // src/ui/titlePage.ts
+  function entryFromResult(plugin2, r) {
+    const isTv = r.media_type === "tv" || !!r.name && !r.title;
+    const poster2 = plugin2.tmdb.posterUrl(r.poster_path, "w342") ?? void 0;
+    return {
+      path: "",
+      basename: "",
+      type: isTv ? "tv" : "film",
+      tmdbId: r.id,
+      title: (isTv ? r.name : r.title) ?? "Untitled",
+      year: isTv ? void 0 : yearOf(r.release_date),
+      director: [],
+      watched: [],
+      creators: [],
+      firstAirYear: isTv ? yearOf(r.first_air_date) : void 0,
+      seasons: [],
+      genres: [],
+      posterUrl: poster2,
+      castIds: [],
+      directorIds: [],
+      tmdbRating: r.vote_average,
+      status: "",
+      cast: [],
+      characters: [],
+      overview: r.overview,
+      productionCompanies: [],
+      providers: [],
+      contentFlags: [],
+      contentTopics: [],
+      lists: [],
+      added: 0,
+      watchCount: 0
+    };
+  }
+  var TitlePage = class extends Modal {
+    constructor(plugin2, item, onAdded = () => {
+    }) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.item = item;
+      this.onAdded = onAdded;
+      this.busy = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal", "reel-titlepage");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-titlepage-content", "reel-detail");
+      const entry = entryFromResult(this.plugin, this.item);
+      const isTv = entry.type === "tv";
+      paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
+      const head = contentEl.createDiv({ cls: "reel-preview-head" });
+      const posterEl = head.createDiv({ cls: "reel-preview-poster" });
+      const src = this.plugin.tmdb.posterUrl(this.item.poster_path, "w342");
+      if (src)
+        posterEl.createEl("img", { attr: { src, alt: "" } });
+      const body = head.createDiv({ cls: "reel-preview-body" });
+      const h = body.createDiv({ cls: "reel-preview-title" });
+      h.createSpan({ text: entry.title });
+      const year2 = entry.year ?? entry.firstAirYear;
+      if (year2)
+        h.createSpan({ cls: "reel-dim", text: ` ${year2}` });
+      const facts = body.createDiv({ cls: "reel-header-facts" });
+      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      if (this.item.vote_average)
+        facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
+      const actions = contentEl.createDiv({ cls: "reel-titlepage-actions" });
+      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist", attr: { type: "button" } });
+      later.addEventListener("click", () => void this.add(later));
+      const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it", attr: { type: "button" } });
+      seen.addEventListener("click", () => {
+        new LogSheet(this.plugin.app, this.plugin, {
+          pending: { id: this.item.id, type: isTv ? "tv" : "film", title: entry.title }
+        }).open();
+        this.onAdded();
+        this.close();
+      });
+      const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested", attr: { type: "button" } });
+      nope.addEventListener("click", () => {
+        void this.plugin.discover.dismiss(this.item.id).then(() => {
+          this.onAdded();
+          this.close();
+        });
+      });
+      if (entry.overview)
+        contentEl.createDiv({ cls: "reel-preview-overview", text: entry.overview });
+      const main = contentEl.createDiv({ cls: "reel-titlepage-main" });
+      const screen = new DetailScreen(this.plugin, entry, () => this.close());
+      void screen.renderReference(main, isTv);
+    }
+    async add(button) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      button.setText("Adding\u2026");
+      button.setAttr("disabled", "true");
+      try {
+        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: true });
+        this.plugin.undo.offer("Added to your watchlist");
+        this.onAdded();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+        button.setText("Retry");
+        button.removeAttribute("disabled");
+        this.busy = false;
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
+  // src/ui/relatedFeed.ts
+  var CAP = 240;
+  function paintRelatedFeed(plugin2, el, opts) {
+    const list2 = el.createDiv({ cls: opts.layout === "grid" ? "reel-related" : "reel-related reel-morelike" });
+    const seen = /* @__PURE__ */ new Set([opts.tmdbId]);
+    let sources = ["recommendations", "similar"];
+    let page = 1;
+    let done = false;
+    let loading = false;
+    let shownCount = 0;
+    const card = (raw) => {
+      const r = { ...raw, media_type: raw.media_type ?? (opts.isTv ? "tv" : "movie") };
+      const rTv = r.media_type === "tv";
+      const title = (rTv ? r.name : r.title) ?? "Untitled";
+      const year2 = String(yearOf(rTv ? r.first_air_date : r.release_date) ?? "");
+      const c = list2.createDiv({ cls: "reel-related-card" });
+      c.setAttr("role", "button");
+      c.setAttr("tabindex", "0");
+      c.setAttr("aria-label", `${title} \u2014 see details`);
+      const poster2 = c.createDiv({ cls: "reel-related-poster" });
+      plugin2.posters.attach(poster2, { posterUrl: plugin2.tmdb.posterUrl(r.poster_path, "w342") ?? void 0, title });
+      c.createDiv({ cls: "reel-related-title", text: title });
+      const bits = [year2, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
+      if (bits.length)
+        c.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
+      const mine = () => plugin2.library.byTmdbId(r.id, rTv ? "tv" : "film");
+      const open2 = () => {
+        const own = mine();
+        if (own) {
+          opts.beforeOpenMine?.();
+          void plugin2.openDetail(own);
+        } else
+          new TitlePage(plugin2, r, opts.onAdded).open();
+      };
+      holdAt(
+        c,
+        (x, y) => showResultMenu(
+          plugin2,
+          { id: r.id, title, year: year2, isTv: rTv },
+          x,
+          y,
+          open2,
+          mine() ? void 0 : () => {
+            void plugin2.notes.createFromResult(r, { date: todayISO(), watchlist: true }).then(() => plugin2.undo.offer(`Added ${title} to your watchlist`)).catch((e) => new Notice(`Reel: ${redact(e)}`));
+          }
+        )
+      );
+      c.addEventListener("click", open2);
+      c.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          open2();
+        }
+      });
+    };
+    const add = (rows2) => {
+      let n2 = 0;
+      for (const r of rows2) {
+        if (seen.has(r.id) || r.adult || !r.poster_path)
+          continue;
+        seen.add(r.id);
+        card(r);
+        n2++;
+        shownCount++;
+      }
+      return n2;
+    };
+    add(opts.seed);
+    const sentinel = el.createDiv({ cls: "reel-feed-end reel-related-end" });
+    if (opts.layout === "strip")
+      list2.appendChild(sentinel);
+    sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
+    const more = async () => {
+      if (loading || done)
+        return;
+      loading = true;
+      try {
+        for (let tries = 0; tries < 4 && shownCount < CAP; tries++) {
+          const source = sources[0];
+          if (!source)
+            break;
+          page += 1;
+          const res = await plugin2.tmdb.relatedPage(opts.isTv ? "tv" : "movie", opts.tmdbId, source, page);
+          if (page >= res.total_pages) {
+            sources = sources.slice(1);
+            page = 0;
+          }
+          if (add(res.results) > 0)
+            break;
+        }
+      } catch {
+        done = true;
+      } finally {
+        loading = false;
+        if (!sources.length || shownCount >= CAP)
+          done = true;
+        if (done)
+          sentinel.remove();
+      }
+    };
+    const startOn = () => {
+      page = 1;
+    };
+    startOn();
+    const root = opts.layout === "strip" ? list2 : null;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting))
+          return;
+        void more().then(() => {
+          if (!sentinel.isConnected)
+            return;
+          io.unobserve(sentinel);
+          io.observe(sentinel);
+        });
+      },
+      { root, rootMargin: opts.layout === "strip" ? "0px 400px 0px 0px" : "600px 0px" }
+    );
+    io.observe(sentinel);
+  }
+
   // src/util/failure.ts
   function diagnose(status, online) {
     if (!online) {
@@ -5727,7 +6059,7 @@ ${body}
   }
 
   // src/ui/discoverView.ts
-  var EMPTY = { genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" };
+  var emptyFilters = () => ({ genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" });
   var DiscoverScreen = class {
     constructor(plugin2) {
       this.plugin = plugin2;
@@ -5776,7 +6108,7 @@ ${body}
       this.profile = null;
       this.results = null;
       this.genres = [];
-      this.filters = { ...EMPTY };
+      this.filters = emptyFilters();
       this.filterSheet = null;
       this.loading = false;
       this.error = null;
@@ -6248,7 +6580,7 @@ ${body}
           clearSeed: () => this.seed = null,
           clearAll: () => {
             this.seed = null;
-            this.filters = { ...EMPTY, type: this.filters.type };
+            this.filters = { ...emptyFilters(), type: this.filters.type };
             apply();
           }
         });
@@ -6589,13 +6921,20 @@ ${body}
       }
       if (!Platform.isMobile) {
         const nav = head.createDiv({ cls: "reel-drow-nav" });
-        const by = (delta) => strip.scrollBy({ left: delta, behavior: "smooth" });
-        const left = nav.createEl("button", { cls: "reel-drow-arrow" });
+        const by = (dir) => {
+          const first = strip.querySelector(".reel-dcard");
+          const gap = parseFloat(getComputedStyle(strip).columnGap || "0") || 0;
+          const step = first ? first.getBoundingClientRect().width + gap : 160;
+          const fit = Math.max(1, Math.floor(strip.clientWidth / step));
+          const target = Math.round(strip.scrollLeft / step + dir * fit) * step;
+          strip.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+        };
+        const left = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Previous titles" } });
         setIcon(left, "chevron-left");
-        left.addEventListener("click", () => by(-600));
-        const right = nav.createEl("button", { cls: "reel-drow-arrow" });
+        left.addEventListener("click", () => by(-1));
+        const right = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Next titles" } });
         setIcon(right, "chevron-right");
-        right.addEventListener("click", () => by(600));
+        right.addEventListener("click", () => by(1));
       }
     }
     /** Another page for one shelf, appended where you are already looking. */
@@ -6886,7 +7225,7 @@ ${body}
         });
         const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
         reset.addEventListener("click", () => {
-          this.filters = { ...EMPTY, type: this.filters.type };
+          this.filters = { ...emptyFilters(), type: this.filters.type };
           this.render(container);
         });
         return;
@@ -7159,7 +7498,7 @@ ${body}
       this.contentEl.empty();
     }
   };
-  var PreviewSheet = class _PreviewSheet extends Modal {
+  var PreviewSheet = class extends Modal {
     constructor(plugin2, item, onAdded, role) {
       super(plugin2.app);
       this.plugin = plugin2;
@@ -7333,53 +7672,14 @@ ${body}
       if (!rows2.length)
         return;
       slot.createDiv({ cls: "reel-block-title", text: "More like this" });
-      const strip = slot.createDiv({ cls: "reel-related reel-morelike" });
-      for (const r of rows2.slice(0, 20)) {
-        const rTv = r.media_type === "tv";
-        const rTitle = (rTv ? r.name : r.title) ?? "Untitled";
-        const card = strip.createDiv({ cls: "reel-related-card" });
-        card.setAttr("role", "button");
-        card.setAttr("tabindex", "0");
-        card.setAttr("aria-label", `${rTitle} \u2014 see details`);
-        const poster2 = card.createDiv({ cls: "reel-related-poster" });
-        const src = this.plugin.tmdb.posterUrl(r.poster_path, "w342");
-        if (src)
-          poster2.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
-        card.createDiv({ cls: "reel-related-title", text: rTitle });
-        const year2 = String(yearOf(rTv ? r.first_air_date : r.release_date) ?? "");
-        const bits = [year2, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
-        if (bits.length)
-          card.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
-        const open2 = () => {
-          const mine = this.plugin.library.byTmdbId(r.id, rTv ? "tv" : "film");
-          if (mine) {
-            this.close();
-            void this.plugin.openDetail(mine);
-          } else {
-            new _PreviewSheet(this.plugin, r, this.onAdded).open();
-          }
-        };
-        holdAt(
-          card,
-          (x, y) => showResultMenu(
-            this.plugin,
-            { id: r.id, title: rTitle, year: year2, isTv: rTv },
-            x,
-            y,
-            open2,
-            this.plugin.library.byTmdbId(r.id, rTv ? "tv" : "film") ? void 0 : () => {
-              void this.plugin.notes.createFromResult(r, { date: todayISO(), watchlist: true }).then(() => this.plugin.undo.offer(`Added ${rTitle} to your watchlist`)).catch((e) => new Notice(`Reel: ${redact(e)}`));
-            }
-          )
-        );
-        card.addEventListener("click", open2);
-        card.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter" || ev.key === " ") {
-            ev.preventDefault();
-            open2();
-          }
-        });
-      }
+      paintRelatedFeed(this.plugin, slot, {
+        tmdbId: this.item.id,
+        isTv,
+        seed: rows2,
+        layout: "strip",
+        beforeOpenMine: () => this.close(),
+        onAdded: this.onAdded
+      });
     }
     /**
      * IMDb, its parents guide, and TMDB.
@@ -8054,6 +8354,10 @@ ${body}
      * response the rest of the plugin uses, so opening this costs nothing
      * after the first time.
      */
+    /** The reference tabs on their own, for a title that is not in the library. */
+    renderReference(main, isTv) {
+      return this.renderFacets(main, isTv);
+    }
     async renderFacets(main, isTv) {
       const wrap = main.createDiv({ cls: "reel-facets" });
       wrap.createDiv({ cls: "reel-loading", text: "Loading details\u2026", attr: { role: "status" } });
@@ -8094,8 +8398,12 @@ ${body}
       if (film2?.release_dates?.results?.length) {
         tabs.push({ id: "releases", label: "Releases", render: (el) => this.renderReleases(el, film2) });
       }
-      if (this.entry.contentTopics.length || this.entry.certification) {
-        tabs.push({ id: "content", label: "Content", render: (el) => this.renderContent(el) });
+      const region = (this.plugin.settings.region || "US").toUpperCase();
+      const cert = this.entry.certification ?? (isTv ? certificationFromContentRatings(meta.content_ratings, region) : certificationFromReleaseDates(film2?.release_dates, region));
+      const flags = this.entry.contentFlags.length ? this.entry.contentFlags : flagsFromKeywords(keywordNames(meta));
+      const imdbId = this.entry.imdbId ?? meta.external_ids?.imdb_id ?? film2?.imdb_id ?? void 0;
+      if (this.entry.contentTopics.length || cert || flags.length || imdbId) {
+        tabs.push({ id: "content", label: "Parents guide", render: (el) => this.renderContent(el, { cert, flags, imdbId, guide: estimateGuide(keywordNames(meta), (meta.genres ?? []).map((g) => g.name), cert) }) });
       }
       if (related.length)
         tabs.push({ id: "related", label: "Similar", render: (el) => this.renderRelated(el, related) });
@@ -8482,12 +8790,52 @@ ${body}
      * one deserve different amounts of trust, and the link to IMDb's fuller
      * guide sits alongside.
      */
-    renderContent(el) {
+    renderContent(el, info) {
       const e = this.entry;
-      if (e.certification) {
-        const box = el.createDiv({ cls: "reel-facet-group" });
-        box.createDiv({ cls: "reel-facet-label", text: "Certificate" });
-        box.createDiv({ cls: "reel-facet-value", text: e.certification });
+      if (info.cert) {
+        const CERT_NOTE = {
+          G: "Suitable for all ages.",
+          PG: "Some material may not suit young children.",
+          "PG-13": "May be inappropriate under 13: action violence, some language, mild sexual content.",
+          R: "Restricted: expect strong language, violence or sexual content.",
+          "NC-17": "Adults only: explicit sexual content or extreme violence.",
+          "TV-Y": "Made for very young children.",
+          "TV-G": "Suitable for all ages.",
+          "TV-PG": "Parental guidance suggested.",
+          "TV-14": "May be unsuitable under 14: stronger language, violence or sexual content.",
+          "TV-MA": "Mature audiences only: graphic content likely."
+        };
+        const box = el.createDiv({ cls: "reel-fl" });
+        box.createDiv({ cls: "reel-fl-title", text: "Rating" });
+        const row = box.createDiv({ cls: "reel-fl-row" });
+        row.createDiv({ cls: "reel-fl-label", text: info.cert });
+        row.createDiv({ cls: "reel-fl-value", text: CERT_NOTE[info.cert.toUpperCase()] ?? "As rated in your region." });
+      }
+      if (info.guide.some((g) => g.level > 0)) {
+        const box = el.createDiv({ cls: "reel-fl reel-guide" });
+        box.createDiv({ cls: "reel-fl-title", text: "Estimated guide" });
+        for (const g of info.guide) {
+          const row = box.createDiv({ cls: `reel-guide-row level-${g.level}` });
+          const head = row.createDiv({ cls: "reel-guide-head" });
+          head.createSpan({ cls: "reel-guide-name", text: g.category });
+          head.createSpan({ cls: "reel-guide-level", text: GUIDE_LEVELS[g.level] });
+          const meter = row.createDiv({ cls: "reel-guide-meter" });
+          for (let i = 1; i <= 3; i++)
+            meter.createSpan({ cls: i <= g.level ? "is-on" : "" });
+          if (g.because.length)
+            row.createDiv({ cls: "reel-guide-because reel-dim", text: g.because.join(" \xB7 ") });
+        }
+        box.createDiv({
+          cls: "reel-dim reel-fl-note",
+          text: "An estimate from the rating, TMDB keywords and genres. IMDb's guide, written by viewers, grades each category; it opens below."
+        });
+      } else if (info.flags.length) {
+        const box = el.createDiv({ cls: "reel-fl" });
+        box.createDiv({ cls: "reel-fl-title", text: "Likely contains" });
+        const chips = box.createDiv({ cls: "reel-chips" });
+        for (const f of info.flags) {
+          chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f] ?? f });
+        }
       }
       if (e.contentTopics.length) {
         const box = el.createDiv({ cls: "reel-facet-group" });
@@ -8502,24 +8850,16 @@ ${body}
           row.createSpan({ cls: "reel-content-name", text: topic });
         }
       }
-      if (e.contentFlags.length) {
-        const box = el.createDiv({ cls: "reel-facet-group" });
-        box.createDiv({ cls: "reel-facet-label", text: "Flags on this note" });
-        const chips = box.createDiv({ cls: "reel-chips" });
-        for (const f of e.contentFlags) {
-          chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f] ?? f });
-        }
-      }
-      const imdb = imdbUrl(e.imdbId);
+      const imdb = imdbUrl(info.imdbId);
       if (imdb) {
         const a = el.createEl("a", { cls: "reel-btn", text: "Full parents guide on IMDb", href: `${imdb}parentalguide` });
         a.setAttr("target", "_blank");
         a.setAttr("rel", "noopener");
       }
-      if (!e.contentTopics.length) {
+      if (!e.contentTopics.length && e.path) {
         el.createDiv({
           cls: "reel-dim",
-          text: "No community content notes yet \u2014 add a DoesTheDogDie key in settings to fetch them."
+          text: "No community content notes yet. Add a DoesTheDogDie key in settings to fetch them."
         });
       }
     }
@@ -8682,51 +9022,12 @@ ${body}
     }
     /** Titles TMDB associates with this one — the "what next" question. */
     renderRelated(el, rows2) {
-      const strip = el.createDiv({ cls: "reel-related" });
-      for (const r of rows2.slice(0, 30)) {
-        const card = strip.createDiv({ cls: "reel-related-card" });
-        card.setAttr("role", "button");
-        card.setAttr("tabindex", "0");
-        card.setAttr("aria-label", `${r.title ?? r.name ?? "Untitled"} \u2014 see details`);
-        const poster2 = card.createDiv({ cls: "reel-related-poster" });
-        this.plugin.posters.attach(poster2, {
-          posterUrl: this.plugin.tmdb.posterUrl(r.poster_path, "w342") ?? void 0,
-          title: r.title ?? r.name ?? ""
-        });
-        card.createDiv({ cls: "reel-related-title", text: r.title ?? r.name ?? "Untitled" });
-        const year2 = (r.release_date ?? r.first_air_date ?? "").slice(0, 4);
-        const bits = [year2, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
-        if (bits.length)
-          card.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
-        const open2 = () => {
-          const mine = this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film");
-          if (mine)
-            void this.plugin.openDetail(mine);
-          else
-            new PreviewSheet(this.plugin, { ...r, media_type: r.media_type ?? (r.name && !r.title ? "tv" : "movie") }, () => {
-            }).open();
-        };
-        holdAt(
-          card,
-          (x, y) => showResultMenu(
-            this.plugin,
-            { id: r.id, title: r.title ?? r.name ?? "", year: (r.release_date ?? r.first_air_date ?? "").slice(0, 4), isTv: r.media_type === "tv" || !!r.name && !r.title },
-            x,
-            y,
-            open2,
-            this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film") ? void 0 : () => {
-              void this.plugin.notes.createFromResult(r, { date: todayISO(), watchlist: true }).then(() => this.plugin.undo.offer(`Added ${r.title ?? r.name ?? "it"} to your watchlist`)).catch((e) => new Notice(`Reel: ${redact(e)}`));
-            }
-          )
-        );
-        card.addEventListener("click", open2);
-        card.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter" || ev.key === " ") {
-            ev.preventDefault();
-            open2();
-          }
-        });
-      }
+      paintRelatedFeed(this.plugin, el, {
+        tmdbId: this.entry.tmdbId,
+        isTv: this.entry.type === "tv",
+        seed: rows2,
+        layout: "grid"
+      });
     }
     /** Mean of every episode rating across all seasons, or null if none. */
     episodeAverage() {
@@ -9759,6 +10060,7 @@ ${body}
       const entry = rows2[this.index];
       container.createDiv({ cls: "reel-rate-count", text: `${this.index + 1} of ${rows2.length}` });
       const card = container.createDiv({ cls: "reel-rate-card" });
+      onHold(this.plugin, card, entry);
       paintWash(card, this.plugin.posters.displayUrl(entry));
       card.setAttr("tabindex", "0");
       card.addEventListener("keydown", (ev) => void this.handleKey(ev, entry, container, rows2.length));
@@ -9911,7 +10213,7 @@ ${body}
   };
 
   // src/ui/filterSheet.ts
-  function emptyFilters() {
+  function emptyFilters2() {
     return { type: "all", genres: [], statuses: [], lists: [], sort: "watched", sortFlip: false, sort2: "", layout: "grid" };
   }
   function toggle(set, value) {
@@ -9970,7 +10272,7 @@ ${body}
       const clear = foot.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all", attr: { type: "button" } });
       clear.addEventListener("click", () => {
         const { sort, sortFlip, sort2, layout } = this.filters;
-        Object.assign(this.filters, emptyFilters(), { sort, sortFlip, sort2, layout });
+        Object.assign(this.filters, emptyFilters2(), { sort, sortFlip, sort2, layout });
         this.opts.onChange();
         this.redraw();
       });
@@ -13595,7 +13897,7 @@ ${body}
   }
   function filterSheet(root) {
     root.addClass("reel-view-body");
-    const state = emptyFilters();
+    const state = emptyFilters2();
     state.genres = ["Action", "Comedy"];
     state.statuses = ["watchlist"];
     mountSheet(
@@ -13926,6 +14228,13 @@ ${body}
     root.addClass("reel-view-body");
     mountSheet(root, new ReviewEditor(plugin, LIBRARY[0], null, () => {
     }));
+  }
+  function titlepage(root) {
+    root.addClass("reel-view-body");
+    mountSheet(
+      root,
+      new TitlePage(plugin, { id: 120, media_type: "movie", title: "A Title You Do Not Own", release_date: "2011-03-04", poster_path: "/p.jpg", vote_average: 7.4, overview: "A film from TMDB that is not in the library yet, opened on its own page." })
+    );
   }
   function logsheet(root) {
     root.addClass("reel-view-body");
@@ -14418,6 +14727,7 @@ ${body}
     filterSheet,
     reviews,
     reviewsheet,
+    titlepage,
     rows,
     rate,
     stats,

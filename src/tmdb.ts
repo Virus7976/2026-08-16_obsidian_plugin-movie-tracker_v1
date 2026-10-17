@@ -394,6 +394,23 @@ export class TmdbClient {
 	 * five extra endpoints' worth of data for zero extra round trips, which
 	 * matters on a phone far more than it does on a desktop.
 	 */
+	/**
+	 * One page of titles related to this one. `recommendations` is what people
+	 * who liked it also liked; `similar` is drawn from shared keywords and genres.
+	 * Not cached: it is read once per scroll and never twice.
+	 */
+	async relatedPage(
+		kind: "movie" | "tv",
+		id: number,
+		source: "recommendations" | "similar",
+		page: number
+	): Promise<{ results: TmdbSearchResult[]; total_pages: number }> {
+		const data = await this.request<{ results?: TmdbSearchResult[]; total_pages?: number }>(`/${kind}/${id}/${source}`, {
+			page: String(page),
+		});
+		return { results: data.results ?? [], total_pages: data.total_pages ?? 1 };
+	}
+
 	async getFilm(id: number): Promise<TmdbFilm> {
 		return this.cached(
 			`movie2-${id}`,
