@@ -932,7 +932,15 @@ export class DiscoverScreen {
 		const io = new IntersectionObserver(
 			(entries) => {
 				if (!entries.some((e) => e.isIntersecting)) return;
-				void this.mountNext(container);
+				// An observer only speaks when the sentinel's state changes. A new
+				// row can leave it still inside the margin, so it never speaks
+				// again and "Loading more…" sits there. Watching it afresh asks
+				// the question again.
+				void this.mountNext(container).then(() => {
+					if (!sentinel.isConnected) return;
+					io.unobserve(sentinel);
+					io.observe(sentinel);
+				});
 			},
 			{ root: scroller as Element | null, rootMargin: "600px 0px" }
 		);
@@ -1268,7 +1276,11 @@ export class DiscoverScreen {
 		const io = new IntersectionObserver(
 			(entries) => {
 				if (!entries.some((e) => e.isIntersecting)) return;
-				void this.moreSearch(container, grid, sentinel, count);
+				void this.moreSearch(container, grid, sentinel, count).then(() => {
+					if (!sentinel.isConnected) return;
+					io.unobserve(sentinel);
+					io.observe(sentinel);
+				});
 			},
 			{ root: scroller as Element | null, rootMargin: "600px 0px" }
 		);

@@ -331,7 +331,25 @@ export class ReviewEditor extends Modal {
 			attr: { rows: "4", placeholder: "What did you think?" },
 		});
 		box.value = this.text;
-		box.addEventListener("input", () => (this.text = box.value));
+		/*
+		 * The box grows with what is typed, up to a cap, then scrolls. A fixed
+		 * height cut the sentence you were writing off at the top of the box. The
+		 * cap is a share of the visible height so the keyboard still leaves room
+		 * for Rating, Date and Save.
+		 */
+		const grow = (): void => {
+			const vh = window.visualViewport?.height ?? window.innerHeight;
+			const cap = Math.max(120, Math.round(vh * 0.4));
+			box.style.height = "auto";
+			box.style.height = `${Math.min(box.scrollHeight + 2, cap)}px`;
+			box.style.overflowY = box.scrollHeight + 2 > cap ? "auto" : "hidden";
+		};
+		box.addEventListener("input", () => {
+			this.text = box.value;
+			grow();
+		});
+		window.setTimeout(grow, 0);
+		window.setTimeout(grow, 350);
 
 		const meta = body.createDiv({ cls: "reel-review-meta" });
 
@@ -351,12 +369,32 @@ export class ReviewEditor extends Modal {
 		});
 
 		meta.createDiv({ cls: "reel-field-label", text: "Date" });
-		const dateEl = meta.createEl("input", { cls: "reel-input reel-review-date", attr: { type: "date" } });
+		/*
+		 * A button that shows the date in words, over a hidden native input. The
+		 * native field drew its own calendar glyph on top of the year on Android,
+		 * and no stylesheet reaches it there; showPicker() opens the same picker.
+		 */
+		const dateWrap = meta.createDiv({ cls: "reel-review-date-wrap" });
+		const dateEl = dateWrap.createEl("input", { cls: "reel-review-date-native", attr: { type: "date", tabindex: "-1", "aria-hidden": "true" } });
 		dateEl.value = this.date;
+		const dateBtn = dateWrap.createEl("button", { cls: "reel-review-date", attr: { type: "button" } });
+		const paintDate = (): void => dateBtn.setText(this.date ? prettyDate(this.date) : "Pick a date");
+		paintDate();
 		// An existing review's date is what ties it to a viewing, and moving it
 		// would orphan the pair. Only a new one is free to choose.
-		dateEl.disabled = this.review != null;
-		dateEl.addEventListener("change", () => (this.date = dateEl.value));
+		dateBtn.disabled = this.review != null;
+		dateBtn.addEventListener("click", () => {
+			try {
+				dateEl.showPicker();
+			} catch {
+				dateEl.focus();
+				dateEl.click();
+			}
+		});
+		dateEl.addEventListener("change", () => {
+			this.date = dateEl.value;
+			paintDate();
+		});
 
 		const actions = contentEl.createDiv({ cls: "reel-actions" });
 		const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel", attr: { type: "button" } });

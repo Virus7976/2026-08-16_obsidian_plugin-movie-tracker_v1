@@ -19421,3 +19421,71 @@ body.is-mobile .modal-container .modal.reel-modal.reel-review-sheet {
 	margin-top: 0;
 	margin-bottom: var(--reel-space-1);
 }
+
+/* ==================================================================== */
+/* Review sheet: a box that grows, a date that is a button               */
+/* ==================================================================== */
+.reel-review-body .reel-review-box {
+	height: auto;
+	min-height: 96px;
+	resize: none;
+	overflow-y: hidden;
+	box-sizing: border-box;
+}
+
+.reel-review-date-wrap {
+	position: relative;
+	min-width: 0;
+}
+
+.reel-review-date-native {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.reel-review-body button.reel-review-date {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	width: 100%;
+	box-shadow: none;
+	text-align: left;
+	color: var(--text-normal);
+	font-weight: 500;
+}
+
+.reel-review-body button.reel-review-date:disabled {
+	opacity: 0.6;
+}
+
+/* Rating and Date rows the same height, labels aligned with the controls */
+.reel-review-body .reel-review-meta {
+	grid-template-columns: 56px 1fr;
+	row-gap: var(--reel-space-2, 8px);
+}
+
+.reel-review-body .reel-review-meta .reel-stars {
+	min-height: 44px;
+}
+
+/* The wash fills the whole sheet, not just the area inside its padding, so it
+   no longer shows as a tinted card with dark margins on a phone. */
+body.is-mobile .reel-review-sheet .reel-sheet-wash {
+	inset: -16px -16px -48px -16px;
+}
+
+.reel-review-body button.reel-review-date {
+	height: 44px;
+	min-height: 44px;
+}
+
+@media (pointer: fine) and (min-width: 700px) {
+	.reel-review-body button.reel-review-date {
+		height: 34px;
+		min-height: 34px;
+	}
+}

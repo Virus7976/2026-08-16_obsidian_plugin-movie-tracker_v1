@@ -52,6 +52,17 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.53",
+		date: "2026-10-17",
+		headline: "A review box that grows, and shelves that snap.",
+		changes: [
+			{ kind: "fixed", text: "Discover's \"Loading more\" now loads. It stalled whenever the new row left the end of the screen still in view." },
+			{ kind: "better", text: "The review box grows as you type, then scrolls once it is large, instead of cutting your words off." },
+			{ kind: "better", text: "The review sheet's tint fills the whole sheet, and the date is one clean field with no calendar icon on top." },
+			{ kind: "better", text: "Swiping a Discover shelf moves one screenful and lands squarely, so you no longer swipe again and again." },
+		],
+	},
+	{
 		version: "0.9.52",
 		date: "2026-10-17",
 		headline: "Up Next shows your watchlist, and the screens feel faster.",

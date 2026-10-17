@@ -4542,7 +4542,12 @@
         (entries) => {
           if (!entries.some((e) => e.isIntersecting))
             return;
-          void this.mountNext(container);
+          void this.mountNext(container).then(() => {
+            if (!sentinel.isConnected)
+              return;
+            io.unobserve(sentinel);
+            io.observe(sentinel);
+          });
         },
         { root: scroller, rootMargin: "600px 0px" }
       );
@@ -4836,7 +4841,12 @@
         (entries) => {
           if (!entries.some((e) => e.isIntersecting))
             return;
-          void this.moreSearch(container, grid, sentinel, count);
+          void this.moreSearch(container, grid, sentinel, count).then(() => {
+            if (!sentinel.isConnected)
+              return;
+            io.unobserve(sentinel);
+            io.observe(sentinel);
+          });
         },
         { root: scroller, rootMargin: "600px 0px" }
       );
@@ -7440,7 +7450,19 @@ ${body}
         attr: { rows: "4", placeholder: "What did you think?" }
       });
       box.value = this.text;
-      box.addEventListener("input", () => this.text = box.value);
+      const grow = () => {
+        const vh = window.visualViewport?.height ?? window.innerHeight;
+        const cap = Math.max(120, Math.round(vh * 0.4));
+        box.style.height = "auto";
+        box.style.height = `${Math.min(box.scrollHeight + 2, cap)}px`;
+        box.style.overflowY = box.scrollHeight + 2 > cap ? "auto" : "hidden";
+      };
+      box.addEventListener("input", () => {
+        this.text = box.value;
+        grow();
+      });
+      window.setTimeout(grow, 0);
+      window.setTimeout(grow, 350);
       const meta = body.createDiv({ cls: "reel-review-meta" });
       meta.createDiv({ cls: "reel-field-label", text: "Rating" });
       renderStars(meta, {
@@ -7450,10 +7472,25 @@ ${body}
         }
       });
       meta.createDiv({ cls: "reel-field-label", text: "Date" });
-      const dateEl = meta.createEl("input", { cls: "reel-input reel-review-date", attr: { type: "date" } });
+      const dateWrap = meta.createDiv({ cls: "reel-review-date-wrap" });
+      const dateEl = dateWrap.createEl("input", { cls: "reel-review-date-native", attr: { type: "date", tabindex: "-1", "aria-hidden": "true" } });
       dateEl.value = this.date;
-      dateEl.disabled = this.review != null;
-      dateEl.addEventListener("change", () => this.date = dateEl.value);
+      const dateBtn = dateWrap.createEl("button", { cls: "reel-review-date", attr: { type: "button" } });
+      const paintDate = () => dateBtn.setText(this.date ? prettyDate(this.date) : "Pick a date");
+      paintDate();
+      dateBtn.disabled = this.review != null;
+      dateBtn.addEventListener("click", () => {
+        try {
+          dateEl.showPicker();
+        } catch {
+          dateEl.focus();
+          dateEl.click();
+        }
+      });
+      dateEl.addEventListener("change", () => {
+        this.date = dateEl.value;
+        paintDate();
+      });
       const actions = contentEl.createDiv({ cls: "reel-actions" });
       const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel", attr: { type: "button" } });
       cancel.addEventListener("click", () => this.close());
