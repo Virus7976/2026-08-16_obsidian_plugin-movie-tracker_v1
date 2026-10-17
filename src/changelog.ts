@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.47",
+		date: "2026-10-17",
+		headline: "Steadier scrolling, a tidier top row, and search that finds kinds of films.",
+		changes: [
+			{ kind: "new", text: "Type a genre or decade in search, like thriller or 90s comedy, to find titles you do not have yet." },
+			{ kind: "better", text: "If your keys are locked, search shows an Unlock item instead of a pop-up. After you unlock, you come back to the same search." },
+			{ kind: "better", text: "Sort is one button with a menu. It has Reverse order." },
+			{ kind: "better", text: "Discover, Rate and the other tabs use the same small controls and posters as the Library." },
+			{ kind: "better", text: "The review sheet keeps the box, rating and buttons in view above the keyboard." },
+			{ kind: "fixed", text: "Changing the sort or a filter keeps you on the title you were looking at." },
+			{ kind: "fixed", text: "The Filters sheet dropdowns no longer show a tiled arrow, and its title uses the normal text colour." },
+			{ kind: "fixed", text: "Search chips sit under the search field, not beside it." },
+			{ kind: "better", text: "The Find something to watch button is gone. Search and the Discover chips cover it." },
+			{ kind: "better", text: "The tag buttons are gone from the phone control row. Use Filters. The desktop sidebar keeps them." },
+		],
+	},
+	{
 		version: "0.9.46",
 		date: "2026-10-17",
 		headline: "One search for everything, and a phone layout you can see more of.",
