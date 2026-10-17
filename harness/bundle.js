@@ -6916,8 +6916,8 @@ ${body}
       contentEl.addClass("reel-review-content");
       paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
       const head = contentEl.createDiv({ cls: "reel-review-head" });
-      head.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
-      head.createDiv({ cls: "reel-log-sub", text: this.entry.title });
+      head.createEl("h3", { cls: "reel-log-title", text: this.entry.title });
+      head.createDiv({ cls: "reel-log-sub", text: this.review ? "Edit your review" : "Write a review" });
       const body = contentEl.createDiv({ cls: "reel-review-body" });
       const box = body.createEl("textarea", {
         cls: "reel-input reel-review-box",
@@ -12845,6 +12845,11 @@ ${body}
     root.addClass("reel-view-body");
     mountSheet(root, new QuickRate(plugin, LIBRARY[0], {}));
   }
+  function reviewsheet(root) {
+    root.addClass("reel-view-body");
+    mountSheet(root, new ReviewEditor(plugin, LIBRARY[0], null, () => {
+    }));
+  }
   function logsheet(root) {
     root.addClass("reel-view-body");
     mountSheet(root, new LogSheet(plugin.app, plugin, { entry: LIBRARY[0], file: {} }));
@@ -13335,6 +13340,7 @@ ${body}
     feed,
     filterSheet,
     reviews,
+    reviewsheet,
     rows,
     rate,
     stats,

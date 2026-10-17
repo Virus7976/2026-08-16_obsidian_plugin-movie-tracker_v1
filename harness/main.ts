@@ -25,6 +25,7 @@ import { skeletonCards, skeletonGrid } from "../src/ui/skeleton";
 import { renderStars } from "../src/ui/stars";
 import { DetailScreen } from "../src/ui/detail";
 import { DiscoverScreen, PreviewSheet } from "../src/ui/discoverView";
+import { ReviewEditor } from "../src/ui/reviewPane";
 import { RecipeSheet } from "../src/ui/recipeSheet";
 import { QuickRate } from "../src/ui/quickRate";
 import { RateScreen } from "../src/ui/rate";
@@ -1495,6 +1496,11 @@ function quickrate(root: HTMLElement): void {
 	mountSheet(root, new QuickRate(plugin, LIBRARY[0], {} as never) as never);
 }
 
+function reviewsheet(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	mountSheet(root, new ReviewEditor(plugin, LIBRARY[0], null, () => {}) as never);
+}
+
 function logsheet(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	mountSheet(root, new LogSheet(plugin.app, plugin, { entry: LIBRARY[0], file: {} as never }) as never);
@@ -2335,6 +2341,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	feed,
 	filterSheet,
 	reviews,
+	reviewsheet,
 	rows,
 	rate,
 	stats,

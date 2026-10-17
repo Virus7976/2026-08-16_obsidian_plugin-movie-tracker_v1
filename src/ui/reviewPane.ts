@@ -311,8 +311,9 @@ export class ReviewEditor extends Modal {
 		contentEl.addClass("reel-review-content");
 		paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
 		const head = contentEl.createDiv({ cls: "reel-review-head" });
-		head.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
-		head.createDiv({ cls: "reel-log-sub", text: this.entry.title });
+		// The film first, because it is what the sheet is about; the verb under it.
+		head.createEl("h3", { cls: "reel-log-title", text: this.entry.title });
+		head.createDiv({ cls: "reel-log-sub", text: this.review ? "Edit your review" : "Write a review" });
 		// Head, a body that scrolls on its own, then the buttons: a column, so
 		// nothing is layered over anything and the keyboard cannot cover the box.
 		const body = contentEl.createDiv({ cls: "reel-review-body" });

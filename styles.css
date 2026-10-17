@@ -18976,3 +18976,144 @@ body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-title {
 	border-radius: 0 0 16px 16px;
 	animation: none;
 }
+
+/* ==================================================================== */
+/* Review sheet, redesigned: one calm surface, nothing floating           */
+/* ==================================================================== */
+/* No second close button: Cancel, the grabber and tapping outside all close
+   it, and Obsidian's own X floated over the title. */
+.reel-review-sheet .modal-close-button {
+	display: none !important;
+}
+
+body.is-mobile .modal-container .modal.reel-modal.reel-review-sheet {
+	padding-left: var(--reel-space-4, 16px);
+	padding-right: var(--reel-space-4, 16px);
+	padding-top: var(--reel-space-3, 12px) !important;
+}
+
+.reel-review-head {
+	padding: var(--reel-space-1, 4px) 0 var(--reel-space-3, 12px);
+}
+
+.reel-review-head .reel-log-title {
+	font-size: var(--font-ui-large, 18px);
+	font-weight: 650;
+	line-height: 1.25;
+	padding-right: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-review-head .reel-log-sub {
+	margin: 2px 0 0;
+	font-size: var(--font-ui-smaller);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.reel-review-body .reel-review-box {
+	min-height: 96px;
+	height: 96px;
+	margin-bottom: var(--reel-space-3, 12px);
+	padding: var(--reel-space-3, 12px) var(--reel-space-4, 16px);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 14px;
+	background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
+	box-shadow: none;
+	font-size: var(--font-ui-medium);
+	line-height: 1.4;
+}
+
+.reel-review-body .reel-review-box:focus {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+/* Rating and date: two quiet rows, label left, control right. */
+.reel-review-body .reel-review-meta {
+	display: grid;
+	grid-template-columns: 64px 1fr;
+	align-items: center;
+	gap: var(--reel-space-1, 4px) var(--reel-space-3, 12px);
+	padding: 0;
+}
+
+.reel-review-body .reel-review-meta .reel-field-label {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.reel-review-body .reel-stars:not(.is-readonly) .reel-star {
+	width: 38px;
+	height: 44px;
+	font-size: 28px;
+}
+
+.reel-review-body .reel-review-date {
+	position: relative;
+	width: 100%;
+	max-width: none;
+	height: 44px;
+	min-height: 44px;
+	padding: 0 var(--reel-space-3, 12px);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
+	font-size: var(--font-ui-medium);
+}
+
+/* The native calendar glyph sat on top of the year. Let a tap anywhere in the
+   field open the picker, and draw no glyph. */
+.reel-review-body .reel-review-date::-webkit-calendar-picker-indicator {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+
+.reel-review-content .reel-actions {
+	border-top: none;
+	padding-top: var(--reel-space-4, 16px);
+	gap: var(--reel-space-3, 12px);
+}
+
+.reel-review-content .reel-actions .reel-btn {
+	flex: 1 1 0;
+	min-height: 48px;
+	border-radius: 12px;
+	font-weight: 600;
+}
+
+.reel-review-content .reel-actions .reel-btn:not(.mod-cta) {
+	background: transparent;
+	box-shadow: none;
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.reel-review-content .reel-actions .reel-btn.mod-cta {
+	flex: 1.6 1 0;
+}
+
+.reel-review-body .reel-review-box,
+.reel-review-body .reel-review-box:focus,
+.reel-review-body .reel-review-box:focus-visible {
+	box-shadow: none !important;
+	outline: none;
+}
+
+.reel-review-body .reel-review-box:focus {
+	border-color: var(--interactive-accent);
+}
+
+.reel-review-content .reel-actions .reel-btn {
+	justify-content: center;
+	text-align: center;
+}
