@@ -11,26 +11,6 @@
     drugs: "Drugs",
     horror: "Horror"
   };
-  var KEYWORD_RULES = {
-    sex: [/\bsex\b/, /sex scene/, /sexual/, /erotic/, /lovemaking/, /seduction/, /prostitut/, /brothel/, /orgy/, /affair/],
-    nudity: [/nudity/, /nude/, /topless/, /full frontal/, /strip club/, /stripper/],
-    profanity: [/profanity/, /swearing/, /obscenit/, /f-word/, /foul language/, /strong language/],
-    violence: [/violence/, /violent/, /brutal/, /torture/, /massacre/, /shootout/, /war crime/],
-    gore: [/gore\b/, /gory/, /dismember/, /decapitat/, /mutilat/, /splatter/, /body horror/],
-    drugs: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/],
-    horror: [/horror/, /slasher/, /supernatural/, /haunting/, /demonic/, /zombie/]
-  };
-  function flagsFromKeywords(keywords) {
-    const found = /* @__PURE__ */ new Set();
-    for (const raw of keywords) {
-      const k = raw.toLowerCase();
-      for (const flag of CONTENT_FLAGS) {
-        if (KEYWORD_RULES[flag].some((re) => re.test(k)))
-          found.add(flag);
-      }
-    }
-    return CONTENT_FLAGS.filter((f) => found.has(f));
-  }
   var CERT_RANK = {
     G: 0,
     "TV-Y": 0,
@@ -6437,10 +6417,9 @@ ${body}
       }
       const region = (this.plugin.settings.region || "US").toUpperCase();
       const cert = this.entry.certification ?? (isTv ? certificationFromContentRatings(meta.content_ratings, region) : certificationFromReleaseDates(film2?.release_dates, region));
-      const flags = this.entry.contentFlags.length ? this.entry.contentFlags : flagsFromKeywords(keywordNames(meta));
       const imdbId = this.entry.imdbId ?? meta.external_ids?.imdb_id ?? film2?.imdb_id ?? void 0;
-      if (this.entry.contentTopics.length || cert || flags.length || imdbId) {
-        tabs.push({ id: "content", label: "Parents guide", render: (el) => this.renderContent(el, { cert, flags, imdbId, guide: estimateGuide(keywordNames(meta), (meta.genres ?? []).map((g) => g.name), cert) }) });
+      if (this.entry.contentTopics.length || cert || imdbId) {
+        tabs.push({ id: "content", label: "Parents guide", render: (el) => this.renderContent(el, { cert, imdbId }) });
       }
       if (related.length)
         tabs.push({ id: "related", label: "Similar", render: (el) => this.renderRelated(el, related) });
@@ -6857,30 +6836,31 @@ ${body}
      * one deserve different amounts of trust, and the link to IMDb's fuller
      * guide sits alongside.
      */
-    /** IMDb's guide in this app's style, loaded when asked for, like a reader mode. */
+    /** IMDb's guide in this app's style. It loads by itself when the tab opens. */
     renderImdbReader(el, imdbId) {
       const box = el.createDiv({ cls: "reel-fl reel-guide-reader" });
       box.createDiv({ cls: "reel-fl-title", text: "From IMDb" });
-      const go = box.createEl("button", { cls: "reel-btn mod-cta", text: "Read IMDb's parents guide here", attr: { type: "button" } });
-      go.addEventListener("click", () => {
-        go.setText("Loading\u2026");
-        go.setAttr("disabled", "true");
+      const body = box.createDiv({ cls: "reel-guide-body" });
+      const load = () => {
+        body.empty();
+        body.createDiv({ cls: "reel-loading", text: "Loading the parents guide\u2026", attr: { role: "status" } });
         void fetchImdbGuide(this.plugin, imdbId).then(({ cats, reason }) => {
-          if (!box.isConnected)
+          if (!body.isConnected)
             return;
-          box.findAll(".reel-guide-fail").forEach((n2) => n2.remove());
+          body.empty();
           if (!cats) {
-            go.setText("Try again");
-            go.removeAttribute("disabled");
-            box.createDiv({
-              cls: "reel-dim reel-fl-note reel-guide-fail",
-              text: `IMDb did not give the guide in a form this could read (${reason ?? "no reply"}). Use the link below to open it there.`
+            body.createDiv({
+              cls: "reel-dim reel-fl-note",
+              text: `IMDb did not give the guide in a form this could read (${reason ?? "no reply"}).`
             });
+            const retry = body.createEl("button", { cls: "reel-btn", text: "Try again", attr: { type: "button" } });
+            retry.addEventListener("click", load);
             return;
           }
-          go.remove();
-          for (const c of cats) {
-            const sec = box.createEl("details", { cls: "reel-guide-sec" });
+          cats.forEach((c, i) => {
+            const sec = body.createEl("details", { cls: "reel-guide-sec" });
+            if (i === 0)
+              sec.setAttr("open", "");
             const sum = sec.createEl("summary");
             sum.createSpan({ cls: "reel-guide-name", text: c.title });
             if (c.severity)
@@ -6890,10 +6870,11 @@ ${body}
               list2.createEl("li", { text: t });
             if (!c.items.length)
               list2.createEl("li", { cls: "reel-dim", text: "No notes yet." });
-          }
-          box.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
+          });
+          body.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
         });
-      });
+      };
+      load();
     }
     renderContent(el, info) {
       const e = this.entry;
@@ -6916,32 +6897,8 @@ ${body}
         row.createDiv({ cls: "reel-fl-label", text: info.cert });
         row.createDiv({ cls: "reel-fl-value", text: CERT_NOTE[info.cert.toUpperCase()] ?? "As rated in your region." });
       }
-      if (info.guide.some((g) => g.level > 0)) {
-        const box = el.createDiv({ cls: "reel-fl reel-guide" });
-        box.createDiv({ cls: "reel-fl-title", text: "Estimated guide" });
-        for (const g of info.guide) {
-          const row = box.createDiv({ cls: `reel-guide-row level-${g.level}` });
-          const head = row.createDiv({ cls: "reel-guide-head" });
-          head.createSpan({ cls: "reel-guide-name", text: g.category });
-          head.createSpan({ cls: "reel-guide-level", text: GUIDE_LEVELS[g.level] });
-          const meter = row.createDiv({ cls: "reel-guide-meter" });
-          for (let i = 1; i <= 3; i++)
-            meter.createSpan({ cls: i <= g.level ? "is-on" : "" });
-          if (g.because.length)
-            row.createDiv({ cls: "reel-guide-because reel-dim", text: g.because.join(" \xB7 ") });
-        }
-        box.createDiv({
-          cls: "reel-dim reel-fl-note",
-          text: "An estimate from the rating, TMDB keywords and genres. IMDb's guide, written by viewers, grades each category; it opens below."
-        });
-      } else if (info.flags.length) {
-        const box = el.createDiv({ cls: "reel-fl" });
-        box.createDiv({ cls: "reel-fl-title", text: "Likely contains" });
-        const chips = box.createDiv({ cls: "reel-chips" });
-        for (const f of info.flags) {
-          chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f] ?? f });
-        }
-      }
+      if (info.imdbId)
+        this.renderImdbReader(el, info.imdbId);
       if (e.contentTopics.length) {
         const box = el.createDiv({ cls: "reel-facet-group" });
         box.createDiv({ cls: "reel-facet-label", text: "Reported by viewers" });
@@ -6955,8 +6912,6 @@ ${body}
           row.createSpan({ cls: "reel-content-name", text: topic });
         }
       }
-      if (info.imdbId)
-        this.renderImdbReader(el, info.imdbId);
       const imdb = imdbUrl(info.imdbId);
       if (imdb) {
         const a = el.createEl("a", { cls: "reel-btn", text: "Full parents guide on IMDb", href: `${imdb}parentalguide` });

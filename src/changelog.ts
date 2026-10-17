@@ -52,6 +52,15 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.62",
+		date: "2026-10-17",
+		headline: "The Parents guide is IMDb's, and it loads by itself.",
+		changes: [
+			{ kind: "new", text: "Open the Parents guide tab and IMDb's guide loads on its own, in your theme, one fold-out per category with its severity." },
+			{ kind: "better", text: "The estimated guide is gone. The tab shows the rating, IMDb's guide, and the topics DoesTheDogDie voters confirmed. If IMDb cannot be read, it says why and offers Try again, with the IMDb link below." },
+		],
+	},
+	{
 		version: "0.9.61",
 		date: "2026-10-17",
 		headline: "IMDb's parents guide: a second way in, and a reason when it fails.",

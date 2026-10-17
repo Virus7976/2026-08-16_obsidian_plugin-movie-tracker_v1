@@ -40,7 +40,7 @@ import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { paintTrailerFor } from "./titleExtras";
 import { unlink } from "../library";
 import { compactCount } from "../util/format";
-import { ContentFlag, FLAG_LABELS, certificationFromContentRatings, certificationFromReleaseDates, flagsFromKeywords, estimateGuide, GUIDE_LEVELS } from "../content";
+import { ContentFlag, FLAG_LABELS, certificationFromContentRatings, certificationFromReleaseDates } from "../content";
 import { haptic } from "../util/haptics";
 import { badgePerson } from "./personBadge";
 import { ReviewEditor, paintReviews, readReviews } from "./reviewPane";
@@ -411,10 +411,9 @@ export class DetailScreen {
 		const cert =
 			this.entry.certification ??
 			(isTv ? certificationFromContentRatings((meta as TmdbShow).content_ratings, region) : certificationFromReleaseDates(film?.release_dates, region));
-		const flags = this.entry.contentFlags.length ? this.entry.contentFlags : flagsFromKeywords(keywordNames(meta));
 		const imdbId = this.entry.imdbId ?? meta.external_ids?.imdb_id ?? film?.imdb_id ?? undefined;
-		if (this.entry.contentTopics.length || cert || flags.length || imdbId) {
-			tabs.push({ id: "content", label: "Parents guide", render: (el) => this.renderContent(el, { cert, flags, imdbId, guide: estimateGuide(keywordNames(meta), (meta.genres ?? []).map((g) => g.name), cert) }) });
+		if (this.entry.contentTopics.length || cert || imdbId) {
+			tabs.push({ id: "content", label: "Parents guide", render: (el) => this.renderContent(el, { cert, imdbId }) });
 		}
 		if (related.length) tabs.push({ id: "related", label: "Similar", render: (el) => this.renderRelated(el, related) });
 
@@ -881,42 +880,45 @@ export class DetailScreen {
 	 * one deserve different amounts of trust, and the link to IMDb's fuller
 	 * guide sits alongside.
 	 */
-	/** IMDb's guide in this app's style, loaded when asked for, like a reader mode. */
+	/** IMDb's guide in this app's style. It loads by itself when the tab opens. */
 	private renderImdbReader(el: HTMLElement, imdbId: string): void {
 		const box = el.createDiv({ cls: "reel-fl reel-guide-reader" });
 		box.createDiv({ cls: "reel-fl-title", text: "From IMDb" });
-		const go = box.createEl("button", { cls: "reel-btn mod-cta", text: "Read IMDb's parents guide here", attr: { type: "button" } });
-		go.addEventListener("click", () => {
-			go.setText("Loading…");
-			go.setAttr("disabled", "true");
+		const body = box.createDiv({ cls: "reel-guide-body" });
+
+		const load = (): void => {
+			body.empty();
+			body.createDiv({ cls: "reel-loading", text: "Loading the parents guide…", attr: { role: "status" } });
 			void fetchImdbGuide(this.plugin, imdbId).then(({ cats, reason }) => {
-				if (!box.isConnected) return;
-				box.findAll(".reel-guide-fail").forEach((n) => n.remove());
+				if (!body.isConnected) return;
+				body.empty();
 				if (!cats) {
-					go.setText("Try again");
-					go.removeAttribute("disabled");
-					box.createDiv({
-						cls: "reel-dim reel-fl-note reel-guide-fail",
-						text: `IMDb did not give the guide in a form this could read (${reason ?? "no reply"}). Use the link below to open it there.`,
+					body.createDiv({
+						cls: "reel-dim reel-fl-note",
+						text: `IMDb did not give the guide in a form this could read (${reason ?? "no reply"}).`,
 					});
+					const retry = body.createEl("button", { cls: "reel-btn", text: "Try again", attr: { type: "button" } });
+					retry.addEventListener("click", load);
 					return;
 				}
-				go.remove();
-				for (const c of cats) {
-					const sec = box.createEl("details", { cls: "reel-guide-sec" });
+				cats.forEach((c, i) => {
+					const sec = body.createEl("details", { cls: "reel-guide-sec" });
+					// The first is open, so the tab shows something the moment it loads.
+					if (i === 0) sec.setAttr("open", "");
 					const sum = sec.createEl("summary");
 					sum.createSpan({ cls: "reel-guide-name", text: c.title });
 					if (c.severity) sum.createSpan({ cls: `reel-guide-pill sev-${c.severity.toLowerCase()}`, text: c.severity });
 					const list = sec.createEl("ul", { cls: "reel-guide-list" });
 					for (const t of c.items) list.createEl("li", { text: t });
 					if (!c.items.length) list.createEl("li", { cls: "reel-dim", text: "No notes yet." });
-				}
-				box.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
+				});
+				body.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
 			});
-		});
+		};
+		load();
 	}
 
-	private renderContent(el: HTMLElement, info: { cert?: string; flags: string[]; imdbId?: string; guide: ReturnType<typeof estimateGuide> }): void {
+	private renderContent(el: HTMLElement, info: { cert?: string; imdbId?: string }): void {
 		const e = this.entry;
 
 		if (info.cert) {
@@ -939,32 +941,7 @@ export class DetailScreen {
 			row.createDiv({ cls: "reel-fl-value", text: CERT_NOTE[info.cert.toUpperCase()] ?? "As rated in your region." });
 		}
 
-		// Category by category, like IMDb's guide: a four-step meter per category and
-		// what the estimate rests on. Tap a row for the reasons.
-		if (info.guide.some((g) => g.level > 0)) {
-			const box = el.createDiv({ cls: "reel-fl reel-guide" });
-			box.createDiv({ cls: "reel-fl-title", text: "Estimated guide" });
-			for (const g of info.guide) {
-				const row = box.createDiv({ cls: `reel-guide-row level-${g.level}` });
-				const head = row.createDiv({ cls: "reel-guide-head" });
-				head.createSpan({ cls: "reel-guide-name", text: g.category });
-				head.createSpan({ cls: "reel-guide-level", text: GUIDE_LEVELS[g.level] });
-				const meter = row.createDiv({ cls: "reel-guide-meter" });
-				for (let i = 1; i <= 3; i++) meter.createSpan({ cls: i <= g.level ? "is-on" : "" });
-				if (g.because.length) row.createDiv({ cls: "reel-guide-because reel-dim", text: g.because.join(" · ") });
-			}
-			box.createDiv({
-				cls: "reel-dim reel-fl-note",
-				text: "An estimate from the rating, TMDB keywords and genres. IMDb's guide, written by viewers, grades each category; it opens below.",
-			});
-		} else if (info.flags.length) {
-			const box = el.createDiv({ cls: "reel-fl" });
-			box.createDiv({ cls: "reel-fl-title", text: "Likely contains" });
-			const chips = box.createDiv({ cls: "reel-chips" });
-			for (const f of info.flags) {
-				chips.createSpan({ cls: "reel-chip static", text: FLAG_LABELS[f as ContentFlag] ?? f });
-			}
-		}
+		if (info.imdbId) this.renderImdbReader(el, info.imdbId);
 
 		if (e.contentTopics.length) {
 			const box = el.createDiv({ cls: "reel-facet-group" });
@@ -984,8 +961,6 @@ export class DetailScreen {
 				row.createSpan({ cls: "reel-content-name", text: topic });
 			}
 		}
-
-		if (info.imdbId) this.renderImdbReader(el, info.imdbId);
 
 		const imdb = imdbUrl(info.imdbId);
 		if (imdb) {
