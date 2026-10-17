@@ -52,6 +52,15 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.59",
+		date: "2026-10-17",
+		headline: "Rating no longer throws you back to the start, and every title opens the same way.",
+		changes: [
+			{ kind: "fixed", text: "Adding, rating or skipping a title in Discover no longer sends you back to the top and back to the left of the row. The card leaves and everything else stays where it is." },
+			{ kind: "better", text: "Every tap on a title, from Discover, a person, a shortlist, a search or More like this, goes through one door. A title you own opens your page; any other opens the same page with the same tabs." },
+		],
+	},
+	{
 		version: "0.9.58",
 		date: "2026-10-17",
 		headline: "A cleaner Log sheet.",

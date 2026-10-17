@@ -346,7 +346,7 @@ export class DiscoverScreen {
 			posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? undefined,
 			title,
 		});
-		posterEl.addEventListener("click", () => new TitlePage(this.plugin, item, () => this.render(container)).open());
+		posterEl.addEventListener("click", () => this.plugin.openTitle(item, { onAdded: () => this.render(container) }));
 
 		const head = card.createDiv({ cls: "reel-quickcard-head" });
 		head.createSpan({ cls: "reel-quickcard-title", text: title });
@@ -1525,10 +1525,12 @@ export class DiscoverScreen {
 		if (isTv) posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
 
 		const openPreview = () =>
-			new TitlePage(this.plugin, item, () => {
-				this.markHandled(item.id);
-				this.render(container);
-			}).open();
+			this.plugin.openTitle(item, {
+				onAdded: () => {
+					this.markHandled(item.id);
+					this.retire(card);
+				},
+			});
 		let held = false;
 		posterEl.addEventListener("click", () => {
 			// A long-press ends in a click on release; that click is not a tap.
@@ -1557,7 +1559,7 @@ export class DiscoverScreen {
 							await this.add(item, true);
 							this.plugin.undo.offer(`${title} → watchlist`);
 							this.markHandled(item.id);
-							this.render(container);
+							this.retire(card);
 						})()
 					)
 			);
@@ -1568,7 +1570,7 @@ export class DiscoverScreen {
 					.onClick(() =>
 						new SeenSheet(this.plugin, item, () => {
 							this.markHandled(item.id);
-							this.render(container);
+							this.retire(card);
 						}).open()
 					)
 			);
@@ -1608,7 +1610,7 @@ export class DiscoverScreen {
 							void (async () => {
 								await this.plugin.discover.dismiss(item.id);
 								this.handled.add(item.id);
-								this.render(container);
+								this.retire(card);
 							})()
 					)
 			);
@@ -1659,7 +1661,7 @@ export class DiscoverScreen {
 				await this.add(item, true);
 				this.plugin.undo.offer(`${title} → watchlist`);
 				this.markHandled(item.id);
-				this.render(container);
+				this.retire(card);
 			})();
 		});
 
@@ -1683,23 +1685,37 @@ export class DiscoverScreen {
 			await this.add(item, true);
 			this.plugin.undo.offer(`${title} → watchlist`);
 			this.markHandled(item.id);
-			this.render(container);
+			this.retire(card);
 		});
 
 		button("check", "Seen it — rate now", "seen", () => {
 			new SeenSheet(this.plugin, item, () => {
 				this.markHandled(item.id);
-				this.render(container);
+				this.retire(card);
 			}).open();
 		});
 
 		button("x", "Not interested", "skip", async () => {
 			await this.plugin.discover.dismiss(item.id);
 			this.handled.add(item.id);
-			this.render(container);
+			this.retire(card);
 		});
 
 		return card;
+	}
+
+	/**
+	 * Take one card out of the feed where it stands.
+	 *
+	 * Adding, rating or skipping a title used to rebuild the whole feed, which
+	 * threw you back to the top of a list you had scrolled a long way down. The
+	 * card simply leaves; the rest close up and nothing else moves. It is removed
+	 * on a timer, not on the transition ending, so a page that never animates
+	 * still loses the card.
+	 */
+	private retire(card: HTMLElement): void {
+		card.addClass("is-leaving");
+		window.setTimeout(() => card.remove(), 130);
 	}
 
 	private async add(item: TmdbSearchResult, watchlist: boolean, rating?: number): Promise<void> {

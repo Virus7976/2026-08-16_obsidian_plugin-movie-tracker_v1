@@ -39,7 +39,8 @@ import { uiSnapshot } from "./ui/snapshot";
 import { confirm } from "./ui/confirm";
 import { showChangelog, showWhatsNewIfUpdated } from "./ui/whatsNew";
 import { todayISO } from "./util/dates";
-import type { Entry } from "./types";
+import type { Entry, TmdbSearchResult } from "./types";
+import { TitlePage } from "./ui/titlePage";
 
 /**
  * `addIcon` takes the *contents* of an SVG, not an `<svg>` element — Obsidian
@@ -212,6 +213,26 @@ export default class ReelPlugin extends Plugin {
 		const leaf = this.app.workspace.getLeaf(true);
 		await leaf.setViewState({ type: REEL_VIEW, active: true });
 		await this.app.workspace.revealLeaf(leaf);
+	}
+
+	/**
+	 * The one way to open a title from a search result, a card, a credit or a
+	 * strip. A title in your library opens its own page; anything else opens the
+	 * same page from TMDB. Both have the same tabs, so a title looks the same
+	 * wherever you reached it.
+	 */
+	openTitle(
+		item: TmdbSearchResult,
+		opts: { tab?: string; role?: string; onAdded?: () => void; beforeOpenMine?: () => void } = {}
+	): void {
+		const isTv = item.media_type === "tv" || (!!item.name && !item.title);
+		const own = this.library.byTmdbId(item.id, isTv ? "tv" : "film");
+		if (own) {
+			opts.beforeOpenMine?.();
+			void this.openDetail(own, opts.tab);
+			return;
+		}
+		new TitlePage(this, { ...item, media_type: isTv ? "tv" : "movie" }, opts.onAdded, opts.role, opts.tab).open();
 	}
 
 	/** Open a title's detail screen in the Reel view, opening the view if needed. */

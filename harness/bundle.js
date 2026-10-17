@@ -5489,128 +5489,6 @@ ${body}
     return grid;
   }
 
-  // src/ui/titlePage.ts
-  function entryFromResult(plugin2, r) {
-    const isTv = r.media_type === "tv" || !!r.name && !r.title;
-    const poster2 = plugin2.tmdb.posterUrl(r.poster_path, "w342") ?? void 0;
-    return {
-      path: "",
-      basename: "",
-      type: isTv ? "tv" : "film",
-      tmdbId: r.id,
-      title: (isTv ? r.name : r.title) ?? "Untitled",
-      year: isTv ? void 0 : yearOf(r.release_date),
-      director: [],
-      watched: [],
-      creators: [],
-      firstAirYear: isTv ? yearOf(r.first_air_date) : void 0,
-      seasons: [],
-      genres: [],
-      posterUrl: poster2,
-      castIds: [],
-      directorIds: [],
-      tmdbRating: r.vote_average,
-      status: "",
-      cast: [],
-      characters: [],
-      overview: r.overview,
-      productionCompanies: [],
-      providers: [],
-      contentFlags: [],
-      contentTopics: [],
-      lists: [],
-      added: 0,
-      watchCount: 0
-    };
-  }
-  var TitlePage = class extends Modal {
-    constructor(plugin2, item, onAdded = () => {
-    }, role, startTab) {
-      super(plugin2.app);
-      this.plugin = plugin2;
-      this.item = item;
-      this.onAdded = onAdded;
-      this.role = role;
-      this.startTab = startTab;
-      this.busy = false;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal", "reel-titlepage");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.addClass("reel-titlepage-content", "reel-detail");
-      const entry = entryFromResult(this.plugin, this.item);
-      const isTv = entry.type === "tv";
-      paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
-      if (this.role) {
-        const r = contentEl.createDiv({ cls: "reel-preview-role" });
-        r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
-        r.createSpan({ cls: "reel-preview-role-value", text: this.role });
-      }
-      const head = contentEl.createDiv({ cls: "reel-preview-head" });
-      const posterEl = head.createDiv({ cls: "reel-preview-poster" });
-      const src = this.plugin.tmdb.posterUrl(this.item.poster_path, "w342");
-      if (src)
-        posterEl.createEl("img", { attr: { src, alt: "" } });
-      const body = head.createDiv({ cls: "reel-preview-body" });
-      const h = body.createDiv({ cls: "reel-preview-title" });
-      h.createSpan({ text: entry.title });
-      const year2 = entry.year ?? entry.firstAirYear;
-      if (year2)
-        h.createSpan({ cls: "reel-dim", text: ` ${year2}` });
-      const facts = body.createDiv({ cls: "reel-header-facts" });
-      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
-      if (this.item.vote_average)
-        facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
-      const actions = contentEl.createDiv({ cls: "reel-titlepage-actions" });
-      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist", attr: { type: "button" } });
-      later.addEventListener("click", () => void this.add(later));
-      const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it", attr: { type: "button" } });
-      seen.addEventListener("click", () => {
-        new LogSheet(this.plugin.app, this.plugin, {
-          pending: { id: this.item.id, type: isTv ? "tv" : "film", title: entry.title }
-        }).open();
-        this.onAdded();
-        this.close();
-      });
-      const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested", attr: { type: "button" } });
-      nope.addEventListener("click", () => {
-        void this.plugin.discover.dismiss(this.item.id).then(() => {
-          this.onAdded();
-          this.close();
-        });
-      });
-      if (entry.overview)
-        contentEl.createDiv({ cls: "reel-preview-overview", text: entry.overview });
-      void paintTrailerFor(this.plugin, contentEl.createDiv({ cls: "reel-detail-trailer" }), entry.tmdbId, isTv, void 0);
-      const main = contentEl.createDiv({ cls: "reel-titlepage-main" });
-      const screen = new DetailScreen(this.plugin, entry, () => this.close(), "Library", this.startTab);
-      void screen.renderReference(main, isTv);
-    }
-    async add(button) {
-      if (this.busy)
-        return;
-      this.busy = true;
-      button.setText("Adding\u2026");
-      button.setAttr("disabled", "true");
-      try {
-        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: true });
-        this.plugin.undo.offer("Added to your watchlist");
-        this.onAdded();
-        this.close();
-      } catch (e) {
-        new Notice(`Reel: ${redact(e)}`);
-        button.setText("Retry");
-        button.removeAttribute("disabled");
-        this.busy = false;
-      }
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-
   // src/ui/personSheet.ts
   var PersonSheet = class extends Modal {
     constructor(plugin2, personId, fallbackName) {
@@ -5873,8 +5751,7 @@ ${body}
           void this.plugin.openDetail(mine);
           return;
         }
-        new TitlePage(this.plugin, credit, () => {
-        }, roleOf(credit)).open();
+        this.plugin.openTitle(credit, { role: roleOf(credit) });
       });
       if (!mine) {
         const add = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
@@ -6036,8 +5913,7 @@ ${body}
           void this.plugin.openDetail(mine);
           return;
         }
-        new TitlePage(this.plugin, this.credit, () => {
-        }, roleOf(this.credit)).open();
+        this.plugin.openTitle(this.credit, { role: roleOf(this.credit) });
       });
       if (!this.mine) {
         const add = actions.createEl("button", { cls: "reel-btn", text: "+ Watchlist" });
@@ -6084,14 +5960,7 @@ ${body}
       if (bits.length)
         c.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
       const mine = () => plugin2.library.byTmdbId(r.id, rTv ? "tv" : "film");
-      const open2 = () => {
-        const own = mine();
-        if (own) {
-          opts.beforeOpenMine?.();
-          void plugin2.openDetail(own);
-        } else
-          new TitlePage(plugin2, r, opts.onAdded).open();
-      };
+      const open2 = () => plugin2.openTitle(r, { onAdded: opts.onAdded, beforeOpenMine: opts.beforeOpenMine });
       holdAt(
         c,
         (x, y) => showResultMenu(
@@ -6103,14 +5972,7 @@ ${body}
           mine() ? void 0 : () => {
             void plugin2.notes.createFromResult(r, { date: todayISO(), watchlist: true }).then(() => plugin2.undo.offer(`Added ${title} to your watchlist`)).catch((e) => new Notice(`Reel: ${redact(e)}`));
           },
-          () => {
-            const own = mine();
-            if (own) {
-              opts.beforeOpenMine?.();
-              void plugin2.openDetail(own, "content");
-            } else
-              new TitlePage(plugin2, r, opts.onAdded, void 0, "content").open();
-          }
+          () => plugin2.openTitle(r, { tab: "content", onAdded: opts.onAdded, beforeOpenMine: opts.beforeOpenMine })
         )
       );
       c.addEventListener("click", open2);
@@ -8236,7 +8098,7 @@ ${body}
         posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? void 0,
         title
       });
-      posterEl.addEventListener("click", () => new TitlePage(this.plugin, item, () => this.render(container)).open());
+      posterEl.addEventListener("click", () => this.plugin.openTitle(item, { onAdded: () => this.render(container) }));
       const head = card.createDiv({ cls: "reel-quickcard-head" });
       head.createSpan({ cls: "reel-quickcard-title", text: title });
       const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
@@ -9207,10 +9069,12 @@ ${body}
         posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
       if (isTv)
         posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
-      const openPreview = () => new TitlePage(this.plugin, item, () => {
-        this.markHandled(item.id);
-        this.render(container);
-      }).open();
+      const openPreview = () => this.plugin.openTitle(item, {
+        onAdded: () => {
+          this.markHandled(item.id);
+          this.retire(card);
+        }
+      });
       let held = false;
       posterEl.addEventListener("click", () => {
         if (held) {
@@ -9232,7 +9096,7 @@ ${body}
               await this.add(item, true);
               this.plugin.undo.offer(`${title} \u2192 watchlist`);
               this.markHandled(item.id);
-              this.render(container);
+              this.retire(card);
             })()
           )
         );
@@ -9240,7 +9104,7 @@ ${body}
           (i) => i.setTitle("Seen it, rate now").setIcon("check").onClick(
             () => new SeenSheet(this.plugin, item, () => {
               this.markHandled(item.id);
-              this.render(container);
+              this.retire(card);
             }).open()
           )
         );
@@ -9270,7 +9134,7 @@ ${body}
             () => void (async () => {
               await this.plugin.discover.dismiss(item.id);
               this.handled.add(item.id);
-              this.render(container);
+              this.retire(card);
             })()
           )
         );
@@ -9320,7 +9184,7 @@ ${body}
           await this.add(item, true);
           this.plugin.undo.offer(`${title} \u2192 watchlist`);
           this.markHandled(item.id);
-          this.render(container);
+          this.retire(card);
         })();
       });
       const actions = card.createDiv({ cls: "reel-dcard-actions" });
@@ -9339,20 +9203,33 @@ ${body}
         await this.add(item, true);
         this.plugin.undo.offer(`${title} \u2192 watchlist`);
         this.markHandled(item.id);
-        this.render(container);
+        this.retire(card);
       });
       button("check", "Seen it \u2014 rate now", "seen", () => {
         new SeenSheet(this.plugin, item, () => {
           this.markHandled(item.id);
-          this.render(container);
+          this.retire(card);
         }).open();
       });
       button("x", "Not interested", "skip", async () => {
         await this.plugin.discover.dismiss(item.id);
         this.handled.add(item.id);
-        this.render(container);
+        this.retire(card);
       });
       return card;
+    }
+    /**
+     * Take one card out of the feed where it stands.
+     *
+     * Adding, rating or skipping a title used to rebuild the whole feed, which
+     * threw you back to the top of a list you had scrolled a long way down. The
+     * card simply leaves; the rest close up and nothing else moves. It is removed
+     * on a timer, not on the transition ending, so a page that never animates
+     * still loses the card.
+     */
+    retire(card) {
+      card.addClass("is-leaving");
+      window.setTimeout(() => card.remove(), 130);
     }
     async add(item, watchlist, rating) {
       await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist, rating });
@@ -10151,10 +10028,12 @@ ${body}
       }
     }
     preview(item) {
-      new TitlePage(this.plugin, item, () => {
-        this.results = (this.results ?? []).filter((r) => r.item.id !== item.id);
-        this.paint();
-      }).open();
+      this.plugin.openTitle(item, {
+        onAdded: () => {
+          this.results = (this.results ?? []).filter((r) => r.item.id !== item.id);
+          this.paint();
+        }
+      });
     }
     /**
      * Name it and keep it.
@@ -10663,6 +10542,128 @@ ${body}
       }
       el.scrollTop = keepScroll;
       this.paintCount();
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
+  // src/ui/titlePage.ts
+  function entryFromResult(plugin2, r) {
+    const isTv = r.media_type === "tv" || !!r.name && !r.title;
+    const poster2 = plugin2.tmdb.posterUrl(r.poster_path, "w342") ?? void 0;
+    return {
+      path: "",
+      basename: "",
+      type: isTv ? "tv" : "film",
+      tmdbId: r.id,
+      title: (isTv ? r.name : r.title) ?? "Untitled",
+      year: isTv ? void 0 : yearOf(r.release_date),
+      director: [],
+      watched: [],
+      creators: [],
+      firstAirYear: isTv ? yearOf(r.first_air_date) : void 0,
+      seasons: [],
+      genres: [],
+      posterUrl: poster2,
+      castIds: [],
+      directorIds: [],
+      tmdbRating: r.vote_average,
+      status: "",
+      cast: [],
+      characters: [],
+      overview: r.overview,
+      productionCompanies: [],
+      providers: [],
+      contentFlags: [],
+      contentTopics: [],
+      lists: [],
+      added: 0,
+      watchCount: 0
+    };
+  }
+  var TitlePage = class extends Modal {
+    constructor(plugin2, item, onAdded = () => {
+    }, role, startTab) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.item = item;
+      this.onAdded = onAdded;
+      this.role = role;
+      this.startTab = startTab;
+      this.busy = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal", "reel-titlepage");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-titlepage-content", "reel-detail");
+      const entry = entryFromResult(this.plugin, this.item);
+      const isTv = entry.type === "tv";
+      paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
+      if (this.role) {
+        const r = contentEl.createDiv({ cls: "reel-preview-role" });
+        r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
+        r.createSpan({ cls: "reel-preview-role-value", text: this.role });
+      }
+      const head = contentEl.createDiv({ cls: "reel-preview-head" });
+      const posterEl = head.createDiv({ cls: "reel-preview-poster" });
+      const src = this.plugin.tmdb.posterUrl(this.item.poster_path, "w342");
+      if (src)
+        posterEl.createEl("img", { attr: { src, alt: "" } });
+      const body = head.createDiv({ cls: "reel-preview-body" });
+      const h = body.createDiv({ cls: "reel-preview-title" });
+      h.createSpan({ text: entry.title });
+      const year2 = entry.year ?? entry.firstAirYear;
+      if (year2)
+        h.createSpan({ cls: "reel-dim", text: ` ${year2}` });
+      const facts = body.createDiv({ cls: "reel-header-facts" });
+      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      if (this.item.vote_average)
+        facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
+      const actions = contentEl.createDiv({ cls: "reel-titlepage-actions" });
+      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist", attr: { type: "button" } });
+      later.addEventListener("click", () => void this.add(later));
+      const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it", attr: { type: "button" } });
+      seen.addEventListener("click", () => {
+        new LogSheet(this.plugin.app, this.plugin, {
+          pending: { id: this.item.id, type: isTv ? "tv" : "film", title: entry.title }
+        }).open();
+        this.onAdded();
+        this.close();
+      });
+      const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested", attr: { type: "button" } });
+      nope.addEventListener("click", () => {
+        void this.plugin.discover.dismiss(this.item.id).then(() => {
+          this.onAdded();
+          this.close();
+        });
+      });
+      if (entry.overview)
+        contentEl.createDiv({ cls: "reel-preview-overview", text: entry.overview });
+      void paintTrailerFor(this.plugin, contentEl.createDiv({ cls: "reel-detail-trailer" }), entry.tmdbId, isTv, void 0);
+      const main = contentEl.createDiv({ cls: "reel-titlepage-main" });
+      const screen = new DetailScreen(this.plugin, entry, () => this.close(), "Library", this.startTab);
+      void screen.renderReference(main, isTv);
+    }
+    async add(button) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      button.setText("Adding\u2026");
+      button.setAttr("disabled", "true");
+      try {
+        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: true });
+        this.plugin.undo.offer("Added to your watchlist");
+        this.onAdded();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+        button.setText("Retry");
+        button.removeAttribute("disabled");
+        this.busy = false;
+      }
     }
     onClose() {
       this.contentEl.empty();

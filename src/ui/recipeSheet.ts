@@ -555,12 +555,14 @@ export class RecipeSheet extends Modal {
 		// The same sheet Discover uses, so a result behaves identically
 		// wherever it was found — full details, links, and the three
 		// decisions inline.
-		new TitlePage(this.plugin, item, () => {
-			// Adding something removes it from the shortlist: it is no longer
-			// a suggestion, it is in your library.
-			this.results = (this.results ?? []).filter((r) => r.item.id !== item.id);
-			this.paint();
-		}).open();
+		this.plugin.openTitle(item, {
+			onAdded: () => {
+				// Adding something removes it from the shortlist: it is no longer
+				// a suggestion, it is in your library.
+				this.results = (this.results ?? []).filter((r) => r.item.id !== item.id);
+				this.paint();
+			},
+		});
 	}
 
 	/**

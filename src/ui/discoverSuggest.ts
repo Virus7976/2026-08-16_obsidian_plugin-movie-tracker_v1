@@ -203,9 +203,7 @@ export class DiscoverSuggest {
 			new PersonSheet(this.plugin, row.r.id, row.title).open();
 			return;
 		}
-		const own = this.plugin.library.byTmdbId(row.r.id, row.isTv ? "tv" : "film");
-		if (own) void this.plugin.openDetail(own, tab);
-		else new TitlePage(this.plugin, { ...row.r, media_type: row.isTv ? "tv" : "movie" }, undefined, undefined, tab).open();
+		this.plugin.openTitle({ ...row.r, media_type: row.isTv ? "tv" : "movie" }, { tab });
 	}
 
 	private async add(row: Row): Promise<void> {

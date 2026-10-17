@@ -391,7 +391,7 @@ export class PersonSheet extends Modal {
 			// sheet is the same information from TMDB directly — overview,
 			// scores, providers, trailer — and it carries the role across, so
 			// the answer to "who was he in this" survives the navigation.
-			new TitlePage(this.plugin, credit, () => {}, roleOf(credit)).open();
+			this.plugin.openTitle(credit, { role: roleOf(credit) });
 		});
 
 		if (!mine) {
@@ -613,7 +613,7 @@ class RoleSheet extends Modal {
 				void this.plugin.openDetail(mine);
 				return;
 			}
-			new TitlePage(this.plugin, this.credit, () => {}, roleOf(this.credit)).open();
+			this.plugin.openTitle(this.credit, { role: roleOf(this.credit) });
 		});
 
 		if (!this.mine) {

@@ -60,13 +60,7 @@ export function paintRelatedFeed(plugin: ReelPlugin, el: HTMLElement, opts: Rela
 		if (bits.length) c.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
 
 		const mine = (): ReturnType<typeof plugin.library.byTmdbId> => plugin.library.byTmdbId(r.id, rTv ? "tv" : "film");
-		const open = (): void => {
-			const own = mine();
-			if (own) {
-				opts.beforeOpenMine?.();
-				void plugin.openDetail(own);
-			} else new TitlePage(plugin, r, opts.onAdded).open();
-		};
+		const open = (): void => plugin.openTitle(r, { onAdded: opts.onAdded, beforeOpenMine: opts.beforeOpenMine });
 		holdAt(c, (x, y) =>
 			showResultMenu(
 				plugin,
@@ -82,13 +76,7 @@ export function paintRelatedFeed(plugin: ReelPlugin, el: HTMLElement, opts: Rela
 								.then(() => plugin.undo.offer(`Added ${title} to your watchlist`))
 								.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
 						},
-				() => {
-					const own = mine();
-					if (own) {
-						opts.beforeOpenMine?.();
-						void plugin.openDetail(own, "content");
-					} else new TitlePage(plugin, r, opts.onAdded, undefined, "content").open();
-				}
+				() => plugin.openTitle(r, { tab: "content", onAdded: opts.onAdded, beforeOpenMine: opts.beforeOpenMine })
 			)
 		);
 		c.addEventListener("click", open);

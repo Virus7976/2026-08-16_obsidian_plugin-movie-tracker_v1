@@ -20876,3 +20876,16 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 		min-height: 34px;
 	}
 }
+
+/* A card leaving the feed: quick, and the neighbours close up when it is gone. */
+.reel-dcard.is-leaving {
+	opacity: 0;
+	transform: scale(0.96);
+	transition: opacity 120ms ease-out, transform 120ms ease-out;
+	pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.reel-dcard.is-leaving {
+		transition: none;
+	}
+}
