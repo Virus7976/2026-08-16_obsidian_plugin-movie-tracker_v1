@@ -241,7 +241,18 @@ export class ReelView extends ItemView {
 		 * field, the dropdowns and the icon buttons inherit whatever the user
 		 * chose, for free and permanently.
 		 */
-		const header = root.createDiv({ cls: "reel-view-header" });
+		/*
+		 * Two shapes of the same screen, the way a desktop app and its phone
+		 * sibling differ. On a phone the sidebar is hidden and everything lives
+		 * in the main column. On a wide pane the sidebar carries navigation, your
+		 * lists and tags, and the main column keeps the toolbar and the grid.
+		 */
+		const shell = root.createDiv({ cls: "reel-shell" });
+		const side = shell.createDiv({ cls: "reel-side" });
+		const main = shell.createDiv({ cls: "reel-main" });
+		this.mainEl = main;
+
+		const header = main.createDiv({ cls: "reel-view-header" });
 		this.headerEl = header;
 
 		/*
@@ -324,7 +335,7 @@ export class ReelView extends ItemView {
 		// draws its own, and one less row of chrome on a phone.
 
 		/* ---- tabs ----------------------------------------------------- */
-		const tabBar = root.createDiv({ cls: "reel-tabs" });
+		const tabBar = side.createDiv({ cls: "reel-tabs" });
 		for (const t of TABS) {
 			const btn = tabBar.createEl("button", { cls: "reel-tab" });
 			setIcon(btn.createSpan({ cls: "reel-tab-icon" }), t.icon);
@@ -348,6 +359,12 @@ export class ReelView extends ItemView {
 		// has to go once there is not, or the last tab looks half-drawn.
 		this.trackScrollEnd(tabBar);
 
+		this.sideTagsEl = side.createDiv({ cls: "reel-side-tags" });
+		const add = side.createEl("button", { cls: "reel-side-add", attr: { type: "button" } });
+		setIcon(add.createSpan({ cls: "reel-side-add-icon" }), "plus");
+		add.createSpan({ text: "Add title" });
+		add.addEventListener("click", () => this.plugin.openSearch());
+
 		/*
 		 * When an undo lands, whatever it took back should come back into view.
 		 *
@@ -362,8 +379,8 @@ export class ReelView extends ItemView {
 			})
 		);
 
-		this.filterEl = root.createDiv({ cls: "reel-view-filters" });
-		this.bodyEl = root.createDiv({ cls: "reel-view-body" });
+		this.filterEl = main.createDiv({ cls: "reel-view-filters" });
+		this.bodyEl = main.createDiv({ cls: "reel-view-body" });
 
 		/*
 		 * Re-measure when the body's contents change, not only when Reel paints.
@@ -390,7 +407,7 @@ export class ReelView extends ItemView {
 				// loop would otherwise force thirty layouts.
 				requestAnimationFrame(() => {
 					queued = false;
-					if (this.bodyEl?.isConnected) sizeBody(this.contentEl, this.bodyEl);
+					if (this.bodyEl?.isConnected) sizeBody(this.mainEl, this.bodyEl);
 				});
 			});
 			mo.observe(this.bodyEl, { childList: true });
@@ -420,7 +437,7 @@ export class ReelView extends ItemView {
 		const remeasure = (): void => {
 			if (!this.bodyEl?.isConnected) return;
 			stampChromeInsets(this.contentEl);
-			sizeBody(this.contentEl, this.bodyEl);
+			sizeBody(this.mainEl, this.bodyEl);
 		};
 		if (typeof ResizeObserver !== "undefined") {
 			const ro = new ResizeObserver(() => requestAnimationFrame(remeasure));
@@ -442,6 +459,8 @@ export class ReelView extends ItemView {
 	}
 
 	private filterEl!: HTMLElement;
+	private mainEl!: HTMLElement;
+	private sideTagsEl!: HTMLElement;
 	/** The search row, collapsed on a phone until the header action asks for it. */
 	private headerEl!: HTMLElement;
 	/** The dropdown that replaces the tab row on a narrow pane. */
@@ -658,7 +677,7 @@ export class ReelView extends ItemView {
 			 * body kept a height computed for a layout that no longer existed.
 			 * A snapshot caught it at 120px with 377px available.
 			 */
-			if (this.bodyEl) sizeBody(this.contentEl, this.bodyEl);
+			if (this.bodyEl) sizeBody(this.mainEl, this.bodyEl);
 		} catch (e) {
 			this.bodyEl.empty();
 			const box = this.bodyEl.createDiv({ cls: "reel-error-state" });
@@ -675,6 +694,7 @@ export class ReelView extends ItemView {
 	private drawTab(): void {
 		this.clearScreenClasses();
 		this.paintNav();
+		this.paintSideTags();
 		if (this.tab === "library") {
 			this.paintFilters();
 			this.paintLibrary();
@@ -898,7 +918,7 @@ export class ReelView extends ItemView {
 		this.lastWidth = measure(this.contentEl);
 		stampWidth(this.contentEl, this.lastWidth);
 		this.measureTopInset();
-		if (this.bodyEl) sizeBody(this.contentEl, this.bodyEl);
+		if (this.bodyEl) sizeBody(this.mainEl, this.bodyEl);
 	}
 
 
@@ -1083,38 +1103,72 @@ export class ReelView extends ItemView {
 		return bar;
 	}
 
+	/** The tags on offer: your lists, then your most-used genres. */
+	private tagList(max: number): { key: "lists" | "genres"; value: string; n: number }[] {
+		const pool = this.pool();
+		const out: { key: "lists" | "genres"; value: string; n: number }[] = [];
+		for (const l of this.plugin.library.lists().slice(0, max)) {
+			out.push({ key: "lists", value: l, n: pool.filter((e) => e.lists.includes(l)).length });
+		}
+		const counts = new Map<string, number>();
+		for (const e of pool) for (const g of e.genres) counts.set(g, (counts.get(g) ?? 0) + 1);
+		for (const [g, n] of [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, max)) {
+			out.push({ key: "genres", value: g, n });
+		}
+		return out;
+	}
+
+	private toggleTag(key: "lists" | "genres", value: string): void {
+		const set = this.filters[key];
+		const at = set.indexOf(value);
+		if (at >= 0) set.splice(at, 1);
+		else set.push(value);
+		this.paint();
+	}
+
+	private tagSlug(t: string): string {
+		return `#${t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+	}
+
 	/**
-	 * Your lists and most-used genres as #tags, in the same scrolling row as the
-	 * controls: one tap to narrow, one to undo. Only what exists in the library,
-	 * so there is never a tag that finds nothing. Returns what it drew, so the
-	 * same filter is not also shown as an active chip.
+	 * #tags in the same scrolling row as the controls (phones): one tap to
+	 * narrow, one to undo. Returns what it drew, so the same filter is not also
+	 * shown as an active chip.
 	 */
 	private paintTags(bar: HTMLElement): Set<string> {
 		const shown = new Set<string>();
-		const slug = (t: string): string => `#${t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
-		const counts = new Map<string, number>();
-		for (const e of this.pool()) for (const g of e.genres) counts.set(g, (counts.get(g) ?? 0) + 1);
-		const genres = [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 6).map(([g]) => g);
-		const lists = this.plugin.library.lists().slice(0, 6);
-		if (!lists.length && !genres.length) return shown;
-
+		const tags = this.tagList(6);
+		if (!tags.length) return shown;
 		bar.createSpan({ cls: "reel-bar-sep", attr: { "aria-hidden": "true" } });
-		const chip = (key: "lists" | "genres", value: string): void => {
-			const set = this.filters[key];
-			const on = set.includes(value);
-			shown.add(`${key}:${value}`);
-			const b = bar.createEl("button", { cls: "reel-tag", text: slug(value), attr: { type: "button" } });
-			setSelected(b, on);
-			b.addEventListener("click", () => {
-				const at = set.indexOf(value);
-				if (at >= 0) set.splice(at, 1);
-				else set.push(value);
-				this.paint();
-			});
-		};
-		for (const l of lists) chip("lists", l);
-		for (const g of genres) chip("genres", g);
+		for (const t of tags) {
+			shown.add(`${t.key}:${t.value}`);
+			const b = bar.createEl("button", { cls: "reel-tag", text: this.tagSlug(t.value), attr: { type: "button" } });
+			setSelected(b, this.filters[t.key].includes(t.value));
+			b.addEventListener("click", () => this.toggleTag(t.key, t.value));
+		}
 		return shown;
+	}
+
+	/** The desktop sidebar's lists and tags, with how many titles each holds. */
+	private paintSideTags(): void {
+		const el = this.sideTagsEl;
+		if (!el) return;
+		el.empty();
+		const tags = this.tagList(12);
+		const group = (title: string, key: "lists" | "genres"): void => {
+			const items = tags.filter((t) => t.key === key);
+			if (!items.length) return;
+			el.createDiv({ cls: "reel-side-heading", text: title });
+			for (const t of items) {
+				const row = el.createEl("button", { cls: "reel-side-tag", attr: { type: "button" } });
+				row.createSpan({ cls: "reel-side-tag-name", text: this.tagSlug(t.value) });
+				row.createSpan({ cls: "reel-side-tag-count", text: String(t.n) });
+				setSelected(row, this.filters[t.key].includes(t.value));
+				row.addEventListener("click", () => this.toggleTag(t.key, t.value));
+			}
+		};
+		group("Lists", "lists");
+		group("Genres", "genres");
 	}
 
 	/** The one place the filter sheet is opened from. */

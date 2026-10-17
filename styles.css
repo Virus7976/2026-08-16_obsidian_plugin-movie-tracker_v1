@@ -17900,3 +17900,410 @@ body:not(.is-phone) .reel-modal .reel-setup-copy {
 	box-shadow: none;
 	border-radius: 10px;
 }
+
+/* ==================================================================== */
+/* Wide panes: the same slim control row, on one line                     */
+/* ==================================================================== */
+.reel-view.is-w700 .reel-filterbar {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	scrollbar-width: none;
+	align-items: center;
+	gap: var(--reel-space-2);
+}
+
+.reel-view.is-w700 .reel-filterbar > * {
+	flex: none;
+}
+
+.reel-view.is-w700 .reel-filterbar .reel-seg {
+	height: 30px;
+	border: 0;
+	background: transparent;
+}
+
+.reel-view.is-w700 .reel-seg .reel-seg-btn {
+	width: 32px;
+	height: 30px;
+	background: transparent;
+	color: var(--text-muted);
+	border-radius: 8px;
+}
+
+.reel-view.is-w700 .reel-seg .reel-seg-btn.is-active {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.reel-view.is-w700 .reel-tag {
+	background: transparent;
+	border: 0;
+	border-radius: 8px;
+	padding: 0 8px;
+	color: var(--text-muted);
+}
+
+.reel-view.is-w700 .reel-tag:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.reel-view.is-w700 .reel-tag.is-active {
+	background: var(--background-modifier-hover);
+	color: var(--interactive-accent);
+	font-weight: 600;
+}
+
+.reel-view.is-w700 .reel-view-filters .reel-chips.reel-filterbar {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	min-height: 40px;
+}
+
+.reel-seg {
+	overflow: visible;
+}
+
+/* ==================================================================== */
+/* Title page on a phone: the poster beside the facts, not above them     */
+/* ==================================================================== */
+.reel-view:not(.is-w700) .reel-hero {
+	display: grid;
+	grid-template-columns: 92px minmax(0, 1fr);
+	column-gap: var(--reel-space-3);
+	row-gap: var(--reel-space-2);
+	align-items: start;
+}
+
+.reel-view:not(.is-w700) .reel-hero-poster {
+	grid-column: 1;
+	grid-row: 1 / span 3;
+	width: 92px;
+	flex: none;
+}
+
+.reel-view:not(.is-w700) .reel-hero-body {
+	display: contents;
+}
+
+.reel-view:not(.is-w700) .reel-hero-body > * {
+	grid-column: 1 / -1;
+	min-width: 0;
+}
+
+.reel-view:not(.is-w700) .reel-hero-body > .reel-hero-title,
+.reel-view:not(.is-w700) .reel-hero-body > .reel-hero-sub,
+.reel-view:not(.is-w700) .reel-hero-body > .reel-scores {
+	grid-column: 2;
+}
+
+.reel-view:not(.is-w700) .reel-hero-title {
+	font-size: var(--font-ui-large, 1.2em);
+	line-height: 1.15;
+}
+
+/* ==================================================================== */
+/* Native feel: touch feedback, lift on hover, one focus ring             */
+/* ==================================================================== */
+.reel-view button,
+.reel-view .reel-cell,
+.reel-view .reel-row,
+.reel-view .reel-tag {
+	-webkit-tap-highlight-color: transparent;
+	transition:
+		transform 110ms var(--reel-ease, ease-out),
+		background-color 140ms var(--reel-ease, ease-out),
+		box-shadow 140ms var(--reel-ease, ease-out),
+		opacity 140ms var(--reel-ease, ease-out);
+}
+
+@media (hover: none) {
+	.reel-view .reel-cell:active,
+	.reel-view .reel-row:active {
+		transform: scale(0.97);
+	}
+
+	.reel-view button:active:not(:disabled) {
+		opacity: 0.8;
+	}
+}
+
+@media (hover: hover) {
+	.reel-view .reel-cell:hover .reel-cell-poster {
+		transform: translateY(-3px);
+		box-shadow: var(--reel-shadow-raised), 0 10px 22px -10px rgb(0 0 0 / 0.45);
+	}
+
+	.reel-view .reel-row:hover {
+		background: var(--background-modifier-hover);
+	}
+}
+
+.reel-view :is(button, [role="button"], select, input):focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+/* Controls are not text: no selecting, no callout on long press. */
+.reel-view :is(button, .reel-chip, .reel-tag, .reel-seg, .reel-nav-btn, .reel-omni-bar, .reel-cell-poster) {
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+}
+
+/* Lists scroll like lists: no rubber-band chaining into the page behind. */
+.reel-view-body {
+	overscroll-behavior-y: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reel-view button,
+	.reel-view .reel-cell,
+	.reel-view .reel-row,
+	.reel-view .reel-tag {
+		transition: none;
+	}
+
+	.reel-view .reel-cell:hover .reel-cell-poster,
+	.reel-view .reel-cell:active {
+		transform: none;
+	}
+}
+
+/* Phones: chip type at UI-small so the controls stay quiet. */
+.reel-view:not(.is-w700) .reel-chip {
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view.is-w700 .reel-tag,
+.reel-view.is-w700 .reel-tag.is-active {
+	color: var(--text-normal);
+}
+
+.reel-view.is-w700 .reel-tag.is-active {
+	box-shadow: inset 0 -2px 0 var(--interactive-accent);
+}
+
+/* ==================================================================== */
+/* Settings: one grouped list, like a native settings screen              */
+/* ==================================================================== */
+.reel-settings .reel-settings-section {
+	margin-bottom: 0;
+	border-radius: 0;
+	border-width: 0 0 1px;
+	border-color: var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.reel-settings > :not(.reel-settings-section) + .reel-settings-section {
+	margin-top: var(--reel-space-3);
+	border-top-width: 1px;
+	border-top-left-radius: var(--reel-radius);
+	border-top-right-radius: var(--reel-radius);
+}
+
+.reel-settings .reel-settings-section:last-of-type {
+	border-bottom-left-radius: var(--reel-radius);
+	border-bottom-right-radius: var(--reel-radius);
+	border-bottom-width: 0;
+}
+
+.reel-settings .reel-section-head {
+	min-height: 52px;
+	padding-block: var(--reel-space-2);
+}
+
+.reel-settings .reel-section-head .reel-section-summary {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+/* ==================================================================== */
+/* Desktop: sidebar and toolbar. Phone: one column. Different on purpose. */
+/* ==================================================================== */
+.reel-shell {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+	min-width: 0;
+}
+
+.reel-main {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 0;
+}
+
+.reel-side,
+.reel-view:not(.is-w700) .reel-side {
+	display: none;
+}
+
+.reel-view.is-w700 .reel-side {
+	display: flex;
+	flex-direction: column;
+	flex: none;
+	width: 212px;
+	padding: var(--reel-space-3) var(--reel-space-2);
+	gap: var(--reel-space-1);
+	overflow-y: auto;
+	border-right: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+/* Sections: a vertical list, not a row of tabs. */
+.reel-view.is-w700 .reel-side .reel-tabs {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	position: static;
+	overflow: visible;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.reel-view.is-w700 .reel-side .reel-tab {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--reel-space-2);
+	width: 100%;
+	height: 32px;
+	min-height: 32px;
+	padding: 0 var(--reel-space-2);
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	font-weight: 500;
+	text-align: left;
+	box-shadow: none;
+	margin: 0;
+}
+
+.reel-view.is-w700 .reel-side .reel-tab:hover {
+	background: var(--background-modifier-hover);
+}
+
+.reel-view.is-w700 .reel-side .reel-tab.is-active {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	font-weight: 600;
+	box-shadow: inset 3px 0 0 var(--interactive-accent);
+}
+
+.reel-view.is-w700 .reel-side .reel-tab-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.reel-side-heading {
+	margin: var(--reel-space-4, 16px) var(--reel-space-2) var(--reel-space-1);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.reel-side-tags {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.reel-side-tag {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--reel-space-2);
+	width: 100%;
+	height: 28px;
+	min-height: 28px;
+	padding: 0 var(--reel-space-2);
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+	text-align: left;
+}
+
+.reel-side-tag:hover {
+	background: var(--background-modifier-hover);
+}
+
+.reel-side-tag.is-active {
+	background: var(--background-modifier-hover);
+	font-weight: 600;
+	box-shadow: inset 3px 0 0 var(--interactive-accent);
+}
+
+.reel-side-tag-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-side-tag-count {
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.reel-side-add {
+	display: none;
+}
+
+.reel-view.is-w700 .reel-side .reel-side-add {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--reel-space-2);
+	flex: none;
+	height: 32px;
+	margin-top: var(--reel-space-2);
+	border: 0;
+	border-radius: 8px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-weight: 600;
+	box-shadow: none;
+}
+
+.reel-view.is-w700 .reel-side-add-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* The tags live in the sidebar on a wide pane, so the toolbar drops them. */
+.reel-view.is-w700 .reel-filterbar .reel-tag,
+.reel-view.is-w700 .reel-filterbar .reel-bar-sep {
+	display: none;
+}
+
+.reel-view .reel-side .reel-side-tag {
+	background: transparent;
+	box-shadow: none;
+	border: 0;
+}
+
+.reel-view .reel-side .reel-side-tag:hover,
+.reel-view .reel-side .reel-side-tag.is-active {
+	background: var(--background-modifier-hover);
+}
+
+.reel-view .reel-side .reel-side-tag.is-active {
+	box-shadow: inset 3px 0 0 var(--interactive-accent);
+}

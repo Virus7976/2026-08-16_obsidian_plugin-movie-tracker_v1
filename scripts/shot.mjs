@@ -34,6 +34,8 @@ const flag = (name, fallback) => {
 	return hit ? hit.slice(name.length + 3) : fallback;
 };
 const dark = args.includes("--dark") ? 1 : 0;
+// A wide window instead of a phone: `npm run shot -- library --desktop`.
+const desktop = args.includes("--desktop");
 const height = Number(flag("h", 812));
 const expand = args.includes("--expand");
 /*
@@ -49,7 +51,7 @@ const top = Number(flag("y", 0));
  * like six sections had failed to render.
  */
 const probeMax = Number(flag("max", 12));
-const out = flag("out", join(ROOT, "shots", `${screen}${dark ? "-dark" : ""}-${height}.png`));
+const out = flag("out", join(ROOT, "shots", `${screen}${dark ? "-dark" : ""}${desktop ? "-desktop" : ""}-${height}.png`));
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 const server = createServer(async (req, res) => {
@@ -106,7 +108,7 @@ const page = await browser.newPage();
 // worth looking at here are one or two pixels wide.
 // The viewport has to reach the region being cropped, or the clip lands past
 // the bottom of the page and returns a blank image.
-await page.setViewport({ width: 375, height: top + height, deviceScaleFactor: 2 });
+await page.setViewport({ width: desktop ? 1280 : 375, height: top + height, deviceScaleFactor: desktop ? 1 : 2 });
 /*
  * What the page said on the way up.
  *
@@ -129,7 +131,7 @@ const palArg = palette ? `&palette=${palette}` : "";
 // who turned it up actually sees it.
 const shotScale = flag("scale", "");
 const scaleArg = shotScale ? `&scale=${shotScale}` : "";
-await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=1&dark=${dark}${palArg}${scaleArg}&probeMax=${probeMax}`, {
+await page.goto(`http://localhost:${PORT}/index.html?screen=${screen}&phone=${desktop ? 0 : 1}&dark=${dark}${palArg}${scaleArg}&probeMax=${probeMax}`, {
 	waitUntil: "networkidle0",
 });
 

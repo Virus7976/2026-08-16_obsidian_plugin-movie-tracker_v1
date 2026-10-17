@@ -12189,7 +12189,10 @@ ${body}
     }
   };
   function library(root, rows2 = all) {
-    const header = root.createDiv({ cls: "reel-view-header" });
+    const shell = root.createDiv({ cls: "reel-shell" });
+    const side = shell.createDiv({ cls: "reel-side" });
+    const main = shell.createDiv({ cls: "reel-main" });
+    const header = main.createDiv({ cls: "reel-view-header" });
     const navBtn = header.createEl("button", { cls: "reel-nav-btn" });
     navBtn.createSpan({ cls: "reel-nav-icon", text: "\u25A3" });
     navBtn.createSpan({ cls: "reel-nav-label", text: "Library" });
@@ -12204,7 +12207,7 @@ ${body}
       attr: { type: "search", placeholder: "Search titles, people, characters, plots\u2026" }
     });
     wrap.createEl("button", { cls: "reel-search-clear clickable-icon", text: "\xD7" });
-    const tabs = root.createDiv({ cls: "reel-tabs" });
+    const tabs = side.createDiv({ cls: "reel-tabs" });
     for (const t of ["Library", "Discover", "Rate", "Up next", "Diary", "Stats"]) {
       const b = tabs.createEl("button", { cls: "reel-tab" });
       b.createSpan({ cls: "reel-tab-icon", text: "\u25A3" });
@@ -12212,7 +12215,21 @@ ${body}
       if (t === "Library")
         b.addClass("is-active");
     }
-    const filters = root.createDiv({ cls: "reel-view-filters" });
+    const sideTags = side.createDiv({ cls: "reel-side-tags" });
+    sideTags.createDiv({ cls: "reel-side-heading", text: "Lists" });
+    for (const [t, n2, on] of [["#favourites", 6, false], ["#rewatch-pile", 4, false], ["#christmas-with-the-family", 3, true]]) {
+      const r = sideTags.createEl("button", { cls: `reel-side-tag${on ? " is-active" : ""}` });
+      r.createSpan({ cls: "reel-side-tag-name", text: t });
+      r.createSpan({ cls: "reel-side-tag-count", text: String(n2) });
+    }
+    sideTags.createDiv({ cls: "reel-side-heading", text: "Genres" });
+    for (const [t, n2] of [["#action", 14], ["#drama", 11], ["#science-fiction", 9]]) {
+      const r = sideTags.createEl("button", { cls: "reel-side-tag" });
+      r.createSpan({ cls: "reel-side-tag-name", text: t });
+      r.createSpan({ cls: "reel-side-tag-count", text: String(n2) });
+    }
+    side.createEl("button", { cls: "reel-side-add", text: "Add title" });
+    const filters = main.createDiv({ cls: "reel-view-filters" });
     const suggest = filters.createDiv({ cls: "reel-suggest" });
     suggest.createSpan({ cls: "reel-suggest-label", text: "Try" });
     for (const s of ["Inside Man", "Christopher Nolan", "Denis Villeneuve", "Action", "Crime", "2010s"]) {
@@ -12223,7 +12240,7 @@ ${body}
     for (const t of ["#favourites", "#rewatch-pile", "#action", "#drama", "#science-fiction"]) {
       libBar.createEl("button", { cls: `reel-tag${t === "#action" ? " is-active" : ""}`, text: t });
     }
-    const body = root.createDiv({ cls: "reel-view-body" });
+    const body = main.createDiv({ cls: "reel-view-body" });
     const strip = body.createDiv({ cls: "reel-summary" });
     strip.createSpan({ cls: "reel-summary-label", text: "Library" });
     strip.createSpan({ text: `${rows2.length} titles` });
@@ -13252,9 +13269,10 @@ ${e?.stack ?? ""}` });
     }
     stampWidth(view, measure(view) || window.innerWidth);
     stampChromeInsets(view);
-    const realBody = view.querySelector(":scope > .reel-view-body");
+    const realBody = view.querySelector(":scope > .reel-view-body, :scope > .reel-shell > .reel-main > .reel-view-body");
+    const realMain = view.querySelector(":scope > .reel-shell > .reel-main");
     if (realBody)
-      sizeBody(view, realBody);
+      sizeBody(realMain && realMain.contains(realBody) ? realMain : view, realBody);
     return view;
   }
   sheetFit();

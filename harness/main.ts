@@ -714,7 +714,11 @@ const plugin = {
  * it or it verifies nothing.
  */
 function library(root: HTMLElement, rows: Entry[] = all): void {
-	const header = root.createDiv({ cls: "reel-view-header" });
+	// The same two-column shell the view builds: sidebar and main.
+	const shell = root.createDiv({ cls: "reel-shell" });
+	const side = shell.createDiv({ cls: "reel-side" });
+	const main = shell.createDiv({ cls: "reel-main" });
+	const header = main.createDiv({ cls: "reel-view-header" });
 	// The navigation dropdown that replaces the tab row on a narrow pane. The
 	// harness has to build it or the audit measures a header that no longer
 	// matches the one that ships.
@@ -747,7 +751,7 @@ function library(root: HTMLElement, rows: Entry[] = all): void {
 	wrap.createEl("button", { cls: "reel-search-clear clickable-icon", text: "×" });
 	// No add button: it moved to a native view action via addAction().
 
-	const tabs = root.createDiv({ cls: "reel-tabs" });
+	const tabs = side.createDiv({ cls: "reel-tabs" });
 	for (const t of ["Library", "Discover", "Rate", "Up next", "Diary", "Stats"]) {
 		const b = tabs.createEl("button", { cls: "reel-tab" });
 		b.createSpan({ cls: "reel-tab-icon", text: "▣" });
@@ -755,7 +759,21 @@ function library(root: HTMLElement, rows: Entry[] = all): void {
 		if (t === "Library") b.addClass("is-active");
 	}
 
-	const filters = root.createDiv({ cls: "reel-view-filters" });
+	const sideTags = side.createDiv({ cls: "reel-side-tags" });
+	sideTags.createDiv({ cls: "reel-side-heading", text: "Lists" });
+	for (const [t, n, on] of [["#favourites", 6, false], ["#rewatch-pile", 4, false], ["#christmas-with-the-family", 3, true]] as const) {
+		const r = sideTags.createEl("button", { cls: `reel-side-tag${on ? " is-active" : ""}` });
+		r.createSpan({ cls: "reel-side-tag-name", text: t });
+		r.createSpan({ cls: "reel-side-tag-count", text: String(n) });
+	}
+	sideTags.createDiv({ cls: "reel-side-heading", text: "Genres" });
+	for (const [t, n] of [["#action", 14], ["#drama", 11], ["#science-fiction", 9]] as const) {
+		const r = sideTags.createEl("button", { cls: "reel-side-tag" });
+		r.createSpan({ cls: "reel-side-tag-name", text: t });
+		r.createSpan({ cls: "reel-side-tag-count", text: String(n) });
+	}
+	side.createEl("button", { cls: "reel-side-add", text: "Add title" });
+	const filters = main.createDiv({ cls: "reel-view-filters" });
 
 	const suggest = filters.createDiv({ cls: "reel-suggest" });
 	suggest.createSpan({ cls: "reel-suggest-label", text: "Try" });
@@ -772,7 +790,7 @@ function library(root: HTMLElement, rows: Entry[] = all): void {
 		libBar.createEl("button", { cls: `reel-tag${t === "#action" ? " is-active" : ""}`, text: t });
 	}
 
-	const body = root.createDiv({ cls: "reel-view-body" });
+	const body = main.createDiv({ cls: "reel-view-body" });
 	// The band replaced the bare "39 titles" line: the count is its headline, and
 	// two of them would be one more row of chrome on the screen that has fought
 	// hardest for its vertical space. A deliberately long subtitle, because it is
@@ -2615,8 +2633,9 @@ function mount(app: HTMLElement, name: string): HTMLElement {
 	stampChromeInsets(view);
 	// The same sizing the app performs. Without it the harness lays out a body
 	// the app never produces, and a check about the app reports on the rig.
-	const realBody = view.querySelector<HTMLElement>(":scope > .reel-view-body");
-	if (realBody) sizeBody(view, realBody);
+	const realBody = view.querySelector<HTMLElement>(":scope > .reel-view-body, :scope > .reel-shell > .reel-main > .reel-view-body");
+	const realMain = view.querySelector<HTMLElement>(":scope > .reel-shell > .reel-main");
+	if (realBody) sizeBody(realMain && realMain.contains(realBody) ? realMain : view, realBody);
 	return view;
 }
 
