@@ -19117,3 +19117,176 @@ body.is-mobile .modal-container .modal.reel-modal.reel-review-sheet {
 	justify-content: center;
 	text-align: center;
 }
+
+@media (pointer: fine) {
+	.reel-review-body .reel-review-date {
+		height: 34px;
+		min-height: 34px;
+	}
+}
+
+/* ==================================================================== */
+/* One look for every tab (phone)                                         */
+/* ==================================================================== */
+/*
+ * The Library sets the pattern and the rest follow it: a section label is a
+ * small muted caps line, a card is a flat surface with a 12px corner and no
+ * shadow, a poster has a rounded 10px corner, a control is a flat chip, and
+ * nothing is larger than it needs to be.
+ */
+.reel-view:not(.is-w700) {
+	--reel-card-bg: color-mix(in srgb, var(--background-secondary) 80%, transparent);
+	--reel-card-radius: 12px;
+}
+
+/* Section labels: Up next, Upcoming, Diary months, Stats blocks, Discover rows */
+.reel-view:not(.is-w700) .reel-block-title,
+.reel-view:not(.is-w700) .reel-diary-month,
+.reel-view:not(.is-w700) .reel-upnext > h3,
+.reel-view:not(.is-w700) .reel-upnext-section {
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+/* Up Next: flat rows with a small poster */
+.reel-view:not(.is-w700) .reel-upnext-row {
+	background: var(--reel-card-bg);
+	border-radius: var(--reel-card-radius);
+	box-shadow: none;
+	border: 1px solid var(--background-modifier-border);
+	padding: var(--reel-space-3);
+	gap: var(--reel-space-3);
+}
+
+.reel-view:not(.is-w700) .reel-upnext-thumb {
+	flex: none;
+	width: 56px;
+	height: 84px;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.reel-view:not(.is-w700) .reel-upnext-title,
+.reel-view:not(.is-w700) .reel-upnext-name {
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	line-height: 1.25;
+}
+
+.reel-view:not(.is-w700) .reel-upnext-ep,
+.reel-view:not(.is-w700) .reel-upnext-meta {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.reel-view:not(.is-w700) .reel-tick,
+.reel-view:not(.is-w700) .reel-more {
+	min-width: 44px;
+	min-height: 44px;
+	border-radius: 12px;
+}
+
+/* Rate: a flat card, quieter stars, buttons like every other button */
+.reel-view:not(.is-w700) .reel-rate-card {
+	border-radius: var(--reel-card-radius);
+	box-shadow: none;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.reel-view:not(.is-w700) .reel-rate-poster {
+	border-radius: 10px;
+}
+
+.reel-view:not(.is-w700) .reel-rate-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 650;
+}
+
+.reel-view:not(.is-w700) .reel-rate-count {
+	font-size: var(--font-ui-smaller);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.reel-view:not(.is-w700) .reel-rate-actions .reel-btn,
+.reel-view:not(.is-w700) .reel-rate-nav .reel-btn {
+	min-height: 44px;
+	border-radius: 12px;
+	justify-content: center;
+	text-align: center;
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	background: var(--reel-card-bg);
+	border: 1px solid var(--background-modifier-border);
+	box-shadow: none;
+}
+
+/* Diary: rows like Library rows */
+.reel-view:not(.is-w700) .reel-diary-row {
+	border-radius: var(--reel-card-radius);
+	gap: var(--reel-space-3);
+}
+
+.reel-view:not(.is-w700) .reel-diary-thumb {
+	flex: none;
+	width: 44px;
+	height: 66px;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.reel-view:not(.is-w700) .reel-diary-title {
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+}
+
+.reel-view:not(.is-w700) .reel-diary-meta {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+/* Stats: tiles with the same corner and border as every card */
+.reel-view:not(.is-w700) .reel-stats .reel-tile {
+	border-radius: var(--reel-card-radius);
+}
+
+/* Discover: the intro line reads as the same caption strip as the Library's */
+.reel-view:not(.is-w700) .reel-discover-head {
+	margin: 0 var(--reel-space-3);
+	padding: var(--reel-space-1) 0;
+	border-top: 1px solid var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.reel-view:not(.is-w700) .reel-discover-note {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	max-width: none;
+}
+
+/* Every tab's controls share a left edge with its content */
+.reel-view:not(.is-w700) .reel-view-body .reel-chips {
+	padding-left: var(--reel-space-3);
+	padding-right: var(--reel-space-3);
+}
+
+.reel-view:not(.is-w700) .reel-upnext .reel-block-title,
+.reel-view:not(.is-w700) .reel-upnext .reel-block-count {
+	padding-left: 14px;
+}
+
+.reel-view:not(.is-w700) .reel-upnext {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.reel-view:not(.is-w700) .reel-upnext .reel-block-title {
+	padding-left: 0;
+}
