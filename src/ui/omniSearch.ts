@@ -10,7 +10,7 @@
  * The filter chips narrow what is shown without leaving the box.
  */
 
-import { App, Notice, SuggestModal, debounce } from "obsidian";
+import { App, Notice, SuggestModal, debounce, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
 import type { Entry, TmdbSearchResult } from "../types";
 import { matchesStatus } from "../util/status";
@@ -19,6 +19,7 @@ import { redact } from "../secrets";
 import { LogSheet } from "./logSheet";
 
 type Item =
+	| { kind: "unlock" }
 	| { kind: "lib"; entry: Entry }
 	| { kind: "tmdb"; result: TmdbSearchResult }
 	| { kind: "head"; text: string };
@@ -55,9 +56,17 @@ export class OmniSearch extends SuggestModal<Item> {
 	private remoteFor = "";
 	private seq = 0;
 
-	constructor(app: App, private plugin: ReelPlugin, query = "", scope: OmniScope = "all") {
+	constructor(
+		app: App,
+		private plugin: ReelPlugin,
+		query = "",
+		scope: OmniScope = "all",
+		state: { kind: Kind; status: Status } = { kind: null, status: null }
+	) {
 		super(app);
 		this.where = scope;
+		this.kind = state.kind;
+		this.status = state.status;
 		this.setPlaceholder("Search your library and TMDB…");
 		this.limit = 40;
 		this.modalEl.addClass("reel-modal", "reel-search", "reel-omni");
@@ -94,7 +103,9 @@ export class OmniSearch extends SuggestModal<Item> {
 			}, () => this.status === id);
 		}
 		this.paintChips();
-		this.inputEl.insertAdjacentElement("afterend", row);
+		// Under the field, on a row of their own. Beside it they shared the
+		// input's line and squeezed the text you were typing.
+		this.resultContainerEl.insertAdjacentElement("beforebegin", row);
 
 		if (query) {
 			this.inputEl.value = query;
@@ -115,11 +126,48 @@ export class OmniSearch extends SuggestModal<Item> {
 		return true;
 	}
 
+	/**
+	 * "thriller", "90s comedy", "something scary": a genre or a decade in the
+	 * box asks for a kind of film, not a title. Answered by TMDB's own filter,
+	 * so it finds what you do not have yet. Null means the words were not that,
+	 * and the normal title search runs instead.
+	 */
+	private async byGenre(q: string): Promise<TmdbSearchResult[] | null> {
+		const words = q.toLowerCase().replace(/^#/, "").split(/\s+/).filter(Boolean);
+		const alias: Record<string, string> = {
+			"sci-fi": "science fiction",
+			scifi: "science fiction",
+			scary: "horror",
+			funny: "comedy",
+			romantic: "romance",
+			animated: "animation",
+			cartoon: "animation",
+			"kids": "family",
+		};
+		let decade: number | undefined;
+		const rest: string[] = [];
+		for (const w of words) {
+			const m = /^(?:(19|20)?(\d)0)s$/.exec(w);
+			if (m) decade = m[1] ? Number(m[1] + m[2] + "0") : Number(m[2]) < 3 ? 2000 + Number(m[2]) * 10 : 1900 + Number(m[2]) * 10;
+			else rest.push(alias[w] ?? w);
+		}
+		const phrase = rest.join(" ");
+		const kinds: ("movie" | "tv")[] = this.kind === "film" ? ["movie"] : this.kind === "tv" ? ["tv"] : ["movie", "tv"];
+		const out: TmdbSearchResult[] = [];
+		for (const type of kinds) {
+			const list = await this.plugin.tmdb.genreList(type);
+			const hit = list.find((g) => g.name.toLowerCase() === phrase);
+			if (!hit && !(decade && !phrase)) continue;
+			out.push(...(await this.plugin.tmdb.discoverBy({ type, genreId: hit?.id, decade })));
+		}
+		return out.length ? out : null;
+	}
+
 	private fetchRemote = debounce(
 		async (q: string) => {
 			const ticket = ++this.seq;
 			try {
-				const r = await this.plugin.tmdb.searchMulti(q);
+				const r = (await this.byGenre(q)) ?? (await this.plugin.tmdb.searchMulti(q));
 				if (ticket !== this.seq) return;
 				this.remote = r;
 				this.remoteFor = q;
@@ -148,7 +196,13 @@ export class OmniSearch extends SuggestModal<Item> {
 		// TMDB only answers "what else exists", so it is skipped when the chip
 		// asks about things you already have.
 		const askRemote = q.length >= 2 && this.where !== "mine" && !this.status;
-		if (askRemote) {
+		if (askRemote && this.plugin.credentials.needsUnlock) {
+			// Reading a sealed key mid-typing would throw a passphrase sheet over
+			// the box you are typing in. Say so in the list instead, and let the
+			// person choose when.
+			out.push({ kind: "head", text: "Not in your library" });
+			out.push({ kind: "unlock" });
+		} else if (askRemote) {
 			if (this.remoteFor !== q) this.fetchRemote(q);
 			const fresh = this.remote
 				.filter((r) => r.media_type === "tv" || r.media_type === "movie")
@@ -164,6 +218,14 @@ export class OmniSearch extends SuggestModal<Item> {
 	}
 
 	renderSuggestion(item: Item, el: HTMLElement): void {
+		if (item.kind === "unlock") {
+			el.addClass("reel-omni-unlock");
+			setIcon(el.createSpan({ cls: "reel-omni-unlock-icon" }), "lock");
+			const text = el.createDiv({ cls: "reel-omni-unlock-text" });
+			text.createDiv({ cls: "reel-omni-unlock-title", text: "Unlock your keys to search TMDB" });
+			text.createDiv({ cls: "reel-dim", text: "You come straight back here with your search kept." });
+			return;
+		}
 		if (item.kind === "head") {
 			el.addClass("reel-omni-head");
 			el.setText(item.text);
@@ -202,6 +264,15 @@ export class OmniSearch extends SuggestModal<Item> {
 	}
 
 	onChooseSuggestion(item: Item): void {
+		if (item.kind === "unlock") {
+			// Close, unlock, and reopen exactly as it was: the words, the scope
+			// and the chips. The prompt is a detour, not a new place.
+			const back = { query: this.inputEl.value, where: this.where, state: { kind: this.kind, status: this.status } };
+			void this.plugin.credentials.unlock().then(() => {
+				new OmniSearch(this.app, this.plugin, back.query, back.where, back.state).open();
+			});
+			return;
+		}
 		if (item.kind === "head") {
 			// Not a result; reopen so a stray tap does not just close the box.
 			new OmniSearch(this.app, this.plugin, this.inputEl.value, this.where).open();

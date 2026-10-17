@@ -1773,7 +1773,9 @@ input.reel-input {
 	flex: 1;
 	min-height: 36px;
 	border-radius: var(--reel-radius);
-	background: var(--background-modifier-form-field);
+	/* `background-color`, not the shorthand: the shorthand resets the theme's
+	   dropdown arrow to repeat, which tiles it across the whole field. */
+	background-color: var(--background-modifier-form-field);
 	color: var(--text-normal);
 	border: 1px solid var(--background-modifier-border);
 	padding: 0 8px;
@@ -18306,4 +18308,251 @@ body:not(.is-phone) .reel-modal .reel-setup-copy {
 
 .reel-view .reel-side .reel-side-tag.is-active {
 	box-shadow: inset 3px 0 0 var(--interactive-accent);
+}
+
+/* The dropdown arrow is one arrow, at the right edge, whatever a rule above says. */
+.reel-select,
+select.reel-select {
+	background-repeat: no-repeat;
+	background-position: right 12px center;
+	padding-right: 32px;
+}
+
+/* Filters sheet: the title is a title, and chip groups sit on the sheet. */
+.reel-filter-sheet .reel-filter-head .reel-log-title {
+	color: var(--text-normal);
+}
+
+.reel-filter-sheet .reel-chips,
+.reel-filter-sheet .reel-filter-chips {
+	background: transparent;
+	position: static;
+	box-shadow: none;
+}
+
+/* ==================================================================== */
+/* Review sheet: head, scrolling body, buttons. A column, nothing layered. */
+/* ==================================================================== */
+.reel-modal.reel-review-sheet {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.reel-review-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.reel-review-head .reel-log-title {
+	margin: 0;
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+}
+
+.reel-review-head .reel-log-sub {
+	margin: 2px 0 var(--reel-space-3);
+}
+
+.reel-review-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.reel-review-body .reel-review-box {
+	display: block;
+	width: 100%;
+	min-height: 96px;
+	margin: 0 0 var(--reel-space-3);
+	resize: none;
+}
+
+.reel-review-body .reel-review-meta {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: center;
+	gap: var(--reel-space-2) var(--reel-space-3);
+	margin: 0;
+}
+
+.reel-review-body .reel-review-meta .reel-field-label {
+	margin: 0;
+}
+
+.reel-review-body .reel-review-date {
+	justify-self: start;
+	max-width: 100%;
+}
+
+.reel-review-content .reel-actions {
+	position: static;
+	flex: none;
+	margin: 0;
+	padding: var(--reel-space-3) 0 0;
+	border-top: 1px solid var(--background-modifier-border);
+	background: transparent;
+	box-shadow: none;
+	display: flex;
+	gap: var(--reel-space-2);
+	justify-content: flex-end;
+}
+
+.reel-review-content .reel-actions .reel-btn {
+	flex: 1 1 0;
+	min-height: 44px;
+}
+
+/* ==================================================================== */
+/* Every tab shares the Library's scale and surface on a phone           */
+/* ==================================================================== */
+/* Discover, Rate, Up next, Diary and Stats were drawn at their own sizes:
+   44px pills, large headings, a full-width action block. Same density as the
+   Library now: 32px controls that tap at 44, small captions, flat cards. */
+.reel-view:not(.is-w700) .reel-view-body .reel-chips {
+	gap: var(--reel-space-2);
+	padding-top: var(--reel-space-1);
+	padding-bottom: var(--reel-space-1);
+}
+
+.reel-view:not(.is-w700) .reel-view-body .reel-chips .reel-chip {
+	position: relative;
+	min-height: 44px;
+	height: 44px;
+	padding: 0 14px;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view:not(.is-w700) .reel-view-body .reel-chips .reel-chip::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	height: 44px;
+	transform: translateY(-50%);
+}
+
+.reel-view:not(.is-w700) .reel-discover {
+	gap: var(--reel-space-3);
+}
+
+.reel-view:not(.is-w700) .reel-recipe-launch .reel-btn {
+	min-height: 44px;
+	height: 44px;
+	padding: 0 var(--reel-space-4);
+	font-size: var(--font-ui-small);
+	border-radius: var(--reel-radius-sm, 10px);
+}
+
+.reel-view:not(.is-w700) .reel-discover-head .reel-refresh {
+	min-height: 44px;
+	height: 44px;
+	padding: 0 12px;
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view:not(.is-w700) .reel-discover-note {
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-view:not(.is-w700) .reel-drow-title {
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+}
+
+.reel-view:not(.is-w700) .reel-drow-reason {
+	font-size: 12px;
+}
+
+.reel-view:not(.is-w700) .reel-drow-strip {
+	gap: var(--reel-space-2);
+}
+
+.reel-view:not(.is-w700) .reel-dcard {
+	flex-basis: 108px;
+	width: 108px;
+	background: transparent;
+	padding: 0;
+}
+
+.reel-view:not(.is-w700) .reel-dgrid {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--reel-space-3) var(--reel-space-2);
+}
+
+.reel-view:not(.is-w700) .reel-dcard-title {
+	font-size: 12px;
+	line-height: 1.25;
+	font-weight: 600;
+	-webkit-line-clamp: 2;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-year {
+	font-size: 12px;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-btn {
+	position: relative;
+	min-height: 44px;
+	height: 44px;
+	border-radius: 8px;
+}
+
+/* ==================================================================== */
+/* One sort button: label plus direction, a menu behind it               */
+/* ==================================================================== */
+.reel-sort-btn {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 11em;
+}
+
+.reel-sort-btn .reel-sort-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.reel-sort-btn .reel-sort-icon svg,
+.reel-sort-btn .reel-sort-dir svg {
+	width: 14px;
+	height: 14px;
+}
+
+.reel-sort-btn .reel-sort-dir {
+	min-width: 0;
+	height: auto;
+	padding: 0;
+	color: var(--text-normal);
+}
+
+/* Search chips: their own row under the field, never beside it. */
+.reel-omni-chips {
+	flex-wrap: nowrap;
+	padding: 8px 12px 4px;
+}
+
+.reel-omni-unlock {
+	display: flex;
+	align-items: center;
+	gap: var(--reel-space-3, 12px);
+}
+
+.reel-omni-unlock-icon svg {
+	width: 18px;
+	height: 18px;
+	color: var(--interactive-accent);
+}
+
+.reel-omni-unlock-title {
+	font-weight: 600;
 }

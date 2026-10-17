@@ -231,6 +231,7 @@ export function renderPosterGrid(plugin: ReelPlugin, el: HTMLElement, rows: Entr
 	const grid = el.createDiv({ cls: "reel-grid" });
 	for (const entry of rows) {
 		const cell = grid.createDiv({ cls: "reel-cell" });
+		cell.dataset.reelPath = entry.path;
 		describe(cell, entry);
 
 		const posterEl = cell.createDiv({ cls: "reel-cell-poster" });
@@ -285,6 +286,7 @@ export function renderRowList(plugin: ReelPlugin, el: HTMLElement, rows: Entry[]
 	const list = el.createDiv({ cls: "reel-list" });
 	for (const entry of rows) {
 		const row = list.createDiv({ cls: "reel-row" });
+		row.dataset.reelPath = entry.path;
 		// This one had no label at all — `role="button"` with nothing to
 		// announce, so the entire row list read as a column of unnamed
 		// buttons. The grid beside it was labelled. That is exactly the drift

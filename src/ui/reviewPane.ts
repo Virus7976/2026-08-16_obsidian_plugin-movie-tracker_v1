@@ -307,8 +307,13 @@ export class ReviewEditor extends Modal {
 
 		modalEl.addClass("reel-review-sheet");
 
-		contentEl.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
-		contentEl.createDiv({ cls: "reel-log-sub", text: this.entry.title });
+		contentEl.addClass("reel-review-content");
+		const head = contentEl.createDiv({ cls: "reel-review-head" });
+		head.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
+		head.createDiv({ cls: "reel-log-sub", text: this.entry.title });
+		// Head, a body that scrolls on its own, then the buttons: a column, so
+		// nothing is layered over anything and the keyboard cannot cover the box.
+		const body = contentEl.createDiv({ cls: "reel-review-body" });
 
 		/*
 		 * The box, first.
@@ -318,14 +323,14 @@ export class ReviewEditor extends Modal {
 		 * word you were typing. Everything else here is metadata about the writing,
 		 * and metadata goes under the thing it describes.
 		 */
-		const box = contentEl.createEl("textarea", {
+		const box = body.createEl("textarea", {
 			cls: "reel-input reel-review-box",
 			attr: { rows: "6", placeholder: "What did you think?" },
 		});
 		box.value = this.text;
 		box.addEventListener("input", () => (this.text = box.value));
 
-		const meta = contentEl.createDiv({ cls: "reel-review-meta" });
+		const meta = body.createDiv({ cls: "reel-review-meta" });
 
 		/*
 		 * The app's own star control, not ten chips.

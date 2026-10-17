@@ -618,28 +618,6 @@ export class DiscoverScreen {
 	private paintFilters(container: HTMLElement): void {
 		const wrap = container.createDiv({ cls: "reel-discover-filters" });
 
-		// The guided flow, and the moods you have already built. Above the
-		// filter chips because it is a better first move than any of them:
-		// starting from three films you loved beats starting from a genre.
-		const launch = wrap.createDiv({ cls: "reel-recipe-launch" });
-		const find = launch.createEl("button", { cls: "reel-btn mod-cta", attr: { type: "button" } });
-		setIcon(find.createSpan(), "wand-2");
-		find.createSpan({ text: "Find something to watch" });
-		find.addEventListener("click", () => this.plugin.openRecipe());
-
-		for (const saved of this.plugin.settings.recipes.slice(0, 4)) {
-			const b = launch.createEl("button", { cls: "reel-chip", text: saved.name ?? "Recipe", attr: { type: "button" } });
-			b.addEventListener("click", () => this.plugin.openRecipe(saved));
-			// Right-click or long-press to forget it. A delete button on every
-			// chip would double the width of a row meant to be scanned.
-			b.addEventListener("contextmenu", async (ev) => {
-				ev.preventDefault();
-				this.plugin.settings.recipes = this.plugin.settings.recipes.filter((r) => r !== saved);
-				await this.plugin.saveSettings();
-				this.render(container);
-			});
-		}
-
 		const row1 = wrap.createDiv({ cls: "reel-chips" });
 		const chip = (parent: HTMLElement, label: string, active: boolean, onClick: () => void) => {
 			const b = parent.createEl("button", { cls: "reel-chip", text: label });

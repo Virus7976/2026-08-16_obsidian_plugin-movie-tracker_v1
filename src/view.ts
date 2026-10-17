@@ -559,6 +559,30 @@ export class ReelView extends ItemView {
 		this.bodyEl.scrollTop = this.tabScroll.get(this.tab) ?? 0;
 	}
 
+	/** The first title on screen and how far down it sits, to put it back after a repaint. */
+	private anchorSnapshot(): { path: string; offset: number } | null {
+		const top = this.bodyEl.getBoundingClientRect().top;
+		for (const el of Array.from(this.bodyEl.querySelectorAll<HTMLElement>("[data-reel-path]"))) {
+			const r = el.getBoundingClientRect();
+			if (r.bottom > top + 4) return { path: el.dataset.reelPath ?? "", offset: r.top - top };
+		}
+		return null;
+	}
+
+	private restoreAnchor(anchor: { path: string; offset: number } | null, fallback: number): void {
+		if (anchor) {
+			const hit = Array.from(this.bodyEl.querySelectorAll<HTMLElement>("[data-reel-path]")).find(
+				(el) => el.dataset.reelPath === anchor.path
+			);
+			if (hit) {
+				const top = this.bodyEl.getBoundingClientRect().top;
+				this.bodyEl.scrollTop += hit.getBoundingClientRect().top - top - anchor.offset;
+				return;
+			}
+		}
+		if (fallback > 0) this.bodyEl.scrollTop = fallback;
+	}
+
 	private paint(): void {
 		this.contentEl.findAll(".reel-tab").forEach((el) => {
 			// aria-current, not aria-pressed: this is "which screen am I on",
@@ -570,6 +594,10 @@ export class ReelView extends ItemView {
 		// scroll to the top — so rating something halfway down your library
 		// threw you back to the start of it.
 		const scroll = this.bodyEl.scrollTop;
+		// And hold the *title* you were looking at, not just the distance from the
+		// top: reversing the sort or ticking a filter changes what sits at that
+		// distance, which read as the list jumping to somewhere else.
+		const anchor = this.anchorSnapshot();
 
 		this.filterEl.empty();
 		this.bodyEl.empty();
@@ -594,7 +622,7 @@ export class ReelView extends ItemView {
 		try {
 			this.paintTab();
 			// After the DOM exists, or there is nothing to scroll yet.
-			if (scroll > 0) this.bodyEl.scrollTop = scroll;
+			this.restoreAnchor(anchor, scroll);
 			this.playMove();
 		} catch (e) {
 			// A thrown paint used to leave an empty pane with no explanation.
@@ -1003,8 +1031,6 @@ export class ReelView extends ItemView {
 		const bar = this.filterEl.createDiv({ cls: "reel-chips reel-filterbar" });
 		const set = activeFilters(this.filters);
 
-		if (showSort) this.paintLayoutControl(bar);
-
 		const open = bar.createEl("button", {
 			cls: "reel-chip reel-filter-btn",
 			attr: { type: "button", "aria-label": "Filters" },
@@ -1013,6 +1039,8 @@ export class ReelView extends ItemView {
 		open.createSpan({ text: "Filters" });
 		if (set.length) open.createSpan({ cls: "reel-filter-count", text: String(set.length) });
 		open.addEventListener("click", () => this.openFilters(showSort));
+
+		if (showSort) this.paintLayoutControl(bar);
 
 		/*
 		 * Ask, beside the filters, because that is what it is.
@@ -1075,7 +1103,7 @@ export class ReelView extends ItemView {
 		 * the same two choices the thumb does — and a button cannot be nested
 		 * inside another button, so the pill is a group holding both.
 		 */
-		const tagged = this.tab === "library" && showSort ? this.paintTags(bar) : new Set<string>();
+		const tagged = new Set<string>();
 		for (const f of set) {
 			if (tagged.has(`${f.key}:${f.value}`)) continue;
 			const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
@@ -1130,25 +1158,6 @@ export class ReelView extends ItemView {
 		return `#${t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 	}
 
-	/**
-	 * #tags in the same scrolling row as the controls (phones): one tap to
-	 * narrow, one to undo. Returns what it drew, so the same filter is not also
-	 * shown as an active chip.
-	 */
-	private paintTags(bar: HTMLElement): Set<string> {
-		const shown = new Set<string>();
-		const tags = this.tagList(6);
-		if (!tags.length) return shown;
-		bar.createSpan({ cls: "reel-bar-sep", attr: { "aria-hidden": "true" } });
-		for (const t of tags) {
-			shown.add(`${t.key}:${t.value}`);
-			const b = bar.createEl("button", { cls: "reel-tag", text: this.tagSlug(t.value), attr: { type: "button" } });
-			setSelected(b, this.filters[t.key].includes(t.value));
-			b.addEventListener("click", () => this.toggleTag(t.key, t.value));
-		}
-		return shown;
-	}
-
 	/** The desktop sidebar's lists and tags, with how many titles each holds. */
 	private paintSideTags(): void {
 		const el = this.sideTagsEl;
@@ -1192,29 +1201,42 @@ export class ReelView extends ItemView {
 	 * reachable without scrolling.
 	 */
 	private paintSortControls(bar: HTMLElement): void {
-		const select = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
-		for (const [value, label] of SORT_OPTIONS) select.createEl("option", { value, text: label });
-		select.value = this.filters.sort;
-		select.setAttr("aria-label", "Sort by");
-		select.addEventListener("change", () => {
-			this.filters.sort = select.value;
-			void this.persistLayout();
-			this.paint();
+		const dir = direction(this.filters.sort, this.filters.sortFlip);
+		const label = SORT_OPTIONS.find(([v]) => v === this.filters.sort)?.[1] ?? this.filters.sort;
+		const btn = bar.createEl("button", {
+			cls: "reel-chip reel-sort-btn",
+			attr: { type: "button", "aria-label": `Sort: ${label}, ${dir === 1 ? "ascending" : "descending"}. Change.` },
 		});
-
-		// Up or down: one tap reverses the order, and it is remembered.
-		const dir = bar.createEl("button", {
-			cls: "reel-chip reel-sort-dir",
-			attr: {
-				type: "button",
-				"aria-label": this.filters.sortFlip ? "Order reversed. Tap to restore." : "Tap to reverse the order",
-			},
-		});
-		setIcon(dir, direction(this.filters.sort, this.filters.sortFlip) === 1 ? "arrow-up" : "arrow-down");
-		dir.addEventListener("click", () => {
-			this.filters.sortFlip = !this.filters.sortFlip;
-			void this.persistLayout();
-			this.paint();
+		setIcon(btn.createSpan({ cls: "reel-sort-icon" }), "arrow-up-down");
+		btn.createSpan({ cls: "reel-sort-label", text: label });
+		setIcon(btn.createSpan({ cls: "reel-sort-dir" }), dir === 1 ? "arrow-up" : "arrow-down");
+		btn.addEventListener("click", (ev) => {
+			const menu = new Menu();
+			for (const [value, text] of SORT_OPTIONS) {
+				menu.addItem((i) =>
+					i
+						.setTitle(text)
+						.setChecked(value === this.filters.sort)
+						.onClick(() => {
+							this.filters.sort = value;
+							void this.persistLayout();
+							this.paint();
+						})
+				);
+			}
+			menu.addSeparator();
+			menu.addItem((i) =>
+				i
+					.setTitle("Reverse order")
+					.setIcon("arrow-down-up")
+					.setChecked(this.filters.sortFlip)
+					.onClick(() => {
+						this.filters.sortFlip = !this.filters.sortFlip;
+						void this.persistLayout();
+						this.paint();
+					})
+			);
+			menu.showAtMouseEvent(ev);
 		});
 
 		// The tiebreaker lives in the sheet. It is a real feature and a rare one,

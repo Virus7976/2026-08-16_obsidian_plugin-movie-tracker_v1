@@ -785,10 +785,6 @@ function library(root: HTMLElement, rows: Entry[] = all): void {
 	// Long labels on purpose — a director's name and a list called something
 	// unreasonable are the cases that used to widen the whole pane.
 	const libBar = filterBar(filters, ["Films", "Science Fiction", "☰ Christmas with the family"]);
-	libBar.createSpan({ cls: "reel-bar-sep" });
-	for (const t of ["#favourites", "#rewatch-pile", "#action", "#drama", "#science-fiction"]) {
-		libBar.createEl("button", { cls: `reel-tag${t === "#action" ? " is-active" : ""}`, text: t });
-	}
 
 	const body = main.createDiv({ cls: "reel-view-body" });
 	// The band replaced the bare "39 titles" line: the count is its headline, and
@@ -829,14 +825,14 @@ function libraryYear(root: HTMLElement): void {
  */
 function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElement {
 	const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
-	if (sort) {
-		const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg" });
-		["▦", "▪", "☰"].forEach((g, i) => seg.createEl("button", { cls: `reel-seg-btn${i === 0 ? " is-active" : ""}`, text: g }));
-	}
 	const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
 	open.createSpan({ cls: "reel-filter-btn-icon", text: "⚙" });
 	open.createSpan({ text: "Filters" });
 	if (active.length) open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
+	if (sort) {
+		const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg" });
+		["▦", "▪", "☰"].forEach((g, i) => seg.createEl("button", { cls: `reel-seg-btn${i === 0 ? " is-active" : ""}`, text: g }));
+	}
 
 	/*
 	 * Ask, which the view draws here once an OpenRouter key exists.
@@ -853,9 +849,10 @@ function filterBar(into: HTMLElement, active: string[], sort = true): HTMLElemen
 	// rows of controls above two posters is a control panel with a preview pane
 	// attached, which is what the device screenshot showed.
 	if (sort) {
-		const sel = bar.createEl("select", { cls: "reel-select dropdown reel-sort-select" });
-		sel.createEl("option", { text: "Recently watched" });
-		bar.createEl("button", { cls: "reel-chip reel-sort-dir", text: "↓", attr: { "aria-label": "Tap to reverse the order" } });
+		const sb = bar.createEl("button", { cls: "reel-chip reel-sort-btn", attr: { "aria-label": "Sort: Recently watched, descending. Change." } });
+		sb.createSpan({ cls: "reel-sort-icon", text: "⇅" });
+		sb.createSpan({ cls: "reel-sort-label", text: "Recent" });
+		sb.createSpan({ cls: "reel-sort-dir", text: "↓" });
 	}
 	const ask = bar.createEl("button", { cls: "reel-chip reel-ask-btn" });
 	ask.createSpan({ cls: "reel-filter-btn-icon", text: "✦" });
