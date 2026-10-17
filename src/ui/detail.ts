@@ -42,6 +42,7 @@ import { ContentFlag, FLAG_LABELS } from "../content";
 import { haptic } from "../util/haptics";
 import { badgePerson } from "./personBadge";
 import { paintReviews } from "./reviewPane";
+import { showTitleMenu } from "./titleMenu";
 
 /**
  * "GB" → 🇬🇧.
@@ -131,10 +132,11 @@ export class DetailScreen {
 		back.createSpan({ text: this.backLabel });
 		back.addEventListener("click", () => this.onBack());
 
-		const openNote = bar.createEl("button", { cls: "reel-btn", text: "Open note" });
-		openNote.addEventListener("click", async () => {
-			const file = this.file;
-			if (file) await this.plugin.app.workspace.getLeaf(false).openFile(file);
+		const more = bar.createEl("button", { cls: "reel-btn reel-detail-more", attr: { type: "button", "aria-label": "More actions" } });
+		setIcon(more.createSpan(), "more-horizontal");
+		more.addEventListener("click", () => {
+			const r = more.getBoundingClientRect();
+			showTitleMenu(this.plugin, this.entry, r.right, r.bottom, { onDetail: true });
 		});
 
 		const page = container.createDiv({ cls: "reel-detail-page" });

@@ -764,148 +764,6 @@
     return renderStars(parent, { value, readonly: true });
   }
 
-  // src/ui/quickRate.ts
-  var QuickRate = class extends Modal {
-    constructor(plugin2, entry, file) {
-      super(plugin2.app);
-      this.plugin = plugin2;
-      this.entry = entry;
-      this.file = file;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal", "reel-quickrate");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.createEl("h3", { cls: "reel-log-title", text: this.entry.title });
-      renderStars(contentEl.createDiv({ cls: "reel-rating-row big" }), {
-        value: this.entry.rating,
-        onChange: async (v) => {
-          try {
-            await this.plugin.notes.setRating(this.file, v ?? null);
-          } catch (e) {
-            new Notice(`Reel: ${redact(e)}`);
-          }
-          this.close();
-        }
-      });
-      const reactions = contentEl.createDiv({ cls: "reel-reactions" });
-      const reaction = (on, iconOn, iconOff, label, toggle2) => {
-        const b = reactions.createEl("button", { cls: "reel-reaction", attr: { type: "button" } });
-        const paint = (state) => {
-          b.empty();
-          setIcon(b.createSpan({ cls: "reel-reaction-icon" }), state ? iconOn : iconOff);
-          b.createSpan({ cls: "reel-reaction-label", text: label });
-          b.toggleClass("is-on", state);
-          b.setAttr("aria-pressed", state ? "true" : "false");
-        };
-        paint(on);
-        b.addEventListener("click", async () => {
-          const next = !b.hasClass("is-on");
-          paint(next);
-          haptic("tick");
-          try {
-            const actual = await toggle2();
-            if (actual !== next)
-              paint(actual);
-          } catch (e) {
-            paint(!next);
-            new Notice(`Reel: ${redact(e)}`);
-          }
-        });
-      };
-      reaction(!!this.entry.liked, "heart", "heart", "Liked", () => this.plugin.notes.toggleLiked(this.file));
-      reaction(
-        !!this.entry.wouldRewatch,
-        "rotate-ccw",
-        "rotate-ccw",
-        "Again",
-        () => this.plugin.notes.toggleRewatch(this.file)
-      );
-      const row = contentEl.createDiv({ cls: "reel-log-actions" });
-      const open2 = row.createEl("button", { cls: "reel-btn mod-cta", text: "Open note" });
-      open2.addEventListener("click", async () => {
-        this.close();
-        await this.plugin.app.workspace.getLeaf(false).openFile(this.file);
-      });
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-
-  // src/ui/listPicker.ts
-  var ListPicker = class extends Modal {
-    constructor(app2, plugin2, entry, file) {
-      super(app2);
-      this.plugin = plugin2;
-      this.entry = entry;
-      this.file = file;
-      this.selected = new Set(entry.lists);
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Lists" });
-      contentEl.createDiv({ cls: "reel-log-sub", text: this.entry.title });
-      const chipRow = contentEl.createDiv({ cls: "reel-flag-row" });
-      const known = /* @__PURE__ */ new Set([...this.plugin.library.lists(), ...this.selected]);
-      const addChip = (name) => {
-        const chip = chipRow.createEl("button", { cls: "reel-chip", text: name });
-        const paint = () => chip.toggleClass("is-active", this.selected.has(name));
-        chip.addEventListener("click", () => {
-          if (this.selected.has(name))
-            this.selected.delete(name);
-          else
-            this.selected.add(name);
-          paint();
-        });
-        paint();
-      };
-      [...known].sort().forEach(addChip);
-      if (!known.size)
-        contentEl.createDiv({ cls: "reel-dim", text: "No lists yet \u2014 create one below." });
-      const newRow = contentEl.createDiv({ cls: "reel-field" });
-      newRow.createDiv({ cls: "reel-field-label", text: "New list" });
-      const input = newRow.createEl("input", {
-        cls: "reel-input",
-        attr: { type: "text", placeholder: "e.g. Halloween 2026", enterkeyhint: "done" }
-      });
-      const create = () => {
-        const name = input.value.trim();
-        if (!name || this.selected.has(name))
-          return;
-        this.selected.add(name);
-        addChip(name);
-        input.value = "";
-      };
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          create();
-        }
-      });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      actions.createEl("button", { cls: "reel-btn", text: "Cancel" }).addEventListener("click", () => this.close());
-      const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Save" });
-      save.addEventListener("click", async () => {
-        create();
-        try {
-          await this.plugin.notes.setLists(this.file, [...this.selected]);
-          this.plugin.undo.offer("Lists updated");
-        } catch (e) {
-          new Notice(`Reel: ${redact(e)}`);
-        }
-        this.close();
-      });
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-
   // src/util/ranges.ts
   function parseRange(spec) {
     if (!spec)
@@ -1054,6 +912,148 @@
     return String(Math.round(n2));
   }
 
+  // src/ui/quickRate.ts
+  var QuickRate = class extends Modal {
+    constructor(plugin2, entry, file) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.entry = entry;
+      this.file = file;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal", "reel-quickrate");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: this.entry.title });
+      renderStars(contentEl.createDiv({ cls: "reel-rating-row big" }), {
+        value: this.entry.rating,
+        onChange: async (v) => {
+          try {
+            await this.plugin.notes.setRating(this.file, v ?? null);
+          } catch (e) {
+            new Notice(`Reel: ${redact(e)}`);
+          }
+          this.close();
+        }
+      });
+      const reactions = contentEl.createDiv({ cls: "reel-reactions" });
+      const reaction = (on, iconOn, iconOff, label, toggle2) => {
+        const b = reactions.createEl("button", { cls: "reel-reaction", attr: { type: "button" } });
+        const paint = (state) => {
+          b.empty();
+          setIcon(b.createSpan({ cls: "reel-reaction-icon" }), state ? iconOn : iconOff);
+          b.createSpan({ cls: "reel-reaction-label", text: label });
+          b.toggleClass("is-on", state);
+          b.setAttr("aria-pressed", state ? "true" : "false");
+        };
+        paint(on);
+        b.addEventListener("click", async () => {
+          const next = !b.hasClass("is-on");
+          paint(next);
+          haptic("tick");
+          try {
+            const actual = await toggle2();
+            if (actual !== next)
+              paint(actual);
+          } catch (e) {
+            paint(!next);
+            new Notice(`Reel: ${redact(e)}`);
+          }
+        });
+      };
+      reaction(!!this.entry.liked, "heart", "heart", "Liked", () => this.plugin.notes.toggleLiked(this.file));
+      reaction(
+        !!this.entry.wouldRewatch,
+        "rotate-ccw",
+        "rotate-ccw",
+        "Again",
+        () => this.plugin.notes.toggleRewatch(this.file)
+      );
+      const row = contentEl.createDiv({ cls: "reel-log-actions" });
+      const open2 = row.createEl("button", { cls: "reel-btn mod-cta", text: "Open note" });
+      open2.addEventListener("click", async () => {
+        this.close();
+        await this.plugin.app.workspace.getLeaf(false).openFile(this.file);
+      });
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
+  // src/ui/listPicker.ts
+  var ListPicker = class extends Modal {
+    constructor(app2, plugin2, entry, file) {
+      super(app2);
+      this.plugin = plugin2;
+      this.entry = entry;
+      this.file = file;
+      this.selected = new Set(entry.lists);
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Lists" });
+      contentEl.createDiv({ cls: "reel-log-sub", text: this.entry.title });
+      const chipRow = contentEl.createDiv({ cls: "reel-flag-row" });
+      const known = /* @__PURE__ */ new Set([...this.plugin.library.lists(), ...this.selected]);
+      const addChip = (name) => {
+        const chip = chipRow.createEl("button", { cls: "reel-chip", text: name });
+        const paint = () => chip.toggleClass("is-active", this.selected.has(name));
+        chip.addEventListener("click", () => {
+          if (this.selected.has(name))
+            this.selected.delete(name);
+          else
+            this.selected.add(name);
+          paint();
+        });
+        paint();
+      };
+      [...known].sort().forEach(addChip);
+      if (!known.size)
+        contentEl.createDiv({ cls: "reel-dim", text: "No lists yet \u2014 create one below." });
+      const newRow = contentEl.createDiv({ cls: "reel-field" });
+      newRow.createDiv({ cls: "reel-field-label", text: "New list" });
+      const input = newRow.createEl("input", {
+        cls: "reel-input",
+        attr: { type: "text", placeholder: "e.g. Halloween 2026", enterkeyhint: "done" }
+      });
+      const create = () => {
+        const name = input.value.trim();
+        if (!name || this.selected.has(name))
+          return;
+        this.selected.add(name);
+        addChip(name);
+        input.value = "";
+      };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          create();
+        }
+      });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      actions.createEl("button", { cls: "reel-btn", text: "Cancel" }).addEventListener("click", () => this.close());
+      const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Save" });
+      save.addEventListener("click", async () => {
+        create();
+        try {
+          await this.plugin.notes.setLists(this.file, [...this.selected]);
+          this.plugin.undo.offer("Lists updated");
+        } catch (e) {
+          new Notice(`Reel: ${redact(e)}`);
+        }
+        this.close();
+      });
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/extract.ts
   function trailerUrl(videos) {
     if (!videos?.length)
@@ -1082,72 +1082,9 @@
     return `https://www.themoviedb.org/${type === "tv" ? "tv" : "movie"}/${tmdbId}`;
   }
 
-  // src/render/grid.ts
-  function wireCell(plugin2, cell, entry, onSelect) {
-    let timer = null;
-    let longPressed = false;
-    let startX = 0;
-    let startY = 0;
-    const cancel = () => {
-      if (timer != null)
-        window.clearTimeout(timer);
-      timer = null;
-      cell.removeClass("is-holding");
-    };
-    const openMenu = (x, y) => {
-      longPressed = true;
-      cell.removeClass("is-holding");
-      haptic("hold");
-      showActions(plugin2, entry, x, y, onSelect);
-    };
-    cell.addEventListener("pointerdown", (e) => {
-      longPressed = false;
-      startX = e.clientX;
-      startY = e.clientY;
-      cell.addClass("is-holding");
-      timer = window.setTimeout(() => openMenu(e.clientX, e.clientY), 500);
-    });
-    cell.addEventListener("pointermove", (e) => {
-      if (Math.abs(e.clientY - startY) > 8 || Math.abs(e.clientX - startX) > 8)
-        cancel();
-    });
-    cell.addEventListener("pointerup", cancel);
-    cell.addEventListener("pointercancel", cancel);
-    cell.addEventListener("pointerleave", cancel);
-    cell.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      cancel();
-      openMenu(e.clientX, e.clientY);
-    });
-    cell.addEventListener("click", async () => {
-      if (longPressed) {
-        longPressed = false;
-        return;
-      }
-      if (onSelect) {
-        onSelect(entry);
-        return;
-      }
-      const file = plugin2.app.vault.getAbstractFileByPath(entry.path);
-      if (file instanceof TFile)
-        await plugin2.app.workspace.getLeaf(false).openFile(file);
-      else
-        new Notice("Reel: note not found.");
-    });
-    cell.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter")
-        return;
-      if (onSelect) {
-        onSelect(entry);
-        return;
-      }
-      const file = plugin2.app.vault.getAbstractFileByPath(entry.path);
-      if (file instanceof TFile) {
-        void plugin2.app.workspace.getLeaf(false).openFile(file).catch((e2) => new Notice(`Reel: ${redact(e2)}`));
-      }
-    });
-  }
-  function showActions(plugin2, entry, x, y, onSelect) {
+  // src/ui/titleMenu.ts
+  function showTitleMenu(plugin2, entry, x, y, opts = {}) {
+    const { onSelect } = opts;
     const file = plugin2.app.vault.getAbstractFileByPath(entry.path);
     if (!(file instanceof TFile)) {
       new Notice("Reel: note not found.");
@@ -1155,14 +1092,16 @@
     }
     const menu = new Menu();
     const run2 = (job) => void job.catch((e) => new Notice(`Reel: ${redact(e)}`));
-    menu.addItem(
-      (i) => i.setTitle("Open").setIcon("panel-right-open").onClick(() => {
-        if (onSelect)
-          onSelect(entry);
-        else
-          void plugin2.app.workspace.getLeaf(false).openFile(file);
-      })
-    );
+    if (!opts.onDetail) {
+      menu.addItem(
+        (i) => i.setTitle("Open").setIcon("panel-right-open").onClick(() => {
+          if (onSelect)
+            onSelect(entry);
+          else
+            void plugin2.app.workspace.getLeaf(false).openFile(file);
+        })
+      );
+    }
     menu.addItem(
       (i) => i.setTitle(entry.rating != null ? "Change rating" : "Rate").setIcon("star").onClick(() => new QuickRate(plugin2, entry, file).open())
     );
@@ -1288,6 +1227,72 @@
         () => void navigator.clipboard.writeText(`${entry.title}${entry.year ? ` (${entry.year})` : ""}`).then(() => new Notice("Copied"))
       )
     );
+  }
+
+  // src/render/grid.ts
+  function wireCell(plugin2, cell, entry, onSelect) {
+    let timer = null;
+    let longPressed = false;
+    let startX = 0;
+    let startY = 0;
+    const cancel = () => {
+      if (timer != null)
+        window.clearTimeout(timer);
+      timer = null;
+      cell.removeClass("is-holding");
+    };
+    const openMenu = (x, y) => {
+      longPressed = true;
+      cell.removeClass("is-holding");
+      haptic("hold");
+      showTitleMenu(plugin2, entry, x, y, { onSelect });
+    };
+    cell.addEventListener("pointerdown", (e) => {
+      longPressed = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      cell.addClass("is-holding");
+      timer = window.setTimeout(() => openMenu(e.clientX, e.clientY), 500);
+    });
+    cell.addEventListener("pointermove", (e) => {
+      if (Math.abs(e.clientY - startY) > 8 || Math.abs(e.clientX - startX) > 8)
+        cancel();
+    });
+    cell.addEventListener("pointerup", cancel);
+    cell.addEventListener("pointercancel", cancel);
+    cell.addEventListener("pointerleave", cancel);
+    cell.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      cancel();
+      openMenu(e.clientX, e.clientY);
+    });
+    cell.addEventListener("click", async () => {
+      if (longPressed) {
+        longPressed = false;
+        return;
+      }
+      if (onSelect) {
+        onSelect(entry);
+        return;
+      }
+      const file = plugin2.app.vault.getAbstractFileByPath(entry.path);
+      if (file instanceof TFile)
+        await plugin2.app.workspace.getLeaf(false).openFile(file);
+      else
+        new Notice("Reel: note not found.");
+    });
+    cell.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter")
+        return;
+      if (onSelect) {
+        onSelect(entry);
+        return;
+      }
+      const file = plugin2.app.vault.getAbstractFileByPath(entry.path);
+      if (file instanceof TFile) {
+        void plugin2.app.workspace.getLeaf(false).openFile(file).catch((e2) => new Notice(`Reel: ${redact(e2)}`));
+      }
+    });
   }
   function describe(el, entry) {
     const bits = [entry.title];
@@ -4498,10 +4503,99 @@
         this.markHandled(item.id);
         this.render(container);
       }).open();
-      posterEl.addEventListener("click", openPreview);
+      let held = false;
+      posterEl.addEventListener("click", () => {
+        if (held) {
+          held = false;
+          return;
+        }
+        openPreview();
+      });
       posterEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter")
           openPreview();
+      });
+      const openMenu = (x, y) => {
+        const menu = new Menu();
+        menu.addItem((i) => i.setTitle("Details").setIcon("info").onClick(openPreview));
+        menu.addItem(
+          (i) => i.setTitle("Add to watchlist").setIcon("bookmark").onClick(
+            () => void (async () => {
+              await this.add(item, true);
+              this.plugin.undo.offer(`${title} \u2192 watchlist`);
+              this.markHandled(item.id);
+              this.render(container);
+            })()
+          )
+        );
+        menu.addItem(
+          (i) => i.setTitle("Seen it, rate now").setIcon("check").onClick(
+            () => new SeenSheet(this.plugin, item, () => {
+              this.markHandled(item.id);
+              this.render(container);
+            }).open()
+          )
+        );
+        menu.addSeparator();
+        menu.addItem(
+          (i) => i.setTitle("Look it up\u2026").setIcon("external-link").onClick(() => {
+            const m = new Menu();
+            m.addItem((h) => h.setTitle(title).setDisabled(true));
+            m.addSeparator();
+            const q = encodeURIComponent(`${title}${year2 ? ` ${year2}` : ""}`);
+            const go = (label, url) => m.addItem((r) => r.setTitle(label).setIcon("external-link").onClick(() => void window.open(url, "_blank", "noopener")));
+            go("TMDB", tmdbUrl(item.id, isTv ? "tv" : "film"));
+            go("Trakt", `https://trakt.tv/search/tmdb/${item.id}?id_type=${isTv ? "show" : "movie"}`);
+            if (!isTv)
+              go("Letterboxd", `https://letterboxd.com/tmdb/${item.id}`);
+            go("Where to watch", `https://www.justwatch.com/${(this.plugin.settings.region || "us").toLowerCase()}/search?q=${q}`);
+            go("Search the web", `https://www.google.com/search?q=${q}`);
+            m.showAtPosition({ x, y });
+          })
+        );
+        menu.addItem(
+          (i) => i.setTitle("Search your library for it").setIcon("search").onClick(() => this.plugin.openOmni(title, "mine"))
+        );
+        menu.addSeparator();
+        menu.addItem(
+          (i) => i.setTitle("Not interested").setIcon("x").onClick(
+            () => void (async () => {
+              await this.plugin.discover.dismiss(item.id);
+              this.handled.add(item.id);
+              this.render(container);
+            })()
+          )
+        );
+        menu.showAtPosition({ x, y });
+      };
+      let holdTimer = null;
+      let hx = 0;
+      let hy = 0;
+      const stopHold = () => {
+        if (holdTimer != null)
+          window.clearTimeout(holdTimer);
+        holdTimer = null;
+      };
+      posterEl.addEventListener("pointerdown", (e) => {
+        hx = e.clientX;
+        hy = e.clientY;
+        held = false;
+        holdTimer = window.setTimeout(() => {
+          held = true;
+          haptic("hold");
+          openMenu(hx, hy);
+        }, 500);
+      });
+      posterEl.addEventListener("pointermove", (e) => {
+        if (Math.abs(e.clientX - hx) > 8 || Math.abs(e.clientY - hy) > 8)
+          stopHold();
+      });
+      for (const ev of ["pointerup", "pointercancel", "pointerleave"])
+        posterEl.addEventListener(ev, stopHold);
+      posterEl.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        stopHold();
+        openMenu(e.clientX, e.clientY);
       });
       card.createDiv({ cls: "reel-dcard-title", text: title });
       if (year2)
@@ -6946,11 +7040,11 @@ ${body}
       setIcon(back.createSpan(), "arrow-left");
       back.createSpan({ text: this.backLabel });
       back.addEventListener("click", () => this.onBack());
-      const openNote = bar.createEl("button", { cls: "reel-btn", text: "Open note" });
-      openNote.addEventListener("click", async () => {
-        const file = this.file;
-        if (file)
-          await this.plugin.app.workspace.getLeaf(false).openFile(file);
+      const more = bar.createEl("button", { cls: "reel-btn reel-detail-more", attr: { type: "button", "aria-label": "More actions" } });
+      setIcon(more.createSpan(), "more-horizontal");
+      more.addEventListener("click", () => {
+        const r = more.getBoundingClientRect();
+        showTitleMenu(this.plugin, this.entry, r.right, r.bottom, { onDetail: true });
       });
       const page = container.createDiv({ cls: "reel-detail-page" });
       this.plugin.swatches.tint(page, this.plugin.posters.displayUrl(e), document.body.hasClass("theme-dark"));

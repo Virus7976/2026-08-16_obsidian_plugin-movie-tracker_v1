@@ -11,7 +11,7 @@
  * commonest answer. The sheet is still there when you want the overview first.
  */
 
-import { Modal, Notice, Platform, setIcon } from "obsidian";
+import { Menu, Modal, Notice, Platform, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
 import type { TmdbSearchResult, TmdbFilm, TmdbShow } from "../types";
 import type { DiscoverRow, RowSource, TasteProfile } from "../discover";
@@ -1481,9 +1481,116 @@ export class DiscoverScreen {
 				this.markHandled(item.id);
 				this.render(container);
 			}).open();
-		posterEl.addEventListener("click", openPreview);
+		let held = false;
+		posterEl.addEventListener("click", () => {
+			// A long-press ends in a click on release; that click is not a tap.
+			if (held) {
+				held = false;
+				return;
+			}
+			openPreview();
+		});
 		posterEl.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") openPreview();
+		});
+
+		// Press and hold, or right-click: the same choices as the three buttons,
+		// plus where to read more. For a title you do not own, "more" is mostly
+		// outside Reel, so the doors are named for what they find.
+		const openMenu = (x: number, y: number): void => {
+			const menu = new Menu();
+			menu.addItem((i) => i.setTitle("Details").setIcon("info").onClick(openPreview));
+			menu.addItem((i) =>
+				i
+					.setTitle("Add to watchlist")
+					.setIcon("bookmark")
+					.onClick(() =>
+						void (async () => {
+							await this.add(item, true);
+							this.plugin.undo.offer(`${title} → watchlist`);
+							this.markHandled(item.id);
+							this.render(container);
+						})()
+					)
+			);
+			menu.addItem((i) =>
+				i
+					.setTitle("Seen it, rate now")
+					.setIcon("check")
+					.onClick(() =>
+						new SeenSheet(this.plugin, item, () => {
+							this.markHandled(item.id);
+							this.render(container);
+						}).open()
+					)
+			);
+			menu.addSeparator();
+			menu.addItem((i) =>
+				i
+					.setTitle("Look it up…")
+					.setIcon("external-link")
+					.onClick(() => {
+						const m = new Menu();
+						m.addItem((h) => h.setTitle(title).setDisabled(true));
+						m.addSeparator();
+						const q = encodeURIComponent(`${title}${year ? ` ${year}` : ""}`);
+						const go = (label: string, url: string) =>
+							m.addItem((r) => r.setTitle(label).setIcon("external-link").onClick(() => void window.open(url, "_blank", "noopener")));
+						go("TMDB", tmdbUrl(item.id, isTv ? "tv" : "film"));
+						go("Trakt", `https://trakt.tv/search/tmdb/${item.id}?id_type=${isTv ? "show" : "movie"}`);
+						if (!isTv) go("Letterboxd", `https://letterboxd.com/tmdb/${item.id}`);
+						go("Where to watch", `https://www.justwatch.com/${(this.plugin.settings.region || "us").toLowerCase()}/search?q=${q}`);
+						go("Search the web", `https://www.google.com/search?q=${q}`);
+						m.showAtPosition({ x, y });
+					})
+			);
+			menu.addItem((i) =>
+				i
+					.setTitle("Search your library for it")
+					.setIcon("search")
+					.onClick(() => this.plugin.openOmni(title, "mine"))
+			);
+			menu.addSeparator();
+			menu.addItem((i) =>
+				i
+					.setTitle("Not interested")
+					.setIcon("x")
+					.onClick(
+						() =>
+							void (async () => {
+								await this.plugin.discover.dismiss(item.id);
+								this.handled.add(item.id);
+								this.render(container);
+							})()
+					)
+			);
+			menu.showAtPosition({ x, y });
+		};
+		let holdTimer: number | null = null;
+		let hx = 0;
+		let hy = 0;
+		const stopHold = (): void => {
+			if (holdTimer != null) window.clearTimeout(holdTimer);
+			holdTimer = null;
+		};
+		posterEl.addEventListener("pointerdown", (e) => {
+			hx = e.clientX;
+			hy = e.clientY;
+			held = false;
+			holdTimer = window.setTimeout(() => {
+				held = true;
+				haptic("hold");
+				openMenu(hx, hy);
+			}, 500);
+		});
+		posterEl.addEventListener("pointermove", (e) => {
+			if (Math.abs(e.clientX - hx) > 8 || Math.abs(e.clientY - hy) > 8) stopHold();
+		});
+		for (const ev of ["pointerup", "pointercancel", "pointerleave"]) posterEl.addEventListener(ev, stopHold);
+		posterEl.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			stopHold();
+			openMenu(e.clientX, e.clientY);
 		});
 
 		card.createDiv({ cls: "reel-dcard-title", text: title });

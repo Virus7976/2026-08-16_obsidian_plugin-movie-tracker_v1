@@ -52,6 +52,19 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.49",
+		date: "2026-10-17",
+		headline: "A real menu for every title.",
+		changes: [
+			{ kind: "new", text: "Press and hold a title for a grouped menu: Lists, Change status, Find more like this, Look it up, Where to watch, and Note. Each opens its own short menu." },
+			{ kind: "new", text: "Find more like this searches your library by the title's director, cast, genres or collection, or looks for similar titles on Discover." },
+			{ kind: "new", text: "Look it up opens IMDb, the IMDb parents guide, TMDB, Trakt or Letterboxd. Where to watch lists the services the note knows about." },
+			{ kind: "new", text: "The title page has a ⋯ button with the same menu, in place of the Open note button." },
+			{ kind: "new", text: "Press and hold a poster on Discover to add it, mark it seen, look it up, or dismiss it." },
+			{ kind: "better", text: "The review and unlock sheets lose the empty band above the title, and the review sheet keeps the date and buttons in view above the keyboard." },
+		],
+	},
+	{
 		version: "0.9.48",
 		date: "2026-10-17",
 		headline: "Small motion, and a tidier look on every tab.",
