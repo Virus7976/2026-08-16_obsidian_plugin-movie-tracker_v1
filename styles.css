@@ -19290,3 +19290,35 @@ body.is-mobile .modal-container .modal.reel-modal.reel-review-sheet {
 .reel-view:not(.is-w700) .reel-upnext .reel-block-title {
 	padding-left: 0;
 }
+
+/* Up Next: the watchlist under the shows you are part-way through */
+.reel-view:not(.is-w700) .reel-watchlist {
+	margin-top: var(--reel-space-4);
+}
+
+.reel-watchlist-head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-1);
+	margin-bottom: var(--reel-space-2);
+}
+
+.reel-watchlist .reel-watchbar {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.reel-upnext-none {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	padding: var(--reel-space-2) 0 var(--reel-space-3);
+}
+
+.reel-watch-row .reel-upnext-body {
+	cursor: pointer;
+}
+
+.reel-view:not(.is-w700) .reel-view-body .reel-chips.reel-watchbar {
+	padding-left: 0;
+	padding-right: 0;
+}

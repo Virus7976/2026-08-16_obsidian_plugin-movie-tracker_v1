@@ -2676,6 +2676,13 @@
   function paintUpNext(plugin2, containerEl, limit, heading = false, entries) {
     new UpNextPainter(plugin2, containerEl, limit, heading, entries).render();
   }
+  var watchState = { kind: "all", sort: "added" };
+  var WATCH_SORTS = [
+    ["added", "Recently added"],
+    ["short", "Shortest first"],
+    ["rated", "Highest rated"],
+    ["title", "Title A to Z"]
+  ];
   var UpNextPainter = class {
     constructor(plugin2, containerEl, limit, heading = false, entries) {
       this.plugin = plugin2;
@@ -2694,7 +2701,8 @@
       const cap = this.limit ?? 12;
       let rows2 = everything.slice(0, cap);
       const hidden = everything.length - rows2.length;
-      if (!rows2.length) {
+      const watchAll = this.watchlist();
+      if (!rows2.length && !watchAll.length) {
         const bare = !this.plugin.library.shows().length;
         renderEmpty(el, {
           icon: "tv",
@@ -2710,6 +2718,9 @@
         });
         return;
       }
+      if (!rows2.length) {
+        el.createDiv({ cls: "reel-upnext-none", text: "Nothing part-watched. Tick an episode and it appears here." });
+      }
       const list2 = el.createDiv({ cls: "reel-upnext" });
       if (hidden > 0) {
         const more = el.createDiv({ cls: "reel-block-count" });
@@ -2722,6 +2733,123 @@
       }
       for (const entry of rows2)
         list2.appendChild(this.row(entry));
+      if (this.heading && watchAll.length)
+        this.paintWatchlist(el, watchAll);
+    }
+    /** Everything you have saved for later, narrowed like the rest of the view. */
+    watchlist() {
+      const all2 = this.plugin.visible(this.plugin.library.all()).filter((e) => e.status === "watchlist");
+      return this.entries ? all2.filter((e) => this.entries?.some((v) => v.path === e.path)) : all2;
+    }
+    paintWatchlist(el, all2) {
+      const wrap = el.createDiv({ cls: "reel-watchlist" });
+      const head = wrap.createDiv({ cls: "reel-watchlist-head" });
+      head.createDiv({ cls: "reel-block-title", text: "Watchlist" });
+      const counts = {
+        film: all2.filter((e) => e.type === "film").length,
+        tv: all2.filter((e) => e.type === "tv").length
+      };
+      const bar = head.createDiv({ cls: "reel-chips reel-filterbar reel-watchbar" });
+      for (const [id, label, n2] of [
+        ["all", "All", all2.length],
+        ["film", "Films", counts.film],
+        ["tv", "Series", counts.tv]
+      ]) {
+        if (id !== "all" && !n2)
+          continue;
+        const chip = bar.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        chip.createSpan({ text: label });
+        chip.createSpan({ cls: "reel-chip-count", text: String(n2) });
+        chip.toggleClass("is-active", watchState.kind === id);
+        chip.setAttr("aria-pressed", String(watchState.kind === id));
+        chip.addEventListener("click", () => {
+          watchState.kind = id;
+          this.render();
+        });
+      }
+      const sortLabel = WATCH_SORTS.find(([v]) => v === watchState.sort)?.[1] ?? "Sort";
+      const sort = bar.createEl("button", { cls: "reel-chip reel-sort-btn", attr: { type: "button", "aria-label": `Sort: ${sortLabel}` } });
+      setIcon(sort.createSpan({ cls: "reel-sort-icon" }), "arrow-up-down");
+      sort.createSpan({ cls: "reel-sort-label", text: sortLabel });
+      sort.addEventListener("click", (ev) => {
+        const menu = new Menu();
+        for (const [value, text] of WATCH_SORTS) {
+          menu.addItem(
+            (i) => i.setTitle(text).setChecked(watchState.sort === value).onClick(() => {
+              watchState.sort = value;
+              this.render();
+            })
+          );
+        }
+        menu.showAtMouseEvent(ev);
+      });
+      let rows2 = watchState.kind === "all" ? all2 : all2.filter((e) => e.type === watchState.kind);
+      rows2 = [...rows2].sort((a, b) => {
+        if (watchState.sort === "short")
+          return (a.runtime ?? 1e6) - (b.runtime ?? 1e6);
+        if (watchState.sort === "rated")
+          return (b.tmdbRating ?? 0) - (a.tmdbRating ?? 0);
+        if (watchState.sort === "title")
+          return a.title.localeCompare(b.title);
+        return (b.added ?? 0) - (a.added ?? 0);
+      });
+      const list2 = wrap.createDiv({ cls: "reel-upnext reel-watchlist-list" });
+      for (const entry of rows2.slice(0, 40))
+        list2.appendChild(this.watchRow(entry));
+      if (rows2.length > 40) {
+        const more = wrap.createDiv({ cls: "reel-block-count" });
+        const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${rows2.length - 40} more` });
+        btn.addEventListener("click", () => {
+          for (const entry of rows2.slice(40))
+            list2.appendChild(this.watchRow(entry));
+          more.remove();
+        });
+      }
+    }
+    watchRow(entry) {
+      const row = createDiv({ cls: "reel-upnext-row reel-watch-row" });
+      const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
+      this.plugin.posters.attach(thumb, entry);
+      const open2 = () => void this.plugin.openDetail(entry);
+      thumb.addEventListener("click", open2);
+      const body = row.createDiv({ cls: "reel-upnext-body" });
+      body.addEventListener("click", open2);
+      upnextTitle(body, entry.title);
+      const meta = body.createDiv({ cls: "reel-upnext-meta" });
+      const year2 = entry.year ?? entry.firstAirYear;
+      if (year2)
+        meta.createSpan({ cls: "reel-dim", text: String(year2) });
+      if (entry.type === "film" && entry.runtime)
+        meta.createSpan({ cls: "reel-dim", text: formatMinutes(entry.runtime) });
+      if (entry.type === "tv")
+        meta.createSpan({ cls: "reel-dim", text: entry.seasons.length ? `${entry.seasons.length} season${entry.seasons.length === 1 ? "" : "s"}` : "Series" });
+      if (entry.tmdbRating)
+        meta.createSpan({ cls: "reel-dim", text: `\u2605 ${entry.tmdbRating.toFixed(1)}` });
+      if (entry.genres.length)
+        body.createDiv({ cls: "reel-upnext-meta reel-dim", text: entry.genres.slice(0, 3).join(" \xB7 ") });
+      const actions = row.createDiv({ cls: "reel-upnext-actions" });
+      const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
+      if (file instanceof TFile) {
+        const tick = actions.createEl("button", { cls: "reel-tick", text: entry.type === "tv" ? "\u25B6" : "\u2713", attr: { type: "button" } });
+        tick.setAttr("aria-label", entry.type === "tv" ? `Start ${entry.title}` : `Mark ${entry.title} watched`);
+        tick.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          haptic("tick");
+          try {
+            await this.plugin.notes.setStatus(file, entry.type === "tv" ? "watching" : "watched");
+            this.plugin.undo.offer(`${entry.title} ${entry.type === "tv" ? "started" : "marked watched"}`);
+          } catch (err) {
+            new Notice(`Reel: ${redact(err)}`);
+          }
+        });
+      }
+      const more = actions.createEl("button", { cls: "reel-more", text: "\u22EF", attr: { type: "button", "aria-label": `More for ${entry.title}` } });
+      more.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const r = more.getBoundingClientRect();
+        showTitleMenu(this.plugin, entry, r.right, r.bottom);
+      });
+      return row;
     }
     /** One row. Detached, so it can be appended lazily by 'show more'. */
     row(entry) {
