@@ -56,7 +56,7 @@ export const RELEASES: Release[] = [
 		date: "2026-10-17",
 		headline: "Up Next shows your watchlist, and the screens feel faster.",
 		changes: [
-			{ kind: "fix", text: "Up Next now shows Tonight's picks and your Watchlist. They were missing from the screen in 0.9.51." },
+			{ kind: "fixed", text: "Up Next now shows Tonight's picks and your Watchlist. They were missing from the screen in 0.9.51." },
 			{ kind: "better", text: "Posters, cards and sheets no longer fade in one by one, and the blur behind some buttons is gone. Scrolling and switching tabs feel quicker." },
 			{ kind: "better", text: "Less empty space between the search bar, the control row and the first shelf on Discover." },
 		],
