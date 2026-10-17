@@ -387,3 +387,35 @@ export function showResultMenu(
 	});
 	menu.showAtPosition({ x, y });
 }
+
+/**
+ * The menu for a word on a chip: a genre, a keyword, a tag, a list.
+ * Search your library for it, copy it, and whatever the caller adds
+ * (toggle on this title, rename, delete).
+ */
+export function showChipMenu(
+	plugin: ReelPlugin,
+	text: string,
+	x: number,
+	y: number,
+	extra: { title: string; icon: string; run: () => void; warning?: boolean }[] = []
+): void {
+	const menu = new Menu();
+	menu.addItem((i) => i.setTitle(`Search your library for "${text}"`).setIcon("search").onClick(() => void plugin.openViewWithSearch(text)));
+	menu.addItem((i) =>
+		i
+			.setTitle("Copy")
+			.setIcon("copy")
+			.onClick(() => {
+				void navigator.clipboard.writeText(text).then(() => new Notice(`Copied "${text}"`));
+			})
+	);
+	if (extra.length) menu.addSeparator();
+	for (const e of extra) {
+		menu.addItem((i) => {
+			i.setTitle(e.title).setIcon(e.icon).onClick(e.run);
+			if (e.warning) i.setWarning(true);
+		});
+	}
+	menu.showAtPosition({ x, y });
+}

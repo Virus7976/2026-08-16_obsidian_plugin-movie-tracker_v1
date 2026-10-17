@@ -3459,6 +3459,25 @@ ${body}
     });
     menu.showAtPosition({ x, y });
   }
+  function showChipMenu(plugin2, text, x, y, extra2 = []) {
+    const menu = new Menu();
+    menu.addItem((i) => i.setTitle(`Search your library for "${text}"`).setIcon("search").onClick(() => void plugin2.openViewWithSearch(text)));
+    menu.addItem(
+      (i) => i.setTitle("Copy").setIcon("copy").onClick(() => {
+        void navigator.clipboard.writeText(text).then(() => new Notice(`Copied "${text}"`));
+      })
+    );
+    if (extra2.length)
+      menu.addSeparator();
+    for (const e of extra2) {
+      menu.addItem((i) => {
+        i.setTitle(e.title).setIcon(e.icon).onClick(e.run);
+        if (e.warning)
+          i.setWarning(true);
+      });
+    }
+    menu.showAtPosition({ x, y });
+  }
 
   // src/render/grid.ts
   function wireCell(plugin2, cell, entry, onSelect) {
@@ -8388,7 +8407,7 @@ ${body}
       tabs.push({ id: "about", label: "About", render: (el) => this.renderAbout(el, meta) });
       tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
       if (film2 && (film2.budget || film2.revenue)) {
-        tabs.push({ id: "money", label: "Box office", render: (el) => this.renderMoney(el, film2) });
+        tabs.push({ id: "money", label: "Box office", render: (el) => this.renderMoney(el, film2, imdbIdOf(film2)) });
       }
       tabs.push({ id: "stats", label: "Stats", render: (el) => this.renderStats(el, meta, isTv) });
       if (cast.length)
@@ -8619,6 +8638,7 @@ ${body}
         for (const n2 of names) {
           const chip = chips.createEl("button", { cls: "reel-chip", text: n2, attr: { type: "button" } });
           chip.addEventListener("click", () => void this.plugin.openViewWithSearch(n2));
+          holdAt(chip, (x, y) => showChipMenu(this.plugin, n2, x, y));
         }
       };
       chipGroup("Genres", (meta.genres ?? []).map((g) => g.name));
@@ -8675,7 +8695,7 @@ ${body}
      * budget was split between cast, effects and marketing is not published
      * anywhere an API can reach, so none of that is invented here.
      */
-    renderMoney(el, film2) {
+    renderMoney(el, film2, imdbId) {
       const budget = film2.budget ?? 0;
       const revenue = film2.revenue ?? 0;
       const money = (n2) => {
@@ -8721,9 +8741,29 @@ ${body}
       if (film2.runtime && budget)
         rows2.push(["Budget per minute", money(Math.round(budget / film2.runtime))]);
       this.factList(el, "The numbers", rows2);
+      const split = el.createDiv({ cls: "reel-money-split" });
+      if (imdbId && revenue) {
+        void this.plugin.omdb.fetchScores(imdbId).then((s) => {
+          if (!split.isConnected || !s?.boxOffice)
+            return;
+          const us = Math.min(s.boxOffice, revenue);
+          const rest = revenue - us;
+          const rows22 = [
+            ["US and Canada", `${money(us)} \xB7 ${Math.round(us / revenue * 100)}%`],
+            ["Rest of the world", rest > 0 ? `${money(rest)} \xB7 ${Math.round(rest / revenue * 100)}%` : void 0],
+            ["Awards", s.awards]
+          ];
+          const bar = split.createDiv({ cls: "reel-money-bars" });
+          const row = bar.createDiv({ cls: "reel-money-bar" });
+          row.createSpan({ cls: "reel-money-bar-label", text: "US share" });
+          const track = row.createDiv({ cls: "reel-money-track" });
+          track.createDiv({ cls: "reel-money-fill" }).setCssProps({ "--reel-fill": String(us / revenue) });
+          this.factList(split, "Where it earned", rows22);
+        });
+      }
       el.createDiv({
         cls: "reel-dim reel-fl-note",
-        text: "Budget and gross come from TMDB, are in US dollars and are not adjusted for inflation. How a budget was split is not published."
+        text: "Budget and worldwide gross are from TMDB; the US split is from OMDb (add a free key in settings). US dollars, not adjusted for inflation. Studios do not publish how a budget was spent, so there is no breakdown."
       });
     }
     /** Ratings, scale and how this title sits against the rest of your library. */
@@ -9095,6 +9135,7 @@ ${body}
         const listRow = listBox.createDiv({ cls: "reel-status-row" });
         for (const name of [.../* @__PURE__ */ new Set([...known, ...e.lists])].sort()) {
           const pill = listRow.createEl("button", { cls: "reel-chip", text: name });
+          holdAt(pill, (x, y) => showChipMenu(this.plugin, name, x, y));
           const on = () => this.entry.lists.includes(name);
           pill.toggleClass("is-active", on());
           pill.addEventListener("click", () => {
@@ -9425,6 +9466,9 @@ ${body}
   };
   function cssUrl2(path) {
     return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+  function imdbIdOf(film2) {
+    return film2.imdb_id ?? film2.external_ids?.imdb_id ?? void 0;
   }
 
   // src/util/blend.ts

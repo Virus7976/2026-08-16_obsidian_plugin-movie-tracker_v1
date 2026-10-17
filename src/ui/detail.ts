@@ -44,7 +44,7 @@ import { haptic } from "../util/haptics";
 import { badgePerson } from "./personBadge";
 import { ReviewEditor, paintReviews, readReviews } from "./reviewPane";
 import { episodeLabelOf } from "../reviews";
-import { holdAt, showPersonMenu, showResultMenu, showTitleMenu } from "./titleMenu";
+import { holdAt, showChipMenu, showPersonMenu, showResultMenu, showTitleMenu } from "./titleMenu";
 
 /**
  * "GB" → 🇬🇧.
@@ -364,7 +364,7 @@ export class DetailScreen {
 		tabs.push({ id: "about", label: "About", render: (el) => this.renderAbout(el, meta) });
 		tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
 		if (film && (film.budget || film.revenue)) {
-			tabs.push({ id: "money", label: "Box office", render: (el) => this.renderMoney(el, film) });
+			tabs.push({ id: "money", label: "Box office", render: (el) => this.renderMoney(el, film, imdbIdOf(film)) });
 		}
 		tabs.push({ id: "stats", label: "Stats", render: (el) => this.renderStats(el, meta, isTv) });
 		if (cast.length) tabs.push({ id: "cast", label: "Cast", render: (el) => this.renderPeople(el, cast, true) });
@@ -632,6 +632,7 @@ export class DetailScreen {
 				const chip = chips.createEl("button", { cls: "reel-chip", text: n, attr: { type: "button" } });
 				// Both are searches of your own library, not a lookup.
 				chip.addEventListener("click", () => void this.plugin.openViewWithSearch(n));
+				holdAt(chip, (x, y) => showChipMenu(this.plugin, n, x, y));
 			}
 		};
 		chipGroup("Genres", (meta.genres ?? []).map((g) => g.name));
@@ -697,7 +698,7 @@ export class DetailScreen {
 	 * budget was split between cast, effects and marketing is not published
 	 * anywhere an API can reach, so none of that is invented here.
 	 */
-	private renderMoney(el: HTMLElement, film: TmdbFilm): void {
+	private renderMoney(el: HTMLElement, film: TmdbFilm, imdbId?: string): void {
 		const budget = film.budget ?? 0;
 		const revenue = film.revenue ?? 0;
 		const money = (n: number): string => {
@@ -746,9 +747,32 @@ export class DetailScreen {
 		if (film.runtime && budget) rows.push(["Budget per minute", money(Math.round(budget / film.runtime))]);
 		this.factList(el, "The numbers", rows);
 
+		// The US and Canada figure is from OMDb (what IMDb lists); the rest of the
+		// world is the difference from TMDB's worldwide total, so it is labelled
+		// as that. Needs the OMDb key; without one the tab is as before.
+		const split = el.createDiv({ cls: "reel-money-split" });
+		if (imdbId && revenue) {
+			void this.plugin.omdb.fetchScores(imdbId).then((s) => {
+				if (!split.isConnected || !s?.boxOffice) return;
+				const us = Math.min(s.boxOffice, revenue);
+				const rest = revenue - us;
+				const rows2: [string, string | undefined][] = [
+					["US and Canada", `${money(us)} · ${Math.round((us / revenue) * 100)}%`],
+					["Rest of the world", rest > 0 ? `${money(rest)} · ${Math.round((rest / revenue) * 100)}%` : undefined],
+					["Awards", s.awards],
+				];
+				const bar = split.createDiv({ cls: "reel-money-bars" });
+				const row = bar.createDiv({ cls: "reel-money-bar" });
+				row.createSpan({ cls: "reel-money-bar-label", text: "US share" });
+				const track = row.createDiv({ cls: "reel-money-track" });
+				track.createDiv({ cls: "reel-money-fill" }).setCssProps({ "--reel-fill": String(us / revenue) });
+				this.factList(split, "Where it earned", rows2);
+			});
+		}
+
 		el.createDiv({
 			cls: "reel-dim reel-fl-note",
-			text: "Budget and gross come from TMDB, are in US dollars and are not adjusted for inflation. How a budget was split is not published.",
+			text: "Budget and worldwide gross are from TMDB; the US split is from OMDb (add a free key in settings). US dollars, not adjusted for inflation. Studios do not publish how a budget was spent, so there is no breakdown.",
 		});
 	}
 
@@ -1149,6 +1173,7 @@ export class DetailScreen {
 			const listRow = listBox.createDiv({ cls: "reel-status-row" });
 			for (const name of [...new Set([...known, ...e.lists])].sort()) {
 				const pill = listRow.createEl("button", { cls: "reel-chip", text: name });
+				holdAt(pill, (x, y) => showChipMenu(this.plugin, name, x, y));
 				const on = () => this.entry.lists.includes(name);
 				pill.toggleClass("is-active", on());
 				pill.addEventListener("click", () => {
@@ -1521,4 +1546,8 @@ export class DetailScreen {
  */
 function cssUrl(path: string): string {
 	return path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function imdbIdOf(film: TmdbFilm): string | undefined {
+	return film.imdb_id ?? film.external_ids?.imdb_id ?? undefined;
 }

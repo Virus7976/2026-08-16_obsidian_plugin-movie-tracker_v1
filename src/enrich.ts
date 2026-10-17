@@ -26,6 +26,8 @@ export interface OmdbScores {
 	rottenTomatoes?: number;
 	rated?: string;
 	awards?: string;
+	/** US and Canada box office in dollars, as IMDb lists it. */
+	boxOffice?: number;
 }
 
 interface OmdbResponse {
@@ -36,6 +38,7 @@ interface OmdbResponse {
 	Metascore?: string;
 	Rated?: string;
 	Awards?: string;
+	BoxOffice?: string;
 	Ratings?: { Source?: string; Value?: string }[];
 }
 
@@ -76,7 +79,7 @@ export class OmdbClient {
 		const key = await this.plugin.credentials.getOptional("omdb");
 		if (!key || !imdbId) return null;
 
-		const cacheKey = `omdb-${imdbId}`;
+		const cacheKey = `omdb2-${imdbId}`;
 		const cached = await this.plugin.tmdb.readExternalCache<OmdbScores>(cacheKey);
 		if (cached) return cached;
 
@@ -99,6 +102,7 @@ export class OmdbClient {
 				rottenTomatoes: parsePercent(rt?.Value),
 				rated: data.Rated && data.Rated !== "N/A" ? data.Rated : undefined,
 				awards: data.Awards && data.Awards !== "N/A" ? data.Awards : undefined,
+				boxOffice: parseNumber(data.BoxOffice?.replace(/[$]/g, "")),
 			};
 
 			// Scores drift as votes accumulate, so this expires like any other
