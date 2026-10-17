@@ -215,11 +215,11 @@ export default class ReelPlugin extends Plugin {
 	}
 
 	/** Open a title's detail screen in the Reel view, opening the view if needed. */
-	async openDetail(entry: Entry): Promise<void> {
+	async openDetail(entry: Entry, tab?: string): Promise<void> {
 		await this.openView();
 		const leaf = this.app.workspace.getLeavesOfType(REEL_VIEW)[0];
 		const view = leaf?.view;
-		if (view instanceof ReelView) view.openDetail(entry);
+		if (view instanceof ReelView) view.openDetail(entry, tab);
 	}
 
 	/**

@@ -20,7 +20,7 @@ import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { DetailScreen } from "./detail";
 import { LogSheet } from "./logSheet";
-import { paintWash } from "./titleExtras";
+import { paintTrailerFor, paintWash } from "./titleExtras";
 
 /** The fields an entry needs, from what a search result already says. */
 export function entryFromResult(plugin: ReelPlugin, r: TmdbSearchResult): Entry {
@@ -63,7 +63,11 @@ export class TitlePage extends Modal {
 	constructor(
 		private plugin: ReelPlugin,
 		private item: TmdbSearchResult,
-		private onAdded: () => void = () => {}
+		private onAdded: () => void = () => {},
+		/** Who the person you came from played here, carried over rather than looked up again. */
+		private role?: string,
+		/** A tab to open on arrival, by id. */
+		private startTab?: string
 	) {
 		super(plugin.app);
 	}
@@ -77,6 +81,12 @@ export class TitlePage extends Modal {
 		const entry = entryFromResult(this.plugin, this.item);
 		const isTv = entry.type === "tv";
 		paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
+
+		if (this.role) {
+			const r = contentEl.createDiv({ cls: "reel-preview-role" });
+			r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
+			r.createSpan({ cls: "reel-preview-role-value", text: this.role });
+		}
 
 		const head = contentEl.createDiv({ cls: "reel-preview-head" });
 		const posterEl = head.createDiv({ cls: "reel-preview-poster" });
@@ -114,9 +124,12 @@ export class TitlePage extends Modal {
 
 		if (entry.overview) contentEl.createDiv({ cls: "reel-preview-overview", text: entry.overview });
 
+		// A trailer is the fastest way to decide, as on a title you own.
+		void paintTrailerFor(this.plugin, contentEl.createDiv({ cls: "reel-detail-trailer" }), entry.tmdbId, isTv, undefined);
+
 		// The reference tabs, from the same code the library's title page uses.
 		const main = contentEl.createDiv({ cls: "reel-titlepage-main" });
-		const screen = new DetailScreen(this.plugin, entry, () => this.close());
+		const screen = new DetailScreen(this.plugin, entry, () => this.close(), "Library", this.startTab);
 		void screen.renderReference(main, isTv);
 	}
 

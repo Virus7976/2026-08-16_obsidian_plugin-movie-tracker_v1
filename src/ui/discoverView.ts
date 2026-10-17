@@ -32,6 +32,7 @@ import { haptic } from "../util/haptics";
 import { setSelected } from "./a11y";
 import { diagnoseError } from "./failure";
 import { gestureIntent } from "../util/gesture";
+import { TitlePage } from "./titlePage";
 import { paintExtras, paintLinks as paintLinksShared, paintTrailer as paintTrailerShared, paintCast, paintWash } from "./titleExtras";
 
 interface Filters {
@@ -345,7 +346,7 @@ export class DiscoverScreen {
 			posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? undefined,
 			title,
 		});
-		posterEl.addEventListener("click", () => new PreviewSheet(this.plugin, item, () => this.render(container)).open());
+		posterEl.addEventListener("click", () => new TitlePage(this.plugin, item, () => this.render(container)).open());
 
 		const head = card.createDiv({ cls: "reel-quickcard-head" });
 		head.createSpan({ cls: "reel-quickcard-title", text: title });
@@ -1524,7 +1525,7 @@ export class DiscoverScreen {
 		if (isTv) posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
 
 		const openPreview = () =>
-			new PreviewSheet(this.plugin, item, () => {
+			new TitlePage(this.plugin, item, () => {
 				this.markHandled(item.id);
 				this.render(container);
 			}).open();

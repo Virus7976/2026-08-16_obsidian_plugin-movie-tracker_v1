@@ -52,6 +52,17 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.57",
+		date: "2026-10-17",
+		headline: "One title page everywhere, with the Parents guide inside it.",
+		changes: [
+			{ kind: "new", text: "Tapping a title in Discover, a person's list or a shortlist opens the same page as your library: trailer, cast, tabs and all." },
+			{ kind: "new", text: "More like this now shows on every title page, including films you own, and keeps loading as you scroll." },
+			{ kind: "new", text: "Press and hold a title and choose Parents guide to open it straight on that tab." },
+			{ kind: "fixed", text: "The Parents guide button on a title no longer opens your phone's browser. It opens the Parents guide tab inside the app." },
+		],
+	},
+	{
 		version: "0.9.56",
 		date: "2026-10-17",
 		headline: "IMDb's parents guide inside the app, and a split box office.",

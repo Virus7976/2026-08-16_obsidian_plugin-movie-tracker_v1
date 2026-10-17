@@ -75,6 +75,9 @@ export function showTitleMenu(
 	menu.addItem((i) =>
 		i.setTitle("Log a viewing").setIcon("calendar-plus").onClick(() => new LogSheet(plugin.app, plugin, { entry, file }).open())
 	);
+	menu.addItem((i) =>
+		i.setTitle("Parents guide").setIcon("shield-alert").onClick(() => void plugin.openDetail(entry, "content"))
+	);
 
 	if (entry.status === "watchlist") {
 		// Marking a film watched has to record a viewing, which `setStatus`
@@ -369,10 +372,13 @@ export function showResultMenu(
 	x: number,
 	y: number,
 	onOpen: () => void,
-	onAdd?: () => void
+	onAdd?: () => void,
+	/** Open the page on its Parents guide tab; absent where the page cannot. */
+	onGuide?: () => void
 ): void {
 	const menu = new Menu();
 	menu.addItem((i) => i.setTitle("Open").setIcon("panel-right").onClick(onOpen));
+	if (onGuide) menu.addItem((i) => i.setTitle("Parents guide").setIcon("shield-alert").onClick(onGuide));
 	if (onAdd) menu.addItem((i) => i.setTitle("Add to watchlist").setIcon("bookmark").onClick(onAdd));
 	const q = encodeURIComponent(`${r.title}${r.year ? ` ${r.year}` : ""}`);
 	const kind = r.isTv ? "tv" : "movie";

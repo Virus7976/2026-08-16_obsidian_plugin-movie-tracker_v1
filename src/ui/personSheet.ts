@@ -15,7 +15,7 @@
 
 import { Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
-import { PreviewSheet } from "./discoverView";
+import { TitlePage } from "./titlePage";
 import { badgePerson } from "./personBadge";
 import type { TmdbPerson, TmdbPersonCredit } from "../types";
 import { redact } from "../secrets";
@@ -391,7 +391,7 @@ export class PersonSheet extends Modal {
 			// sheet is the same information from TMDB directly — overview,
 			// scores, providers, trailer — and it carries the role across, so
 			// the answer to "who was he in this" survives the navigation.
-			new PreviewSheet(this.plugin, credit, () => {}, roleOf(credit)).open();
+			new TitlePage(this.plugin, credit, () => {}, roleOf(credit)).open();
 		});
 
 		if (!mine) {
@@ -613,7 +613,7 @@ class RoleSheet extends Modal {
 				void this.plugin.openDetail(mine);
 				return;
 			}
-			new PreviewSheet(this.plugin, this.credit, () => {}, roleOf(this.credit)).open();
+			new TitlePage(this.plugin, this.credit, () => {}, roleOf(this.credit)).open();
 		});
 
 		if (!this.mine) {

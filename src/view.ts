@@ -1317,7 +1317,7 @@ export class ReelView extends ItemView {
 		this.bodyEl.scrollTop = this.listScroll;
 	}
 
-	openDetail(entry: Entry): void {
+	openDetail(entry: Entry, tab?: string): void {
 		this.listScroll = this.bodyEl.scrollTop;
 		this.moving = "forward";
 		const from = TABS.find((t) => t.id === this.tab)?.label ?? "Library";
@@ -1325,7 +1325,8 @@ export class ReelView extends ItemView {
 			this.plugin,
 			entry,
 			() => this.closeDetail(),
-			from
+			from,
+			tab
 		);
 		this.paint();
 		this.bodyEl.scrollTop = 0;

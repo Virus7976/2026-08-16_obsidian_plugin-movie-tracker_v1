@@ -81,7 +81,14 @@ export function paintRelatedFeed(plugin: ReelPlugin, el: HTMLElement, opts: Rela
 								.createFromResult(r, { date: todayISO(), watchlist: true })
 								.then(() => plugin.undo.offer(`Added ${title} to your watchlist`))
 								.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
-						}
+						},
+				() => {
+					const own = mine();
+					if (own) {
+						opts.beforeOpenMine?.();
+						void plugin.openDetail(own, "content");
+					} else new TitlePage(plugin, r, opts.onAdded, undefined, "content").open();
+				}
 			)
 		);
 		c.addEventListener("click", open);

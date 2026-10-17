@@ -33,7 +33,7 @@ import { setSelected } from "./a11y";
 import { skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
 import { reportFailure } from "./failure";
-import { PreviewSheet } from "./discoverView";
+import { TitlePage } from "./titlePage";
 
 type Step = "seeds" | "mood" | "results";
 
@@ -555,7 +555,7 @@ export class RecipeSheet extends Modal {
 		// The same sheet Discover uses, so a result behaves identically
 		// wherever it was found — full details, links, and the three
 		// decisions inline.
-		new PreviewSheet(this.plugin, item, () => {
+		new TitlePage(this.plugin, item, () => {
 			// Adding something removes it from the shortlist: it is no longer
 			// a suggestion, it is in your library.
 			this.results = (this.results ?? []).filter((r) => r.item.id !== item.id);

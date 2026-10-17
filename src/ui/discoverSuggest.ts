@@ -155,7 +155,8 @@ export class DiscoverSuggest {
 						x,
 						y,
 						() => this.open(row),
-						this.owned(row) ? undefined : () => void this.add(row)
+						this.owned(row) ? undefined : () => void this.add(row),
+						() => this.open(row, "content")
 					)
 				);
 			}
@@ -196,15 +197,15 @@ export class DiscoverSuggest {
 		}
 	}
 
-	private open(row: Row): void {
+	private open(row: Row, tab?: string): void {
 		this.close();
 		if (row.kind === "person") {
 			new PersonSheet(this.plugin, row.r.id, row.title).open();
 			return;
 		}
 		const own = this.plugin.library.byTmdbId(row.r.id, row.isTv ? "tv" : "film");
-		if (own) void this.plugin.openDetail(own);
-		else new TitlePage(this.plugin, { ...row.r, media_type: row.isTv ? "tv" : "movie" }).open();
+		if (own) void this.plugin.openDetail(own, tab);
+		else new TitlePage(this.plugin, { ...row.r, media_type: row.isTv ? "tv" : "movie" }, undefined, undefined, tab).open();
 	}
 
 	private async add(row: Row): Promise<void> {

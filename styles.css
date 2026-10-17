@@ -20833,3 +20833,16 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 .reel-guide-pill.sev-mild::before { background: var(--color-green, #3fa66a); }
 .reel-guide-pill.sev-moderate::before { background: var(--color-yellow, #d9a32b); }
 .reel-guide-pill.sev-severe::before { background: var(--color-red, #d9534f); }
+
+@media (pointer: fine) and (min-width: 700px) {
+	.reel-link.guide {
+		min-height: 0;
+	}
+}
+@media (pointer: fine) and (min-width: 700px) {
+	.reel-link.guide {
+		display: inline-flex;
+		align-items: center;
+		min-height: 30px;
+	}
+}

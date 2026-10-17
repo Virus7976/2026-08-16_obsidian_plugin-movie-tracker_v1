@@ -83,13 +83,17 @@ export class DetailScreen {
 	private openSeason: number | null = null;
 	private episodeCache = new Map<number, TmdbEpisode[]>();
 	private rootEl: HTMLElement | null = null;
+	/** Set once the tabs exist: switch to one by id and bring it into view. */
+	private jumpToTab: ((id: string) => void) | null = null;
 
 	constructor(
 		private plugin: ReelPlugin,
 		private entry: Entry,
 		private onBack: () => void,
 		/** Where you came from, so the back button doesn't claim otherwise. */
-		private backLabel = "Library"
+		private backLabel = "Library",
+		/** A tab to open on arrival, by id (for example "content" for the Parents guide). */
+		private startTab?: string
 	) {}
 
 	private get file(): TFile | null {
@@ -269,7 +273,17 @@ export class DetailScreen {
 		// severity bands and per-item notes are community-maintained and have
 		// no public API; scraping them would break the first time IMDb touched
 		// their markup. A link is always current and always complete.
-		if (imdb) link("Parents guide", `${imdb}parentalguide`, "guide");
+		// Opens the Parents guide tab on this page, not a browser: the tab has the
+		// estimate, IMDb's guide in the app's style, and the link out as a last resort.
+		const guide = links.createEl("a", { cls: "reel-link guide", text: "Parents guide", attr: { role: "button", tabindex: "0" } });
+		const goGuide = (ev: Event): void => {
+			ev.preventDefault();
+			this.jumpToTab?.("content");
+		};
+		guide.addEventListener("click", goGuide);
+		guide.addEventListener("keydown", (ev: KeyboardEvent) => {
+			if (ev.key === "Enter" || ev.key === " ") goGuide(ev);
+		});
 
 		// JustWatch resolves "where can I actually watch this" across every
 		// service, which the providers list only approximates. Their paths are
@@ -358,6 +372,23 @@ export class DetailScreen {
 		// unless you opened the Crew tab and scrolled.
 		this.renderCreditRows(wrap, cast, crew, isTv);
 
+		// More like this, for a title you own as much as one you do not: the same
+		// strip everywhere, and it keeps loading as you scroll along it.
+		if (related.length) {
+			wrap.createDiv({ cls: "reel-block-title", text: "More like this" });
+			paintRelatedFeed(this.plugin, wrap, {
+				tmdbId: this.entry.tmdbId,
+				isTv,
+				seed: related.filter((r) => !r.adult && r.poster_path),
+				layout: "strip",
+				// On a title page opened from elsewhere, going to one of your own
+				// titles closes this page first.
+				beforeOpenMine: () => {
+					if (!this.entry.path) this.onBack();
+				},
+			});
+		}
+
 		const tabs: { id: string; label: string; render: (el: HTMLElement) => void }[] = [];
 
 		// Few, full sections rather than many thin ones: a section that had only
@@ -430,6 +461,12 @@ export class DetailScreen {
 			body.empty();
 			tabs[i].render(body);
 		};
+		this.jumpToTab = (id: string) => {
+			const i = tabs.findIndex((t) => t.id === id);
+			if (i < 0) return;
+			show(i);
+			buttons[i]?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+		};
 
 		tabs.forEach((t, i) => {
 			const b = bar.createEl("button", { cls: "reel-facet-tab", text: t.label, attr: { type: "button" } });
@@ -437,6 +474,7 @@ export class DetailScreen {
 			b.addEventListener("click", () => show(i));
 		});
 		show(0);
+		if (this.startTab) requestAnimationFrame(() => this.jumpToTab?.(this.startTab as string));
 	}
 
 	/**

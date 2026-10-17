@@ -3246,6 +3246,9 @@ ${body}
     menu.addItem(
       (i) => i.setTitle("Log a viewing").setIcon("calendar-plus").onClick(() => new LogSheet(plugin2.app, plugin2, { entry, file }).open())
     );
+    menu.addItem(
+      (i) => i.setTitle("Parents guide").setIcon("shield-alert").onClick(() => void plugin2.openDetail(entry, "content"))
+    );
     if (entry.status === "watchlist") {
       menu.addItem(
         (i) => i.setTitle("Mark watched").setIcon("check").onClick(
@@ -3443,9 +3446,11 @@ ${body}
     });
     menu.showAtPosition({ x, y });
   }
-  function showResultMenu(plugin2, r, x, y, onOpen, onAdd) {
+  function showResultMenu(plugin2, r, x, y, onOpen, onAdd, onGuide) {
     const menu = new Menu();
     menu.addItem((i) => i.setTitle("Open").setIcon("panel-right").onClick(onOpen));
+    if (onGuide)
+      menu.addItem((i) => i.setTitle("Parents guide").setIcon("shield-alert").onClick(onGuide));
     if (onAdd)
       menu.addItem((i) => i.setTitle("Add to watchlist").setIcon("bookmark").onClick(onAdd));
     const q = encodeURIComponent(`${r.title}${r.year ? ` ${r.year}` : ""}`);
@@ -5484,253 +5489,6 @@ ${body}
     return grid;
   }
 
-  // src/ui/searchModal.ts
-  var SearchModal = class extends SuggestModal {
-    constructor(app2, plugin2, opts = {}) {
-      super(app2);
-      this.plugin = plugin2;
-      this.opts = opts;
-      this.results = [];
-      this.lastQuery = "";
-      this.seq = 0;
-      this.startQuery = "";
-      this.resolveResults = null;
-      /** 300ms debounce, with a sequence guard so a slow reply can't overwrite a fast one. */
-      this.runSearch = debounce(
-        async (query) => {
-          const ticket = ++this.seq;
-          try {
-            const results = await this.plugin.tmdb.searchMulti(query);
-            if (ticket !== this.seq)
-              return;
-            this.results = results;
-          } catch (e) {
-            if (ticket !== this.seq)
-              return;
-            this.results = [];
-            new Notice(`Reel: ${redact(e)}`);
-          }
-          this.resolveResults?.(this.results);
-          this.resolveResults = null;
-        },
-        300,
-        true
-      );
-      this.setPlaceholder(
-        opts.placeholder ?? (opts.watchlist ? "Add to watchlist \u2014 search TMDB\u2026" : "Search TMDB for a film or show\u2026")
-      );
-      this.limit = 20;
-      this.modalEl.addClass("reel-modal", "reel-search");
-      this.setInstructions([
-        { command: "\u2191\u2193", purpose: "navigate" },
-        { command: "\u21B5", purpose: "select" },
-        { command: "esc", purpose: "dismiss" },
-        // Results are capped at 20; without saying so, a missing title
-        // looks like TMDB doesn't have it rather than like a cut-off list.
-        { command: "20 max", purpose: "add words to narrow" }
-      ]);
-      this.startQuery = opts.query ?? "";
-    }
-    /** Obsidian's onOpen empties the box, so a carried-over query is set after it. */
-    onOpen() {
-      super.onOpen();
-      if (this.startQuery) {
-        this.inputEl.value = this.startQuery;
-        this.inputEl.dispatchEvent(new Event("input"));
-      }
-    }
-    async getSuggestions(query) {
-      const q = query.trim();
-      if (q.length < 2) {
-        this.results = [];
-        return [];
-      }
-      if (q === this.lastQuery && this.results.length)
-        return this.results;
-      this.lastQuery = q;
-      return new Promise((resolve) => {
-        this.resolveResults?.(this.results);
-        this.resolveResults = resolve;
-        this.runSearch(q);
-      });
-    }
-    renderSuggestion(item, el) {
-      el.addClass("reel-suggestion");
-      const isTv = item.media_type === "tv";
-      const title = isTv ? item.name ?? "Untitled" : item.title ?? "Untitled";
-      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
-      const thumb = el.createDiv({ cls: "reel-suggestion-thumb" });
-      const url = this.plugin.tmdb.posterUrl(item.poster_path, "w92");
-      if (url) {
-        const img = thumb.createEl("img", { attr: { src: url, loading: "lazy", alt: "" } });
-        img.addEventListener("error", () => {
-          img.remove();
-          thumb.addClass("is-empty");
-        });
-      } else {
-        thumb.addClass("is-empty");
-      }
-      const body = el.createDiv({ cls: "reel-suggestion-body" });
-      const line = body.createDiv({ cls: "reel-suggestion-title" });
-      line.createSpan({ text: title });
-      if (year2)
-        line.createSpan({ cls: "reel-dim", text: ` ${year2}` });
-      const meta = body.createDiv({ cls: "reel-suggestion-meta" });
-      meta.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
-      const existing = this.plugin.library.byTmdbId(item.id, isTv ? "tv" : "film");
-      if (existing)
-        meta.createSpan({ cls: "reel-badge in-library", text: "In library" });
-      if (item.vote_average)
-        meta.createSpan({ cls: "reel-dim", text: `\u2605 ${item.vote_average.toFixed(1)}` });
-    }
-    async onChooseSuggestion(item) {
-      if (this.opts.onPick) {
-        this.opts.onPick(item);
-        return;
-      }
-      const isTv = item.media_type === "tv";
-      const type = isTv ? "tv" : "film";
-      const existing = this.plugin.library.byTmdbId(item.id, type);
-      if (existing) {
-        const file = this.app.vault.getAbstractFileByPath(existing.path);
-        if (file instanceof TFile) {
-          new LogSheet(this.app, this.plugin, { file, entry: existing }).open();
-          return;
-        }
-      }
-      new LogSheet(this.app, this.plugin, {
-        pending: { id: item.id, type, title: isTv ? item.name ?? "" : item.title ?? "" },
-        watchlist: this.opts.watchlist
-      }).open();
-    }
-  };
-
-  // src/ui/discoverFilterSheet.ts
-  var DiscoverFilterSheet = class extends Modal {
-    constructor(app2, filters, hooks) {
-      super(app2);
-      this.filters = filters;
-      this.hooks = hooks;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      modalEl.addClass("reel-filter-sheet");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.addClass("reel-filter-content");
-      const head = contentEl.createDiv({ cls: "reel-filter-head" });
-      head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
-      this.body = contentEl.createDiv({ cls: "reel-filter-body" });
-      this.redraw();
-      const foot = contentEl.createDiv({ cls: "reel-log-actions reel-filter-actions" });
-      const clear = foot.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all", attr: { type: "button" } });
-      clear.addEventListener("click", () => {
-        this.hooks.clearAll();
-        this.redraw();
-      });
-      const done = foot.createEl("button", { cls: "reel-btn mod-cta reel-filter-done", attr: { type: "button" } });
-      done.createSpan({ text: "Show results" });
-      done.addEventListener("click", () => this.close());
-    }
-    /** Called when the genre list arrives after the sheet is already open. */
-    refresh() {
-      if (this.body?.isConnected)
-        this.redraw();
-    }
-    redraw() {
-      const el = this.body;
-      const keep = el.scrollTop;
-      el.empty();
-      const section = (label, asOptions = false) => {
-        const box = el.createDiv({ cls: "reel-filter-section" });
-        box.createDiv({ cls: "reel-filter-label", text: label });
-        return box.createDiv({ cls: asOptions ? "reel-opts" : "reel-chips reel-filter-chips" });
-      };
-      const pick = (into, label, active, onClick) => {
-        const b = into.createEl("button", { cls: into.hasClass("reel-opts") ? "reel-opt" : "reel-chip", attr: { type: "button" } });
-        if (b.hasClass("reel-opt")) {
-          b.createSpan({ cls: "reel-opt-mark" });
-          b.createSpan({ cls: "reel-opt-label", text: label });
-        } else
-          b.setText(label);
-        setSelected(b, active);
-        b.addEventListener("click", () => {
-          onClick();
-          this.hooks.onChange();
-          this.redraw();
-        });
-        return b;
-      };
-      const kinds = section("Type");
-      pick(kinds, "Films", this.filters.type === "movie", () => this.hooks.setType("movie"));
-      pick(kinds, "Series", this.filters.type === "tv", () => this.hooks.setType("tv"));
-      const like = section("Similar to");
-      const seed = this.hooks.seedTitle();
-      if (seed)
-        pick(like, `${seed}  \u2715`, true, () => this.hooks.clearSeed());
-      else {
-        const b = like.createEl("button", { cls: "reel-chip", text: "Pick a title\u2026", attr: { type: "button" } });
-        b.addEventListener("click", () => {
-          this.hooks.pickSeed(() => {
-            this.hooks.onChange();
-            this.redraw();
-          });
-        });
-      }
-      const genres = this.hooks.genres();
-      const gbox = section("Genre");
-      if (!genres.length)
-        gbox.createSpan({ cls: "reel-dim", text: "Loading\u2026" });
-      for (const g of genres) {
-        pick(gbox, g.name, this.filters.genreIds.includes(g.id), () => {
-          const at = this.filters.genreIds.indexOf(g.id);
-          if (at >= 0) {
-            this.filters.genreIds.splice(at, 1);
-            this.filters.genreNames.splice(at, 1);
-          } else {
-            this.filters.genreIds.push(g.id);
-            this.filters.genreNames.push(g.name);
-          }
-        });
-      }
-      this.fold(gbox, Platform.isPhone ? 8 : 99);
-      const decades = section("Decade");
-      const nowDecade = Math.floor((/* @__PURE__ */ new Date()).getFullYear() / 10) * 10;
-      for (let d = nowDecade; d >= 1950; d -= 10) {
-        pick(decades, `${d}s`, this.filters.decade === d, () => {
-          this.filters.decade = this.filters.decade === d ? null : d;
-        });
-      }
-      const score2 = section("Minimum score");
-      for (const r of [6, 7, 8]) {
-        pick(score2, `${r}+`, this.filters.minRating === r, () => {
-          this.filters.minRating = this.filters.minRating === r ? null : r;
-        });
-      }
-      el.scrollTop = keep;
-    }
-    /** Long groups show their first few, the rest behind one button. */
-    fold(group, limit) {
-      const all2 = Array.from(group.children);
-      const hidden = all2.slice(limit).filter((c) => !c.hasClass("is-active"));
-      if (!hidden.length)
-        return;
-      hidden.forEach((c) => c.addClass("is-folded"));
-      const more = group.parentElement?.createEl("button", {
-        cls: "reel-filter-more",
-        text: `Show ${hidden.length} more`,
-        attr: { type: "button", "aria-expanded": "false" }
-      });
-      more?.addEventListener("click", () => {
-        const open2 = more.getAttr("aria-expanded") !== "true";
-        hidden.forEach((c) => c.toggleClass("is-folded", !open2));
-        more.setAttr("aria-expanded", String(open2));
-        more.setText(open2 ? "Show less" : `Show ${hidden.length} more`);
-      });
-    }
-  };
-
   // src/ui/titlePage.ts
   function entryFromResult(plugin2, r) {
     const isTv = r.media_type === "tv" || !!r.name && !r.title;
@@ -5767,11 +5525,13 @@ ${body}
   }
   var TitlePage = class extends Modal {
     constructor(plugin2, item, onAdded = () => {
-    }) {
+    }, role, startTab) {
       super(plugin2.app);
       this.plugin = plugin2;
       this.item = item;
       this.onAdded = onAdded;
+      this.role = role;
+      this.startTab = startTab;
       this.busy = false;
     }
     onOpen() {
@@ -5783,6 +5543,11 @@ ${body}
       const entry = entryFromResult(this.plugin, this.item);
       const isTv = entry.type === "tv";
       paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
+      if (this.role) {
+        const r = contentEl.createDiv({ cls: "reel-preview-role" });
+        r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
+        r.createSpan({ cls: "reel-preview-role-value", text: this.role });
+      }
       const head = contentEl.createDiv({ cls: "reel-preview-head" });
       const posterEl = head.createDiv({ cls: "reel-preview-poster" });
       const src = this.plugin.tmdb.posterUrl(this.item.poster_path, "w342");
@@ -5818,8 +5583,9 @@ ${body}
       });
       if (entry.overview)
         contentEl.createDiv({ cls: "reel-preview-overview", text: entry.overview });
+      void paintTrailerFor(this.plugin, contentEl.createDiv({ cls: "reel-detail-trailer" }), entry.tmdbId, isTv, void 0);
       const main = contentEl.createDiv({ cls: "reel-titlepage-main" });
-      const screen = new DetailScreen(this.plugin, entry, () => this.close());
+      const screen = new DetailScreen(this.plugin, entry, () => this.close(), "Library", this.startTab);
       void screen.renderReference(main, isTv);
     }
     async add(button) {
@@ -5831,1909 +5597,6 @@ ${body}
       try {
         await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: true });
         this.plugin.undo.offer("Added to your watchlist");
-        this.onAdded();
-        this.close();
-      } catch (e) {
-        new Notice(`Reel: ${redact(e)}`);
-        button.setText("Retry");
-        button.removeAttribute("disabled");
-        this.busy = false;
-      }
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-
-  // src/ui/relatedFeed.ts
-  var CAP = 240;
-  function paintRelatedFeed(plugin2, el, opts) {
-    const list2 = el.createDiv({ cls: opts.layout === "grid" ? "reel-related" : "reel-related reel-morelike" });
-    const seen = /* @__PURE__ */ new Set([opts.tmdbId]);
-    let sources = ["recommendations", "similar"];
-    let page = 1;
-    let done = false;
-    let loading = false;
-    let shownCount = 0;
-    const card = (raw) => {
-      const r = { ...raw, media_type: raw.media_type ?? (opts.isTv ? "tv" : "movie") };
-      const rTv = r.media_type === "tv";
-      const title = (rTv ? r.name : r.title) ?? "Untitled";
-      const year2 = String(yearOf(rTv ? r.first_air_date : r.release_date) ?? "");
-      const c = list2.createDiv({ cls: "reel-related-card" });
-      c.setAttr("role", "button");
-      c.setAttr("tabindex", "0");
-      c.setAttr("aria-label", `${title} \u2014 see details`);
-      const poster2 = c.createDiv({ cls: "reel-related-poster" });
-      plugin2.posters.attach(poster2, { posterUrl: plugin2.tmdb.posterUrl(r.poster_path, "w342") ?? void 0, title });
-      c.createDiv({ cls: "reel-related-title", text: title });
-      const bits = [year2, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
-      if (bits.length)
-        c.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
-      const mine = () => plugin2.library.byTmdbId(r.id, rTv ? "tv" : "film");
-      const open2 = () => {
-        const own = mine();
-        if (own) {
-          opts.beforeOpenMine?.();
-          void plugin2.openDetail(own);
-        } else
-          new TitlePage(plugin2, r, opts.onAdded).open();
-      };
-      holdAt(
-        c,
-        (x, y) => showResultMenu(
-          plugin2,
-          { id: r.id, title, year: year2, isTv: rTv },
-          x,
-          y,
-          open2,
-          mine() ? void 0 : () => {
-            void plugin2.notes.createFromResult(r, { date: todayISO(), watchlist: true }).then(() => plugin2.undo.offer(`Added ${title} to your watchlist`)).catch((e) => new Notice(`Reel: ${redact(e)}`));
-          }
-        )
-      );
-      c.addEventListener("click", open2);
-      c.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter" || ev.key === " ") {
-          ev.preventDefault();
-          open2();
-        }
-      });
-    };
-    const add = (rows2) => {
-      let n2 = 0;
-      for (const r of rows2) {
-        if (seen.has(r.id) || r.adult || !r.poster_path)
-          continue;
-        seen.add(r.id);
-        card(r);
-        n2++;
-        shownCount++;
-      }
-      return n2;
-    };
-    add(opts.seed);
-    const sentinel = el.createDiv({ cls: "reel-feed-end reel-related-end" });
-    if (opts.layout === "strip")
-      list2.appendChild(sentinel);
-    sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
-    const more = async () => {
-      if (loading || done)
-        return;
-      loading = true;
-      try {
-        for (let tries = 0; tries < 4 && shownCount < CAP; tries++) {
-          const source = sources[0];
-          if (!source)
-            break;
-          page += 1;
-          const res = await plugin2.tmdb.relatedPage(opts.isTv ? "tv" : "movie", opts.tmdbId, source, page);
-          if (page >= res.total_pages) {
-            sources = sources.slice(1);
-            page = 0;
-          }
-          if (add(res.results) > 0)
-            break;
-        }
-      } catch {
-        done = true;
-      } finally {
-        loading = false;
-        if (!sources.length || shownCount >= CAP)
-          done = true;
-        if (done)
-          sentinel.remove();
-      }
-    };
-    const startOn = () => {
-      page = 1;
-    };
-    startOn();
-    const root = opts.layout === "strip" ? list2 : null;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((e) => e.isIntersecting))
-          return;
-        void more().then(() => {
-          if (!sentinel.isConnected)
-            return;
-          io.unobserve(sentinel);
-          io.observe(sentinel);
-        });
-      },
-      { root, rootMargin: opts.layout === "strip" ? "0px 400px 0px 0px" : "600px 0px" }
-    );
-    io.observe(sentinel);
-  }
-
-  // src/util/failure.ts
-  function diagnose(status, online) {
-    if (!online) {
-      return {
-        kind: "offline",
-        message: "You're offline. Your library, diary and stats all still work \u2014 only new lookups need a connection.",
-        retryable: true
-      };
-    }
-    if (status === 401 || status === 403) {
-      return {
-        kind: "auth",
-        message: "TMDB rejected the key. Check it in Settings \u2192 Reel.",
-        // Retrying an unchanged bad key fails identically every time, so
-        // offering it would be a button that cannot work.
-        retryable: false,
-        settings: true
-      };
-    }
-    if (status === 404) {
-      return {
-        kind: "missing",
-        message: "TMDB has no record of that. It may have been merged or removed.",
-        retryable: false
-      };
-    }
-    if (status === 429) {
-      return {
-        kind: "rate",
-        message: "TMDB is rate limiting. Wait a few seconds and try again.",
-        retryable: true
-      };
-    }
-    if (status != null && status >= 500) {
-      return {
-        kind: "server",
-        message: "TMDB is having trouble. Nothing wrong on your end.",
-        retryable: true
-      };
-    }
-    return {
-      kind: "unknown",
-      message: "That didn't work.",
-      retryable: true
-    };
-  }
-  function worthReporting(kind, background) {
-    if (!background)
-      return true;
-    return kind !== "offline";
-  }
-
-  // src/tmdb.ts
-  var TmdbError = class extends Error {
-    constructor(message, status) {
-      super(message);
-      this.status = status;
-      this.name = "TmdbError";
-    }
-  };
-
-  // src/ui/failure.ts
-  function diagnoseError(error) {
-    if (error instanceof MissingKeyError) {
-      return {
-        kind: "auth",
-        message: "No TMDB key is unlocked. Add or unlock one in Settings \u2192 Reel.",
-        retryable: false,
-        settings: true
-      };
-    }
-    const status = error instanceof TmdbError ? error.status : void 0;
-    return diagnose(status, navigator.onLine !== false);
-  }
-  function reportFailure(error, opts = {}) {
-    const d = diagnoseError(error);
-    if (!worthReporting(d.kind, opts.background === true)) {
-      console.warn("Reel: offline \u2014", opts.context ?? "background work", "skipped");
-      return d;
-    }
-    if (d.kind === "unknown")
-      console.warn("Reel:", opts.context ?? "failed", redact(error));
-    const notice = new Notice("", d.retryable ? 12e3 : 9e3);
-    const el = notice.noticeEl;
-    el.addClass("reel-undo-notice");
-    el.createSpan({ text: opts.context ? `${opts.context} \u2014 ${d.message}` : d.message });
-    if (d.settings)
-      return d;
-    if (d.retryable && opts.retry) {
-      const btn = el.createEl("button", { cls: "reel-undo-btn", text: "Retry", attr: { type: "button" } });
-      btn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        btn.setAttr("disabled", "true");
-        notice.hide();
-        opts.retry?.();
-      });
-    }
-    return d;
-  }
-
-  // src/util/gesture.ts
-  var HORIZONTAL_MIN = 60;
-  var VERTICAL_MIN = 140;
-  var STRAIGHTNESS = 1.5;
-  function gestureIntent(drag) {
-    const { dx, dy, atTop, canUndo } = drag;
-    if (atTop && canUndo && dy > VERTICAL_MIN && Math.abs(dy) > Math.abs(dx) * STRAIGHTNESS) {
-      return "undo";
-    }
-    if (Math.abs(dx) < HORIZONTAL_MIN || Math.abs(dx) < Math.abs(dy) * STRAIGHTNESS)
-      return "none";
-    return dx < 0 ? "next" : "previous";
-  }
-
-  // src/ui/discoverView.ts
-  var emptyFilters = () => ({ genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" });
-  var DiscoverScreen = class {
-    constructor(plugin2) {
-      this.plugin = plugin2;
-      /**
-       * The feed as recipes, before any of it has been fetched.
-       *
-       * Null until a taste profile has been read. Long — sixty-odd rows on a
-       * library with ratings in it, and an unbounded popularity tail after that —
-       * because the feed is meant not to end.
-       */
-      this.sources = null;
-      /** Sources that have been mounted, in the order they appear. */
-      this.feed = [];
-      /** Index of the next source to mount. */
-      this.nextSource = 0;
-      /** One mount at a time, or a fast scroll fires four of them at once. */
-      this.mounting = false;
-      /** Torn down and rebuilt on every draw, or they accumulate per repaint. */
-      this.watchers = [];
-      /** Where new rows are appended, so mounting one does not redraw the page. */
-      this.feedEl = null;
-      /**
-       * The view's search box, pointed outward.
-       *
-       * Discover is the one tab where the library filters mean nothing — it is
-       * about titles you do *not* have. But the search box is the same box, and a
-       * query that silently did nothing here was most of "the search should work
-       * the same no matter what tab you are on".
-       */
-      this.query = "";
-      this.searchResults = null;
-      /** What `searchResults` is an answer to, so a new query refetches. */
-      this.searchedFor = "";
-      /** How many results were dropped for already being in your library. */
-      this.searchOwned = 0;
-      /** The last page of results fetched; the sentinel asks for the next. */
-      this.searchPage = 0;
-      /** What TMDB says it holds for this query. 0 until the first page lands. */
-      this.searchPages = 0;
-      /** Titles TMDB claims to have, so the count can stop overstating one page. */
-      this.searchTotal = 0;
-      /** A page is in flight, so the sentinel must not ask for it twice. */
-      this.searchMore = false;
-      /** The people the query matched, drawn above the titles. Page one only. */
-      this.searchPeople = [];
-      this.profile = null;
-      this.results = null;
-      this.genres = [];
-      this.filters = emptyFilters();
-      this.filterSheet = null;
-      this.loading = false;
-      this.error = null;
-      this.handled = /* @__PURE__ */ new Set();
-      this.page = 1;
-      this.exhausted = false;
-      /** "Something like this one" — a title to draw recommendations from. */
-      this.seed = null;
-      /** One-at-a-time browsing, for when you want to move fast rather than skim. */
-      this.quick = false;
-      this.quickAt = 0;
-      /** Results handed over by the recipe flow, if any. */
-      this.shortlist = null;
-      /**
-       * The title the last quick action handled, and where it sat.
-       *
-       * Undo has to put back three things, not one: the vault change, the fact
-       * that the card was marked handled, and your position in the queue.
-       * Reversing only the first leaves a title in your library that the screen
-       * still believes you dealt with.
-       */
-      this.lastAction = null;
-      /**
-       * Every title the feed has already shown, across all rows.
-       *
-       * Trending and your top genre overlap heavily, and the same poster turning
-       * up in four consecutive shelves is what makes an endless feed feel like a
-       * short one on a loop.
-       */
-      this.seen = /* @__PURE__ */ new Set();
-      /**
-       * Cards taken out of the feed by an action, newest last.
-       *
-       * `handled` is a set and says nothing about order, so it cannot answer "which
-       * one did I just do". Undo has to put back the last one specifically, and
-       * pressing undo twice has to put back two.
-       */
-      this.handledOrder = [];
-      /** The container of the most recent render, so an undo can repaint it. */
-      this.lastContainer = null;
-    }
-    /**
-     * The mounted rows, in the shape the rest of the screen already expects.
-     *
-     * Quick mode and the narrowing pass both read the loaded pool, and neither
-     * cares that it now arrives a row at a time.
-     */
-    get rows() {
-      if (!this.sources)
-        return null;
-      return this.feed.map((f) => ({ id: f.source.id, title: f.source.title, reason: f.source.reason, items: f.items }));
-    }
-    get filtered() {
-      return this.seed != null || this.filters.genreIds.length > 0 || this.filters.decade != null || this.filters.minRating != null;
-    }
-    reset() {
-      this.seed = null;
-      this.sources = null;
-      this.feed = [];
-      this.nextSource = 0;
-      this.mounting = false;
-      this.searchResults = null;
-      this.searchedFor = "";
-      this.searchPage = 0;
-      this.searchPages = 0;
-      this.searchMore = false;
-      this.profile = null;
-      this.results = null;
-      this.error = null;
-      this.handled.clear();
-      this.page = 1;
-      this.exhausted = false;
-    }
-    /**
-     * Draw the screen, and never leave it blank.
-     *
-     * `render` empties the container before it draws. If anything after that
-     * throws — and several paths reach here from a `.finally()`, where a throw
-     * becomes an unhandled rejection nothing catches — the user is left
-     * looking at an empty pane with no explanation. That is the white screen.
-     *
-     * The view's own `paintTab` has a try/catch, but it only guards the
-     * *synchronous* first paint. Every repaint that follows a fetch arrives
-     * outside it.
-     */
-    render(container) {
-      this.lastContainer = container;
-      try {
-        this.draw(container);
-      } catch (e) {
-        container.empty();
-        const box = container.createDiv({ cls: "reel-error-state" });
-        box.createDiv({ cls: "reel-empty-title", text: "Discover hit a problem" });
-        box.createDiv({ cls: "reel-empty-body", text: redact(e) });
-        const again = box.createEl("button", { cls: "reel-btn mod-cta", text: "Start again" });
-        again.addEventListener("click", () => {
-          this.reset();
-          this.quick = false;
-          this.shortlist = null;
-          this.render(container);
-        });
-        console.error("Reel: Discover render failed", e);
-      }
-    }
-    draw(container) {
-      container.empty();
-      container.addClass("reel-discover");
-      for (const w of this.watchers)
-        w.disconnect();
-      this.watchers = [];
-      this.feedEl = null;
-      const staged = this.plugin.discover.takeStaged();
-      if (staged) {
-        this.shortlist = staged;
-        this.quick = true;
-        this.quickAt = 0;
-      }
-      this.paintFilters(container);
-      if (this.error) {
-        container.createDiv({ cls: "reel-error", text: this.error });
-        const retry = container.createEl("button", { cls: "reel-btn", text: "Try again" });
-        retry.addEventListener("click", () => {
-          this.error = null;
-          this.render(container);
-        });
-        return;
-      }
-      if (this.query)
-        this.paintSearch(container);
-      else if (this.quick)
-        this.paintQuick(container);
-      else if (this.filtered)
-        this.paintResults(container);
-      else
-        this.paintForYou(container);
-    }
-    /* ------------------------------------------------------------------ */
-    /* Quick mode — one title at a time                                    */
-    /* ------------------------------------------------------------------ */
-    /**
-     * The same pool the rows draw from, flattened and de-duplicated.
-     *
-     * A title can appear in several rows — trending and your top genre often
-     * overlap — and seeing it twice in a linear run reads as the queue being
-     * stuck rather than as two separate recommendations.
-     */
-    quickPool() {
-      if (this.shortlist?.length)
-        return this.shortlist.filter((i) => !this.handled.has(i.id));
-      const source = this.filtered ? this.results ?? [] : (this.rows ?? []).flatMap((r) => r.items);
-      const seen = /* @__PURE__ */ new Set();
-      const out = [];
-      for (const item of source) {
-        if (seen.has(item.id) || this.handled.has(item.id))
-          continue;
-        seen.add(item.id);
-        out.push(item);
-      }
-      return out;
-    }
-    paintQuick(container) {
-      if (!this.filtered && !this.sources) {
-        void this.loadRows(container);
-        skeletonCards(container, 1, "Loading");
-        return;
-      }
-      if (this.filtered && !this.results) {
-        this.paintResults(container);
-        return;
-      }
-      const pool2 = this.quickPool();
-      if (!pool2.length) {
-        const done = container.createDiv({ cls: "reel-empty" });
-        done.createDiv({ text: "Nothing left in this queue." });
-        const back = done.createEl("button", { cls: "reel-btn mod-cta", text: "Back to rows" });
-        back.addEventListener("click", () => {
-          this.quick = false;
-          this.render(container);
-        });
-        return;
-      }
-      if (this.quickAt >= pool2.length)
-        this.quickAt = 0;
-      const item = pool2[this.quickAt];
-      const isTv = item.media_type === "tv";
-      const title = (isTv ? item.name : item.title) ?? "Untitled";
-      const card = container.createDiv({ cls: "reel-quickcard" });
-      this.plugin.swatches.tint(
-        card,
-        this.plugin.tmdb.posterUrl(item.poster_path, "w342"),
-        document.body.hasClass("theme-dark")
-      );
-      card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool2.length}` });
-      const posterEl = card.createDiv({ cls: "reel-quickcard-poster" });
-      this.plugin.posters.attach(posterEl, {
-        posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? void 0,
-        title
-      });
-      posterEl.addEventListener("click", () => new PreviewSheet(this.plugin, item, () => this.render(container)).open());
-      const head = card.createDiv({ cls: "reel-quickcard-head" });
-      head.createSpan({ cls: "reel-quickcard-title", text: title });
-      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
-      if (year2)
-        head.createSpan({ cls: "reel-dim", text: ` ${year2}` });
-      const facts = card.createDiv({ cls: "reel-header-facts" });
-      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
-      if (item.vote_average)
-        facts.createSpan({ cls: "reel-dim", text: `TMDB ${item.vote_average.toFixed(1)}` });
-      if (item.overview)
-        card.createDiv({ cls: "reel-quickcard-overview", text: item.overview });
-      void paintExtras(this.plugin, card.createDiv({ cls: "reel-quickcard-extras" }), item.id, isTv);
-      const step = (by) => {
-        this.quickAt = Math.max(0, this.quickAt + by);
-        this.render(container);
-      };
-      const actions = card.createDiv({ cls: "reel-quickcard-actions" });
-      const skip = actions.createEl("button", { cls: "reel-btn reel-quick-skip", text: "\u2715  Skip" });
-      skip.addEventListener("click", () => step(1));
-      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+  Watchlist" });
-      later.addEventListener("click", () => void this.quickAdd(item, true, container));
-      const seen = actions.createEl("button", { cls: "reel-btn", text: "\u2713  Seen it" });
-      seen.addEventListener("click", () => {
-        const isTvItem = item.media_type === "tv";
-        new LogSheet(this.plugin.app, this.plugin, {
-          pending: {
-            id: item.id,
-            type: isTvItem ? "tv" : "film",
-            title: (isTvItem ? item.name : item.title) ?? "Untitled"
-          }
-        }).open();
-        this.markHandled(item.id);
-        this.render(container);
-      });
-      const nav = card.createDiv({ cls: "reel-quickcard-nav" });
-      const prev = nav.createEl("button", { cls: "reel-btn", text: "\u2039 Back", attr: { type: "button" } });
-      prev.toggleClass("is-disabled", this.quickAt === 0);
-      prev.addEventListener("click", () => step(-1));
-      const never = nav.createEl("button", { cls: "reel-btn", text: "Never show this", attr: { type: "button" } });
-      never.addEventListener("click", () => {
-        void this.plugin.discover.dismiss(item.id).then(() => {
-          this.handled.add(item.id);
-          this.render(container);
-        });
-      });
-      const hint = card.createDiv({ cls: "reel-dim reel-quickcard-hint" });
-      hint.setText(
-        this.lastAction ? "Swipe to move, swipe down to take back the last one. Arrow keys and Z work too." : "Swipe, or use \u2190 and \u2192 on a keyboard."
-      );
-      if (this.lastAction) {
-        const back = card.createEl("button", {
-          cls: "reel-chip reel-quick-undo",
-          text: "Undo that",
-          attr: { type: "button" }
-        });
-        back.addEventListener("click", () => void this.undoLast(container));
-      }
-      this.wireSwipe(card, step, () => void this.undoLast(container));
-      card.setAttr("tabindex", "0");
-      card.addEventListener("keydown", (ev) => {
-        if (ev.key === "ArrowRight") {
-          ev.preventDefault();
-          step(1);
-        } else if (ev.key === "ArrowLeft") {
-          ev.preventDefault();
-          step(-1);
-        } else if (ev.key === "z" || ev.key === "Z") {
-          ev.preventDefault();
-          void this.undoLast(container);
-        }
-      });
-      card.focus({ preventScroll: true });
-    }
-    /** Add from quick mode and advance, so one tap is the whole interaction. */
-    async quickAdd(item, watchlist, container) {
-      try {
-        await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist });
-        haptic("commit");
-        this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
-        this.markHandled(item.id);
-        this.lastAction = { id: item.id, at: this.quickAt };
-        this.render(container);
-      } catch (e) {
-        new Notice(`Reel: ${redact(e)}`);
-      }
-    }
-    /**
-     * Horizontal drag to move through the queue.
-     *
-     * Only acts when the gesture is clearly sideways: the card scrolls
-     * vertically, and a swipe that stole every downward drag would make the
-     * overview unreadable on a phone.
-     */
-    /**
-     * Swipe left and right to move, down to take back what you just did.
-     *
-     * Left and right always worked. What did not was recovering from a
-     * mistake: quick mode is built to be fast, so it is the single easiest
-     * place to add a title you were only skimming past — and going *back* only
-     * showed you a card for something already in your library. The action was
-     * gone and the screen said nothing about it.
-     *
-     * Down rather than up: up is where the browser and Obsidian both put
-     * their own gestures, and a third meaning on that axis is a collision
-     * waiting to happen.
-     */
-    wireSwipe(card, step, onUndo) {
-      let startX = 0;
-      let startY = 0;
-      let tracking = false;
-      let atTop = false;
-      const scroller = () => {
-        for (let p = card; p; p = p.parentElement) {
-          if (p.scrollHeight > p.clientHeight + 1)
-            return p;
-        }
-        return null;
-      };
-      card.addEventListener(
-        "touchstart",
-        (ev) => {
-          const t = ev.touches[0];
-          if (!t)
-            return;
-          startX = t.clientX;
-          startY = t.clientY;
-          tracking = true;
-          const s = scroller();
-          atTop = !s || s.scrollTop <= 0;
-        },
-        { passive: true }
-      );
-      card.addEventListener(
-        "touchend",
-        (ev) => {
-          if (!tracking)
-            return;
-          tracking = false;
-          const t = ev.changedTouches[0];
-          if (!t)
-            return;
-          const dx = t.clientX - startX;
-          const dy = t.clientY - startY;
-          switch (gestureIntent({ dx, dy, atTop, canUndo: this.lastAction != null })) {
-            case "undo":
-              onUndo();
-              return;
-            case "next":
-              step(1);
-              return;
-            case "previous":
-              step(-1);
-              return;
-            default:
-              return;
-          }
-        },
-        { passive: true }
-      );
-    }
-    /**
-     * Take back the last thing quick mode did.
-     *
-     * Delegates the vault change to the undo service — it already knows how
-     * to reverse an add, including trashing a note it created — and handles
-     * the two things only this screen knows about: that the card was marked
-     * handled, and where you were when you did it.
-     */
-    /** Take a card out of the feed, remembering that it was this one. */
-    markHandled(id) {
-      this.handled.add(id);
-      this.handledOrder = [...this.handledOrder.filter((n2) => n2 !== id), id];
-    }
-    /**
-     * Put back whatever the last action removed.
-     *
-     * Called after an undo lands. Rating a title from the feed used to reverse
-     * the vault write and leave the card gone — the note came back and the poster
-     * did not, so the undo looked like it had half worked. The screen's own state
-     * is not something a vault write can reach, so it has to be told.
-     */
-    restoreLast() {
-      const id = this.handledOrder.pop();
-      if (id == null)
-        return;
-      this.handled.delete(id);
-      this.seen.delete(id);
-      if (this.lastContainer?.isConnected)
-        this.render(this.lastContainer);
-    }
-    async undoLast(container) {
-      const last = this.lastAction;
-      if (!last) {
-        new Notice("Reel: nothing to take back.");
-        return;
-      }
-      haptic("commit");
-      this.lastAction = null;
-      await this.plugin.undo.undo();
-      this.handled.delete(last.id);
-      this.handledOrder = this.handledOrder.filter((n2) => n2 !== last.id);
-      this.seen.delete(last.id);
-      this.quickAt = last.at;
-      this.render(container);
-    }
-    /* ------------------------------------------------------------------ */
-    /* Filter bar                                                          */
-    /* ------------------------------------------------------------------ */
-    paintFilters(container) {
-      const wrap = container.createDiv({ cls: "reel-discover-filters" });
-      const bar = wrap.createDiv({ cls: "reel-chips reel-filterbar" });
-      const apply = () => {
-        this.results = null;
-        this.page = 1;
-        this.exhausted = false;
-        this.render(container);
-      };
-      const setType = (next) => {
-        if (this.filters.type === next)
-          return;
-        this.filters.type = next;
-        this.sources = null;
-        this.feed = [];
-        this.nextSource = 0;
-        this.genres = [];
-        this.filters.genreIds = [];
-        this.filters.genreNames = [];
-        this.loadGenres();
-      };
-      if (!this.genres.length)
-        this.loadGenres();
-      const set = [];
-      if (this.seed)
-        set.push({ label: `Like ${this.seed.title}`, clear: () => this.seed = null });
-      this.filters.genreIds.forEach((id, i) => {
-        set.push({
-          label: this.filters.genreNames[i] ?? String(id),
-          clear: () => {
-            this.filters.genreIds = this.filters.genreIds.filter((g) => g !== id);
-            this.filters.genreNames = this.filters.genreNames.filter((_, at) => at !== i);
-          }
-        });
-      });
-      if (this.filters.decade != null)
-        set.push({ label: `${this.filters.decade}s`, clear: () => this.filters.decade = null });
-      if (this.filters.minRating != null)
-        set.push({ label: `${this.filters.minRating}+`, clear: () => this.filters.minRating = null });
-      const open2 = bar.createEl("button", { cls: "reel-chip reel-filter-btn", attr: { type: "button" } });
-      setIcon(open2.createSpan({ cls: "reel-filter-btn-icon" }), "sliders-horizontal");
-      open2.createSpan({ text: "Filters" });
-      if (set.length)
-        open2.createSpan({ cls: "reel-filter-count", text: String(set.length) });
-      open2.addEventListener("click", () => {
-        const sheet = new DiscoverFilterSheet(this.plugin.app, this.filters, {
-          onChange: apply,
-          setType,
-          genres: () => this.genres,
-          seedTitle: () => this.seed?.title ?? null,
-          pickSeed: (done) => new SearchModal(this.plugin.app, this.plugin, {
-            placeholder: "Find me something like\u2026",
-            onPick: (item) => {
-              this.seed = {
-                id: item.id,
-                type: item.media_type === "tv" ? "tv" : "movie",
-                title: (item.media_type === "tv" ? item.name : item.title) ?? "that"
-              };
-              done();
-            }
-          }).open(),
-          clearSeed: () => this.seed = null,
-          clearAll: () => {
-            this.seed = null;
-            this.filters = { ...emptyFilters(), type: this.filters.type };
-            apply();
-          }
-        });
-        this.filterSheet = sheet;
-        sheet.open();
-      });
-      const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg", attr: { role: "group", "aria-label": "Type" } });
-      for (const [id, label, icon] of [
-        ["movie", "Films", "film"],
-        ["tv", "Series", "tv"]
-      ]) {
-        const b = seg.createEl("button", {
-          cls: "reel-seg-btn",
-          attr: { type: "button", "aria-label": label, "aria-pressed": String(this.filters.type === id) }
-        });
-        b.toggleClass("is-active", this.filters.type === id);
-        setIcon(b, icon);
-        b.addEventListener("click", () => {
-          setType(id);
-          apply();
-        });
-      }
-      const quick2 = bar.createEl("button", { cls: "reel-chip reel-chip-mode", attr: { type: "button" } });
-      setIcon(quick2.createSpan({ cls: "reel-filter-btn-icon" }), "zap");
-      quick2.createSpan({ text: "Quick" });
-      setSelected(quick2, this.quick);
-      quick2.addEventListener("click", () => {
-        this.quick = !this.quick;
-        this.quickAt = 0;
-        apply();
-      });
-      for (const f of set) {
-        const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
-        tag.setAttr("role", "group");
-        tag.setAttr("aria-label", `${f.label} filter`);
-        const label = tag.createEl("button", { cls: "reel-filter-tag-label", text: f.label, attr: { type: "button" } });
-        label.addEventListener("click", () => open2.click());
-        const drop = tag.createEl("button", {
-          cls: "reel-filter-tag-x",
-          attr: { type: "button", "aria-label": `Remove the ${f.label} filter` }
-        });
-        setIcon(drop.createSpan({ cls: "reel-filter-x" }), "x");
-        drop.addEventListener("click", () => {
-          f.clear();
-          apply();
-        });
-      }
-    }
-    /** The genre list for the current type; the sheet and the tags both read it. */
-    loadGenres() {
-      const type = this.filters.type;
-      void this.plugin.tmdb.genreList(type).then((list2) => {
-        if (this.filters.type !== type)
-          return;
-        this.genres = list2;
-        this.filterSheet?.refresh();
-      }).catch(() => {
-      });
-    }
-    /* ------------------------------------------------------------------ */
-    /* For you                                                             */
-    /* ------------------------------------------------------------------ */
-    /**
-     * Does a title already in hand satisfy the current filters?
-     *
-     * Used to narrow the shelves without a round trip. The server answers the
-     * same question better — it can see every title, not the sixty already
-     * loaded — but it cannot answer it *instantly*, and instant is what stops
-     * the screen changing shape under you.
-     */
-    matchesFilters(item) {
-      const f = this.filters;
-      if (f.minRating != null && (item.vote_average ?? 0) < f.minRating)
-        return false;
-      if (f.genreIds.some((g) => !(item.genre_ids ?? []).includes(g)))
-        return false;
-      if (f.decade != null) {
-        const year2 = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
-        if (!Number.isFinite(year2) || year2 < f.decade || year2 >= f.decade + 10)
-          return false;
-      }
-      return true;
-    }
-    /**
-     * The bit of the screen that must not move when a filter changes.
-     *
-     * Shared by the personalised view and the filtered one. Picking a minimum
-     * rating used to replace shelves with a flat grid — same data, entirely
-     * different screen — so the app appeared to navigate somewhere when the
-     * user had only narrowed what they were already looking at. A filter should
-     * change what is in the list, never what kind of list it is.
-     */
-    paintHead(container) {
-      const head = container.createDiv({ cls: "reel-discover-head" });
-      if (this.profile?.sparse) {
-        head.createDiv({
-          cls: "reel-discover-note",
-          text: "Rate a few films and these become personal \u2014 right now they're just what's popular."
-        });
-      } else if (this.profile?.genreNames.length) {
-        head.createDiv({
-          cls: "reel-discover-note",
-          text: `Based on your library \u2014 mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`
-        });
-      }
-      const reload = head.createEl("button", { cls: "reel-chip reel-refresh", attr: { type: "button" } });
-      setIcon(reload.createSpan({ cls: "reel-refresh-icon" }), "refresh-cw");
-      reload.createSpan({ text: "Refresh" });
-      reload.addEventListener("click", () => {
-        reload.addClass("is-spinning");
-        this.plugin.discover.reroll();
-        void this.plugin.tmdb.clearDiscoverCache().then(() => {
-          this.reset();
-          this.render(container);
-        });
-      });
-    }
-    /**
-     * The shelves you were already looking at, narrowed.
-     *
-     * Drawn before the fetched results and from titles already in memory, so
-     * the moment a chip is tapped the screen answers with the same shelves
-     * holding fewer things. The fetch then adds what it finds underneath.
-     */
-    paintNarrowedRows(container) {
-      if (!this.rows)
-        return false;
-      const narrowed = this.rows.map((r) => ({ ...r, items: r.items.filter((i) => !this.handled.has(i.id) && this.matchesFilters(i)) })).filter((r) => r.items.length);
-      for (const row of narrowed)
-        this.paintStaticRow(container, row);
-      return narrowed.length > 0;
-    }
-    /**
-     * A shelf that does not page.
-     *
-     * These are rows you have already loaded, shown with some of their cards
-     * filtered out. Asking such a row for another page would fetch titles the
-     * filter is about to discard, so it stays as it is and the fetched results
-     * underneath do the widening.
-     */
-    paintStaticRow(container, row) {
-      const items = row.items.filter((i) => !this.handled.has(i.id));
-      if (!items.length)
-        return;
-      const section = container.createDiv({ cls: "reel-drow" });
-      const head = section.createDiv({ cls: "reel-drow-head" });
-      head.createDiv({ cls: "reel-drow-title", text: row.title });
-      if (row.reason)
-        head.createDiv({ cls: "reel-drow-reason", text: row.reason });
-      const strip = section.createDiv({ cls: "reel-drow-strip" });
-      for (const item of items)
-        strip.appendChild(this.card(item, container));
-    }
-    /**
-     * The feed.
-     *
-     * It used to be eight rows, fetched all at once, each holding one page of
-     * about twenty cards. Every row ended, the page ended, and tomorrow it said
-     * the same thing — which is exactly what "a hardcoded block I cannot refresh"
-     * describes.
-     *
-     * Now both axes keep going. Reaching the end of a row asks that row for its
-     * next page; reaching the bottom of the page mounts the next row. The list of
-     * rows is long and its tail is unbounded, so there is no last one to reach.
-     */
-    paintForYou(container) {
-      if (!this.sources) {
-        container.createDiv({ cls: "reel-loading", text: "Finding things for you\u2026" });
-        for (let i = 0; i < 3; i++)
-          skeletonCards(container, 6, "Finding things for you");
-        if (this.loading)
-          return;
-        this.loading = true;
-        void this.loadRows(container);
-        return;
-      }
-      this.paintHead(container);
-      const feedEl = container.createDiv({ cls: "reel-feed" });
-      this.feedEl = feedEl;
-      for (const row of this.feed)
-        this.mountRow(feedEl, row, container);
-      const live = this.feed.some((r) => r.items.some((i) => !this.handled.has(i.id)));
-      if (!live && this.exhausted) {
-        const empty = container.createDiv({ cls: "reel-empty" });
-        empty.createDiv({ text: "Nothing left to suggest \u2014 try a genre above." });
-        const dismissed = this.plugin.settings.dismissedIds.length;
-        if (dismissed) {
-          empty.createDiv({
-            cls: "reel-dim",
-            text: `${dismissed} dismissed \u2014 clear them in Settings \u2192 Reel to see them again.`
-          });
-        }
-        return;
-      }
-      this.paintFeedSentinel(container);
-    }
-    /**
-     * The thing at the bottom that asks for more.
-     *
-     * A sentinel plus an observer rather than a scroll handler: the body is a
-     * measured, fixed-height element and its scroll events fire at whatever rate
-     * the device feels like, whereas an intersection is asked once and answered
-     * once. The rootMargin means the fetch starts a screen early, so the next row
-     * is usually there before you arrive at the gap.
-     */
-    paintFeedSentinel(container) {
-      const more = this.sources ? this.nextSource < this.sources.length : false;
-      if (!more)
-        return;
-      const sentinel = container.createDiv({ cls: "reel-feed-end" });
-      sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
-      const scroller = container.closest(".reel-view-body") ?? null;
-      const io = new IntersectionObserver(
-        (entries) => {
-          if (!entries.some((e) => e.isIntersecting))
-            return;
-          void this.mountNext(container).then(() => {
-            if (!sentinel.isConnected)
-              return;
-            io.unobserve(sentinel);
-            io.observe(sentinel);
-          });
-        },
-        { root: scroller, rootMargin: "600px 0px" }
-      );
-      io.observe(sentinel);
-      this.watchers.push(io);
-    }
-    /**
-     * Mount the next row, skipping ones that come back empty.
-     *
-     * A source can legitimately return nothing — every title in it is already in
-     * your library, or dismissed, or has no poster. Stopping there would end the
-     * feed on a technicality, so it tries the next one, up to a handful of times
-     * per scroll so a run of empties cannot become an unbounded request loop.
-     */
-    async mountNext(container) {
-      if (this.mounting || !this.sources)
-        return;
-      this.mounting = true;
-      try {
-        for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
-          const source = this.sources[this.nextSource++];
-          const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
-          for (const i of items)
-            this.seen.add(i.id);
-          if (!items.length)
-            continue;
-          const row = { source, items, page: 1, done: false, loading: false };
-          this.feed.push(row);
-          if (this.feedEl && this.feedEl.isConnected) {
-            this.mountRow(this.feedEl, row, container);
-            return;
-          }
-          this.render(container);
-          return;
-        }
-        if (this.nextSource >= (this.sources?.length ?? 0)) {
-          this.exhausted = true;
-          this.render(container);
-        }
-      } catch {
-      } finally {
-        this.mounting = false;
-      }
-    }
-    async loadRows(container) {
-      try {
-        const profile = await this.plugin.discover.taste(this.filters.type);
-        this.profile = profile;
-        this.sources = this.plugin.discover.rowSources(profile, this.filters.type);
-        this.feed = [];
-        this.nextSource = 0;
-        this.seen.clear();
-        this.exhausted = false;
-        this.mounting = false;
-        for (let i = 0; i < 4; i++) {
-          const before = this.feed.length;
-          await this.mountNextSilently();
-          if (this.feed.length === before)
-            break;
-        }
-      } catch (e) {
-        this.error = diagnoseError(e).message;
-      } finally {
-        this.loading = false;
-        this.render(container);
-      }
-    }
-    /** The same step as `mountNext`, without touching the DOM. */
-    async mountNextSilently() {
-      if (!this.sources)
-        return;
-      for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
-        const source = this.sources[this.nextSource++];
-        const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
-        for (const i of items)
-          this.seen.add(i.id);
-        if (!items.length)
-          continue;
-        this.feed.push({ source, items, page: 1, done: false, loading: false });
-        return;
-      }
-    }
-    /**
-     * One shelf, which pages as you scroll it.
-     *
-     * The horizontal sentinel sits at the right-hand end of the strip and is
-     * observed against the strip itself, so it fires when you scroll the row
-     * rather than when the row happens to be on screen. Cards are appended in
-     * place: rebuilding the strip would send it back to the left, which on a row
-     * you are actively scrolling is the most annoying thing a feed can do.
-     */
-    mountRow(into, row, container) {
-      const items = row.items.filter((i) => !this.handled.has(i.id));
-      if (!items.length)
-        return;
-      const section = into.createDiv({ cls: "reel-drow" });
-      const head = section.createDiv({ cls: "reel-drow-head" });
-      head.createDiv({ cls: "reel-drow-title", text: row.source.title });
-      if (row.source.reason)
-        head.createDiv({ cls: "reel-drow-reason", text: row.source.reason });
-      const strip = section.createDiv({ cls: "reel-drow-strip" });
-      for (const item of items)
-        strip.appendChild(this.card(item, container));
-      if (!row.done) {
-        const tail = strip.createDiv({ cls: "reel-drow-tail" });
-        const io = new IntersectionObserver(
-          (entries) => {
-            if (!entries.some((e) => e.isIntersecting))
-              return;
-            void this.extendRow(row, strip, tail, container);
-          },
-          { root: strip, rootMargin: "0px 600px" }
-        );
-        io.observe(tail);
-        this.watchers.push(io);
-      }
-      if (!Platform.isMobile) {
-        const nav = head.createDiv({ cls: "reel-drow-nav" });
-        const by = (dir) => {
-          const first = strip.querySelector(".reel-dcard");
-          const gap = parseFloat(getComputedStyle(strip).columnGap || "0") || 0;
-          const step = first ? first.getBoundingClientRect().width + gap : 160;
-          const fit = Math.max(1, Math.floor(strip.clientWidth / step));
-          const target = Math.round(strip.scrollLeft / step + dir * fit) * step;
-          strip.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
-        };
-        const left = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Previous titles" } });
-        setIcon(left, "chevron-left");
-        left.addEventListener("click", () => by(-1));
-        const right = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Next titles" } });
-        setIcon(right, "chevron-right");
-        right.addEventListener("click", () => by(1));
-      }
-    }
-    /** Another page for one shelf, appended where you are already looking. */
-    async extendRow(row, strip, tail, container) {
-      if (row.loading || row.done)
-        return;
-      row.loading = true;
-      try {
-        const next = await row.source.fetch(row.page + 1);
-        row.page += 1;
-        const fresh = next.filter((i) => !this.seen.has(i.id) && !this.handled.has(i.id));
-        for (const i of fresh)
-          this.seen.add(i.id);
-        if (!fresh.length) {
-          row.empties = (row.empties ?? 0) + 1;
-          if (row.empties >= 2 || row.page > 20) {
-            row.done = true;
-            tail.remove();
-          }
-          return;
-        }
-        row.empties = 0;
-        row.items = [...row.items, ...fresh];
-        for (const item of fresh)
-          strip.insertBefore(this.card(item, container), tail);
-      } catch {
-        row.done = true;
-        tail.remove();
-      } finally {
-        row.loading = false;
-      }
-    }
-    /* ------------------------------------------------------------------ */
-    /* Search — the view's own box, pointed at TMDB                        */
-    /* ------------------------------------------------------------------ */
-    /**
-     * What a search means on a screen about titles you do not own.
-     *
-     * Anything already in your library is dropped, because the card's actions are
-     * "add" and "watchlist" and offering those for a note you already have is how
-     * you end up with two of them. The count is stated rather than swallowed, with
-     * a way through to the library search, so a title you know you own not
-     * appearing here is explained rather than mysterious.
-     */
-    paintSearch(container) {
-      const q = this.query.trim();
-      if (this.searchedFor !== q) {
-        this.searchResults = null;
-        this.searchedFor = q;
-        this.searchPage = 0;
-        this.searchPages = 0;
-        this.searchTotal = 0;
-        this.searchMore = false;
-        this.searchPeople = [];
-      }
-      if (!this.searchResults) {
-        skeletonGrid(container, 12, "Searching");
-        if (this.loading)
-          return;
-        this.loading = true;
-        void this.plugin.tmdb.searchMultiPage(q, 1).then((res) => {
-          const usable = res.results.filter((i) => !i.adult && i.poster_path);
-          const fresh = this.plugin.discover.filterOut(usable);
-          this.searchOwned = usable.length - fresh.length;
-          this.searchResults = fresh;
-          this.searchPage = res.page;
-          this.searchPages = res.totalPages;
-          this.searchTotal = res.totalResults;
-          this.searchPeople = res.people;
-        }).catch((e) => {
-          this.error = diagnoseError(e).message;
-        }).finally(() => {
-          this.loading = false;
-          this.render(container);
-        });
-        return;
-      }
-      const items = this.searchResults.filter((i) => !this.handled.has(i.id));
-      const count = container.createDiv({ cls: "reel-block-count" });
-      const more = this.searchTotal > items.length;
-      if (!items.length && this.searchPeople.length) {
-        const n2 = this.searchPeople.length;
-        count.setText(`${n2} ${n2 === 1 ? "person" : "people"} on TMDB for \u201C${q}\u201D`);
-      } else {
-        count.setText(
-          more ? `${items.length} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${items.length} on TMDB for \u201C${q}\u201D`
-        );
-      }
-      if (this.searchOwned) {
-        count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
-      }
-      this.paintSearchPeople(container);
-      if (!items.length) {
-        if (this.searchPeople.length)
-          return;
-        const none = container.createDiv({ cls: "reel-empty" });
-        none.createDiv({
-          text: this.searchOwned ? "Everything matching is already in your library." : "Nothing on TMDB matches that."
-        });
-        return;
-      }
-      const grid = container.createDiv({ cls: "reel-dgrid" });
-      for (const item of items)
-        grid.appendChild(this.card(item, container));
-      this.paintSearchSentinel(container, grid, count);
-    }
-    /**
-     * The people the search matched.
-     *
-     * Same cell as the cast strip on a title's preview, because it is the same
-     * thing being offered and a second way of drawing a face would be a second
-     * thing to keep consistent. Tapping one opens their filmography, which is
-     * what you were after when you typed their name.
-     */
-    paintSearchPeople(container) {
-      if (!this.searchPeople.length)
-        return;
-      container.createDiv({ cls: "reel-block-title", text: "People" });
-      const strip = container.createDiv({ cls: "reel-caststrip is-people" }).createDiv({ cls: "reel-caststrip-track" });
-      for (const p of this.searchPeople) {
-        const name = (p.name ?? "").trim();
-        if (!name)
-          continue;
-        const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
-        const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
-        this.plugin.people.attach(shot, name, p.id);
-        badgePerson(this.plugin, shot, p.id);
-        cell.createDiv({ cls: "reel-caststrip-name", text: name });
-        const known = (p.known_for_department ?? "").trim();
-        if (known)
-          cell.createDiv({ cls: "reel-caststrip-role", text: known });
-        cell.setAttr("role", "button");
-        cell.setAttr("tabindex", "0");
-        cell.setAttr("aria-label", `${name} \u2014 open their filmography`);
-        const open2 = () => {
-          new PersonSheet(this.plugin, p.id, name).open();
-        };
-        cell.addEventListener("click", open2);
-        cell.addEventListener("keydown", (ev) => {
-          if (ev.key !== "Enter" && ev.key !== " ")
-            return;
-          ev.preventDefault();
-          open2();
-        });
-      }
-    }
-    /**
-     * Keep the search going as you scroll, instead of stopping at page one.
-     *
-     * The same sentinel-and-observer shape as the feed, and for the same reason:
-     * an intersection is asked once and answered once, where a scroll handler on
-     * a measured, fixed-height body fires at whatever rate the device likes.
-     *
-     * Cards are appended to the grid that is already on screen rather than the
-     * screen being redrawn. A redraw would replace the scroller's children and
-     * throw the reader back to the top — the one thing an infinite scroll must
-     * never do.
-     */
-    paintSearchSentinel(container, grid, count) {
-      if (this.searchPage >= this.searchPages)
-        return;
-      const sentinel = container.createDiv({ cls: "reel-feed-end" });
-      sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
-      const scroller = container.closest(".reel-view-body") ?? null;
-      const io = new IntersectionObserver(
-        (entries) => {
-          if (!entries.some((e) => e.isIntersecting))
-            return;
-          void this.moreSearch(container, grid, sentinel, count).then(() => {
-            if (!sentinel.isConnected)
-              return;
-            io.unobserve(sentinel);
-            io.observe(sentinel);
-          });
-        },
-        { root: scroller, rootMargin: "600px 0px" }
-      );
-      io.observe(sentinel);
-      this.watchers.push(io);
-    }
-    /**
-     * One more page of search results, appended.
-     *
-     * A page can legitimately yield nothing to show — every title on it is
-     * already in your library, or has no poster, or the page was mostly people.
-     * Stopping there would end the search on a technicality while TMDB still
-     * holds hundreds of matches, so it walks on to the next page, up to a few
-     * per scroll so a run of empty pages cannot become an unbounded request
-     * loop.
-     */
-    async moreSearch(container, grid, sentinel, count) {
-      if (this.searchMore)
-        return;
-      this.searchMore = true;
-      const q = this.searchedFor;
-      try {
-        for (let tries = 0; tries < 3 && this.searchPage < this.searchPages; tries++) {
-          const res = await this.plugin.tmdb.searchMultiPage(q, this.searchPage + 1);
-          if (this.searchedFor !== q || !this.searchResults)
-            return;
-          this.searchPage = res.page;
-          if (res.totalPages)
-            this.searchPages = res.totalPages;
-          const usable = res.results.filter((i) => !i.adult && i.poster_path);
-          const fresh = this.plugin.discover.filterOut(usable);
-          this.searchOwned += usable.length - fresh.length;
-          const seen = new Set(this.searchResults.map((i) => i.id));
-          const added = fresh.filter((i) => !seen.has(i.id) && !this.handled.has(i.id));
-          this.searchResults.push(...added);
-          for (const item of added)
-            grid.appendChild(this.card(item, container));
-          if (added.length)
-            break;
-        }
-        const shown2 = this.searchResults?.filter((i) => !this.handled.has(i.id)).length ?? 0;
-        count.setText(
-          this.searchTotal > shown2 ? `${shown2} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${shown2} on TMDB for \u201C${q}\u201D`
-        );
-        if (this.searchOwned) {
-          count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
-        }
-        if (this.searchPage >= this.searchPages)
-          sentinel.remove();
-      } catch {
-        sentinel.remove();
-      } finally {
-        this.searchMore = false;
-      }
-    }
-    /* ------------------------------------------------------------------ */
-    /* Filtered results                                                    */
-    /* ------------------------------------------------------------------ */
-    paintResults(container) {
-      this.paintHead(container);
-      const hadRows = this.paintNarrowedRows(container);
-      if (!this.results) {
-        container.createDiv({ cls: "reel-loading", text: hadRows ? "Looking for more\u2026" : "Searching\u2026" });
-        skeletonGrid(container, hadRows ? 6 : 12, "Searching");
-        if (this.loading)
-          return;
-        this.loading = true;
-        const query = this.seed ? (
-          // A seed changes the source: recommendations for that title,
-          // then narrowed by whatever else is set. "An action comedy
-          // like X" means titles like X that are also action comedies.
-          this.plugin.discover.like(
-            { id: this.seed.id, type: this.seed.type },
-            {
-              genreIds: this.filters.genreIds,
-              decade: this.filters.decade,
-              minRating: this.filters.minRating
-            }
-          )
-        ) : this.plugin.discover.search({
-          type: this.filters.type,
-          genreIds: this.filters.genreIds,
-          decade: this.filters.decade ?? void 0,
-          minRating: this.filters.minRating ?? void 0
-        });
-        void query.then((items2) => {
-          this.results = items2;
-        }).catch((e) => {
-          this.error = diagnoseError(e).message;
-        }).finally(() => {
-          this.loading = false;
-          this.render(container);
-        });
-        return;
-      }
-      const items = this.results.filter((i) => !this.handled.has(i.id));
-      const label = [
-        this.filters.minRating ? `${this.filters.minRating}+` : "",
-        this.filters.genreNames.join(" "),
-        this.filters.type === "tv" ? "series" : "films",
-        this.filters.decade ? `from the ${this.filters.decade}s` : "",
-        // Naming the seed matters: otherwise a narrowed set looks identical
-        // to an ordinary genre browse and you cannot tell whether the
-        // "like X" part was honoured at all.
-        this.seed ? `like ${this.seed.title}` : ""
-      ].filter(Boolean).join(" ");
-      if (hadRows)
-        container.createDiv({ cls: "reel-drow-title", text: "More matches" });
-      container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
-      if (!items.length) {
-        const none = container.createDiv({ cls: "reel-empty" });
-        none.createDiv({
-          text: hadRows ? "Nothing more beyond what's above." : "Nothing matches those filters."
-        });
-        const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
-        reset.addEventListener("click", () => {
-          this.filters = { ...emptyFilters(), type: this.filters.type };
-          this.render(container);
-        });
-        return;
-      }
-      const grid = container.createDiv({ cls: "reel-dgrid" });
-      for (const item of items)
-        grid.appendChild(this.card(item, container));
-      if (!this.exhausted) {
-        const more = container.createDiv({ cls: "reel-dgrid-more" });
-        const btn = more.createEl("button", { cls: "reel-btn", text: "Load more" });
-        btn.addEventListener("click", () => {
-          btn.setText("Loading\u2026");
-          btn.disabled = true;
-          void this.plugin.discover.search(
-            {
-              type: this.filters.type,
-              genreIds: this.filters.genreIds,
-              decade: this.filters.decade ?? void 0,
-              minRating: this.filters.minRating ?? void 0
-            },
-            this.page + 1
-          ).then((next) => {
-            this.page += 1;
-            const fresh = next.filter((n2) => !this.results?.some((r) => r.id === n2.id));
-            if (!fresh.length)
-              this.exhausted = true;
-            this.results = [...this.results ?? [], ...fresh];
-          }).catch(() => {
-            this.exhausted = true;
-          }).finally(() => this.render(container));
-        });
-      }
-    }
-    /* ------------------------------------------------------------------ */
-    /* Cards                                                               */
-    /* ------------------------------------------------------------------ */
-    card(item, container) {
-      const isTv = item.media_type === "tv";
-      const title = (isTv ? item.name : item.title) ?? "Untitled";
-      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
-      const card = createDiv({ cls: "reel-dcard" });
-      const posterEl = card.createDiv({ cls: "reel-dcard-poster" });
-      posterEl.setAttr("role", "button");
-      posterEl.setAttr("tabindex", "0");
-      posterEl.setAttr("aria-label", `${title} \u2014 details`);
-      const src = this.plugin.tmdb.posterUrl(item.poster_path, "w342");
-      if (src)
-        this.plugin.posters.attach(posterEl, { posterUrl: src, title });
-      if (item.vote_average)
-        posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
-      if (isTv)
-        posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
-      const openPreview = () => new PreviewSheet(this.plugin, item, () => {
-        this.markHandled(item.id);
-        this.render(container);
-      }).open();
-      let held = false;
-      posterEl.addEventListener("click", () => {
-        if (held) {
-          held = false;
-          return;
-        }
-        openPreview();
-      });
-      posterEl.addEventListener("keydown", (e) => {
-        if (e.key === "Enter")
-          openPreview();
-      });
-      const openMenu = (x, y) => {
-        const menu = new Menu();
-        menu.addItem((i) => i.setTitle("Details").setIcon("info").onClick(openPreview));
-        menu.addItem(
-          (i) => i.setTitle("Add to watchlist").setIcon("bookmark").onClick(
-            () => void (async () => {
-              await this.add(item, true);
-              this.plugin.undo.offer(`${title} \u2192 watchlist`);
-              this.markHandled(item.id);
-              this.render(container);
-            })()
-          )
-        );
-        menu.addItem(
-          (i) => i.setTitle("Seen it, rate now").setIcon("check").onClick(
-            () => new SeenSheet(this.plugin, item, () => {
-              this.markHandled(item.id);
-              this.render(container);
-            }).open()
-          )
-        );
-        menu.addSeparator();
-        menu.addItem(
-          (i) => i.setTitle("Look it up\u2026").setIcon("external-link").onClick(() => {
-            const m = new Menu();
-            m.addItem((h) => h.setTitle(title).setDisabled(true));
-            m.addSeparator();
-            const q = encodeURIComponent(`${title}${year2 ? ` ${year2}` : ""}`);
-            const go = (label, url) => m.addItem((r) => r.setTitle(label).setIcon("external-link").onClick(() => void window.open(url, "_blank", "noopener")));
-            go("TMDB", tmdbUrl(item.id, isTv ? "tv" : "film"));
-            go("Trakt", `https://trakt.tv/search/tmdb/${item.id}?id_type=${isTv ? "show" : "movie"}`);
-            if (!isTv)
-              go("Letterboxd", `https://letterboxd.com/tmdb/${item.id}`);
-            go("Where to watch", `https://www.justwatch.com/${(this.plugin.settings.region || "us").toLowerCase()}/search?q=${q}`);
-            go("Search the web", `https://www.google.com/search?q=${q}`);
-            m.showAtPosition({ x, y });
-          })
-        );
-        menu.addItem(
-          (i) => i.setTitle("Search your library for it").setIcon("search").onClick(() => this.plugin.openOmni(title, "mine"))
-        );
-        menu.addSeparator();
-        menu.addItem(
-          (i) => i.setTitle("Not interested").setIcon("x").onClick(
-            () => void (async () => {
-              await this.plugin.discover.dismiss(item.id);
-              this.handled.add(item.id);
-              this.render(container);
-            })()
-          )
-        );
-        menu.showAtPosition({ x, y });
-      };
-      let holdTimer = null;
-      let hx = 0;
-      let hy = 0;
-      const stopHold = () => {
-        if (holdTimer != null)
-          window.clearTimeout(holdTimer);
-        holdTimer = null;
-      };
-      posterEl.addEventListener("pointerdown", (e) => {
-        hx = e.clientX;
-        hy = e.clientY;
-        held = false;
-        holdTimer = window.setTimeout(() => {
-          held = true;
-          haptic("hold");
-          openMenu(hx, hy);
-        }, 500);
-      });
-      posterEl.addEventListener("pointermove", (e) => {
-        if (Math.abs(e.clientX - hx) > 8 || Math.abs(e.clientY - hy) > 8)
-          stopHold();
-      });
-      for (const ev of ["pointerup", "pointercancel", "pointerleave"])
-        posterEl.addEventListener(ev, stopHold);
-      posterEl.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        stopHold();
-        openMenu(e.clientX, e.clientY);
-      });
-      card.createDiv({ cls: "reel-dcard-title", text: title });
-      if (year2)
-        card.createDiv({ cls: "reel-dcard-year", text: String(year2) });
-      const corner = posterEl.createEl("button", {
-        cls: "reel-dcard-add",
-        attr: { type: "button", "aria-label": `Add ${title} to your watchlist` }
-      });
-      setIcon(corner, "plus");
-      corner.addEventListener("click", (e) => {
-        e.stopPropagation();
-        haptic("tick");
-        void (async () => {
-          await this.add(item, true);
-          this.plugin.undo.offer(`${title} \u2192 watchlist`);
-          this.markHandled(item.id);
-          this.render(container);
-        })();
-      });
-      const actions = card.createDiv({ cls: "reel-dcard-actions" });
-      const button = (icon, label, cls, fn) => {
-        const b = actions.createEl("button", { cls: `reel-dcard-btn ${cls}` });
-        setIcon(b, icon);
-        b.setAttr("aria-label", `${label}: ${title}`);
-        b.setAttr("title", label);
-        b.addEventListener("click", (e) => {
-          e.stopPropagation();
-          void Promise.resolve(fn());
-        });
-        return b;
-      };
-      button("plus", "Add to watchlist", "add", async () => {
-        await this.add(item, true);
-        this.plugin.undo.offer(`${title} \u2192 watchlist`);
-        this.markHandled(item.id);
-        this.render(container);
-      });
-      button("check", "Seen it \u2014 rate now", "seen", () => {
-        new SeenSheet(this.plugin, item, () => {
-          this.markHandled(item.id);
-          this.render(container);
-        }).open();
-      });
-      button("x", "Not interested", "skip", async () => {
-        await this.plugin.discover.dismiss(item.id);
-        this.handled.add(item.id);
-        this.render(container);
-      });
-      return card;
-    }
-    async add(item, watchlist, rating) {
-      await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist, rating });
-    }
-  };
-  var RATING_WORDS = ["Not for me", "Weak", "Fine", "Great", "Favourite"];
-  var SeenSheet = class extends Modal {
-    constructor(plugin2, item, onDone) {
-      super(plugin2.app);
-      this.plugin = plugin2;
-      this.item = item;
-      this.onDone = onDone;
-      this.busy = false;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      modalEl.addClass("reel-seensheet");
-      const isTv = this.item.media_type === "tv";
-      const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
-      const year2 = yearOf(this.item.release_date ?? this.item.first_air_date);
-      const head = contentEl.createDiv({ cls: "reel-seen-head" });
-      const src = this.item.poster_path ? this.plugin.tmdb.posterUrl(this.item.poster_path, "w342") : null;
-      if (src) {
-        const art = head.createDiv({ cls: "reel-seen-poster" });
-        art.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
-        this.plugin.swatches.tint(modalEl, src, document.body.hasClass("theme-dark"));
-      }
-      const who = head.createDiv({ cls: "reel-seen-who" });
-      who.createDiv({ cls: "reel-seen-title", text: title });
-      const meta = who.createDiv({ cls: "reel-seen-meta" });
-      if (year2)
-        meta.createSpan({ text: String(year2) });
-      meta.createSpan({ cls: "reel-badge subtle", text: isTv ? "Series" : "Film" });
-      if (this.item.vote_average)
-        meta.createSpan({ cls: "reel-dim", text: `\u2605 ${this.item.vote_average.toFixed(1)}` });
-      who.createDiv({ cls: "reel-seen-note", text: "Adding as watched." });
-      const starRow = contentEl.createDiv({ cls: "reel-rating-row big centred" });
-      const readout = contentEl.createDiv({ cls: "reel-seen-readout", text: "Tap a star to rate it" });
-      renderStars(starRow, {
-        onChange: (v) => {
-          if (v == null)
-            return;
-          readout.setText(`${v} \u2014 ${RATING_WORDS[Math.ceil(v) - 1] ?? ""}`);
-          readout.addClass("is-set");
-          void this.save(v);
-        }
-      });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const noRating = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Add without rating" });
-      noRating.addEventListener("click", () => void this.save(void 0));
-      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
-      cancel.addEventListener("click", () => this.close());
-    }
-    async save(rating) {
-      if (this.busy)
-        return;
-      this.busy = true;
-      try {
-        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: false, rating });
-        this.plugin.undo.offer(rating != null ? `Added \u2014 rated ${rating}` : "Added as watched");
-        this.onDone();
-        this.close();
-      } catch (e) {
-        new Notice(`Reel: ${redact(e)}`);
-        this.busy = false;
-      }
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-  var PreviewSheet = class extends Modal {
-    constructor(plugin2, item, onAdded, role) {
-      super(plugin2.app);
-      this.plugin = plugin2;
-      this.item = item;
-      this.onAdded = onAdded;
-      this.role = role;
-      this.busy = false;
-      /** The sticky foot, kept so it can be put back at the end. */
-      this.actionsEl = null;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.addClass("reel-preview");
-      paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
-      const isTv = this.item.media_type === "tv";
-      const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
-      const year2 = yearOf(isTv ? this.item.first_air_date : this.item.release_date);
-      if (this.role) {
-        const r = contentEl.createDiv({ cls: "reel-preview-role" });
-        r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
-        r.createSpan({ cls: "reel-preview-role-value", text: this.role });
-      }
-      const head = contentEl.createDiv({ cls: "reel-preview-head" });
-      const posterEl = head.createDiv({ cls: "reel-preview-poster" });
-      const src = this.plugin.tmdb.posterUrl(this.item.poster_path, "w342");
-      if (src)
-        posterEl.createEl("img", { attr: { src, alt: "" } });
-      const body = head.createDiv({ cls: "reel-preview-body" });
-      const h = body.createDiv({ cls: "reel-preview-title" });
-      h.createSpan({ text: title });
-      if (year2)
-        h.createSpan({ cls: "reel-dim", text: ` ${year2}` });
-      const facts = body.createDiv({ cls: "reel-header-facts" });
-      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
-      if (this.item.vote_average)
-        facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
-      if (this.item.overview)
-        contentEl.createDiv({ cls: "reel-preview-overview", text: this.item.overview });
-      void this.loadTrailer(contentEl.createDiv({ cls: "reel-preview-trailer" }), isTv);
-      const actions = contentEl.createDiv({ cls: "reel-log-actions reel-preview-actions" });
-      this.actionsEl = actions;
-      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
-      later.addEventListener("click", () => void this.add(true, later));
-      const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it" });
-      seen.addEventListener("click", () => {
-        new LogSheet(this.plugin.app, this.plugin, {
-          pending: {
-            id: this.item.id,
-            type: isTv ? "tv" : "film",
-            title
-          }
-        }).open();
-        this.onAdded();
-        this.close();
-      });
-      const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested" });
-      nope.addEventListener("click", () => {
-        void this.plugin.discover.dismiss(this.item.id).then(() => {
-          this.onAdded();
-          this.close();
-        });
-      });
-    }
-    /**
-     * Fill the sheet out from the full TMDB record.
-     *
-     * This used to fetch the detail payload and take only the trailer and the
-     * provider list from it, which made "Full details" a promise the screen
-     * did not keep — it showed *less* than the inline role panel it was
-     * reached from. The request was already being made; almost everything
-     * below was in the response and was being discarded.
-     *
-     * Silent on failure. The sheet works without any of it, and an error
-     * notice for a missing trailer would be noise on a screen you are
-     * skimming.
-     */
-    async loadTrailer(slot, isTv) {
-      try {
-        const meta = isTv ? await this.plugin.tmdb.getShow(this.item.id) : await this.plugin.tmdb.getFilm(this.item.id);
-        const url = trailerUrl(meta.videos?.results);
-        if (url)
-          this.paintTrailer(slot, url);
-        this.paintFacts(slot, meta, isTv);
-        const providers = providerNames(meta["watch/providers"], this.plugin.settings.region);
-        if (providers.length) {
-          const box = slot.createDiv({ cls: "reel-preview-providers" });
-          box.createSpan({ cls: "reel-dim", text: "Streaming on " });
-          box.createSpan({ text: providers.slice(0, 4).join(", ") });
-        }
-        this.paintLinks(slot, meta, isTv);
-      } catch {
-      } finally {
-        const actions = this.actionsEl;
-        if (actions?.parentElement)
-          actions.parentElement.appendChild(actions);
-      }
-    }
-    /**
-     * The facts that make this "details" rather than a preview.
-     *
-     * All of it came back in the request already made for the trailer and was
-     * being discarded — genres, runtime, certification, the cast. The cast
-     * strip matters most: on a screen you reached *from* an actor, the other
-     * people in the thing are the obvious next question.
-     */
-    paintFacts(slot, meta, isTv) {
-      const facts = [];
-      const genres = (meta.genres ?? []).map((g) => g.name).filter(Boolean);
-      if (genres.length)
-        facts.push(genres.slice(0, 3).join(", "));
-      if (isTv) {
-        const show = meta;
-        if (show.number_of_episodes)
-          facts.push(`${show.number_of_episodes} episodes`);
-        if (show.status)
-          facts.push(show.status);
-      } else {
-        const runtime = meta.runtime;
-        if (runtime)
-          facts.push(formatMinutes(runtime));
-      }
-      if (facts.length)
-        slot.createDiv({ cls: "reel-preview-facts", text: facts.join(" \xB7 ") });
-      const credits = isTv ? meta.aggregate_credits : meta.credits;
-      const made = isTv ? (meta.created_by ?? []).map((c) => c.name) : (credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
-      if (made.length) {
-        slot.createDiv({
-          cls: "reel-preview-facts",
-          text: `${isTv ? "Created by" : "Directed by"} ${made.join(", ")}`
-        });
-      }
-      this.paintMoreLikeThis(slot, meta, isTv);
-      const cast = (credits?.cast ?? []).slice(0, 10);
-      if (!cast.length)
-        return;
-      slot.createDiv({ cls: "reel-block-title", text: "Cast" });
-      const strip = slot.createDiv({ cls: "reel-caststrip" }).createDiv({ cls: "reel-caststrip-track" });
-      for (const p of cast) {
-        const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
-        const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
-        this.plugin.people.attach(shot, p.name, p.id);
-        badgePerson(this.plugin, shot, p.id);
-        cell.createDiv({ cls: "reel-caststrip-name", text: p.name });
-        const role = (p.character ?? p.roles?.[0]?.character ?? "").trim();
-        if (role)
-          cell.createDiv({ cls: "reel-caststrip-role", text: role });
-        const id = p.id;
-        if (!id)
-          continue;
-        cell.setAttr("role", "button");
-        cell.setAttr("tabindex", "0");
-        cell.setAttr("aria-label", `${p.name} \u2014 open their filmography`);
-        cell.addEventListener("click", () => new PersonSheet(this.plugin, id, p.name).open());
-      }
-    }
-    /**
-     * Titles like this one, as IMDb's "More like this": tap any of them for the
-     * same sheet about that title, which has its own strip, and so on. Press and
-     * hold for the places that know more.
-     */
-    paintMoreLikeThis(slot, meta, isTv) {
-      const rows2 = [];
-      for (const r of [...meta.recommendations?.results ?? [], ...meta.similar?.results ?? []]) {
-        if (r.id === this.item.id || r.adult || !r.poster_path || rows2.some((x) => x.id === r.id))
-          continue;
-        rows2.push({ ...r, media_type: r.media_type ?? (isTv ? "tv" : "movie") });
-      }
-      if (!rows2.length)
-        return;
-      slot.createDiv({ cls: "reel-block-title", text: "More like this" });
-      paintRelatedFeed(this.plugin, slot, {
-        tmdbId: this.item.id,
-        isTv,
-        seed: rows2,
-        layout: "strip",
-        beforeOpenMine: () => this.close(),
-        onAdded: this.onAdded
-      });
-    }
-    /**
-     * IMDb, its parents guide, and TMDB.
-     *
-     * The parents guide needs an IMDb id, which a search result does not
-     * carry — it only arrives on the detail payload, which is why this could
-     * not be built before the fetch. Direct links, never a search: "search
-     * IMDb for this title" is a different and much worse thing.
-     */
-    paintLinks(slot, meta, isTv) {
-      paintLinks(slot, meta, isTv);
-    }
-    /**
-     * The trailer, playable in place.
-     *
-     * Click-to-load rather than an iframe on arrival: an embed that mounts
-     * itself costs a YouTube request and a set of cookies for every card you
-     * so much as glance at, and most of them you close again. The poster frame
-     * is free, and one tap is a fair price for the thing you asked for.
-     */
-    paintTrailer(slot, url) {
-      paintTrailer(slot, url);
-    }
-    async add(watchlist, button) {
-      if (this.busy)
-        return;
-      this.busy = true;
-      button.setText("Adding\u2026");
-      button.setAttr("disabled", "true");
-      try {
-        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist });
-        this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
         this.onAdded();
         this.close();
       } catch (e) {
@@ -8010,7 +5873,7 @@ ${body}
           void this.plugin.openDetail(mine);
           return;
         }
-        new PreviewSheet(this.plugin, credit, () => {
+        new TitlePage(this.plugin, credit, () => {
         }, roleOf(credit)).open();
       });
       if (!mine) {
@@ -8173,7 +6036,7 @@ ${body}
           void this.plugin.openDetail(mine);
           return;
         }
-        new PreviewSheet(this.plugin, this.credit, () => {
+        new TitlePage(this.plugin, this.credit, () => {
         }, roleOf(this.credit)).open();
       });
       if (!this.mine) {
@@ -8194,6 +6057,135 @@ ${body}
       this.contentEl.empty();
     }
   };
+
+  // src/ui/relatedFeed.ts
+  var CAP = 240;
+  function paintRelatedFeed(plugin2, el, opts) {
+    const list2 = el.createDiv({ cls: opts.layout === "grid" ? "reel-related" : "reel-related reel-morelike" });
+    const seen = /* @__PURE__ */ new Set([opts.tmdbId]);
+    let sources = ["recommendations", "similar"];
+    let page = 1;
+    let done = false;
+    let loading = false;
+    let shownCount = 0;
+    const card = (raw) => {
+      const r = { ...raw, media_type: raw.media_type ?? (opts.isTv ? "tv" : "movie") };
+      const rTv = r.media_type === "tv";
+      const title = (rTv ? r.name : r.title) ?? "Untitled";
+      const year2 = String(yearOf(rTv ? r.first_air_date : r.release_date) ?? "");
+      const c = list2.createDiv({ cls: "reel-related-card" });
+      c.setAttr("role", "button");
+      c.setAttr("tabindex", "0");
+      c.setAttr("aria-label", `${title} \u2014 see details`);
+      const poster2 = c.createDiv({ cls: "reel-related-poster" });
+      plugin2.posters.attach(poster2, { posterUrl: plugin2.tmdb.posterUrl(r.poster_path, "w342") ?? void 0, title });
+      c.createDiv({ cls: "reel-related-title", text: title });
+      const bits = [year2, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
+      if (bits.length)
+        c.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
+      const mine = () => plugin2.library.byTmdbId(r.id, rTv ? "tv" : "film");
+      const open2 = () => {
+        const own = mine();
+        if (own) {
+          opts.beforeOpenMine?.();
+          void plugin2.openDetail(own);
+        } else
+          new TitlePage(plugin2, r, opts.onAdded).open();
+      };
+      holdAt(
+        c,
+        (x, y) => showResultMenu(
+          plugin2,
+          { id: r.id, title, year: year2, isTv: rTv },
+          x,
+          y,
+          open2,
+          mine() ? void 0 : () => {
+            void plugin2.notes.createFromResult(r, { date: todayISO(), watchlist: true }).then(() => plugin2.undo.offer(`Added ${title} to your watchlist`)).catch((e) => new Notice(`Reel: ${redact(e)}`));
+          },
+          () => {
+            const own = mine();
+            if (own) {
+              opts.beforeOpenMine?.();
+              void plugin2.openDetail(own, "content");
+            } else
+              new TitlePage(plugin2, r, opts.onAdded, void 0, "content").open();
+          }
+        )
+      );
+      c.addEventListener("click", open2);
+      c.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          open2();
+        }
+      });
+    };
+    const add = (rows2) => {
+      let n2 = 0;
+      for (const r of rows2) {
+        if (seen.has(r.id) || r.adult || !r.poster_path)
+          continue;
+        seen.add(r.id);
+        card(r);
+        n2++;
+        shownCount++;
+      }
+      return n2;
+    };
+    add(opts.seed);
+    const sentinel = el.createDiv({ cls: "reel-feed-end reel-related-end" });
+    if (opts.layout === "strip")
+      list2.appendChild(sentinel);
+    sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
+    const more = async () => {
+      if (loading || done)
+        return;
+      loading = true;
+      try {
+        for (let tries = 0; tries < 4 && shownCount < CAP; tries++) {
+          const source = sources[0];
+          if (!source)
+            break;
+          page += 1;
+          const res = await plugin2.tmdb.relatedPage(opts.isTv ? "tv" : "movie", opts.tmdbId, source, page);
+          if (page >= res.total_pages) {
+            sources = sources.slice(1);
+            page = 0;
+          }
+          if (add(res.results) > 0)
+            break;
+        }
+      } catch {
+        done = true;
+      } finally {
+        loading = false;
+        if (!sources.length || shownCount >= CAP)
+          done = true;
+        if (done)
+          sentinel.remove();
+      }
+    };
+    const startOn = () => {
+      page = 1;
+    };
+    startOn();
+    const root = opts.layout === "strip" ? list2 : null;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting))
+          return;
+        void more().then(() => {
+          if (!sentinel.isConnected)
+            return;
+          io.unobserve(sentinel);
+          io.observe(sentinel);
+        });
+      },
+      { root, rootMargin: opts.layout === "strip" ? "0px 400px 0px 0px" : "600px 0px" }
+    );
+    io.observe(sentinel);
+  }
 
   // src/imdbGuide.ts
   var SEVERITIES = ["none", "mild", "moderate", "severe"];
@@ -8302,14 +6294,17 @@ ${body}
     }, 600);
   }
   var DetailScreen = class {
-    constructor(plugin2, entry, onBack, backLabel = "Library") {
+    constructor(plugin2, entry, onBack, backLabel = "Library", startTab) {
       this.plugin = plugin2;
       this.entry = entry;
       this.onBack = onBack;
       this.backLabel = backLabel;
+      this.startTab = startTab;
       this.openSeason = null;
       this.episodeCache = /* @__PURE__ */ new Map();
       this.rootEl = null;
+      /** Set once the tabs exist: switch to one by id and bring it into view. */
+      this.jumpToTab = null;
     }
     get file() {
       const f = this.plugin.app.vault.getAbstractFileByPath(this.entry.path);
@@ -8435,8 +6430,16 @@ ${body}
       if (imdb)
         link2("IMDb", imdb, "imdb");
       link2("TMDB", tmdbUrl(e.tmdbId, e.type), "tmdb");
-      if (imdb)
-        link2("Parents guide", `${imdb}parentalguide`, "guide");
+      const guide2 = links.createEl("a", { cls: "reel-link guide", text: "Parents guide", attr: { role: "button", tabindex: "0" } });
+      const goGuide = (ev) => {
+        ev.preventDefault();
+        this.jumpToTab?.("content");
+      };
+      guide2.addEventListener("click", goGuide);
+      guide2.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ")
+          goGuide(ev);
+      });
       const region = (this.plugin.settings.region || "US").toLowerCase();
       link2("JustWatch", `https://www.justwatch.com/${region}/search?q=${encodeURIComponent(e.title)}`, "justwatch");
       if (e.type === "film")
@@ -8495,6 +6498,21 @@ ${body}
       if (cast.length)
         this.renderCastStrip(wrap, cast);
       this.renderCreditRows(wrap, cast, crew, isTv);
+      if (related.length) {
+        wrap.createDiv({ cls: "reel-block-title", text: "More like this" });
+        paintRelatedFeed(this.plugin, wrap, {
+          tmdbId: this.entry.tmdbId,
+          isTv,
+          seed: related.filter((r) => !r.adult && r.poster_path),
+          layout: "strip",
+          // On a title page opened from elsewhere, going to one of your own
+          // titles closes this page first.
+          beforeOpenMine: () => {
+            if (!this.entry.path)
+              this.onBack();
+          }
+        });
+      }
       const tabs = [];
       tabs.push({ id: "about", label: "About", render: (el) => this.renderAbout(el, meta) });
       tabs.push({ id: "details", label: "Details", render: (el) => this.renderFacts(el, meta, isTv) });
@@ -8543,12 +6561,21 @@ ${body}
         body.empty();
         tabs[i].render(body);
       };
+      this.jumpToTab = (id) => {
+        const i = tabs.findIndex((t) => t.id === id);
+        if (i < 0)
+          return;
+        show(i);
+        buttons[i]?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      };
       tabs.forEach((t, i) => {
         const b = bar.createEl("button", { cls: "reel-facet-tab", text: t.label, attr: { type: "button" } });
         buttons.push(b);
         b.addEventListener("click", () => show(i));
       });
       show(0);
+      if (this.startTab)
+        requestAnimationFrame(() => this.jumpToTab?.(this.startTab));
     }
     /**
      * Director / Writer / Stars, as named rows of tappable names.
@@ -9599,6 +7626,2035 @@ ${body}
     return film2.imdb_id ?? film2.external_ids?.imdb_id ?? void 0;
   }
 
+  // src/ui/searchModal.ts
+  var SearchModal = class extends SuggestModal {
+    constructor(app2, plugin2, opts = {}) {
+      super(app2);
+      this.plugin = plugin2;
+      this.opts = opts;
+      this.results = [];
+      this.lastQuery = "";
+      this.seq = 0;
+      this.startQuery = "";
+      this.resolveResults = null;
+      /** 300ms debounce, with a sequence guard so a slow reply can't overwrite a fast one. */
+      this.runSearch = debounce(
+        async (query) => {
+          const ticket = ++this.seq;
+          try {
+            const results = await this.plugin.tmdb.searchMulti(query);
+            if (ticket !== this.seq)
+              return;
+            this.results = results;
+          } catch (e) {
+            if (ticket !== this.seq)
+              return;
+            this.results = [];
+            new Notice(`Reel: ${redact(e)}`);
+          }
+          this.resolveResults?.(this.results);
+          this.resolveResults = null;
+        },
+        300,
+        true
+      );
+      this.setPlaceholder(
+        opts.placeholder ?? (opts.watchlist ? "Add to watchlist \u2014 search TMDB\u2026" : "Search TMDB for a film or show\u2026")
+      );
+      this.limit = 20;
+      this.modalEl.addClass("reel-modal", "reel-search");
+      this.setInstructions([
+        { command: "\u2191\u2193", purpose: "navigate" },
+        { command: "\u21B5", purpose: "select" },
+        { command: "esc", purpose: "dismiss" },
+        // Results are capped at 20; without saying so, a missing title
+        // looks like TMDB doesn't have it rather than like a cut-off list.
+        { command: "20 max", purpose: "add words to narrow" }
+      ]);
+      this.startQuery = opts.query ?? "";
+    }
+    /** Obsidian's onOpen empties the box, so a carried-over query is set after it. */
+    onOpen() {
+      super.onOpen();
+      if (this.startQuery) {
+        this.inputEl.value = this.startQuery;
+        this.inputEl.dispatchEvent(new Event("input"));
+      }
+    }
+    async getSuggestions(query) {
+      const q = query.trim();
+      if (q.length < 2) {
+        this.results = [];
+        return [];
+      }
+      if (q === this.lastQuery && this.results.length)
+        return this.results;
+      this.lastQuery = q;
+      return new Promise((resolve) => {
+        this.resolveResults?.(this.results);
+        this.resolveResults = resolve;
+        this.runSearch(q);
+      });
+    }
+    renderSuggestion(item, el) {
+      el.addClass("reel-suggestion");
+      const isTv = item.media_type === "tv";
+      const title = isTv ? item.name ?? "Untitled" : item.title ?? "Untitled";
+      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
+      const thumb = el.createDiv({ cls: "reel-suggestion-thumb" });
+      const url = this.plugin.tmdb.posterUrl(item.poster_path, "w92");
+      if (url) {
+        const img = thumb.createEl("img", { attr: { src: url, loading: "lazy", alt: "" } });
+        img.addEventListener("error", () => {
+          img.remove();
+          thumb.addClass("is-empty");
+        });
+      } else {
+        thumb.addClass("is-empty");
+      }
+      const body = el.createDiv({ cls: "reel-suggestion-body" });
+      const line = body.createDiv({ cls: "reel-suggestion-title" });
+      line.createSpan({ text: title });
+      if (year2)
+        line.createSpan({ cls: "reel-dim", text: ` ${year2}` });
+      const meta = body.createDiv({ cls: "reel-suggestion-meta" });
+      meta.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      const existing = this.plugin.library.byTmdbId(item.id, isTv ? "tv" : "film");
+      if (existing)
+        meta.createSpan({ cls: "reel-badge in-library", text: "In library" });
+      if (item.vote_average)
+        meta.createSpan({ cls: "reel-dim", text: `\u2605 ${item.vote_average.toFixed(1)}` });
+    }
+    async onChooseSuggestion(item) {
+      if (this.opts.onPick) {
+        this.opts.onPick(item);
+        return;
+      }
+      const isTv = item.media_type === "tv";
+      const type = isTv ? "tv" : "film";
+      const existing = this.plugin.library.byTmdbId(item.id, type);
+      if (existing) {
+        const file = this.app.vault.getAbstractFileByPath(existing.path);
+        if (file instanceof TFile) {
+          new LogSheet(this.app, this.plugin, { file, entry: existing }).open();
+          return;
+        }
+      }
+      new LogSheet(this.app, this.plugin, {
+        pending: { id: item.id, type, title: isTv ? item.name ?? "" : item.title ?? "" },
+        watchlist: this.opts.watchlist
+      }).open();
+    }
+  };
+
+  // src/ui/discoverFilterSheet.ts
+  var DiscoverFilterSheet = class extends Modal {
+    constructor(app2, filters, hooks) {
+      super(app2);
+      this.filters = filters;
+      this.hooks = hooks;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      modalEl.addClass("reel-filter-sheet");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-filter-content");
+      const head = contentEl.createDiv({ cls: "reel-filter-head" });
+      head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
+      this.body = contentEl.createDiv({ cls: "reel-filter-body" });
+      this.redraw();
+      const foot = contentEl.createDiv({ cls: "reel-log-actions reel-filter-actions" });
+      const clear = foot.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all", attr: { type: "button" } });
+      clear.addEventListener("click", () => {
+        this.hooks.clearAll();
+        this.redraw();
+      });
+      const done = foot.createEl("button", { cls: "reel-btn mod-cta reel-filter-done", attr: { type: "button" } });
+      done.createSpan({ text: "Show results" });
+      done.addEventListener("click", () => this.close());
+    }
+    /** Called when the genre list arrives after the sheet is already open. */
+    refresh() {
+      if (this.body?.isConnected)
+        this.redraw();
+    }
+    redraw() {
+      const el = this.body;
+      const keep = el.scrollTop;
+      el.empty();
+      const section = (label, asOptions = false) => {
+        const box = el.createDiv({ cls: "reel-filter-section" });
+        box.createDiv({ cls: "reel-filter-label", text: label });
+        return box.createDiv({ cls: asOptions ? "reel-opts" : "reel-chips reel-filter-chips" });
+      };
+      const pick = (into, label, active, onClick) => {
+        const b = into.createEl("button", { cls: into.hasClass("reel-opts") ? "reel-opt" : "reel-chip", attr: { type: "button" } });
+        if (b.hasClass("reel-opt")) {
+          b.createSpan({ cls: "reel-opt-mark" });
+          b.createSpan({ cls: "reel-opt-label", text: label });
+        } else
+          b.setText(label);
+        setSelected(b, active);
+        b.addEventListener("click", () => {
+          onClick();
+          this.hooks.onChange();
+          this.redraw();
+        });
+        return b;
+      };
+      const kinds = section("Type");
+      pick(kinds, "Films", this.filters.type === "movie", () => this.hooks.setType("movie"));
+      pick(kinds, "Series", this.filters.type === "tv", () => this.hooks.setType("tv"));
+      const like = section("Similar to");
+      const seed = this.hooks.seedTitle();
+      if (seed)
+        pick(like, `${seed}  \u2715`, true, () => this.hooks.clearSeed());
+      else {
+        const b = like.createEl("button", { cls: "reel-chip", text: "Pick a title\u2026", attr: { type: "button" } });
+        b.addEventListener("click", () => {
+          this.hooks.pickSeed(() => {
+            this.hooks.onChange();
+            this.redraw();
+          });
+        });
+      }
+      const genres = this.hooks.genres();
+      const gbox = section("Genre");
+      if (!genres.length)
+        gbox.createSpan({ cls: "reel-dim", text: "Loading\u2026" });
+      for (const g of genres) {
+        pick(gbox, g.name, this.filters.genreIds.includes(g.id), () => {
+          const at = this.filters.genreIds.indexOf(g.id);
+          if (at >= 0) {
+            this.filters.genreIds.splice(at, 1);
+            this.filters.genreNames.splice(at, 1);
+          } else {
+            this.filters.genreIds.push(g.id);
+            this.filters.genreNames.push(g.name);
+          }
+        });
+      }
+      this.fold(gbox, Platform.isPhone ? 8 : 99);
+      const decades = section("Decade");
+      const nowDecade = Math.floor((/* @__PURE__ */ new Date()).getFullYear() / 10) * 10;
+      for (let d = nowDecade; d >= 1950; d -= 10) {
+        pick(decades, `${d}s`, this.filters.decade === d, () => {
+          this.filters.decade = this.filters.decade === d ? null : d;
+        });
+      }
+      const score2 = section("Minimum score");
+      for (const r of [6, 7, 8]) {
+        pick(score2, `${r}+`, this.filters.minRating === r, () => {
+          this.filters.minRating = this.filters.minRating === r ? null : r;
+        });
+      }
+      el.scrollTop = keep;
+    }
+    /** Long groups show their first few, the rest behind one button. */
+    fold(group, limit) {
+      const all2 = Array.from(group.children);
+      const hidden = all2.slice(limit).filter((c) => !c.hasClass("is-active"));
+      if (!hidden.length)
+        return;
+      hidden.forEach((c) => c.addClass("is-folded"));
+      const more = group.parentElement?.createEl("button", {
+        cls: "reel-filter-more",
+        text: `Show ${hidden.length} more`,
+        attr: { type: "button", "aria-expanded": "false" }
+      });
+      more?.addEventListener("click", () => {
+        const open2 = more.getAttr("aria-expanded") !== "true";
+        hidden.forEach((c) => c.toggleClass("is-folded", !open2));
+        more.setAttr("aria-expanded", String(open2));
+        more.setText(open2 ? "Show less" : `Show ${hidden.length} more`);
+      });
+    }
+  };
+
+  // src/util/failure.ts
+  function diagnose(status, online) {
+    if (!online) {
+      return {
+        kind: "offline",
+        message: "You're offline. Your library, diary and stats all still work \u2014 only new lookups need a connection.",
+        retryable: true
+      };
+    }
+    if (status === 401 || status === 403) {
+      return {
+        kind: "auth",
+        message: "TMDB rejected the key. Check it in Settings \u2192 Reel.",
+        // Retrying an unchanged bad key fails identically every time, so
+        // offering it would be a button that cannot work.
+        retryable: false,
+        settings: true
+      };
+    }
+    if (status === 404) {
+      return {
+        kind: "missing",
+        message: "TMDB has no record of that. It may have been merged or removed.",
+        retryable: false
+      };
+    }
+    if (status === 429) {
+      return {
+        kind: "rate",
+        message: "TMDB is rate limiting. Wait a few seconds and try again.",
+        retryable: true
+      };
+    }
+    if (status != null && status >= 500) {
+      return {
+        kind: "server",
+        message: "TMDB is having trouble. Nothing wrong on your end.",
+        retryable: true
+      };
+    }
+    return {
+      kind: "unknown",
+      message: "That didn't work.",
+      retryable: true
+    };
+  }
+  function worthReporting(kind, background) {
+    if (!background)
+      return true;
+    return kind !== "offline";
+  }
+
+  // src/tmdb.ts
+  var TmdbError = class extends Error {
+    constructor(message, status) {
+      super(message);
+      this.status = status;
+      this.name = "TmdbError";
+    }
+  };
+
+  // src/ui/failure.ts
+  function diagnoseError(error) {
+    if (error instanceof MissingKeyError) {
+      return {
+        kind: "auth",
+        message: "No TMDB key is unlocked. Add or unlock one in Settings \u2192 Reel.",
+        retryable: false,
+        settings: true
+      };
+    }
+    const status = error instanceof TmdbError ? error.status : void 0;
+    return diagnose(status, navigator.onLine !== false);
+  }
+  function reportFailure(error, opts = {}) {
+    const d = diagnoseError(error);
+    if (!worthReporting(d.kind, opts.background === true)) {
+      console.warn("Reel: offline \u2014", opts.context ?? "background work", "skipped");
+      return d;
+    }
+    if (d.kind === "unknown")
+      console.warn("Reel:", opts.context ?? "failed", redact(error));
+    const notice = new Notice("", d.retryable ? 12e3 : 9e3);
+    const el = notice.noticeEl;
+    el.addClass("reel-undo-notice");
+    el.createSpan({ text: opts.context ? `${opts.context} \u2014 ${d.message}` : d.message });
+    if (d.settings)
+      return d;
+    if (d.retryable && opts.retry) {
+      const btn = el.createEl("button", { cls: "reel-undo-btn", text: "Retry", attr: { type: "button" } });
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        btn.setAttr("disabled", "true");
+        notice.hide();
+        opts.retry?.();
+      });
+    }
+    return d;
+  }
+
+  // src/util/gesture.ts
+  var HORIZONTAL_MIN = 60;
+  var VERTICAL_MIN = 140;
+  var STRAIGHTNESS = 1.5;
+  function gestureIntent(drag) {
+    const { dx, dy, atTop, canUndo } = drag;
+    if (atTop && canUndo && dy > VERTICAL_MIN && Math.abs(dy) > Math.abs(dx) * STRAIGHTNESS) {
+      return "undo";
+    }
+    if (Math.abs(dx) < HORIZONTAL_MIN || Math.abs(dx) < Math.abs(dy) * STRAIGHTNESS)
+      return "none";
+    return dx < 0 ? "next" : "previous";
+  }
+
+  // src/ui/discoverView.ts
+  var emptyFilters = () => ({ genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" });
+  var DiscoverScreen = class {
+    constructor(plugin2) {
+      this.plugin = plugin2;
+      /**
+       * The feed as recipes, before any of it has been fetched.
+       *
+       * Null until a taste profile has been read. Long — sixty-odd rows on a
+       * library with ratings in it, and an unbounded popularity tail after that —
+       * because the feed is meant not to end.
+       */
+      this.sources = null;
+      /** Sources that have been mounted, in the order they appear. */
+      this.feed = [];
+      /** Index of the next source to mount. */
+      this.nextSource = 0;
+      /** One mount at a time, or a fast scroll fires four of them at once. */
+      this.mounting = false;
+      /** Torn down and rebuilt on every draw, or they accumulate per repaint. */
+      this.watchers = [];
+      /** Where new rows are appended, so mounting one does not redraw the page. */
+      this.feedEl = null;
+      /**
+       * The view's search box, pointed outward.
+       *
+       * Discover is the one tab where the library filters mean nothing — it is
+       * about titles you do *not* have. But the search box is the same box, and a
+       * query that silently did nothing here was most of "the search should work
+       * the same no matter what tab you are on".
+       */
+      this.query = "";
+      this.searchResults = null;
+      /** What `searchResults` is an answer to, so a new query refetches. */
+      this.searchedFor = "";
+      /** How many results were dropped for already being in your library. */
+      this.searchOwned = 0;
+      /** The last page of results fetched; the sentinel asks for the next. */
+      this.searchPage = 0;
+      /** What TMDB says it holds for this query. 0 until the first page lands. */
+      this.searchPages = 0;
+      /** Titles TMDB claims to have, so the count can stop overstating one page. */
+      this.searchTotal = 0;
+      /** A page is in flight, so the sentinel must not ask for it twice. */
+      this.searchMore = false;
+      /** The people the query matched, drawn above the titles. Page one only. */
+      this.searchPeople = [];
+      this.profile = null;
+      this.results = null;
+      this.genres = [];
+      this.filters = emptyFilters();
+      this.filterSheet = null;
+      this.loading = false;
+      this.error = null;
+      this.handled = /* @__PURE__ */ new Set();
+      this.page = 1;
+      this.exhausted = false;
+      /** "Something like this one" — a title to draw recommendations from. */
+      this.seed = null;
+      /** One-at-a-time browsing, for when you want to move fast rather than skim. */
+      this.quick = false;
+      this.quickAt = 0;
+      /** Results handed over by the recipe flow, if any. */
+      this.shortlist = null;
+      /**
+       * The title the last quick action handled, and where it sat.
+       *
+       * Undo has to put back three things, not one: the vault change, the fact
+       * that the card was marked handled, and your position in the queue.
+       * Reversing only the first leaves a title in your library that the screen
+       * still believes you dealt with.
+       */
+      this.lastAction = null;
+      /**
+       * Every title the feed has already shown, across all rows.
+       *
+       * Trending and your top genre overlap heavily, and the same poster turning
+       * up in four consecutive shelves is what makes an endless feed feel like a
+       * short one on a loop.
+       */
+      this.seen = /* @__PURE__ */ new Set();
+      /**
+       * Cards taken out of the feed by an action, newest last.
+       *
+       * `handled` is a set and says nothing about order, so it cannot answer "which
+       * one did I just do". Undo has to put back the last one specifically, and
+       * pressing undo twice has to put back two.
+       */
+      this.handledOrder = [];
+      /** The container of the most recent render, so an undo can repaint it. */
+      this.lastContainer = null;
+    }
+    /**
+     * The mounted rows, in the shape the rest of the screen already expects.
+     *
+     * Quick mode and the narrowing pass both read the loaded pool, and neither
+     * cares that it now arrives a row at a time.
+     */
+    get rows() {
+      if (!this.sources)
+        return null;
+      return this.feed.map((f) => ({ id: f.source.id, title: f.source.title, reason: f.source.reason, items: f.items }));
+    }
+    get filtered() {
+      return this.seed != null || this.filters.genreIds.length > 0 || this.filters.decade != null || this.filters.minRating != null;
+    }
+    reset() {
+      this.seed = null;
+      this.sources = null;
+      this.feed = [];
+      this.nextSource = 0;
+      this.mounting = false;
+      this.searchResults = null;
+      this.searchedFor = "";
+      this.searchPage = 0;
+      this.searchPages = 0;
+      this.searchMore = false;
+      this.profile = null;
+      this.results = null;
+      this.error = null;
+      this.handled.clear();
+      this.page = 1;
+      this.exhausted = false;
+    }
+    /**
+     * Draw the screen, and never leave it blank.
+     *
+     * `render` empties the container before it draws. If anything after that
+     * throws — and several paths reach here from a `.finally()`, where a throw
+     * becomes an unhandled rejection nothing catches — the user is left
+     * looking at an empty pane with no explanation. That is the white screen.
+     *
+     * The view's own `paintTab` has a try/catch, but it only guards the
+     * *synchronous* first paint. Every repaint that follows a fetch arrives
+     * outside it.
+     */
+    render(container) {
+      this.lastContainer = container;
+      try {
+        this.draw(container);
+      } catch (e) {
+        container.empty();
+        const box = container.createDiv({ cls: "reel-error-state" });
+        box.createDiv({ cls: "reel-empty-title", text: "Discover hit a problem" });
+        box.createDiv({ cls: "reel-empty-body", text: redact(e) });
+        const again = box.createEl("button", { cls: "reel-btn mod-cta", text: "Start again" });
+        again.addEventListener("click", () => {
+          this.reset();
+          this.quick = false;
+          this.shortlist = null;
+          this.render(container);
+        });
+        console.error("Reel: Discover render failed", e);
+      }
+    }
+    draw(container) {
+      container.empty();
+      container.addClass("reel-discover");
+      for (const w of this.watchers)
+        w.disconnect();
+      this.watchers = [];
+      this.feedEl = null;
+      const staged = this.plugin.discover.takeStaged();
+      if (staged) {
+        this.shortlist = staged;
+        this.quick = true;
+        this.quickAt = 0;
+      }
+      this.paintFilters(container);
+      if (this.error) {
+        container.createDiv({ cls: "reel-error", text: this.error });
+        const retry = container.createEl("button", { cls: "reel-btn", text: "Try again" });
+        retry.addEventListener("click", () => {
+          this.error = null;
+          this.render(container);
+        });
+        return;
+      }
+      if (this.query)
+        this.paintSearch(container);
+      else if (this.quick)
+        this.paintQuick(container);
+      else if (this.filtered)
+        this.paintResults(container);
+      else
+        this.paintForYou(container);
+    }
+    /* ------------------------------------------------------------------ */
+    /* Quick mode — one title at a time                                    */
+    /* ------------------------------------------------------------------ */
+    /**
+     * The same pool the rows draw from, flattened and de-duplicated.
+     *
+     * A title can appear in several rows — trending and your top genre often
+     * overlap — and seeing it twice in a linear run reads as the queue being
+     * stuck rather than as two separate recommendations.
+     */
+    quickPool() {
+      if (this.shortlist?.length)
+        return this.shortlist.filter((i) => !this.handled.has(i.id));
+      const source = this.filtered ? this.results ?? [] : (this.rows ?? []).flatMap((r) => r.items);
+      const seen = /* @__PURE__ */ new Set();
+      const out = [];
+      for (const item of source) {
+        if (seen.has(item.id) || this.handled.has(item.id))
+          continue;
+        seen.add(item.id);
+        out.push(item);
+      }
+      return out;
+    }
+    paintQuick(container) {
+      if (!this.filtered && !this.sources) {
+        void this.loadRows(container);
+        skeletonCards(container, 1, "Loading");
+        return;
+      }
+      if (this.filtered && !this.results) {
+        this.paintResults(container);
+        return;
+      }
+      const pool2 = this.quickPool();
+      if (!pool2.length) {
+        const done = container.createDiv({ cls: "reel-empty" });
+        done.createDiv({ text: "Nothing left in this queue." });
+        const back = done.createEl("button", { cls: "reel-btn mod-cta", text: "Back to rows" });
+        back.addEventListener("click", () => {
+          this.quick = false;
+          this.render(container);
+        });
+        return;
+      }
+      if (this.quickAt >= pool2.length)
+        this.quickAt = 0;
+      const item = pool2[this.quickAt];
+      const isTv = item.media_type === "tv";
+      const title = (isTv ? item.name : item.title) ?? "Untitled";
+      const card = container.createDiv({ cls: "reel-quickcard" });
+      this.plugin.swatches.tint(
+        card,
+        this.plugin.tmdb.posterUrl(item.poster_path, "w342"),
+        document.body.hasClass("theme-dark")
+      );
+      card.createDiv({ cls: "reel-quickcard-count", text: `${this.quickAt + 1} of ${pool2.length}` });
+      const posterEl = card.createDiv({ cls: "reel-quickcard-poster" });
+      this.plugin.posters.attach(posterEl, {
+        posterUrl: this.plugin.tmdb.posterUrl(item.poster_path, "w500") ?? void 0,
+        title
+      });
+      posterEl.addEventListener("click", () => new TitlePage(this.plugin, item, () => this.render(container)).open());
+      const head = card.createDiv({ cls: "reel-quickcard-head" });
+      head.createSpan({ cls: "reel-quickcard-title", text: title });
+      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
+      if (year2)
+        head.createSpan({ cls: "reel-dim", text: ` ${year2}` });
+      const facts = card.createDiv({ cls: "reel-header-facts" });
+      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      if (item.vote_average)
+        facts.createSpan({ cls: "reel-dim", text: `TMDB ${item.vote_average.toFixed(1)}` });
+      if (item.overview)
+        card.createDiv({ cls: "reel-quickcard-overview", text: item.overview });
+      void paintExtras(this.plugin, card.createDiv({ cls: "reel-quickcard-extras" }), item.id, isTv);
+      const step = (by) => {
+        this.quickAt = Math.max(0, this.quickAt + by);
+        this.render(container);
+      };
+      const actions = card.createDiv({ cls: "reel-quickcard-actions" });
+      const skip = actions.createEl("button", { cls: "reel-btn reel-quick-skip", text: "\u2715  Skip" });
+      skip.addEventListener("click", () => step(1));
+      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+  Watchlist" });
+      later.addEventListener("click", () => void this.quickAdd(item, true, container));
+      const seen = actions.createEl("button", { cls: "reel-btn", text: "\u2713  Seen it" });
+      seen.addEventListener("click", () => {
+        const isTvItem = item.media_type === "tv";
+        new LogSheet(this.plugin.app, this.plugin, {
+          pending: {
+            id: item.id,
+            type: isTvItem ? "tv" : "film",
+            title: (isTvItem ? item.name : item.title) ?? "Untitled"
+          }
+        }).open();
+        this.markHandled(item.id);
+        this.render(container);
+      });
+      const nav = card.createDiv({ cls: "reel-quickcard-nav" });
+      const prev = nav.createEl("button", { cls: "reel-btn", text: "\u2039 Back", attr: { type: "button" } });
+      prev.toggleClass("is-disabled", this.quickAt === 0);
+      prev.addEventListener("click", () => step(-1));
+      const never = nav.createEl("button", { cls: "reel-btn", text: "Never show this", attr: { type: "button" } });
+      never.addEventListener("click", () => {
+        void this.plugin.discover.dismiss(item.id).then(() => {
+          this.handled.add(item.id);
+          this.render(container);
+        });
+      });
+      const hint = card.createDiv({ cls: "reel-dim reel-quickcard-hint" });
+      hint.setText(
+        this.lastAction ? "Swipe to move, swipe down to take back the last one. Arrow keys and Z work too." : "Swipe, or use \u2190 and \u2192 on a keyboard."
+      );
+      if (this.lastAction) {
+        const back = card.createEl("button", {
+          cls: "reel-chip reel-quick-undo",
+          text: "Undo that",
+          attr: { type: "button" }
+        });
+        back.addEventListener("click", () => void this.undoLast(container));
+      }
+      this.wireSwipe(card, step, () => void this.undoLast(container));
+      card.setAttr("tabindex", "0");
+      card.addEventListener("keydown", (ev) => {
+        if (ev.key === "ArrowRight") {
+          ev.preventDefault();
+          step(1);
+        } else if (ev.key === "ArrowLeft") {
+          ev.preventDefault();
+          step(-1);
+        } else if (ev.key === "z" || ev.key === "Z") {
+          ev.preventDefault();
+          void this.undoLast(container);
+        }
+      });
+      card.focus({ preventScroll: true });
+    }
+    /** Add from quick mode and advance, so one tap is the whole interaction. */
+    async quickAdd(item, watchlist, container) {
+      try {
+        await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist });
+        haptic("commit");
+        this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
+        this.markHandled(item.id);
+        this.lastAction = { id: item.id, at: this.quickAt };
+        this.render(container);
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+      }
+    }
+    /**
+     * Horizontal drag to move through the queue.
+     *
+     * Only acts when the gesture is clearly sideways: the card scrolls
+     * vertically, and a swipe that stole every downward drag would make the
+     * overview unreadable on a phone.
+     */
+    /**
+     * Swipe left and right to move, down to take back what you just did.
+     *
+     * Left and right always worked. What did not was recovering from a
+     * mistake: quick mode is built to be fast, so it is the single easiest
+     * place to add a title you were only skimming past — and going *back* only
+     * showed you a card for something already in your library. The action was
+     * gone and the screen said nothing about it.
+     *
+     * Down rather than up: up is where the browser and Obsidian both put
+     * their own gestures, and a third meaning on that axis is a collision
+     * waiting to happen.
+     */
+    wireSwipe(card, step, onUndo) {
+      let startX = 0;
+      let startY = 0;
+      let tracking = false;
+      let atTop = false;
+      const scroller = () => {
+        for (let p = card; p; p = p.parentElement) {
+          if (p.scrollHeight > p.clientHeight + 1)
+            return p;
+        }
+        return null;
+      };
+      card.addEventListener(
+        "touchstart",
+        (ev) => {
+          const t = ev.touches[0];
+          if (!t)
+            return;
+          startX = t.clientX;
+          startY = t.clientY;
+          tracking = true;
+          const s = scroller();
+          atTop = !s || s.scrollTop <= 0;
+        },
+        { passive: true }
+      );
+      card.addEventListener(
+        "touchend",
+        (ev) => {
+          if (!tracking)
+            return;
+          tracking = false;
+          const t = ev.changedTouches[0];
+          if (!t)
+            return;
+          const dx = t.clientX - startX;
+          const dy = t.clientY - startY;
+          switch (gestureIntent({ dx, dy, atTop, canUndo: this.lastAction != null })) {
+            case "undo":
+              onUndo();
+              return;
+            case "next":
+              step(1);
+              return;
+            case "previous":
+              step(-1);
+              return;
+            default:
+              return;
+          }
+        },
+        { passive: true }
+      );
+    }
+    /**
+     * Take back the last thing quick mode did.
+     *
+     * Delegates the vault change to the undo service — it already knows how
+     * to reverse an add, including trashing a note it created — and handles
+     * the two things only this screen knows about: that the card was marked
+     * handled, and where you were when you did it.
+     */
+    /** Take a card out of the feed, remembering that it was this one. */
+    markHandled(id) {
+      this.handled.add(id);
+      this.handledOrder = [...this.handledOrder.filter((n2) => n2 !== id), id];
+    }
+    /**
+     * Put back whatever the last action removed.
+     *
+     * Called after an undo lands. Rating a title from the feed used to reverse
+     * the vault write and leave the card gone — the note came back and the poster
+     * did not, so the undo looked like it had half worked. The screen's own state
+     * is not something a vault write can reach, so it has to be told.
+     */
+    restoreLast() {
+      const id = this.handledOrder.pop();
+      if (id == null)
+        return;
+      this.handled.delete(id);
+      this.seen.delete(id);
+      if (this.lastContainer?.isConnected)
+        this.render(this.lastContainer);
+    }
+    async undoLast(container) {
+      const last = this.lastAction;
+      if (!last) {
+        new Notice("Reel: nothing to take back.");
+        return;
+      }
+      haptic("commit");
+      this.lastAction = null;
+      await this.plugin.undo.undo();
+      this.handled.delete(last.id);
+      this.handledOrder = this.handledOrder.filter((n2) => n2 !== last.id);
+      this.seen.delete(last.id);
+      this.quickAt = last.at;
+      this.render(container);
+    }
+    /* ------------------------------------------------------------------ */
+    /* Filter bar                                                          */
+    /* ------------------------------------------------------------------ */
+    paintFilters(container) {
+      const wrap = container.createDiv({ cls: "reel-discover-filters" });
+      const bar = wrap.createDiv({ cls: "reel-chips reel-filterbar" });
+      const apply = () => {
+        this.results = null;
+        this.page = 1;
+        this.exhausted = false;
+        this.render(container);
+      };
+      const setType = (next) => {
+        if (this.filters.type === next)
+          return;
+        this.filters.type = next;
+        this.sources = null;
+        this.feed = [];
+        this.nextSource = 0;
+        this.genres = [];
+        this.filters.genreIds = [];
+        this.filters.genreNames = [];
+        this.loadGenres();
+      };
+      if (!this.genres.length)
+        this.loadGenres();
+      const set = [];
+      if (this.seed)
+        set.push({ label: `Like ${this.seed.title}`, clear: () => this.seed = null });
+      this.filters.genreIds.forEach((id, i) => {
+        set.push({
+          label: this.filters.genreNames[i] ?? String(id),
+          clear: () => {
+            this.filters.genreIds = this.filters.genreIds.filter((g) => g !== id);
+            this.filters.genreNames = this.filters.genreNames.filter((_, at) => at !== i);
+          }
+        });
+      });
+      if (this.filters.decade != null)
+        set.push({ label: `${this.filters.decade}s`, clear: () => this.filters.decade = null });
+      if (this.filters.minRating != null)
+        set.push({ label: `${this.filters.minRating}+`, clear: () => this.filters.minRating = null });
+      const open2 = bar.createEl("button", { cls: "reel-chip reel-filter-btn", attr: { type: "button" } });
+      setIcon(open2.createSpan({ cls: "reel-filter-btn-icon" }), "sliders-horizontal");
+      open2.createSpan({ text: "Filters" });
+      if (set.length)
+        open2.createSpan({ cls: "reel-filter-count", text: String(set.length) });
+      open2.addEventListener("click", () => {
+        const sheet = new DiscoverFilterSheet(this.plugin.app, this.filters, {
+          onChange: apply,
+          setType,
+          genres: () => this.genres,
+          seedTitle: () => this.seed?.title ?? null,
+          pickSeed: (done) => new SearchModal(this.plugin.app, this.plugin, {
+            placeholder: "Find me something like\u2026",
+            onPick: (item) => {
+              this.seed = {
+                id: item.id,
+                type: item.media_type === "tv" ? "tv" : "movie",
+                title: (item.media_type === "tv" ? item.name : item.title) ?? "that"
+              };
+              done();
+            }
+          }).open(),
+          clearSeed: () => this.seed = null,
+          clearAll: () => {
+            this.seed = null;
+            this.filters = { ...emptyFilters(), type: this.filters.type };
+            apply();
+          }
+        });
+        this.filterSheet = sheet;
+        sheet.open();
+      });
+      const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg", attr: { role: "group", "aria-label": "Type" } });
+      for (const [id, label, icon] of [
+        ["movie", "Films", "film"],
+        ["tv", "Series", "tv"]
+      ]) {
+        const b = seg.createEl("button", {
+          cls: "reel-seg-btn",
+          attr: { type: "button", "aria-label": label, "aria-pressed": String(this.filters.type === id) }
+        });
+        b.toggleClass("is-active", this.filters.type === id);
+        setIcon(b, icon);
+        b.addEventListener("click", () => {
+          setType(id);
+          apply();
+        });
+      }
+      const quick2 = bar.createEl("button", { cls: "reel-chip reel-chip-mode", attr: { type: "button" } });
+      setIcon(quick2.createSpan({ cls: "reel-filter-btn-icon" }), "zap");
+      quick2.createSpan({ text: "Quick" });
+      setSelected(quick2, this.quick);
+      quick2.addEventListener("click", () => {
+        this.quick = !this.quick;
+        this.quickAt = 0;
+        apply();
+      });
+      for (const f of set) {
+        const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
+        tag.setAttr("role", "group");
+        tag.setAttr("aria-label", `${f.label} filter`);
+        const label = tag.createEl("button", { cls: "reel-filter-tag-label", text: f.label, attr: { type: "button" } });
+        label.addEventListener("click", () => open2.click());
+        const drop = tag.createEl("button", {
+          cls: "reel-filter-tag-x",
+          attr: { type: "button", "aria-label": `Remove the ${f.label} filter` }
+        });
+        setIcon(drop.createSpan({ cls: "reel-filter-x" }), "x");
+        drop.addEventListener("click", () => {
+          f.clear();
+          apply();
+        });
+      }
+    }
+    /** The genre list for the current type; the sheet and the tags both read it. */
+    loadGenres() {
+      const type = this.filters.type;
+      void this.plugin.tmdb.genreList(type).then((list2) => {
+        if (this.filters.type !== type)
+          return;
+        this.genres = list2;
+        this.filterSheet?.refresh();
+      }).catch(() => {
+      });
+    }
+    /* ------------------------------------------------------------------ */
+    /* For you                                                             */
+    /* ------------------------------------------------------------------ */
+    /**
+     * Does a title already in hand satisfy the current filters?
+     *
+     * Used to narrow the shelves without a round trip. The server answers the
+     * same question better — it can see every title, not the sixty already
+     * loaded — but it cannot answer it *instantly*, and instant is what stops
+     * the screen changing shape under you.
+     */
+    matchesFilters(item) {
+      const f = this.filters;
+      if (f.minRating != null && (item.vote_average ?? 0) < f.minRating)
+        return false;
+      if (f.genreIds.some((g) => !(item.genre_ids ?? []).includes(g)))
+        return false;
+      if (f.decade != null) {
+        const year2 = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
+        if (!Number.isFinite(year2) || year2 < f.decade || year2 >= f.decade + 10)
+          return false;
+      }
+      return true;
+    }
+    /**
+     * The bit of the screen that must not move when a filter changes.
+     *
+     * Shared by the personalised view and the filtered one. Picking a minimum
+     * rating used to replace shelves with a flat grid — same data, entirely
+     * different screen — so the app appeared to navigate somewhere when the
+     * user had only narrowed what they were already looking at. A filter should
+     * change what is in the list, never what kind of list it is.
+     */
+    paintHead(container) {
+      const head = container.createDiv({ cls: "reel-discover-head" });
+      if (this.profile?.sparse) {
+        head.createDiv({
+          cls: "reel-discover-note",
+          text: "Rate a few films and these become personal \u2014 right now they're just what's popular."
+        });
+      } else if (this.profile?.genreNames.length) {
+        head.createDiv({
+          cls: "reel-discover-note",
+          text: `Based on your library \u2014 mostly ${this.profile.genreNames.slice(0, 3).join(", ").toLowerCase()}.`
+        });
+      }
+      const reload = head.createEl("button", { cls: "reel-chip reel-refresh", attr: { type: "button" } });
+      setIcon(reload.createSpan({ cls: "reel-refresh-icon" }), "refresh-cw");
+      reload.createSpan({ text: "Refresh" });
+      reload.addEventListener("click", () => {
+        reload.addClass("is-spinning");
+        this.plugin.discover.reroll();
+        void this.plugin.tmdb.clearDiscoverCache().then(() => {
+          this.reset();
+          this.render(container);
+        });
+      });
+    }
+    /**
+     * The shelves you were already looking at, narrowed.
+     *
+     * Drawn before the fetched results and from titles already in memory, so
+     * the moment a chip is tapped the screen answers with the same shelves
+     * holding fewer things. The fetch then adds what it finds underneath.
+     */
+    paintNarrowedRows(container) {
+      if (!this.rows)
+        return false;
+      const narrowed = this.rows.map((r) => ({ ...r, items: r.items.filter((i) => !this.handled.has(i.id) && this.matchesFilters(i)) })).filter((r) => r.items.length);
+      for (const row of narrowed)
+        this.paintStaticRow(container, row);
+      return narrowed.length > 0;
+    }
+    /**
+     * A shelf that does not page.
+     *
+     * These are rows you have already loaded, shown with some of their cards
+     * filtered out. Asking such a row for another page would fetch titles the
+     * filter is about to discard, so it stays as it is and the fetched results
+     * underneath do the widening.
+     */
+    paintStaticRow(container, row) {
+      const items = row.items.filter((i) => !this.handled.has(i.id));
+      if (!items.length)
+        return;
+      const section = container.createDiv({ cls: "reel-drow" });
+      const head = section.createDiv({ cls: "reel-drow-head" });
+      head.createDiv({ cls: "reel-drow-title", text: row.title });
+      if (row.reason)
+        head.createDiv({ cls: "reel-drow-reason", text: row.reason });
+      const strip = section.createDiv({ cls: "reel-drow-strip" });
+      for (const item of items)
+        strip.appendChild(this.card(item, container));
+    }
+    /**
+     * The feed.
+     *
+     * It used to be eight rows, fetched all at once, each holding one page of
+     * about twenty cards. Every row ended, the page ended, and tomorrow it said
+     * the same thing — which is exactly what "a hardcoded block I cannot refresh"
+     * describes.
+     *
+     * Now both axes keep going. Reaching the end of a row asks that row for its
+     * next page; reaching the bottom of the page mounts the next row. The list of
+     * rows is long and its tail is unbounded, so there is no last one to reach.
+     */
+    paintForYou(container) {
+      if (!this.sources) {
+        container.createDiv({ cls: "reel-loading", text: "Finding things for you\u2026" });
+        for (let i = 0; i < 3; i++)
+          skeletonCards(container, 6, "Finding things for you");
+        if (this.loading)
+          return;
+        this.loading = true;
+        void this.loadRows(container);
+        return;
+      }
+      this.paintHead(container);
+      const feedEl = container.createDiv({ cls: "reel-feed" });
+      this.feedEl = feedEl;
+      for (const row of this.feed)
+        this.mountRow(feedEl, row, container);
+      const live = this.feed.some((r) => r.items.some((i) => !this.handled.has(i.id)));
+      if (!live && this.exhausted) {
+        const empty = container.createDiv({ cls: "reel-empty" });
+        empty.createDiv({ text: "Nothing left to suggest \u2014 try a genre above." });
+        const dismissed = this.plugin.settings.dismissedIds.length;
+        if (dismissed) {
+          empty.createDiv({
+            cls: "reel-dim",
+            text: `${dismissed} dismissed \u2014 clear them in Settings \u2192 Reel to see them again.`
+          });
+        }
+        return;
+      }
+      this.paintFeedSentinel(container);
+    }
+    /**
+     * The thing at the bottom that asks for more.
+     *
+     * A sentinel plus an observer rather than a scroll handler: the body is a
+     * measured, fixed-height element and its scroll events fire at whatever rate
+     * the device feels like, whereas an intersection is asked once and answered
+     * once. The rootMargin means the fetch starts a screen early, so the next row
+     * is usually there before you arrive at the gap.
+     */
+    paintFeedSentinel(container) {
+      const more = this.sources ? this.nextSource < this.sources.length : false;
+      if (!more)
+        return;
+      const sentinel = container.createDiv({ cls: "reel-feed-end" });
+      sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
+      const scroller = container.closest(".reel-view-body") ?? null;
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting))
+            return;
+          void this.mountNext(container).then(() => {
+            if (!sentinel.isConnected)
+              return;
+            io.unobserve(sentinel);
+            io.observe(sentinel);
+          });
+        },
+        { root: scroller, rootMargin: "600px 0px" }
+      );
+      io.observe(sentinel);
+      this.watchers.push(io);
+    }
+    /**
+     * Mount the next row, skipping ones that come back empty.
+     *
+     * A source can legitimately return nothing — every title in it is already in
+     * your library, or dismissed, or has no poster. Stopping there would end the
+     * feed on a technicality, so it tries the next one, up to a handful of times
+     * per scroll so a run of empties cannot become an unbounded request loop.
+     */
+    async mountNext(container) {
+      if (this.mounting || !this.sources)
+        return;
+      this.mounting = true;
+      try {
+        for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
+          const source = this.sources[this.nextSource++];
+          const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
+          for (const i of items)
+            this.seen.add(i.id);
+          if (!items.length)
+            continue;
+          const row = { source, items, page: 1, done: false, loading: false };
+          this.feed.push(row);
+          if (this.feedEl && this.feedEl.isConnected) {
+            this.mountRow(this.feedEl, row, container);
+            return;
+          }
+          this.render(container);
+          return;
+        }
+        if (this.nextSource >= (this.sources?.length ?? 0)) {
+          this.exhausted = true;
+          this.render(container);
+        }
+      } catch {
+      } finally {
+        this.mounting = false;
+      }
+    }
+    async loadRows(container) {
+      try {
+        const profile = await this.plugin.discover.taste(this.filters.type);
+        this.profile = profile;
+        this.sources = this.plugin.discover.rowSources(profile, this.filters.type);
+        this.feed = [];
+        this.nextSource = 0;
+        this.seen.clear();
+        this.exhausted = false;
+        this.mounting = false;
+        for (let i = 0; i < 4; i++) {
+          const before = this.feed.length;
+          await this.mountNextSilently();
+          if (this.feed.length === before)
+            break;
+        }
+      } catch (e) {
+        this.error = diagnoseError(e).message;
+      } finally {
+        this.loading = false;
+        this.render(container);
+      }
+    }
+    /** The same step as `mountNext`, without touching the DOM. */
+    async mountNextSilently() {
+      if (!this.sources)
+        return;
+      for (let tries = 0; tries < 6 && this.nextSource < this.sources.length; tries++) {
+        const source = this.sources[this.nextSource++];
+        const items = (await source.fetch(1)).filter((i) => !this.seen.has(i.id));
+        for (const i of items)
+          this.seen.add(i.id);
+        if (!items.length)
+          continue;
+        this.feed.push({ source, items, page: 1, done: false, loading: false });
+        return;
+      }
+    }
+    /**
+     * One shelf, which pages as you scroll it.
+     *
+     * The horizontal sentinel sits at the right-hand end of the strip and is
+     * observed against the strip itself, so it fires when you scroll the row
+     * rather than when the row happens to be on screen. Cards are appended in
+     * place: rebuilding the strip would send it back to the left, which on a row
+     * you are actively scrolling is the most annoying thing a feed can do.
+     */
+    mountRow(into, row, container) {
+      const items = row.items.filter((i) => !this.handled.has(i.id));
+      if (!items.length)
+        return;
+      const section = into.createDiv({ cls: "reel-drow" });
+      const head = section.createDiv({ cls: "reel-drow-head" });
+      head.createDiv({ cls: "reel-drow-title", text: row.source.title });
+      if (row.source.reason)
+        head.createDiv({ cls: "reel-drow-reason", text: row.source.reason });
+      const strip = section.createDiv({ cls: "reel-drow-strip" });
+      for (const item of items)
+        strip.appendChild(this.card(item, container));
+      if (!row.done) {
+        const tail = strip.createDiv({ cls: "reel-drow-tail" });
+        const io = new IntersectionObserver(
+          (entries) => {
+            if (!entries.some((e) => e.isIntersecting))
+              return;
+            void this.extendRow(row, strip, tail, container);
+          },
+          { root: strip, rootMargin: "0px 600px" }
+        );
+        io.observe(tail);
+        this.watchers.push(io);
+      }
+      if (!Platform.isMobile) {
+        const nav = head.createDiv({ cls: "reel-drow-nav" });
+        const by = (dir) => {
+          const first = strip.querySelector(".reel-dcard");
+          const gap = parseFloat(getComputedStyle(strip).columnGap || "0") || 0;
+          const step = first ? first.getBoundingClientRect().width + gap : 160;
+          const fit = Math.max(1, Math.floor(strip.clientWidth / step));
+          const target = Math.round(strip.scrollLeft / step + dir * fit) * step;
+          strip.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+        };
+        const left = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Previous titles" } });
+        setIcon(left, "chevron-left");
+        left.addEventListener("click", () => by(-1));
+        const right = nav.createEl("button", { cls: "reel-drow-arrow", attr: { "aria-label": "Next titles" } });
+        setIcon(right, "chevron-right");
+        right.addEventListener("click", () => by(1));
+      }
+    }
+    /** Another page for one shelf, appended where you are already looking. */
+    async extendRow(row, strip, tail, container) {
+      if (row.loading || row.done)
+        return;
+      row.loading = true;
+      try {
+        const next = await row.source.fetch(row.page + 1);
+        row.page += 1;
+        const fresh = next.filter((i) => !this.seen.has(i.id) && !this.handled.has(i.id));
+        for (const i of fresh)
+          this.seen.add(i.id);
+        if (!fresh.length) {
+          row.empties = (row.empties ?? 0) + 1;
+          if (row.empties >= 2 || row.page > 20) {
+            row.done = true;
+            tail.remove();
+          }
+          return;
+        }
+        row.empties = 0;
+        row.items = [...row.items, ...fresh];
+        for (const item of fresh)
+          strip.insertBefore(this.card(item, container), tail);
+      } catch {
+        row.done = true;
+        tail.remove();
+      } finally {
+        row.loading = false;
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    /* Search — the view's own box, pointed at TMDB                        */
+    /* ------------------------------------------------------------------ */
+    /**
+     * What a search means on a screen about titles you do not own.
+     *
+     * Anything already in your library is dropped, because the card's actions are
+     * "add" and "watchlist" and offering those for a note you already have is how
+     * you end up with two of them. The count is stated rather than swallowed, with
+     * a way through to the library search, so a title you know you own not
+     * appearing here is explained rather than mysterious.
+     */
+    paintSearch(container) {
+      const q = this.query.trim();
+      if (this.searchedFor !== q) {
+        this.searchResults = null;
+        this.searchedFor = q;
+        this.searchPage = 0;
+        this.searchPages = 0;
+        this.searchTotal = 0;
+        this.searchMore = false;
+        this.searchPeople = [];
+      }
+      if (!this.searchResults) {
+        skeletonGrid(container, 12, "Searching");
+        if (this.loading)
+          return;
+        this.loading = true;
+        void this.plugin.tmdb.searchMultiPage(q, 1).then((res) => {
+          const usable = res.results.filter((i) => !i.adult && i.poster_path);
+          const fresh = this.plugin.discover.filterOut(usable);
+          this.searchOwned = usable.length - fresh.length;
+          this.searchResults = fresh;
+          this.searchPage = res.page;
+          this.searchPages = res.totalPages;
+          this.searchTotal = res.totalResults;
+          this.searchPeople = res.people;
+        }).catch((e) => {
+          this.error = diagnoseError(e).message;
+        }).finally(() => {
+          this.loading = false;
+          this.render(container);
+        });
+        return;
+      }
+      const items = this.searchResults.filter((i) => !this.handled.has(i.id));
+      const count = container.createDiv({ cls: "reel-block-count" });
+      const more = this.searchTotal > items.length;
+      if (!items.length && this.searchPeople.length) {
+        const n2 = this.searchPeople.length;
+        count.setText(`${n2} ${n2 === 1 ? "person" : "people"} on TMDB for \u201C${q}\u201D`);
+      } else {
+        count.setText(
+          more ? `${items.length} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${items.length} on TMDB for \u201C${q}\u201D`
+        );
+      }
+      if (this.searchOwned) {
+        count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
+      }
+      this.paintSearchPeople(container);
+      if (!items.length) {
+        if (this.searchPeople.length)
+          return;
+        const none = container.createDiv({ cls: "reel-empty" });
+        none.createDiv({
+          text: this.searchOwned ? "Everything matching is already in your library." : "Nothing on TMDB matches that."
+        });
+        return;
+      }
+      const grid = container.createDiv({ cls: "reel-dgrid" });
+      for (const item of items)
+        grid.appendChild(this.card(item, container));
+      this.paintSearchSentinel(container, grid, count);
+    }
+    /**
+     * The people the search matched.
+     *
+     * Same cell as the cast strip on a title's preview, because it is the same
+     * thing being offered and a second way of drawing a face would be a second
+     * thing to keep consistent. Tapping one opens their filmography, which is
+     * what you were after when you typed their name.
+     */
+    paintSearchPeople(container) {
+      if (!this.searchPeople.length)
+        return;
+      container.createDiv({ cls: "reel-block-title", text: "People" });
+      const strip = container.createDiv({ cls: "reel-caststrip is-people" }).createDiv({ cls: "reel-caststrip-track" });
+      for (const p of this.searchPeople) {
+        const name = (p.name ?? "").trim();
+        if (!name)
+          continue;
+        const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+        const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+        this.plugin.people.attach(shot, name, p.id);
+        badgePerson(this.plugin, shot, p.id);
+        cell.createDiv({ cls: "reel-caststrip-name", text: name });
+        const known = (p.known_for_department ?? "").trim();
+        if (known)
+          cell.createDiv({ cls: "reel-caststrip-role", text: known });
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-label", `${name} \u2014 open their filmography`);
+        const open2 = () => {
+          new PersonSheet(this.plugin, p.id, name).open();
+        };
+        cell.addEventListener("click", open2);
+        cell.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ")
+            return;
+          ev.preventDefault();
+          open2();
+        });
+      }
+    }
+    /**
+     * Keep the search going as you scroll, instead of stopping at page one.
+     *
+     * The same sentinel-and-observer shape as the feed, and for the same reason:
+     * an intersection is asked once and answered once, where a scroll handler on
+     * a measured, fixed-height body fires at whatever rate the device likes.
+     *
+     * Cards are appended to the grid that is already on screen rather than the
+     * screen being redrawn. A redraw would replace the scroller's children and
+     * throw the reader back to the top — the one thing an infinite scroll must
+     * never do.
+     */
+    paintSearchSentinel(container, grid, count) {
+      if (this.searchPage >= this.searchPages)
+        return;
+      const sentinel = container.createDiv({ cls: "reel-feed-end" });
+      sentinel.createDiv({ cls: "reel-loading", text: "Loading more\u2026" });
+      const scroller = container.closest(".reel-view-body") ?? null;
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting))
+            return;
+          void this.moreSearch(container, grid, sentinel, count).then(() => {
+            if (!sentinel.isConnected)
+              return;
+            io.unobserve(sentinel);
+            io.observe(sentinel);
+          });
+        },
+        { root: scroller, rootMargin: "600px 0px" }
+      );
+      io.observe(sentinel);
+      this.watchers.push(io);
+    }
+    /**
+     * One more page of search results, appended.
+     *
+     * A page can legitimately yield nothing to show — every title on it is
+     * already in your library, or has no poster, or the page was mostly people.
+     * Stopping there would end the search on a technicality while TMDB still
+     * holds hundreds of matches, so it walks on to the next page, up to a few
+     * per scroll so a run of empty pages cannot become an unbounded request
+     * loop.
+     */
+    async moreSearch(container, grid, sentinel, count) {
+      if (this.searchMore)
+        return;
+      this.searchMore = true;
+      const q = this.searchedFor;
+      try {
+        for (let tries = 0; tries < 3 && this.searchPage < this.searchPages; tries++) {
+          const res = await this.plugin.tmdb.searchMultiPage(q, this.searchPage + 1);
+          if (this.searchedFor !== q || !this.searchResults)
+            return;
+          this.searchPage = res.page;
+          if (res.totalPages)
+            this.searchPages = res.totalPages;
+          const usable = res.results.filter((i) => !i.adult && i.poster_path);
+          const fresh = this.plugin.discover.filterOut(usable);
+          this.searchOwned += usable.length - fresh.length;
+          const seen = new Set(this.searchResults.map((i) => i.id));
+          const added = fresh.filter((i) => !seen.has(i.id) && !this.handled.has(i.id));
+          this.searchResults.push(...added);
+          for (const item of added)
+            grid.appendChild(this.card(item, container));
+          if (added.length)
+            break;
+        }
+        const shown2 = this.searchResults?.filter((i) => !this.handled.has(i.id)).length ?? 0;
+        count.setText(
+          this.searchTotal > shown2 ? `${shown2} of ${this.searchTotal} on TMDB for \u201C${q}\u201D` : `${shown2} on TMDB for \u201C${q}\u201D`
+        );
+        if (this.searchOwned) {
+          count.createSpan({ cls: "reel-dim", text: ` \xB7 ${this.searchOwned} already in your library` });
+        }
+        if (this.searchPage >= this.searchPages)
+          sentinel.remove();
+      } catch {
+        sentinel.remove();
+      } finally {
+        this.searchMore = false;
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    /* Filtered results                                                    */
+    /* ------------------------------------------------------------------ */
+    paintResults(container) {
+      this.paintHead(container);
+      const hadRows = this.paintNarrowedRows(container);
+      if (!this.results) {
+        container.createDiv({ cls: "reel-loading", text: hadRows ? "Looking for more\u2026" : "Searching\u2026" });
+        skeletonGrid(container, hadRows ? 6 : 12, "Searching");
+        if (this.loading)
+          return;
+        this.loading = true;
+        const query = this.seed ? (
+          // A seed changes the source: recommendations for that title,
+          // then narrowed by whatever else is set. "An action comedy
+          // like X" means titles like X that are also action comedies.
+          this.plugin.discover.like(
+            { id: this.seed.id, type: this.seed.type },
+            {
+              genreIds: this.filters.genreIds,
+              decade: this.filters.decade,
+              minRating: this.filters.minRating
+            }
+          )
+        ) : this.plugin.discover.search({
+          type: this.filters.type,
+          genreIds: this.filters.genreIds,
+          decade: this.filters.decade ?? void 0,
+          minRating: this.filters.minRating ?? void 0
+        });
+        void query.then((items2) => {
+          this.results = items2;
+        }).catch((e) => {
+          this.error = diagnoseError(e).message;
+        }).finally(() => {
+          this.loading = false;
+          this.render(container);
+        });
+        return;
+      }
+      const items = this.results.filter((i) => !this.handled.has(i.id));
+      const label = [
+        this.filters.minRating ? `${this.filters.minRating}+` : "",
+        this.filters.genreNames.join(" "),
+        this.filters.type === "tv" ? "series" : "films",
+        this.filters.decade ? `from the ${this.filters.decade}s` : "",
+        // Naming the seed matters: otherwise a narrowed set looks identical
+        // to an ordinary genre browse and you cannot tell whether the
+        // "like X" part was honoured at all.
+        this.seed ? `like ${this.seed.title}` : ""
+      ].filter(Boolean).join(" ");
+      if (hadRows)
+        container.createDiv({ cls: "reel-drow-title", text: "More matches" });
+      container.createDiv({ cls: "reel-block-count", text: `${items.length} ${label}` });
+      if (!items.length) {
+        const none = container.createDiv({ cls: "reel-empty" });
+        none.createDiv({
+          text: hadRows ? "Nothing more beyond what's above." : "Nothing matches those filters."
+        });
+        const reset = none.createEl("button", { cls: "reel-btn mod-cta", text: "Clear filters" });
+        reset.addEventListener("click", () => {
+          this.filters = { ...emptyFilters(), type: this.filters.type };
+          this.render(container);
+        });
+        return;
+      }
+      const grid = container.createDiv({ cls: "reel-dgrid" });
+      for (const item of items)
+        grid.appendChild(this.card(item, container));
+      if (!this.exhausted) {
+        const more = container.createDiv({ cls: "reel-dgrid-more" });
+        const btn = more.createEl("button", { cls: "reel-btn", text: "Load more" });
+        btn.addEventListener("click", () => {
+          btn.setText("Loading\u2026");
+          btn.disabled = true;
+          void this.plugin.discover.search(
+            {
+              type: this.filters.type,
+              genreIds: this.filters.genreIds,
+              decade: this.filters.decade ?? void 0,
+              minRating: this.filters.minRating ?? void 0
+            },
+            this.page + 1
+          ).then((next) => {
+            this.page += 1;
+            const fresh = next.filter((n2) => !this.results?.some((r) => r.id === n2.id));
+            if (!fresh.length)
+              this.exhausted = true;
+            this.results = [...this.results ?? [], ...fresh];
+          }).catch(() => {
+            this.exhausted = true;
+          }).finally(() => this.render(container));
+        });
+      }
+    }
+    /* ------------------------------------------------------------------ */
+    /* Cards                                                               */
+    /* ------------------------------------------------------------------ */
+    card(item, container) {
+      const isTv = item.media_type === "tv";
+      const title = (isTv ? item.name : item.title) ?? "Untitled";
+      const year2 = yearOf(isTv ? item.first_air_date : item.release_date);
+      const card = createDiv({ cls: "reel-dcard" });
+      const posterEl = card.createDiv({ cls: "reel-dcard-poster" });
+      posterEl.setAttr("role", "button");
+      posterEl.setAttr("tabindex", "0");
+      posterEl.setAttr("aria-label", `${title} \u2014 details`);
+      const src = this.plugin.tmdb.posterUrl(item.poster_path, "w342");
+      if (src)
+        this.plugin.posters.attach(posterEl, { posterUrl: src, title });
+      if (item.vote_average)
+        posterEl.createDiv({ cls: "reel-dcard-score", text: item.vote_average.toFixed(1) });
+      if (isTv)
+        posterEl.createDiv({ cls: "reel-dcard-type", text: "TV" });
+      const openPreview = () => new TitlePage(this.plugin, item, () => {
+        this.markHandled(item.id);
+        this.render(container);
+      }).open();
+      let held = false;
+      posterEl.addEventListener("click", () => {
+        if (held) {
+          held = false;
+          return;
+        }
+        openPreview();
+      });
+      posterEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter")
+          openPreview();
+      });
+      const openMenu = (x, y) => {
+        const menu = new Menu();
+        menu.addItem((i) => i.setTitle("Details").setIcon("info").onClick(openPreview));
+        menu.addItem(
+          (i) => i.setTitle("Add to watchlist").setIcon("bookmark").onClick(
+            () => void (async () => {
+              await this.add(item, true);
+              this.plugin.undo.offer(`${title} \u2192 watchlist`);
+              this.markHandled(item.id);
+              this.render(container);
+            })()
+          )
+        );
+        menu.addItem(
+          (i) => i.setTitle("Seen it, rate now").setIcon("check").onClick(
+            () => new SeenSheet(this.plugin, item, () => {
+              this.markHandled(item.id);
+              this.render(container);
+            }).open()
+          )
+        );
+        menu.addSeparator();
+        menu.addItem(
+          (i) => i.setTitle("Look it up\u2026").setIcon("external-link").onClick(() => {
+            const m = new Menu();
+            m.addItem((h) => h.setTitle(title).setDisabled(true));
+            m.addSeparator();
+            const q = encodeURIComponent(`${title}${year2 ? ` ${year2}` : ""}`);
+            const go = (label, url) => m.addItem((r) => r.setTitle(label).setIcon("external-link").onClick(() => void window.open(url, "_blank", "noopener")));
+            go("TMDB", tmdbUrl(item.id, isTv ? "tv" : "film"));
+            go("Trakt", `https://trakt.tv/search/tmdb/${item.id}?id_type=${isTv ? "show" : "movie"}`);
+            if (!isTv)
+              go("Letterboxd", `https://letterboxd.com/tmdb/${item.id}`);
+            go("Where to watch", `https://www.justwatch.com/${(this.plugin.settings.region || "us").toLowerCase()}/search?q=${q}`);
+            go("Search the web", `https://www.google.com/search?q=${q}`);
+            m.showAtPosition({ x, y });
+          })
+        );
+        menu.addItem(
+          (i) => i.setTitle("Search your library for it").setIcon("search").onClick(() => this.plugin.openOmni(title, "mine"))
+        );
+        menu.addSeparator();
+        menu.addItem(
+          (i) => i.setTitle("Not interested").setIcon("x").onClick(
+            () => void (async () => {
+              await this.plugin.discover.dismiss(item.id);
+              this.handled.add(item.id);
+              this.render(container);
+            })()
+          )
+        );
+        menu.showAtPosition({ x, y });
+      };
+      let holdTimer = null;
+      let hx = 0;
+      let hy = 0;
+      const stopHold = () => {
+        if (holdTimer != null)
+          window.clearTimeout(holdTimer);
+        holdTimer = null;
+      };
+      posterEl.addEventListener("pointerdown", (e) => {
+        hx = e.clientX;
+        hy = e.clientY;
+        held = false;
+        holdTimer = window.setTimeout(() => {
+          held = true;
+          haptic("hold");
+          openMenu(hx, hy);
+        }, 500);
+      });
+      posterEl.addEventListener("pointermove", (e) => {
+        if (Math.abs(e.clientX - hx) > 8 || Math.abs(e.clientY - hy) > 8)
+          stopHold();
+      });
+      for (const ev of ["pointerup", "pointercancel", "pointerleave"])
+        posterEl.addEventListener(ev, stopHold);
+      posterEl.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        stopHold();
+        openMenu(e.clientX, e.clientY);
+      });
+      card.createDiv({ cls: "reel-dcard-title", text: title });
+      if (year2)
+        card.createDiv({ cls: "reel-dcard-year", text: String(year2) });
+      const corner = posterEl.createEl("button", {
+        cls: "reel-dcard-add",
+        attr: { type: "button", "aria-label": `Add ${title} to your watchlist` }
+      });
+      setIcon(corner, "plus");
+      corner.addEventListener("click", (e) => {
+        e.stopPropagation();
+        haptic("tick");
+        void (async () => {
+          await this.add(item, true);
+          this.plugin.undo.offer(`${title} \u2192 watchlist`);
+          this.markHandled(item.id);
+          this.render(container);
+        })();
+      });
+      const actions = card.createDiv({ cls: "reel-dcard-actions" });
+      const button = (icon, label, cls, fn) => {
+        const b = actions.createEl("button", { cls: `reel-dcard-btn ${cls}` });
+        setIcon(b, icon);
+        b.setAttr("aria-label", `${label}: ${title}`);
+        b.setAttr("title", label);
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void Promise.resolve(fn());
+        });
+        return b;
+      };
+      button("plus", "Add to watchlist", "add", async () => {
+        await this.add(item, true);
+        this.plugin.undo.offer(`${title} \u2192 watchlist`);
+        this.markHandled(item.id);
+        this.render(container);
+      });
+      button("check", "Seen it \u2014 rate now", "seen", () => {
+        new SeenSheet(this.plugin, item, () => {
+          this.markHandled(item.id);
+          this.render(container);
+        }).open();
+      });
+      button("x", "Not interested", "skip", async () => {
+        await this.plugin.discover.dismiss(item.id);
+        this.handled.add(item.id);
+        this.render(container);
+      });
+      return card;
+    }
+    async add(item, watchlist, rating) {
+      await this.plugin.notes.createFromResult(item, { date: todayISO(), watchlist, rating });
+    }
+  };
+  var RATING_WORDS = ["Not for me", "Weak", "Fine", "Great", "Favourite"];
+  var SeenSheet = class extends Modal {
+    constructor(plugin2, item, onDone) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.item = item;
+      this.onDone = onDone;
+      this.busy = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      modalEl.addClass("reel-seensheet");
+      const isTv = this.item.media_type === "tv";
+      const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
+      const year2 = yearOf(this.item.release_date ?? this.item.first_air_date);
+      const head = contentEl.createDiv({ cls: "reel-seen-head" });
+      const src = this.item.poster_path ? this.plugin.tmdb.posterUrl(this.item.poster_path, "w342") : null;
+      if (src) {
+        const art = head.createDiv({ cls: "reel-seen-poster" });
+        art.createEl("img", { attr: { src, alt: "", loading: "lazy", decoding: "async" } });
+        this.plugin.swatches.tint(modalEl, src, document.body.hasClass("theme-dark"));
+      }
+      const who = head.createDiv({ cls: "reel-seen-who" });
+      who.createDiv({ cls: "reel-seen-title", text: title });
+      const meta = who.createDiv({ cls: "reel-seen-meta" });
+      if (year2)
+        meta.createSpan({ text: String(year2) });
+      meta.createSpan({ cls: "reel-badge subtle", text: isTv ? "Series" : "Film" });
+      if (this.item.vote_average)
+        meta.createSpan({ cls: "reel-dim", text: `\u2605 ${this.item.vote_average.toFixed(1)}` });
+      who.createDiv({ cls: "reel-seen-note", text: "Adding as watched." });
+      const starRow = contentEl.createDiv({ cls: "reel-rating-row big centred" });
+      const readout = contentEl.createDiv({ cls: "reel-seen-readout", text: "Tap a star to rate it" });
+      renderStars(starRow, {
+        onChange: (v) => {
+          if (v == null)
+            return;
+          readout.setText(`${v} \u2014 ${RATING_WORDS[Math.ceil(v) - 1] ?? ""}`);
+          readout.addClass("is-set");
+          void this.save(v);
+        }
+      });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const noRating = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Add without rating" });
+      noRating.addEventListener("click", () => void this.save(void 0));
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+    }
+    async save(rating) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      try {
+        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist: false, rating });
+        this.plugin.undo.offer(rating != null ? `Added \u2014 rated ${rating}` : "Added as watched");
+        this.onDone();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+        this.busy = false;
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+  var PreviewSheet = class extends Modal {
+    constructor(plugin2, item, onAdded, role) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.item = item;
+      this.onAdded = onAdded;
+      this.role = role;
+      this.busy = false;
+      /** The sticky foot, kept so it can be put back at the end. */
+      this.actionsEl = null;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-preview");
+      paintWash(contentEl, this.plugin.tmdb.posterUrl(this.item.poster_path, "w342"));
+      const isTv = this.item.media_type === "tv";
+      const title = (isTv ? this.item.name : this.item.title) ?? "Untitled";
+      const year2 = yearOf(isTv ? this.item.first_air_date : this.item.release_date);
+      if (this.role) {
+        const r = contentEl.createDiv({ cls: "reel-preview-role" });
+        r.createSpan({ cls: "reel-preview-role-label", text: "Role" });
+        r.createSpan({ cls: "reel-preview-role-value", text: this.role });
+      }
+      const head = contentEl.createDiv({ cls: "reel-preview-head" });
+      const posterEl = head.createDiv({ cls: "reel-preview-poster" });
+      const src = this.plugin.tmdb.posterUrl(this.item.poster_path, "w342");
+      if (src)
+        posterEl.createEl("img", { attr: { src, alt: "" } });
+      const body = head.createDiv({ cls: "reel-preview-body" });
+      const h = body.createDiv({ cls: "reel-preview-title" });
+      h.createSpan({ text: title });
+      if (year2)
+        h.createSpan({ cls: "reel-dim", text: ` ${year2}` });
+      const facts = body.createDiv({ cls: "reel-header-facts" });
+      facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
+      if (this.item.vote_average)
+        facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
+      if (this.item.overview)
+        contentEl.createDiv({ cls: "reel-preview-overview", text: this.item.overview });
+      void this.loadTrailer(contentEl.createDiv({ cls: "reel-preview-trailer" }), isTv);
+      const actions = contentEl.createDiv({ cls: "reel-log-actions reel-preview-actions" });
+      this.actionsEl = actions;
+      const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist" });
+      later.addEventListener("click", () => void this.add(true, later));
+      const seen = actions.createEl("button", { cls: "reel-btn", text: "Seen it" });
+      seen.addEventListener("click", () => {
+        new LogSheet(this.plugin.app, this.plugin, {
+          pending: {
+            id: this.item.id,
+            type: isTv ? "tv" : "film",
+            title
+          }
+        }).open();
+        this.onAdded();
+        this.close();
+      });
+      const nope = actions.createEl("button", { cls: "reel-btn", text: "Not interested" });
+      nope.addEventListener("click", () => {
+        void this.plugin.discover.dismiss(this.item.id).then(() => {
+          this.onAdded();
+          this.close();
+        });
+      });
+    }
+    /**
+     * Fill the sheet out from the full TMDB record.
+     *
+     * This used to fetch the detail payload and take only the trailer and the
+     * provider list from it, which made "Full details" a promise the screen
+     * did not keep — it showed *less* than the inline role panel it was
+     * reached from. The request was already being made; almost everything
+     * below was in the response and was being discarded.
+     *
+     * Silent on failure. The sheet works without any of it, and an error
+     * notice for a missing trailer would be noise on a screen you are
+     * skimming.
+     */
+    async loadTrailer(slot, isTv) {
+      try {
+        const meta = isTv ? await this.plugin.tmdb.getShow(this.item.id) : await this.plugin.tmdb.getFilm(this.item.id);
+        const url = trailerUrl(meta.videos?.results);
+        if (url)
+          this.paintTrailer(slot, url);
+        this.paintFacts(slot, meta, isTv);
+        const providers = providerNames(meta["watch/providers"], this.plugin.settings.region);
+        if (providers.length) {
+          const box = slot.createDiv({ cls: "reel-preview-providers" });
+          box.createSpan({ cls: "reel-dim", text: "Streaming on " });
+          box.createSpan({ text: providers.slice(0, 4).join(", ") });
+        }
+        this.paintLinks(slot, meta, isTv);
+      } catch {
+      } finally {
+        const actions = this.actionsEl;
+        if (actions?.parentElement)
+          actions.parentElement.appendChild(actions);
+      }
+    }
+    /**
+     * The facts that make this "details" rather than a preview.
+     *
+     * All of it came back in the request already made for the trailer and was
+     * being discarded — genres, runtime, certification, the cast. The cast
+     * strip matters most: on a screen you reached *from* an actor, the other
+     * people in the thing are the obvious next question.
+     */
+    paintFacts(slot, meta, isTv) {
+      const facts = [];
+      const genres = (meta.genres ?? []).map((g) => g.name).filter(Boolean);
+      if (genres.length)
+        facts.push(genres.slice(0, 3).join(", "));
+      if (isTv) {
+        const show = meta;
+        if (show.number_of_episodes)
+          facts.push(`${show.number_of_episodes} episodes`);
+        if (show.status)
+          facts.push(show.status);
+      } else {
+        const runtime = meta.runtime;
+        if (runtime)
+          facts.push(formatMinutes(runtime));
+      }
+      if (facts.length)
+        slot.createDiv({ cls: "reel-preview-facts", text: facts.join(" \xB7 ") });
+      const credits = isTv ? meta.aggregate_credits : meta.credits;
+      const made = isTv ? (meta.created_by ?? []).map((c) => c.name) : (credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
+      if (made.length) {
+        slot.createDiv({
+          cls: "reel-preview-facts",
+          text: `${isTv ? "Created by" : "Directed by"} ${made.join(", ")}`
+        });
+      }
+      this.paintMoreLikeThis(slot, meta, isTv);
+      const cast = (credits?.cast ?? []).slice(0, 10);
+      if (!cast.length)
+        return;
+      slot.createDiv({ cls: "reel-block-title", text: "Cast" });
+      const strip = slot.createDiv({ cls: "reel-caststrip" }).createDiv({ cls: "reel-caststrip-track" });
+      for (const p of cast) {
+        const cell = strip.createDiv({ cls: "reel-caststrip-cell" });
+        const shot = cell.createDiv({ cls: "reel-caststrip-shot" });
+        this.plugin.people.attach(shot, p.name, p.id);
+        badgePerson(this.plugin, shot, p.id);
+        cell.createDiv({ cls: "reel-caststrip-name", text: p.name });
+        const role = (p.character ?? p.roles?.[0]?.character ?? "").trim();
+        if (role)
+          cell.createDiv({ cls: "reel-caststrip-role", text: role });
+        const id = p.id;
+        if (!id)
+          continue;
+        cell.setAttr("role", "button");
+        cell.setAttr("tabindex", "0");
+        cell.setAttr("aria-label", `${p.name} \u2014 open their filmography`);
+        cell.addEventListener("click", () => new PersonSheet(this.plugin, id, p.name).open());
+      }
+    }
+    /**
+     * Titles like this one, as IMDb's "More like this": tap any of them for the
+     * same sheet about that title, which has its own strip, and so on. Press and
+     * hold for the places that know more.
+     */
+    paintMoreLikeThis(slot, meta, isTv) {
+      const rows2 = [];
+      for (const r of [...meta.recommendations?.results ?? [], ...meta.similar?.results ?? []]) {
+        if (r.id === this.item.id || r.adult || !r.poster_path || rows2.some((x) => x.id === r.id))
+          continue;
+        rows2.push({ ...r, media_type: r.media_type ?? (isTv ? "tv" : "movie") });
+      }
+      if (!rows2.length)
+        return;
+      slot.createDiv({ cls: "reel-block-title", text: "More like this" });
+      paintRelatedFeed(this.plugin, slot, {
+        tmdbId: this.item.id,
+        isTv,
+        seed: rows2,
+        layout: "strip",
+        beforeOpenMine: () => this.close(),
+        onAdded: this.onAdded
+      });
+    }
+    /**
+     * IMDb, its parents guide, and TMDB.
+     *
+     * The parents guide needs an IMDb id, which a search result does not
+     * carry — it only arrives on the detail payload, which is why this could
+     * not be built before the fetch. Direct links, never a search: "search
+     * IMDb for this title" is a different and much worse thing.
+     */
+    paintLinks(slot, meta, isTv) {
+      paintLinks(slot, meta, isTv);
+    }
+    /**
+     * The trailer, playable in place.
+     *
+     * Click-to-load rather than an iframe on arrival: an embed that mounts
+     * itself costs a YouTube request and a set of cookies for every card you
+     * so much as glance at, and most of them you close again. The poster frame
+     * is free, and one tap is a fair price for the thing you asked for.
+     */
+    paintTrailer(slot, url) {
+      paintTrailer(slot, url);
+    }
+    async add(watchlist, button) {
+      if (this.busy)
+        return;
+      this.busy = true;
+      button.setText("Adding\u2026");
+      button.setAttr("disabled", "true");
+      try {
+        await this.plugin.notes.createFromResult(this.item, { date: todayISO(), watchlist });
+        this.plugin.undo.offer(watchlist ? "Added to your watchlist" : "Added as watched");
+        this.onAdded();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`);
+        button.setText("Retry");
+        button.removeAttribute("disabled");
+        this.busy = false;
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/util/blend.ts
   function becauseText(because, cap = 3) {
     const names = because.slice(0, cap);
@@ -10095,7 +10151,7 @@ ${body}
       }
     }
     preview(item) {
-      new PreviewSheet(this.plugin, item, () => {
+      new TitlePage(this.plugin, item, () => {
         this.results = (this.results ?? []).filter((r) => r.item.id !== item.id);
         this.paint();
       }).open();
