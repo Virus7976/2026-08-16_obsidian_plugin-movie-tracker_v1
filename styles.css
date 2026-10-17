@@ -7731,8 +7731,6 @@ input.reel-input {
 .reel-view:not(.is-w620) .reel-detail-bar {
 	background: var(--background-primary);
 	background: color-mix(in srgb, var(--background-primary) 82%, transparent);
-	-webkit-backdrop-filter: saturate(180%) blur(14px);
-	backdrop-filter: saturate(180%) blur(14px);
 	border-bottom: 1px solid var(--background-modifier-border);
 	/* Clear of the measured chrome, so it pins where the content starts rather
 	   than where the viewport does. */
@@ -12834,8 +12832,6 @@ input.reel-input {
 .reel-modal.reel-sheet .reel-log-actions,
 .reel-modal.reel-sheet .reel-prompt-actions {
 	background: color-mix(in srgb, var(--background-primary) 82%, transparent);
-	-webkit-backdrop-filter: blur(18px) saturate(180%);
-	backdrop-filter: blur(18px) saturate(180%);
 }
 
 /*
@@ -18592,41 +18588,6 @@ select.reel-select {
 /* people who ask for less.                                               */
 /* ==================================================================== */
 @media (prefers-reduced-motion: no-preference) {
-	/* Posters rise into place, a few at a time, when a screen is drawn. */
-	.reel-gridwrap .reel-cell,
-	.reel-gridwrap .reel-row {
-		animation: reel-rise 240ms var(--reel-ease) both;
-	}
-	.reel-gridwrap .reel-cell:nth-child(1), .reel-gridwrap .reel-row:nth-child(1) { animation-delay: 0ms; }
-	.reel-gridwrap .reel-cell:nth-child(2), .reel-gridwrap .reel-row:nth-child(2) { animation-delay: 20ms; }
-	.reel-gridwrap .reel-cell:nth-child(3), .reel-gridwrap .reel-row:nth-child(3) { animation-delay: 40ms; }
-	.reel-gridwrap .reel-cell:nth-child(4), .reel-gridwrap .reel-row:nth-child(4) { animation-delay: 60ms; }
-	.reel-gridwrap .reel-cell:nth-child(5), .reel-gridwrap .reel-row:nth-child(5) { animation-delay: 80ms; }
-	.reel-gridwrap .reel-cell:nth-child(6), .reel-gridwrap .reel-row:nth-child(6) { animation-delay: 100ms; }
-	.reel-gridwrap .reel-cell:nth-child(n+7), .reel-gridwrap .reel-row:nth-child(n+7) { animation-delay: 120ms; }
-
-	/* Discover shelves and rows */
-	.reel-drow-strip .reel-dcard,
-	.reel-dgrid .reel-dcard {
-		animation: reel-rise 240ms var(--reel-ease) both;
-	}
-	.reel-drow-strip .reel-dcard:nth-child(2) { animation-delay: 30ms; }
-	.reel-drow-strip .reel-dcard:nth-child(3) { animation-delay: 60ms; }
-	.reel-drow-strip .reel-dcard:nth-child(n+4) { animation-delay: 90ms; }
-
-	/* A sheet's wash fades up behind its content, like the title page does. */
-	.reel-modal .reel-sheet-wash-art {
-		animation: reel-wash-in 420ms var(--reel-ease) both;
-	}
-
-	/* Sheet content settles a beat after the sheet itself. */
-	.reel-modal.reel-sheet .modal-content > *,
-	.reel-review-content > * {
-		animation: reel-settle 260ms var(--reel-ease) both;
-	}
-	.reel-review-content > :nth-child(2) { animation-delay: 40ms; }
-	.reel-review-content > :nth-child(3) { animation-delay: 80ms; }
-
 	/* Stars: pop when you set one. */
 	.reel-star.is-full .reel-star-fg,
 	.reel-star.is-half .reel-star-fg {
@@ -18644,16 +18605,6 @@ select.reel-select {
 	}
 	.reel-chip:active, .reel-btn:active, .reel-seg-btn:active {
 		transform: scale(0.96);
-	}
-
-	/* Heart and watchlist flags settle in. */
-	.reel-cell-flag {
-		animation: reel-star-pop 320ms var(--reel-ease) 120ms both;
-	}
-
-	/* The summary strip fades in on its own. */
-	.reel-summary {
-		animation: reel-settle 300ms var(--reel-ease) both;
 	}
 }
 
@@ -19347,8 +19298,6 @@ body.is-mobile .modal-container .modal.reel-modal.reel-review-sheet {
 	border-radius: 50%;
 	background: color-mix(in srgb, var(--background-primary) 70%, transparent);
 	background-clip: padding-box;
-	-webkit-backdrop-filter: blur(8px);
-	backdrop-filter: blur(8px);
 	color: var(--text-normal);
 	box-shadow: none;
 }
@@ -19447,4 +19396,28 @@ body.is-mobile .modal-container .modal.reel-modal.reel-review-sheet {
 
 .reel-pick-row {
 	border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
+}
+
+/* ==================================================================== */
+/* Phone top stack, tightened: control row, caption, first shelf         */
+/* ==================================================================== */
+.reel-view:not(.is-w700) .reel-discover {
+	gap: var(--reel-space-2);
+}
+
+.reel-view:not(.is-w700) .reel-discover-filters {
+	margin: 0;
+	gap: 0;
+}
+
+.reel-view:not(.is-w700) .reel-discover-filters .reel-chips.reel-filterbar {
+	min-height: 40px;
+	padding-top: 0;
+	padding-bottom: 0;
+	margin-bottom: 0;
+}
+
+.reel-view:not(.is-w700) .reel-discover-head {
+	margin-top: 0;
+	margin-bottom: var(--reel-space-1);
 }

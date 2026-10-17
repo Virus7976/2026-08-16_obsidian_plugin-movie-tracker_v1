@@ -2869,7 +2869,7 @@
       const cap = this.limit ?? 12;
       let rows2 = everything.slice(0, cap);
       const hidden = everything.length - rows2.length;
-      const watchAll = this.watchlist();
+      const watchAll = this.heading ? [] : this.watchlist();
       if (!rows2.length && !watchAll.length) {
         const bare = !this.plugin.library.shows().length;
         renderEmpty(el, {
@@ -2901,7 +2901,7 @@
       }
       for (const entry of rows2)
         list2.appendChild(this.row(entry));
-      if (this.heading && watchAll.length)
+      if (watchAll.length)
         this.paintWatchlist(el, watchAll);
     }
     /** Everything you have saved for later, narrowed like the rest of the view. */

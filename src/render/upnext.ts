@@ -151,7 +151,8 @@ class UpNextPainter {
 		let rows = everything.slice(0, cap);
 		const hidden = everything.length - rows.length;
 
-		const watchAll = this.watchlist();
+		// The code block (heading) is "tonight"; the view owns the watchlist.
+		const watchAll = this.heading ? [] : this.watchlist();
 		if (!rows.length && !watchAll.length) {
 			// The library may be full and simply have nothing part-watched, or
 			// it may be a fresh install. Those want different offers, and the
@@ -191,9 +192,7 @@ class UpNextPainter {
 		}
 		for (const entry of rows) list.appendChild(this.row(entry));
 
-		// In the view only: the code block is "what do I watch tonight", and the
-		// watchlist is a different question with a screen of its own.
-		if (this.heading && watchAll.length) this.paintWatchlist(el, watchAll);
+				if (watchAll.length) this.paintWatchlist(el, watchAll);
 	}
 
 	/** Everything you have saved for later, narrowed like the rest of the view. */
