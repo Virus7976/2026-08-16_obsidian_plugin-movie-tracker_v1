@@ -52,6 +52,17 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.56",
+		date: "2026-10-17",
+		headline: "IMDb's parents guide inside the app, and a split box office.",
+		changes: [
+			{ kind: "new", text: "Parents guide: press Read IMDb's parents guide here and it opens inside the app, in your theme, one fold-out per category with its severity." },
+			{ kind: "new", text: "Box office splits US and Canada from the rest of the world. This needs an OMDb key in settings." },
+			{ kind: "new", text: "Press and hold (or right-click) a genre, keyword or list chip to search your library for it or copy it." },
+			{ kind: "better", text: "The estimated parents guide has a new look: a card, a three-step bar for each category, and the reason for each." },
+		],
+	},
+	{
 		version: "0.9.55",
 		date: "2026-10-17",
 		headline: "Press and hold everywhere, a full page for any title, and a parents guide.",
