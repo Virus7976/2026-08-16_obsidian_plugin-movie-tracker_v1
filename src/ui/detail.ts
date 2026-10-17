@@ -35,6 +35,7 @@ import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
 import { paintRelatedFeed } from "./relatedFeed";
+import { fetchImdbGuide } from "../imdbGuide";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { paintTrailerFor } from "./titleExtras";
 import { unlink } from "../library";
@@ -842,6 +843,37 @@ export class DetailScreen {
 	 * one deserve different amounts of trust, and the link to IMDb's fuller
 	 * guide sits alongside.
 	 */
+	/** IMDb's guide in this app's style, loaded when asked for, like a reader mode. */
+	private renderImdbReader(el: HTMLElement, imdbId: string): void {
+		const box = el.createDiv({ cls: "reel-fl reel-guide-reader" });
+		box.createDiv({ cls: "reel-fl-title", text: "From IMDb" });
+		const go = box.createEl("button", { cls: "reel-btn mod-cta", text: "Read IMDb's parents guide here", attr: { type: "button" } });
+		go.addEventListener("click", () => {
+			go.setText("Loading…");
+			go.setAttr("disabled", "true");
+			void fetchImdbGuide(this.plugin, imdbId).then((cats) => {
+				if (!box.isConnected) return;
+				if (!cats) {
+					go.setText("Try again");
+					go.removeAttribute("disabled");
+					box.createDiv({ cls: "reel-dim reel-fl-note", text: "IMDb did not answer in a way this could read. Use the link below to open it there." });
+					return;
+				}
+				go.remove();
+				for (const c of cats) {
+					const sec = box.createEl("details", { cls: "reel-guide-sec" });
+					const sum = sec.createEl("summary");
+					sum.createSpan({ cls: "reel-guide-name", text: c.title });
+					if (c.severity) sum.createSpan({ cls: `reel-guide-pill sev-${c.severity.toLowerCase()}`, text: c.severity });
+					const list = sec.createEl("ul", { cls: "reel-guide-list" });
+					for (const t of c.items) list.createEl("li", { text: t });
+					if (!c.items.length) list.createEl("li", { cls: "reel-dim", text: "No notes yet." });
+				}
+				box.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
+			});
+		});
+	}
+
 	private renderContent(el: HTMLElement, info: { cert?: string; flags: string[]; imdbId?: string; guide: ReturnType<typeof estimateGuide> }): void {
 		const e = this.entry;
 
@@ -910,6 +942,8 @@ export class DetailScreen {
 				row.createSpan({ cls: "reel-content-name", text: topic });
 			}
 		}
+
+		if (info.imdbId) this.renderImdbReader(el, info.imdbId);
 
 		const imdb = imdbUrl(info.imdbId);
 		if (imdb) {
