@@ -52,6 +52,15 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.61",
+		date: "2026-10-17",
+		headline: "IMDb's parents guide: a second way in, and a reason when it fails.",
+		changes: [
+			{ kind: "better", text: "The IMDb parents guide tries IMDb's data feed first and its page second. When neither works it now says what IMDb answered, so it can be fixed." },
+			{ kind: "fixed", text: "Tapping Try again no longer stacks the same message twice, and the Parents guide tab no longer ends with a DoesTheDogDie hint." },
+		],
+	},
+	{
 		version: "0.9.60",
 		date: "2026-10-17",
 		headline: "Press and hold on the stats tiles.",

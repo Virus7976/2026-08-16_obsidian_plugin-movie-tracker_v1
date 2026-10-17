@@ -6118,39 +6118,70 @@ ${body}
     });
     return out;
   }
+  var GQL_QUERY = "query($id:ID!){title(id:$id){parentsGuide{categories{category{id text} severity{text} guideItems(first:12){edges{node{text{plainText}}}}}}}}";
+  async function viaGraphql(imdbId) {
+    const res = await requestUrl({
+      url: "https://api.graphql.imdb.com/",
+      method: "POST",
+      contentType: "application/json",
+      headers: { Accept: "application/json", "x-imdb-client-name": "imdb-web-next-localized" },
+      body: JSON.stringify({ query: GQL_QUERY, variables: { id: imdbId } }),
+      throw: false
+    });
+    if (res.status >= 400)
+      return { cats: [], status: res.status };
+    let json = null;
+    try {
+      json = res.json;
+    } catch {
+    }
+    return { cats: fromJson(json), status: res.status };
+  }
+  async function viaPage(imdbId) {
+    const res = await requestUrl({
+      url: `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/parentalguide/`,
+      method: "GET",
+      headers: { "Accept-Language": "en-US,en;q=0.9" },
+      throw: false
+    });
+    if (res.status >= 400 || !res.text)
+      return { cats: [], status: res.status };
+    const doc = new DOMParser().parseFromString(res.text, "text/html");
+    let cats = [];
+    const next = doc.getElementById("__NEXT_DATA__")?.textContent;
+    if (next) {
+      try {
+        cats = fromJson(JSON.parse(next));
+      } catch {
+      }
+    }
+    if (!cats.length)
+      cats = fromDom(doc);
+    return { cats, status: res.status };
+  }
   async function fetchImdbGuide(plugin2, imdbId) {
     const cacheKey = `imdbguide-${imdbId}`;
     const cached = await plugin2.tmdb.readExternalCache(cacheKey);
     if (cached?.length)
-      return cached;
-    try {
-      const res = await requestUrl({
-        url: `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/parentalguide/`,
-        method: "GET",
-        headers: { "Accept-Language": "en-US,en;q=0.9" },
-        throw: false
-      });
-      if (res.status >= 400 || !res.text)
-        return null;
-      const doc = new DOMParser().parseFromString(res.text, "text/html");
-      let cats = [];
-      const next = doc.getElementById("__NEXT_DATA__")?.textContent;
-      if (next) {
-        try {
-          cats = fromJson(JSON.parse(next));
-        } catch {
+      return { cats: cached };
+    const notes = [];
+    for (const [name, run2] of [
+      ["data", viaGraphql],
+      ["page", viaPage]
+    ]) {
+      try {
+        const { cats, status } = await run2(imdbId);
+        const usable = cats.filter((c) => c.items.length || c.severity);
+        if (usable.length) {
+          await plugin2.tmdb.writeExternalCache(cacheKey, usable, false);
+          return { cats: usable };
         }
+        notes.push(`${name} ${status}${status < 400 ? " (no guide in reply)" : ""}`);
+      } catch (e) {
+        notes.push(`${name} failed`);
       }
-      if (!cats.length)
-        cats = fromDom(doc);
-      cats = cats.filter((c) => c.items.length || c.severity);
-      if (!cats.length)
-        return null;
-      await plugin2.tmdb.writeExternalCache(cacheKey, cats, false);
-      return cats;
-    } catch {
-      return null;
     }
+    return { cats: null, reason: notes.join(", ") };
   }
 
   // src/ui/detail.ts
@@ -6834,13 +6865,17 @@ ${body}
       go.addEventListener("click", () => {
         go.setText("Loading\u2026");
         go.setAttr("disabled", "true");
-        void fetchImdbGuide(this.plugin, imdbId).then((cats) => {
+        void fetchImdbGuide(this.plugin, imdbId).then(({ cats, reason }) => {
           if (!box.isConnected)
             return;
+          box.findAll(".reel-guide-fail").forEach((n2) => n2.remove());
           if (!cats) {
             go.setText("Try again");
             go.removeAttribute("disabled");
-            box.createDiv({ cls: "reel-dim reel-fl-note", text: "IMDb did not answer in a way this could read. Use the link below to open it there." });
+            box.createDiv({
+              cls: "reel-dim reel-fl-note reel-guide-fail",
+              text: `IMDb did not give the guide in a form this could read (${reason ?? "no reply"}). Use the link below to open it there.`
+            });
             return;
           }
           go.remove();
@@ -6927,12 +6962,6 @@ ${body}
         const a = el.createEl("a", { cls: "reel-btn", text: "Full parents guide on IMDb", href: `${imdb}parentalguide` });
         a.setAttr("target", "_blank");
         a.setAttr("rel", "noopener");
-      }
-      if (!e.contentTopics.length && e.path) {
-        el.createDiv({
-          cls: "reel-dim",
-          text: "No community content notes yet. Add a DoesTheDogDie key in settings to fetch them."
-        });
       }
     }
     /** Per-country release dates, grouped by kind, as TMDB reports them. */

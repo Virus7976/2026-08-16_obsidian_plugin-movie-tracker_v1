@@ -75,34 +75,77 @@ function fromDom(doc: Document): ImdbGuideCategory[] {
 	return out;
 }
 
-export async function fetchImdbGuide(plugin: ReelPlugin, imdbId: string): Promise<ImdbGuideCategory[] | null> {
+export interface ImdbGuideResult {
+	cats: ImdbGuideCategory[] | null;
+	/** Why there is nothing to show, in a few words, so a failure can be reported. */
+	reason?: string;
+}
+
+const GQL_QUERY =
+	"query($id:ID!){title(id:$id){parentsGuide{categories{category{id text} severity{text} guideItems(first:12){edges{node{text{plainText}}}}}}}}";
+
+/** IMDb's own site asks this endpoint for the same data; tried first, being JSON. */
+async function viaGraphql(imdbId: string): Promise<{ cats: ImdbGuideCategory[]; status: number }> {
+	const res = await requestUrl({
+		url: "https://api.graphql.imdb.com/",
+		method: "POST",
+		contentType: "application/json",
+		headers: { Accept: "application/json", "x-imdb-client-name": "imdb-web-next-localized" },
+		body: JSON.stringify({ query: GQL_QUERY, variables: { id: imdbId } }),
+		throw: false,
+	});
+	if (res.status >= 400) return { cats: [], status: res.status };
+	let json: unknown = null;
+	try {
+		json = res.json;
+	} catch {
+		/* not JSON */
+	}
+	return { cats: fromJson(json), status: res.status };
+}
+
+async function viaPage(imdbId: string): Promise<{ cats: ImdbGuideCategory[]; status: number }> {
+	const res = await requestUrl({
+		url: `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/parentalguide/`,
+		method: "GET",
+		headers: { "Accept-Language": "en-US,en;q=0.9" },
+		throw: false,
+	});
+	if (res.status >= 400 || !res.text) return { cats: [], status: res.status };
+	const doc = new DOMParser().parseFromString(res.text, "text/html");
+	let cats: ImdbGuideCategory[] = [];
+	const next = doc.getElementById("__NEXT_DATA__")?.textContent;
+	if (next) {
+		try {
+			cats = fromJson(JSON.parse(next));
+		} catch {
+			/* fall through to the markup */
+		}
+	}
+	if (!cats.length) cats = fromDom(doc);
+	return { cats, status: res.status };
+}
+
+export async function fetchImdbGuide(plugin: ReelPlugin, imdbId: string): Promise<ImdbGuideResult> {
 	const cacheKey = `imdbguide-${imdbId}`;
 	const cached = await plugin.tmdb.readExternalCache<ImdbGuideCategory[]>(cacheKey);
-	if (cached?.length) return cached;
-	try {
-		const res = await requestUrl({
-			url: `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/parentalguide/`,
-			method: "GET",
-			headers: { "Accept-Language": "en-US,en;q=0.9" },
-			throw: false,
-		});
-		if (res.status >= 400 || !res.text) return null;
-		const doc = new DOMParser().parseFromString(res.text, "text/html");
-		let cats: ImdbGuideCategory[] = [];
-		const next = doc.getElementById("__NEXT_DATA__")?.textContent;
-		if (next) {
-			try {
-				cats = fromJson(JSON.parse(next));
-			} catch {
-				// Fall through to the markup.
+	if (cached?.length) return { cats: cached };
+	const notes: string[] = [];
+	for (const [name, run] of [
+		["data", viaGraphql],
+		["page", viaPage],
+	] as const) {
+		try {
+			const { cats, status } = await run(imdbId);
+			const usable = cats.filter((c) => c.items.length || c.severity);
+			if (usable.length) {
+				await plugin.tmdb.writeExternalCache(cacheKey, usable, false);
+				return { cats: usable };
 			}
+			notes.push(`${name} ${status}${status < 400 ? " (no guide in reply)" : ""}`);
+		} catch (e) {
+			notes.push(`${name} failed`);
 		}
-		if (!cats.length) cats = fromDom(doc);
-		cats = cats.filter((c) => c.items.length || c.severity);
-		if (!cats.length) return null;
-		await plugin.tmdb.writeExternalCache(cacheKey, cats, false);
-		return cats;
-	} catch {
-		return null;
 	}
+	return { cats: null, reason: notes.join(", ") };
 }

@@ -889,12 +889,16 @@ export class DetailScreen {
 		go.addEventListener("click", () => {
 			go.setText("Loading…");
 			go.setAttr("disabled", "true");
-			void fetchImdbGuide(this.plugin, imdbId).then((cats) => {
+			void fetchImdbGuide(this.plugin, imdbId).then(({ cats, reason }) => {
 				if (!box.isConnected) return;
+				box.findAll(".reel-guide-fail").forEach((n) => n.remove());
 				if (!cats) {
 					go.setText("Try again");
 					go.removeAttribute("disabled");
-					box.createDiv({ cls: "reel-dim reel-fl-note", text: "IMDb did not answer in a way this could read. Use the link below to open it there." });
+					box.createDiv({
+						cls: "reel-dim reel-fl-note reel-guide-fail",
+						text: `IMDb did not give the guide in a form this could read (${reason ?? "no reply"}). Use the link below to open it there.`,
+					});
 					return;
 				}
 				go.remove();
@@ -990,12 +994,6 @@ export class DetailScreen {
 			a.setAttr("rel", "noopener");
 		}
 
-		if (!e.contentTopics.length && e.path) {
-			el.createDiv({
-				cls: "reel-dim",
-				text: "No community content notes yet. Add a DoesTheDogDie key in settings to fetch them.",
-			});
-		}
 	}
 
 	/** Per-country release dates, grouped by kind, as TMDB reports them. */

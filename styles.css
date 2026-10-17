@@ -20889,3 +20889,10 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 		transition: none;
 	}
 }
+
+.reel-guide-reader {
+	margin-bottom: var(--reel-space-4, 16px);
+}
+.reel-guide-fail {
+	margin-top: 8px;
+}
