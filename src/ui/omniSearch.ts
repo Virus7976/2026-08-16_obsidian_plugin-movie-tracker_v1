@@ -103,9 +103,11 @@ export class OmniSearch extends SuggestModal<Item> {
 			}, () => this.status === id);
 		}
 		this.paintChips();
+		// Next to the field's own row, never inside it. On a phone Obsidian draws the
+		// field at the bottom, above the keyboard, and this lands right above it.
 		// Under the field, on a row of their own. Beside it they shared the
 		// input's line and squeezed the text you were typing.
-		this.resultContainerEl.insertAdjacentElement("beforebegin", row);
+		(this.inputEl.parentElement ?? this.inputEl).insertAdjacentElement("afterend", row);
 
 		if (query) {
 			this.inputEl.value = query;

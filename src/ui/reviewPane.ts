@@ -32,6 +32,7 @@ import {
 import { prettyDate, todayISO } from "../util/dates";
 import { renderStars, renderStarsStatic } from "./stars";
 import { PublishSheet } from "./publishSheet";
+import { paintWash } from "./titleExtras";
 import { redact } from "../secrets";
 
 /** How much of a review a summary shows before it is worth opening. */
@@ -308,6 +309,7 @@ export class ReviewEditor extends Modal {
 		modalEl.addClass("reel-review-sheet");
 
 		contentEl.addClass("reel-review-content");
+		paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
 		const head = contentEl.createDiv({ cls: "reel-review-head" });
 		head.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
 		head.createDiv({ cls: "reel-log-sub", text: this.entry.title });
@@ -325,7 +327,7 @@ export class ReviewEditor extends Modal {
 		 */
 		const box = body.createEl("textarea", {
 			cls: "reel-input reel-review-box",
-			attr: { rows: "6", placeholder: "What did you think?" },
+			attr: { rows: "4", placeholder: "What did you think?" },
 		});
 		box.value = this.text;
 		box.addEventListener("input", () => (this.text = box.value));

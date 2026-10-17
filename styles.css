@@ -18556,3 +18556,270 @@ select.reel-select {
 .reel-omni-unlock-title {
 	font-weight: 600;
 }
+
+/* ==================================================================== */
+/* Review sheet, second pass: tidy head, short box, smaller stars        */
+/* ==================================================================== */
+.reel-review-head {
+	display: block;
+}
+
+.reel-review-head .reel-log-title,
+.reel-review-head .reel-log-sub {
+	display: block;
+	width: 100%;
+}
+
+.reel-review-head .reel-log-sub {
+	margin: 2px 0 var(--reel-space-3);
+	color: var(--text-muted);
+}
+
+.reel-review-body .reel-review-box {
+	min-height: 84px;
+	height: 84px;
+	padding: var(--reel-space-3);
+	border-radius: 12px;
+	background: var(--background-secondary);
+}
+
+.reel-review-body .reel-stars:not(.is-readonly) .reel-star {
+	width: 34px;
+	height: 44px;
+	font-size: 28px;
+}
+
+.reel-review-body .reel-review-meta {
+	grid-template-columns: 56px 1fr;
+}
+
+/* ==================================================================== */
+/* Small motion. Each one under 300ms, none that move far, all off for    */
+/* people who ask for less.                                               */
+/* ==================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+	/* Posters rise into place, a few at a time, when a screen is drawn. */
+	.reel-gridwrap .reel-cell,
+	.reel-gridwrap .reel-row {
+		animation: reel-rise 240ms var(--reel-ease) both;
+	}
+	.reel-gridwrap .reel-cell:nth-child(1), .reel-gridwrap .reel-row:nth-child(1) { animation-delay: 0ms; }
+	.reel-gridwrap .reel-cell:nth-child(2), .reel-gridwrap .reel-row:nth-child(2) { animation-delay: 20ms; }
+	.reel-gridwrap .reel-cell:nth-child(3), .reel-gridwrap .reel-row:nth-child(3) { animation-delay: 40ms; }
+	.reel-gridwrap .reel-cell:nth-child(4), .reel-gridwrap .reel-row:nth-child(4) { animation-delay: 60ms; }
+	.reel-gridwrap .reel-cell:nth-child(5), .reel-gridwrap .reel-row:nth-child(5) { animation-delay: 80ms; }
+	.reel-gridwrap .reel-cell:nth-child(6), .reel-gridwrap .reel-row:nth-child(6) { animation-delay: 100ms; }
+	.reel-gridwrap .reel-cell:nth-child(n+7), .reel-gridwrap .reel-row:nth-child(n+7) { animation-delay: 120ms; }
+
+	/* Discover shelves and rows */
+	.reel-drow-strip .reel-dcard,
+	.reel-dgrid .reel-dcard {
+		animation: reel-rise 240ms var(--reel-ease) both;
+	}
+	.reel-drow-strip .reel-dcard:nth-child(2) { animation-delay: 30ms; }
+	.reel-drow-strip .reel-dcard:nth-child(3) { animation-delay: 60ms; }
+	.reel-drow-strip .reel-dcard:nth-child(n+4) { animation-delay: 90ms; }
+
+	/* A sheet's wash fades up behind its content, like the title page does. */
+	.reel-modal .reel-sheet-wash-art {
+		animation: reel-wash-in 420ms var(--reel-ease) both;
+	}
+
+	/* Sheet content settles a beat after the sheet itself. */
+	.reel-modal.reel-sheet .modal-content > *,
+	.reel-review-content > * {
+		animation: reel-settle 260ms var(--reel-ease) both;
+	}
+	.reel-review-content > :nth-child(2) { animation-delay: 40ms; }
+	.reel-review-content > :nth-child(3) { animation-delay: 80ms; }
+
+	/* Stars: pop when you set one. */
+	.reel-star.is-full .reel-star-fg,
+	.reel-star.is-half .reel-star-fg {
+		animation: reel-star-pop 260ms var(--reel-ease);
+	}
+	.reel-stars:not(.is-readonly) .reel-star:active {
+		transform: scale(0.88);
+		transition: transform 80ms var(--reel-ease);
+	}
+
+	/* Buttons and chips: a quick, soft press and release. */
+	.reel-chip, .reel-btn, .reel-seg-btn, .reel-tab {
+		transition: transform var(--reel-dur-fast) var(--reel-ease),
+			background-color var(--reel-dur-fast) var(--reel-ease);
+	}
+	.reel-chip:active, .reel-btn:active, .reel-seg-btn:active {
+		transform: scale(0.96);
+	}
+
+	/* Heart and watchlist flags settle in. */
+	.reel-cell-flag {
+		animation: reel-star-pop 320ms var(--reel-ease) 120ms both;
+	}
+
+	/* The summary strip fades in on its own. */
+	.reel-summary {
+		animation: reel-settle 300ms var(--reel-ease) both;
+	}
+}
+
+@keyframes reel-rise {
+	from { opacity: 0; transform: translateY(8px) scale(0.985); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes reel-settle {
+	from { opacity: 0; transform: translateY(6px); }
+	to { opacity: 1; transform: none; }
+}
+
+@keyframes reel-wash-in {
+	from { opacity: 0; }
+	to { opacity: 0.5; }
+}
+
+@keyframes reel-star-pop {
+	0% { transform: scale(0.7); }
+	60% { transform: scale(1.12); }
+	100% { transform: scale(1); }
+}
+
+/* ==================================================================== */
+/* Phone control row: fits, and nothing sits on top of anything          */
+/* ==================================================================== */
+/* The pinned Filters button slid over the view switch whenever the row was a
+   few pixels too wide. The row fits now, so nothing needs pinning. */
+.reel-view:not(.is-w700) .reel-filterbar .reel-filter-btn {
+	position: relative;
+	left: auto;
+	box-shadow: none;
+}
+
+.reel-view:not(.is-w700) .reel-filterbar .reel-seg .reel-seg-btn {
+	width: 38px;
+	min-width: 38px;
+	padding: 0;
+}
+
+.reel-view:not(.is-w700) .reel-filterbar .reel-sort-btn {
+	max-width: 8em;
+	padding: 0 10px;
+	gap: 5px;
+}
+
+/* ==================================================================== */
+/* Discover and the other tabs: chips and card buttons drawn at 32px,     */
+/* with a 44px box around them so the thumb still lands                   */
+/* ==================================================================== */
+.reel-view:not(.is-w700) .reel-view-body .reel-chips .reel-chip,
+.reel-view:not(.is-w700) .reel-discover-head .reel-refresh,
+.reel-view:not(.is-w700) .reel-dcard-btn {
+	box-sizing: border-box;
+	height: 44px;
+	min-height: 44px;
+	border: 6px solid transparent;
+	background-clip: padding-box;
+	padding: 0 8px;
+	font-size: var(--font-ui-smaller);
+	background-color: var(--background-secondary);
+	box-shadow: none;
+}
+
+.reel-view:not(.is-w700) .reel-view-body .reel-chips .reel-chip {
+	margin: 0 -4px;
+}
+
+.reel-view:not(.is-w700) .reel-view-body .reel-chips .reel-chip.is-active,
+.reel-view:not(.is-w700) .reel-view-body .reel-chips .reel-chip[aria-pressed="true"] {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-view:not(.is-w700) .reel-dcard-btn.add {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-view:not(.is-w700) .reel-dcard-actions {
+	gap: 0;
+	margin: 0 -6px -6px;
+}
+
+.reel-view:not(.is-w700) .reel-dcard {
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-poster {
+	border-radius: 10px;
+}
+
+/* ==================================================================== */
+/* Prompt sheets (unlock, confirm): a short column, no dead gap           */
+/* ==================================================================== */
+.reel-modal.reel-sheet .reel-prompt {
+	display: flex;
+	flex-direction: column;
+	gap: var(--reel-space-2);
+}
+
+.reel-modal.reel-sheet .reel-prompt-title {
+	margin: 0;
+	color: var(--text-normal);
+	font-weight: 600;
+}
+
+.reel-modal.reel-sheet .reel-prompt-body {
+	margin: 0 0 var(--reel-space-1);
+}
+
+.reel-modal.reel-sheet .reel-prompt-error:empty {
+	display: none;
+}
+
+.reel-modal.reel-sheet .reel-prompt .reel-prompt-actions {
+	position: static;
+	margin: var(--reel-space-2) 0 0;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	display: flex;
+	gap: var(--reel-space-2);
+}
+
+.reel-modal.reel-sheet .reel-prompt .reel-prompt-actions .reel-btn {
+	flex: 1 1 0;
+	min-height: 44px;
+}
+
+/* Search sheet: the chip row is one flat strip beside the field, never clipped,
+   and a section heading is a label, not a result you can highlight. */
+.reel-omni-chips {
+	flex: none;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	padding: 8px 12px;
+	min-height: 52px;
+	align-items: center;
+}
+
+.reel-omni-chips .reel-chip {
+	flex: none;
+	height: 36px;
+	min-height: 36px;
+	padding: 0 14px;
+}
+
+.suggestion-item.reel-omni-head,
+.suggestion-item.reel-omni-head.is-selected {
+	background: transparent;
+	color: var(--text-muted);
+	min-height: 0;
+	padding: 12px 16px 4px;
+	font-size: var(--font-ui-smaller);
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	box-shadow: none;
+}

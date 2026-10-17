@@ -6720,13 +6720,14 @@ ${body}
         modalEl.addClass("reel-sheet");
       modalEl.addClass("reel-review-sheet");
       contentEl.addClass("reel-review-content");
+      paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
       const head = contentEl.createDiv({ cls: "reel-review-head" });
       head.createEl("h3", { cls: "reel-log-title", text: this.review ? "Edit review" : "Write a review" });
       head.createDiv({ cls: "reel-log-sub", text: this.entry.title });
       const body = contentEl.createDiv({ cls: "reel-review-body" });
       const box = body.createEl("textarea", {
         cls: "reel-input reel-review-box",
-        attr: { rows: "6", placeholder: "What did you think?" }
+        attr: { rows: "4", placeholder: "What did you think?" }
       });
       box.value = this.text;
       box.addEventListener("input", () => this.text = box.value);
