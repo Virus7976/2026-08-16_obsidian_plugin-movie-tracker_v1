@@ -52,6 +52,20 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.51",
+		date: "2026-10-17",
+		headline: "A watchlist that changes every day, and Discover in the Library's style.",
+		changes: [
+			{ kind: "new", text: "Tonight's picks, at the top of the Watchlist in Up Next: three titles chosen for tonight, each with the reason. It weighs what you rated highly, how long the film is for a weeknight or a weekend, how long it has waited on your list, and whether you can stream it now." },
+			{ kind: "new", text: "Shuffle picks again. Today's picks hold still when you reopen the screen, and tomorrow's avoid today's." },
+			{ kind: "new", text: "The Watchlist in Up Next lists everything you saved, with All, Films and Series chips and a sort menu." },
+			{ kind: "new", text: "Discover has the Library's control row: a Filters button, a Films and Series switch, and Quick. Genre, decade, minimum score and Similar to are in the Filters sheet." },
+			{ kind: "better", text: "Each Discover poster has one + button in its corner. Press and hold for Seen it, Not interested and more." },
+			{ kind: "better", text: "The review sheet is redesigned: the film's name first, a calm text box, and a Rating and Date row without the calendar icon on top of the year." },
+			{ kind: "better", text: "Up Next, Rate, Diary, Stats and Discover now share the Library's cards, labels and buttons." },
+		],
+	},
+	{
 		version: "0.9.50",
 		date: "2026-10-17",
 		headline: "Searches from the menu now search, and sheets sit above the keyboard.",
