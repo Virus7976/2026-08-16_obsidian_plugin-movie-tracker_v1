@@ -52,6 +52,19 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.48",
+		date: "2026-10-17",
+		headline: "Small motion, and a tidier look on every tab.",
+		changes: [
+			{ kind: "new", text: "Soft motion: posters rise into place, stars pop when you set one, buttons press in, and sheets fade in. It all turns off if your phone asks for reduced motion." },
+			{ kind: "better", text: "The review sheet is shorter and cleaner, with the cover colour glowing behind it." },
+			{ kind: "better", text: "Discover chips and buttons match the Library, and cards on a shelf line up." },
+			{ kind: "better", text: "The unlock keys sheet has no big gap before its buttons." },
+			{ kind: "better", text: "Search chips sit right above the search field. A section heading is no longer a blue pill." },
+			{ kind: "fixed", text: "The Filters button no longer sits on top of the view switch." },
+		],
+	},
+	{
 		version: "0.9.47",
 		date: "2026-10-17",
 		headline: "Steadier scrolling, a tidier top row, and search that finds kinds of films.",
