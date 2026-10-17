@@ -157,6 +157,8 @@ export class DiscoverScreen {
 	private handledOrder: number[] = [];
 	/** The container of the most recent render, so an undo can repaint it. */
 	private lastContainer: HTMLElement | null = null;
+	/** How far each shelf is scrolled sideways, so a repaint puts it back. */
+	private stripScroll = new Map<string, number>();
 
 	constructor(private plugin: ReelPlugin) {}
 
@@ -864,6 +866,19 @@ export class DiscoverScreen {
 
 		const strip = section.createDiv({ cls: "reel-drow-strip" });
 		for (const item of items) strip.appendChild(this.card(item, container));
+
+		// Remember where this shelf was scrolled to, and put it back after any
+		// repaint; a rebuilt strip starts at the left, which on a shelf you have
+		// been working along is the most annoying thing a feed can do.
+		const key = row.title;
+		strip.addEventListener("scroll", () => this.stripScroll.set(key, strip.scrollLeft), { passive: true });
+		const kept = this.stripScroll.get(key);
+		if (kept) {
+			strip.scrollLeft = kept;
+			requestAnimationFrame(() => {
+				if (strip.isConnected) strip.scrollLeft = kept;
+			});
+		}
 	}
 
 	/**
@@ -1054,6 +1069,19 @@ export class DiscoverScreen {
 
 		const strip = section.createDiv({ cls: "reel-drow-strip" });
 		for (const item of items) strip.appendChild(this.card(item, container));
+
+		// Remember where this shelf was scrolled to, and put it back after any
+		// repaint; a rebuilt strip starts at the left, which on a shelf you have
+		// been working along is the most annoying thing a feed can do.
+		const key = row.source.title;
+		strip.addEventListener("scroll", () => this.stripScroll.set(key, strip.scrollLeft), { passive: true });
+		const kept = this.stripScroll.get(key);
+		if (kept) {
+			strip.scrollLeft = kept;
+			requestAnimationFrame(() => {
+				if (strip.isConnected) strip.scrollLeft = kept;
+			});
+		}
 
 		if (!row.done) {
 			const tail = strip.createDiv({ cls: "reel-drow-tail" });

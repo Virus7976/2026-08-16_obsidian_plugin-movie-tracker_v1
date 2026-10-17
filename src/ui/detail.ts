@@ -36,6 +36,7 @@ import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
 import { paintRelatedFeed } from "./relatedFeed";
 import { fetchImdbGuide } from "../imdbGuide";
+import { attachSources } from "./sources";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { paintTrailerFor } from "./titleExtras";
 import { unlink } from "../library";
@@ -459,6 +460,14 @@ export class DetailScreen {
 			buttons.forEach((b, n) => b.toggleClass("is-active", n === i));
 			body.empty();
 			tabs[i].render(body);
+			// Hold the tab for the other sites that cover it.
+			attachSources(this.plugin, body, tabs[i].id, {
+				title: this.entry.title,
+				year: this.entry.year ?? this.entry.firstAirYear,
+				imdbId: this.entry.imdbId ?? meta.external_ids?.imdb_id ?? film?.imdb_id ?? undefined,
+				tmdbId: this.entry.tmdbId,
+				isTv,
+			});
 		};
 		this.jumpToTab = (id: string) => {
 			const i = tabs.findIndex((t) => t.id === id);

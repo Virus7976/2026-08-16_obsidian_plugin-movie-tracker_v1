@@ -6164,6 +6164,56 @@ ${body}
     return { cats: null, reason: notes.join(", ") };
   }
 
+  // src/ui/sources.ts
+  function sourcesFor(tab, t) {
+    const q = encodeURIComponent(`${t.title}${t.year ? ` ${t.year}` : ""}`);
+    const imdb = t.imdbId ? `https://www.imdb.com/title/${t.imdbId}` : `https://www.imdb.com/find/?q=${q}&s=tt`;
+    const imdbAt = (path) => t.imdbId ? `${imdb}/${path}/` : imdb;
+    const wiki = ["Wikipedia", `https://en.wikipedia.org/w/index.php?search=${q}`];
+    const tmdb = ["TMDB", tmdbUrl(t.tmdbId, t.isTv ? "tv" : "film")];
+    const mojo = ["Box Office Mojo", t.imdbId ? `https://www.boxofficemojo.com/title/${t.imdbId}/` : `https://www.boxofficemojo.com/search/?q=${q}`];
+    const numbers = ["The Numbers", `https://www.the-numbers.com/custom-search?searchterm=${encodeURIComponent(t.title)}`];
+    const rt = ["Rotten Tomatoes", `https://www.rottentomatoes.com/search?search=${encodeURIComponent(t.title)}`];
+    const meta = ["Metacritic", `https://www.metacritic.com/search/${encodeURIComponent(t.title)}/`];
+    const lb = ["Letterboxd", `https://letterboxd.com/tmdb/${t.tmdbId}/`];
+    const trakt = ["Trakt", `https://trakt.tv/search/tmdb/${t.tmdbId}?id_type=${t.isTv ? "show" : "movie"}`];
+    const csm = ["Common Sense Media", `https://www.commonsensemedia.org/search/${encodeURIComponent(t.title)}`];
+    const dtd = ["DoesTheDogDie", `https://www.doesthedogdie.com/search?q=${encodeURIComponent(t.title)}`];
+    switch (tab) {
+      case "money":
+        return [["IMDb box office", imdbAt("business")], mojo, numbers, wiki, tmdb];
+      case "stats":
+        return [["IMDb ratings", imdbAt("ratings")], rt, meta, lb, trakt];
+      case "content":
+        return [["IMDb parents guide", imdbAt("parentalguide")], csm, dtd];
+      case "releases":
+        return [["IMDb release dates", imdbAt("releaseinfo")], wiki, tmdb];
+      case "cast":
+      case "crew":
+        return [["IMDb full cast and crew", imdbAt("fullcredits")], wiki, tmdb];
+      case "details":
+        return [["IMDb company credits", imdbAt("companycredits")], ["IMDb technical specs", imdbAt("technical")], wiki, tmdb];
+      case "photos":
+        return [["IMDb photos", imdbAt("mediaindex")], tmdb];
+      case "reviews":
+        return [["IMDb user reviews", imdbAt("reviews")], rt, meta, lb];
+      default:
+        return [["IMDb", imdb], wiki, lb, tmdb];
+    }
+  }
+  function attachSources(plugin2, body, tab, target) {
+    holdAt(body, (x, y) => {
+      const hit = document.elementFromPoint(x, y);
+      if (hit?.closest("button, a, summary, [role='button']"))
+        return;
+      const menu = new Menu();
+      for (const [label, url] of sourcesFor(tab, target)) {
+        menu.addItem((i) => i.setTitle(label).setIcon("external-link").onClick(() => void window.open(url, "_blank", "noopener")));
+      }
+      menu.showAtPosition({ x, y });
+    });
+  }
+
   // src/ui/detail.ts
   function flagEmoji(iso2) {
     const code = iso2.trim().toUpperCase();
@@ -6447,6 +6497,13 @@ ${body}
         buttons.forEach((b, n2) => b.toggleClass("is-active", n2 === i));
         body.empty();
         tabs[i].render(body);
+        attachSources(this.plugin, body, tabs[i].id, {
+          title: this.entry.title,
+          year: this.entry.year ?? this.entry.firstAirYear,
+          imdbId: this.entry.imdbId ?? meta.external_ids?.imdb_id ?? film2?.imdb_id ?? void 0,
+          tmdbId: this.entry.tmdbId,
+          isTv
+        });
       };
       this.jumpToTab = (id) => {
         const i = tabs.findIndex((t) => t.id === id);
@@ -7939,6 +7996,8 @@ ${body}
       this.handledOrder = [];
       /** The container of the most recent render, so an undo can repaint it. */
       this.lastContainer = null;
+      /** How far each shelf is scrolled sideways, so a repaint puts it back. */
+      this.stripScroll = /* @__PURE__ */ new Map();
     }
     /**
      * The mounted rows, in the shape the rest of the screen already expects.
@@ -8523,6 +8582,16 @@ ${body}
       const strip = section.createDiv({ cls: "reel-drow-strip" });
       for (const item of items)
         strip.appendChild(this.card(item, container));
+      const key = row.title;
+      strip.addEventListener("scroll", () => this.stripScroll.set(key, strip.scrollLeft), { passive: true });
+      const kept = this.stripScroll.get(key);
+      if (kept) {
+        strip.scrollLeft = kept;
+        requestAnimationFrame(() => {
+          if (strip.isConnected)
+            strip.scrollLeft = kept;
+        });
+      }
     }
     /**
      * The feed.
@@ -8696,6 +8765,16 @@ ${body}
       const strip = section.createDiv({ cls: "reel-drow-strip" });
       for (const item of items)
         strip.appendChild(this.card(item, container));
+      const key = row.source.title;
+      strip.addEventListener("scroll", () => this.stripScroll.set(key, strip.scrollLeft), { passive: true });
+      const kept = this.stripScroll.get(key);
+      if (kept) {
+        strip.scrollLeft = kept;
+        requestAnimationFrame(() => {
+          if (strip.isConnected)
+            strip.scrollLeft = kept;
+        });
+      }
       if (!row.done) {
         const tail = strip.createDiv({ cls: "reel-drow-tail" });
         const io = new IntersectionObserver(

@@ -52,6 +52,15 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.63",
+		date: "2026-10-17",
+		headline: "Hold any tab for other sites, and Discover keeps your place.",
+		changes: [
+			{ kind: "new", text: "Press and hold (or right-click) the body of any tab on a title page for other sites that cover it. Box office offers IMDb, Box Office Mojo and The Numbers; Stats offers Rotten Tomatoes, Metacritic and Letterboxd; each tab has its own list." },
+			{ kind: "fixed", text: "Discover no longer jumps back to the left of a shelf, or to the top, after you add, rate or skip something. It keeps where you were." },
+		],
+	},
+	{
 		version: "0.9.62",
 		date: "2026-10-17",
 		headline: "The Parents guide is IMDb's, and it loads by itself.",

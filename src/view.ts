@@ -224,7 +224,15 @@ export class ReelView extends ItemView {
 		// and a second magnifier in the header only duplicated it.
 
 		this.build();
-		this.registerEvent(this.plugin.library.on("changed", () => this.paint()));
+		this.registerEvent(
+			this.plugin.library.on("changed", () => {
+				// Discover does not draw your library, and adding or rating from it
+				// is what changes the library, so repainting it here only threw you
+				// back to the start of every shelf. It repaints when you come back.
+				if (this.tab === "discover" && !this.detail) return;
+				this.paint();
+			})
+		);
 	}
 
 	private build(): void {
