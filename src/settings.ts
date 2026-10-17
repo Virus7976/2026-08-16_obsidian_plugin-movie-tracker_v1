@@ -155,6 +155,8 @@ export interface ReelSettings {
 	downloadPosters: boolean;
 	/** Which titles get a poster file in the vault. */
 	posterScope: "all" | "watched";
+	/** path → date a watchlist title was last offered as a pick, so it is not repeated. */
+	watchPicksShown: Record<string, string>;
 	/** Move a title's poster to the trash when its note is deleted. */
 	deletePosterWithTitle: boolean;
 	/** Keep cast and crew photos on disk. Off: shown from the network, never saved. */
@@ -267,6 +269,7 @@ export const DEFAULT_SETTINGS: ReelSettings = {
 	posterQuality: "w342",
 	downloadPosters: true,
 	posterScope: "all",
+	watchPicksShown: {},
 	deletePosterWithTitle: true,
 	savePortraits: false,
 	portraitCacheMax: 150,

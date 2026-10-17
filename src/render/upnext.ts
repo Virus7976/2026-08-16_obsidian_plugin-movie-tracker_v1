@@ -12,6 +12,7 @@ import type { Entry } from "../types";
 import { nextEpisode, rangeCount } from "../util/ranges";
 import { prettyDate, todayISO, formatMinutes } from "../util/dates";
 import { showTitleMenu } from "../ui/titleMenu";
+import { pickTonight } from "../picks";
 import { redact } from "../secrets";
 import { haptic } from "../util/haptics";
 import { renderEmpty } from "../ui/empty";
@@ -107,6 +108,9 @@ export function paintUpNext(
 	new UpNextPainter(plugin, containerEl, limit, heading, entries).render();
 }
 
+/** Bumped by Shuffle; resets when Reel reloads. */
+let pickSalt = 0;
+
 /** The Watchlist section's own choices, kept across repaints for the session. */
 const watchState: { kind: "all" | "film" | "tv"; sort: "added" | "short" | "rated" | "title" } = { kind: "all", sort: "added" };
 
@@ -200,6 +204,7 @@ class UpNextPainter {
 
 	private paintWatchlist(el: HTMLElement, all: Entry[]): void {
 		const wrap = el.createDiv({ cls: "reel-watchlist" });
+		this.paintPicks(wrap, all);
 		const head = wrap.createDiv({ cls: "reel-watchlist-head" });
 		head.createDiv({ cls: "reel-block-title", text: "Watchlist" });
 		const counts = {
@@ -262,6 +267,60 @@ class UpNextPainter {
 				more.remove();
 			});
 		}
+	}
+
+	/**
+	 * A few titles chosen for tonight, with the reason for each. See picks.ts.
+	 * What was offered is remembered, so tomorrow's choice is not today's.
+	 */
+	private paintPicks(wrap: HTMLElement, all: Entry[]): void {
+		const settings = this.plugin.settings;
+		const now = new Date();
+		const picks = pickTonight(all, this.plugin.library.all(), { now, salt: pickSalt, shown: settings.watchPicksShown });
+		if (!picks.length) return;
+
+		const box = wrap.createDiv({ cls: "reel-picks" });
+		const head = box.createDiv({ cls: "reel-picks-head" });
+		head.createDiv({ cls: "reel-block-title", text: "Tonight" });
+		const shuffle = head.createEl("button", {
+			cls: "reel-chip reel-picks-shuffle",
+			attr: { type: "button", "aria-label": "Pick again" },
+		});
+		setIcon(shuffle.createSpan({ cls: "reel-filter-btn-icon" }), "shuffle");
+		shuffle.createSpan({ text: "Shuffle" });
+		shuffle.addEventListener("click", () => {
+			haptic("tick");
+			pickSalt += 1;
+			this.render();
+		});
+
+		const list = box.createDiv({ cls: "reel-upnext reel-picks-list" });
+		for (const pick of picks) {
+			const row = this.watchRow(pick.entry);
+			row.addClass("reel-pick-row");
+			const body = row.querySelector(".reel-upnext-body");
+			body?.createDiv({ cls: "reel-pick-reason", text: pick.reason });
+			list.appendChild(row);
+		}
+
+		// Remember what was offered, once a day per title: a title shown
+		// yesterday is passed over today unless nothing else is left.
+		const today = now.toISOString().slice(0, 10);
+		let changed = false;
+		for (const pick of picks) {
+			if (settings.watchPicksShown[pick.entry.path]?.slice(0, 10) !== today) {
+				settings.watchPicksShown[pick.entry.path] = now.toISOString();
+				changed = true;
+			}
+		}
+		const cutoff = now.getTime() - 14 * 86400000;
+		for (const [path, when] of Object.entries(settings.watchPicksShown)) {
+			if (new Date(when).getTime() < cutoff) {
+				delete settings.watchPicksShown[path];
+				changed = true;
+			}
+		}
+		if (changed) void this.plugin.saveSettings();
 	}
 
 	private watchRow(entry: Entry): HTMLElement {

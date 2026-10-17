@@ -19322,3 +19322,129 @@ body.is-mobile .modal-container .modal.reel-modal.reel-review-sheet {
 	padding-left: 0;
 	padding-right: 0;
 }
+
+/* ==================================================================== */
+/* Discover, refined                                                      */
+/* ==================================================================== */
+/* One corner button on each poster instead of a row of three squares. */
+.reel-dcard-add {
+	display: none;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-add {
+	position: absolute;
+	top: -2px;
+	right: -2px;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 7px solid transparent;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--background-primary) 70%, transparent);
+	background-clip: padding-box;
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+	color: var(--text-normal);
+	box-shadow: none;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-add svg {
+	width: 16px;
+	height: 16px;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-add:active {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.reel-view:not(.is-w700) .reel-dcard-actions {
+	display: none;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-poster {
+	position: relative;
+}
+
+/* The score badge reads like the Library's rating badge. */
+.reel-view:not(.is-w700) .reel-dcard-score::after {
+	content: " \2605";
+}
+
+/* A shelf's heading and its reason sit together, tightly. */
+.reel-view:not(.is-w700) .reel-drow {
+	gap: var(--reel-space-1);
+}
+
+.reel-view:not(.is-w700) .reel-drow-head {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0;
+	padding: 0 var(--reel-space-3);
+}
+
+.reel-view:not(.is-w700) .reel-drow-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 650;
+	line-height: 1.25;
+}
+
+.reel-view:not(.is-w700) .reel-drow-reason {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.3;
+}
+
+.reel-view:not(.is-w700) .reel-discover {
+	gap: var(--reel-space-4);
+}
+
+/* Refresh is a small round icon, not a labelled pill beside a sentence. */
+.reel-view:not(.is-w700) .reel-discover-head .reel-refresh {
+	padding: 0;
+	width: 44px;
+}
+
+.reel-view:not(.is-w700) .reel-discover-head .reel-refresh > :not(.reel-refresh-icon) {
+	display: none;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-title {
+	margin-top: 6px;
+}
+
+/* Tonight's picks */
+.reel-picks {
+	margin-bottom: var(--reel-space-4);
+}
+
+.reel-picks-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: var(--reel-space-2);
+}
+
+.reel-picks-head .reel-block-title {
+	margin: 0;
+}
+
+.reel-pick-reason {
+	margin-top: 2px;
+	font-size: var(--font-ui-smaller);
+	line-height: 1.3;
+	color: var(--text-normal);
+}
+
+.reel-pick-reason::before {
+	content: "º6  ";
+	color: var(--interactive-accent);
+}
+
+.reel-pick-row {
+	border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
+}

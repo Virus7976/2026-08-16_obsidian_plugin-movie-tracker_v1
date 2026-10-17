@@ -2351,6 +2351,173 @@
     return Math.round((b.getTime() - a.getTime()) / 864e5);
   }
 
+  // src/picks.ts
+  var DAY = 864e5;
+  function seeded(text) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) % 1e5 / 1e5;
+  }
+  function tasteOf(all2) {
+    const t = { genres: /* @__PURE__ */ new Map(), people: /* @__PURE__ */ new Map(), because: /* @__PURE__ */ new Map() };
+    for (const e of all2) {
+      if (e.status === "watchlist")
+        continue;
+      const r = e.rating ?? (e.liked ? 4 : void 0);
+      if (r == null)
+        continue;
+      const w = r >= 4 ? (r - 3) / 2 + (e.liked ? 0.25 : 0) : r <= 2 ? -0.5 : 0;
+      if (!w)
+        continue;
+      const add = (map, key, weight) => {
+        map.set(key, (map.get(key) ?? 0) + weight);
+        if (weight > 0) {
+          const prev = t.because.get(key);
+          if (!prev || r > prev.rating)
+            t.because.set(key, { title: e.title, rating: r });
+        }
+      };
+      for (const g of e.genres)
+        add(t.genres, g, w);
+      for (const d of e.director)
+        add(t.people, d, w * 1.5);
+      for (const c of e.cast.slice(0, 3))
+        add(t.people, c, w * 0.5);
+    }
+    return t;
+  }
+  function scoreOf(e, taste, o) {
+    const parts = [];
+    let genre = 0;
+    let genreKey = "";
+    let genreBest = 0;
+    for (const g of e.genres) {
+      const w = taste.genres.get(g) ?? 0;
+      genre += w;
+      if (w > genreBest) {
+        genreBest = w;
+        genreKey = g;
+      }
+    }
+    const genreFit = e.genres.length ? genre / Math.sqrt(e.genres.length) : 0;
+    let person = 0;
+    let personKey = "";
+    let personBest = 0;
+    for (const p of [...e.director, ...e.cast.slice(0, 3)]) {
+      const w = taste.people.get(p) ?? 0;
+      person += w;
+      if (w > personBest) {
+        personBest = w;
+        personKey = p;
+      }
+    }
+    const clip = (n2, lo, hi) => Math.max(lo, Math.min(hi, n2));
+    const tasteScore = clip(genreFit, -2, 3) + clip(person, -1, 2);
+    if (personKey && taste.because.get(personKey)) {
+      const b = taste.because.get(personKey);
+      parts.push({ v: clip(person, 0, 2) * 2, why: `${personKey}, who you liked in ${b?.title}` });
+    } else if (genreKey && taste.because.get(genreKey)) {
+      const b = taste.because.get(genreKey);
+      parts.push({ v: clip(genreFit, 0, 3) * 2, why: `Because you rated ${b?.title} ${b?.rating}\u2605` });
+    }
+    const rating = e.tmdbRating ?? 0;
+    const quality = rating ? clip((rating - 6.2) / 2, -1, 1) : 0;
+    if (rating >= 7.6)
+      parts.push({ v: quality * 1.2, why: `Highly rated, \u2605 ${rating.toFixed(1)}` });
+    const day = o.now.getDay();
+    const weekend = day === 0 || day === 6 || day === 5;
+    const evening = o.now.getHours() >= 17;
+    let tonight = 0;
+    if (e.type === "film" && e.runtime) {
+      const h = Math.floor(e.runtime / 60);
+      const m = e.runtime % 60;
+      const len = `${h}h ${m}m`;
+      if (!weekend && evening) {
+        if (e.runtime <= 110) {
+          tonight = 0.7;
+          parts.push({ v: 1.2, why: `Short enough for a weeknight, ${len}` });
+        } else if (e.runtime <= 135)
+          tonight = 0.2;
+        else
+          tonight = -0.5;
+      } else if (weekend && e.runtime >= 120) {
+        tonight = 0.4;
+        parts.push({ v: 0.9, why: `A proper weekend film, ${len}` });
+      }
+    } else if (e.type === "tv" && !weekend)
+      tonight = 0.2;
+    const days = e.added ? Math.max(0, (o.now.getTime() - e.added) / DAY) : 0;
+    let waiting = 0;
+    if (days > 14) {
+      waiting = Math.min(0.9, (days - 14) / 60);
+      const weeks = Math.round(days / 7);
+      parts.push({ v: waiting * 1.5, why: `Waiting on your list for ${weeks} weeks` });
+    } else if (e.added && days <= 3) {
+      waiting = 0.4;
+      parts.push({ v: 0.5, why: "New to your list" });
+    }
+    const service = e.providers[0];
+    if (service) {
+      parts.push({ v: 0.7, why: `On ${service} now` });
+    }
+    const key = `${o.now.getFullYear()}-${o.now.getMonth()}-${o.now.getDate()}|${o.salt}|${e.path}`;
+    const jitter = seeded(key) * 1.3;
+    const last = o.shown[e.path];
+    let seen = 0;
+    if (last) {
+      const then = new Date(last);
+      const sameDay = then.getFullYear() === o.now.getFullYear() && then.getMonth() === o.now.getMonth() && then.getDate() === o.now.getDate();
+      const ago2 = (o.now.getTime() - then.getTime()) / DAY;
+      if (sameDay)
+        seen = 0;
+      else if (ago2 < 3)
+        seen = -1.6;
+      else if (ago2 < 7)
+        seen = -0.6;
+    }
+    const score2 = 2 * tasteScore + quality + tonight + waiting + (service ? 0.5 : 0) + jitter + seen;
+    parts.sort((a, b) => b.v - a.v);
+    const reason = parts[0]?.why ?? "From your watchlist";
+    return { entry: e, score: score2, reason };
+  }
+  function pickTonight(watchlist, library2, opts) {
+    const count = opts.count ?? 3;
+    if (!watchlist.length)
+      return [];
+    const taste = tasteOf(library2);
+    const o = { now: opts.now, salt: opts.salt ?? 0, shown: opts.shown ?? {} };
+    const ranked = watchlist.map((e) => scoreOf(e, taste, o));
+    const chosen = [];
+    const usedGenres = /* @__PURE__ */ new Set();
+    let shows = 0;
+    const pool2 = [...ranked];
+    while (chosen.length < count && pool2.length) {
+      let bestAt = 0;
+      let best = -Infinity;
+      pool2.forEach((p, i) => {
+        let s = p.score;
+        if (p.entry.genres[0] && usedGenres.has(p.entry.genres[0]))
+          s -= 0.6;
+        if (p.entry.type === "tv" && shows >= 1)
+          s -= 1.5;
+        if (s > best) {
+          best = s;
+          bestAt = i;
+        }
+      });
+      const [taken] = pool2.splice(bestAt, 1);
+      chosen.push(taken);
+      if (taken.entry.genres[0])
+        usedGenres.add(taken.entry.genres[0]);
+      if (taken.entry.type === "tv")
+        shows++;
+    }
+    return chosen;
+  }
+
   // src/ui/titleExtras.ts
   function paintTrailer(slot, url) {
     const id = /[?&]v=([\w-]{6,})/.exec(url)?.[1] ?? /youtu\.be\/([\w-]{6,})/.exec(url)?.[1];
@@ -2676,6 +2843,7 @@
   function paintUpNext(plugin2, containerEl, limit, heading = false, entries) {
     new UpNextPainter(plugin2, containerEl, limit, heading, entries).render();
   }
+  var pickSalt = 0;
   var watchState = { kind: "all", sort: "added" };
   var WATCH_SORTS = [
     ["added", "Recently added"],
@@ -2743,6 +2911,7 @@
     }
     paintWatchlist(el, all2) {
       const wrap = el.createDiv({ cls: "reel-watchlist" });
+      this.paintPicks(wrap, all2);
       const head = wrap.createDiv({ cls: "reel-watchlist-head" });
       head.createDiv({ cls: "reel-block-title", text: "Watchlist" });
       const counts = {
@@ -2805,6 +2974,56 @@
           more.remove();
         });
       }
+    }
+    /**
+     * A few titles chosen for tonight, with the reason for each. See picks.ts.
+     * What was offered is remembered, so tomorrow's choice is not today's.
+     */
+    paintPicks(wrap, all2) {
+      const settings2 = this.plugin.settings;
+      const now = /* @__PURE__ */ new Date();
+      const picks = pickTonight(all2, this.plugin.library.all(), { now, salt: pickSalt, shown: settings2.watchPicksShown });
+      if (!picks.length)
+        return;
+      const box = wrap.createDiv({ cls: "reel-picks" });
+      const head = box.createDiv({ cls: "reel-picks-head" });
+      head.createDiv({ cls: "reel-block-title", text: "Tonight" });
+      const shuffle = head.createEl("button", {
+        cls: "reel-chip reel-picks-shuffle",
+        attr: { type: "button", "aria-label": "Pick again" }
+      });
+      setIcon(shuffle.createSpan({ cls: "reel-filter-btn-icon" }), "shuffle");
+      shuffle.createSpan({ text: "Shuffle" });
+      shuffle.addEventListener("click", () => {
+        haptic("tick");
+        pickSalt += 1;
+        this.render();
+      });
+      const list2 = box.createDiv({ cls: "reel-upnext reel-picks-list" });
+      for (const pick of picks) {
+        const row = this.watchRow(pick.entry);
+        row.addClass("reel-pick-row");
+        const body = row.querySelector(".reel-upnext-body");
+        body?.createDiv({ cls: "reel-pick-reason", text: pick.reason });
+        list2.appendChild(row);
+      }
+      const today = now.toISOString().slice(0, 10);
+      let changed = false;
+      for (const pick of picks) {
+        if (settings2.watchPicksShown[pick.entry.path]?.slice(0, 10) !== today) {
+          settings2.watchPicksShown[pick.entry.path] = now.toISOString();
+          changed = true;
+        }
+      }
+      const cutoff = now.getTime() - 14 * 864e5;
+      for (const [path, when] of Object.entries(settings2.watchPicksShown)) {
+        if (new Date(when).getTime() < cutoff) {
+          delete settings2.watchPicksShown[path];
+          changed = true;
+        }
+      }
+      if (changed)
+        void this.plugin.saveSettings();
     }
     watchRow(entry) {
       const row = createDiv({ cls: "reel-upnext-row reel-watch-row" });
@@ -4888,6 +5107,21 @@
       card.createDiv({ cls: "reel-dcard-title", text: title });
       if (year2)
         card.createDiv({ cls: "reel-dcard-year", text: String(year2) });
+      const corner = posterEl.createEl("button", {
+        cls: "reel-dcard-add",
+        attr: { type: "button", "aria-label": `Add ${title} to your watchlist` }
+      });
+      setIcon(corner, "plus");
+      corner.addEventListener("click", (e) => {
+        e.stopPropagation();
+        haptic("tick");
+        void (async () => {
+          await this.add(item, true);
+          this.plugin.undo.offer(`${title} \u2192 watchlist`);
+          this.markHandled(item.id);
+          this.render(container);
+        })();
+      });
       const actions = card.createDiv({ cls: "reel-dcard-actions" });
       const button = (icon, label, cls, fn) => {
         const b = actions.createEl("button", { cls: `reel-dcard-btn ${cls}` });
@@ -9553,6 +9787,7 @@ ${body}
     posterQuality: "w342",
     downloadPosters: true,
     posterScope: "all",
+    watchPicksShown: {},
     deletePosterWithTitle: true,
     savePortraits: false,
     portraitCacheMax: 150,

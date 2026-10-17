@@ -1619,6 +1619,25 @@ export class DiscoverScreen {
 		card.createDiv({ cls: "reel-dcard-title", text: title });
 		if (year) card.createDiv({ cls: "reel-dcard-year", text: String(year) });
 
+		// On a phone the commonest answer is one corner button on the poster,
+		// like the Library's flags; "seen it" and "not interested" are one
+		// press-and-hold away. On a wide pane the three buttons sit under it.
+		const corner = posterEl.createEl("button", {
+			cls: "reel-dcard-add",
+			attr: { type: "button", "aria-label": `Add ${title} to your watchlist` },
+		});
+		setIcon(corner, "plus");
+		corner.addEventListener("click", (e) => {
+			e.stopPropagation();
+			haptic("tick");
+			void (async () => {
+				await this.add(item, true);
+				this.plugin.undo.offer(`${title} → watchlist`);
+				this.markHandled(item.id);
+				this.render(container);
+			})();
+		});
+
 		// The three decisions, inline. Opening a sheet to say "no" is the
 		// wrong cost for the commonest answer.
 		const actions = card.createDiv({ cls: "reel-dcard-actions" });
