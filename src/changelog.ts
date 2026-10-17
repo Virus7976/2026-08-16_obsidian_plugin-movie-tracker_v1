@@ -52,6 +52,23 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.54",
+		date: "2026-10-17",
+		headline: "Episode reviews, a richer title screen, and a faster feel.",
+		changes: [
+			{ kind: "new", text: "Review a single episode. Each episode in a season has a pencil button, and the review is saved in the note under the episode's number." },
+			{ kind: "new", text: "Press and hold an episode for Mark watched, Mark watched up to here, Write a review and Clear rating." },
+			{ kind: "new", text: "The title screen has a Box office tab (budget, gross, profit) and a Stats tab (scores, how it compares with your library, length or seasons). Similar titles are a grid." },
+			{ kind: "new", text: "Pick several genres at once in Discover Filters. Action and Comedy together gives action comedies." },
+			{ kind: "new", text: "The Watchlist has nine sorts and Genre and On a service filters." },
+			{ kind: "better", text: "Press and hold a row in Up Next, the Watchlist or Upcoming for its menu. The three dots are gone." },
+			{ kind: "better", text: "Adding a title opens its Reel screen, not the raw note. Upcoming rows do too." },
+			{ kind: "better", text: "The person screen is cleaner: name beside the portrait, smaller text, aligned credits." },
+			{ kind: "better", text: "Discover shelves scroll freely again." },
+			{ kind: "fixed", text: "Tonight's picks no longer show a raw [[link]] in the reason." },
+		],
+	},
+	{
 		version: "0.9.53",
 		date: "2026-10-17",
 		headline: "A review box that grows, and shelves that snap.",
