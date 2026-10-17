@@ -52,6 +52,62 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.46",
+		date: "2026-10-17",
+		headline: "One search for everything, and a phone layout you can see more of.",
+		changes: [
+			{
+				kind: "new",
+				text: "One search box for your library and TMDB. Chips narrow it to what you have, what you do not, films, shows, watchlist or watched.",
+				note: "Searching meant deciding where to look first. Discover now opens the same search, starting on titles you do not have.",
+			},
+			{
+				kind: "new",
+				text: "On a wide window, a left sidebar holds the sections, your lists and genres as #tags with counts, and an Add title button.",
+			},
+			{
+				kind: "better",
+				text: "On a phone the top is one search bar and one row of controls: view switch, Filters, Sort, and your tags. Posters are three across.",
+			},
+			{
+				kind: "better",
+				text: "Cards show the same four corners every time: content rating, liked or watchlist, your score, and how many times you watched. Titles use two lines, then the year and runtime.",
+			},
+			{
+				kind: "better",
+				text: "The Filters sheet uses option rows, folds long lists behind Show more, and has Clear all and the result count in a footer that no longer covers the chips.",
+			},
+			{
+				kind: "new",
+				text: "A button to reverse the sort order. It is remembered with the sort.",
+			},
+			{
+				kind: "new",
+				text: "Settings for posters: save them for every title or only ones you have watched, and delete a poster when you delete its title.",
+			},
+			{
+				kind: "better",
+				text: "Cast photos are no longer saved by default, so they cannot pile up on a phone. Settings shows where images live, that they are hidden from the gallery, and has a button to delete saved photos.",
+			},
+			{
+				kind: "better",
+				text: "The title page on a phone shows the poster beside the facts instead of above them. Settings is one grouped list.",
+			},
+			{
+				kind: "fixed",
+				text: "Writing a review, or typing in any sheet, keeps the box above the keyboard.",
+			},
+			{
+				kind: "fixed",
+				text: "Ticking Watchlist and Watched together no longer shows everything. Choosing one clears the other.",
+			},
+			{
+				kind: "fixed",
+				text: "The month heading in the Diary no longer leaves a gap that rows scroll through.",
+			},
+		],
+	},
+	{
 		version: "0.9.45",
 		date: "2026-09-05",
 		headline: "Searching an actor or director finds them.",
