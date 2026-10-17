@@ -425,6 +425,7 @@ class UpNextPainter {
 		const next = this.plugin.upNext.nextFor(entry);
 		const row = createDiv({ cls: "reel-upnext-row" });
 
+		onHold(this.plugin, row, entry);
 		const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
 		this.plugin.posters.attach(thumb, entry);
 		// Opens the detail screen rather than the raw note — the note in

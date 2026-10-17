@@ -8,6 +8,7 @@
 
 import { MarkdownPostProcessorContext, MarkdownRenderChild, TFile } from "obsidian";
 import { upnextTitle } from "./upnext";
+import { onHold } from "../ui/titleMenu";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { daysBetween, prettyDate, todayISO } from "../util/dates";
@@ -92,6 +93,7 @@ class CalendarPainter {
 
 	private row(entry: Entry, today: string): HTMLElement {
 		const row = createDiv({ cls: "reel-upnext-row" });
+		onHold(this.plugin, row, entry);
 
 		const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
 		this.plugin.posters.attach(thumb, entry);
@@ -112,10 +114,8 @@ class CalendarPainter {
 
 		if (gap <= 0) body.createDiv({ cls: "reel-badge new", text: "Out now" });
 
-		row.addEventListener("click", async () => {
-			const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
-			if (file instanceof TFile) await this.plugin.app.workspace.getLeaf(false).openFile(file);
-		});
+		// The title's own screen, not its raw note.
+		row.addEventListener("click", () => void this.plugin.openDetail(entry));
 
 		return row;
 	}

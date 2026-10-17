@@ -2676,6 +2676,1687 @@
     }
   }
 
+  // src/reviews.ts
+  var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  function dateFromHeading(heading) {
+    const iso2 = /(\d{4})-(\d{2})-(\d{2})/.exec(heading);
+    if (iso2)
+      return `${iso2[1]}-${iso2[2]}-${iso2[3]}`;
+    const pretty = /\b(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})\b/.exec(heading);
+    if (pretty) {
+      const month = MONTHS.indexOf(pretty[2].slice(0, 3).toLowerCase());
+      if (month >= 0) {
+        return `${pretty[3]}-${String(month + 1).padStart(2, "0")}-${pretty[1].padStart(2, "0")}`;
+      }
+    }
+    return void 0;
+  }
+  function ratingFromHeading(heading) {
+    const stars2 = (heading.match(/★/g) ?? []).length;
+    if (!stars2)
+      return void 0;
+    return stars2 + (heading.includes("\xBD") ? 0.5 : 0);
+  }
+  function parseReviews(content) {
+    const out = [];
+    const headings = [...content.matchAll(/^##[ \t]+(.+?)[ \t]*$/gm)];
+    headings.forEach((match, i) => {
+      const heading = match[1];
+      const date = dateFromHeading(heading);
+      if (!date)
+        return;
+      const from = (match.index ?? 0) + match[0].length;
+      const rest = content.slice(from);
+      const nextHeading = /^#{1,6}[ \t]+/m.exec(rest);
+      const to = nextHeading ? from + (nextHeading.index ?? 0) : content.length;
+      out.push({
+        date,
+        heading,
+        rating: ratingFromHeading(heading),
+        text: content.slice(from, to).trim(),
+        from,
+        to
+      });
+    });
+    return out;
+  }
+  function reviewsNewestFirst(content) {
+    return parseReviews(content).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }
+  function replaceReview(content, review, text) {
+    const body = text.trim();
+    const block = body ? `
+
+${body}
+` : "\n";
+    return content.slice(0, review.from) + block + content.slice(review.to);
+  }
+  function episodeLabelOf(heading) {
+    const m = /^(S\d+E\d+[^·]*?)\s*·\s/.exec(heading);
+    return m ? m[1].trim() : void 0;
+  }
+  function appendReviewSection(content, date, rating, text, episode) {
+    const body = text.trim();
+    if (!body)
+      return content;
+    const stars2 = rating != null && rating > 0 ? ` \xB7 ${starString(rating)}` : "";
+    const heading = `## ${episode ? `${episode} \xB7 ` : ""}${prettyDate(date) || date}${stars2}`;
+    const gap = content.endsWith("\n") ? "\n" : "\n\n";
+    return `${content}${gap}${heading}
+
+${body}
+`;
+  }
+  function headingFor(review, rating) {
+    const label = episodeLabelOf(review.heading);
+    const when = review.date ? prettyDate(review.date) || review.date : review.heading.replace(/\s*·.*$/, "").trim();
+    const base = label ? `${label} \xB7 ${when}` : when;
+    const stars2 = rating != null && rating > 0 ? ` \xB7 ${starString(rating)}` : "";
+    return `## ${base}${stars2}`;
+  }
+  function replaceHeading(content, review, heading) {
+    const lineStart = content.lastIndexOf("\n", review.from - 1) + 1;
+    return content.slice(0, lineStart) + heading + content.slice(review.from);
+  }
+
+  // src/publish/compose.ts
+  var TRAKT_MIN_WORDS = 5;
+  var TRAKT_REVIEW_WORDS = 200;
+  function wordCount(text) {
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  }
+  function traktComplaint(payload) {
+    const body = payload.text.trim();
+    if (!body)
+      return "There's nothing written to post.";
+    const words = wordCount(body);
+    if (words < TRAKT_MIN_WORDS) {
+      return `Trakt needs at least ${TRAKT_MIN_WORDS} words \u2014 this is ${words}.`;
+    }
+    if (!payload.entry.tmdbId) {
+      return "This note has no TMDB id, so Trakt can't tell which title it's about.";
+    }
+    return null;
+  }
+
+  // src/publish/mastodon.ts
+  function normaliseHost(raw) {
+    let host = (raw ?? "").trim();
+    if (!host)
+      return "";
+    host = host.replace(/^https?:\/\//i, "");
+    host = host.split("/")[0];
+    if (host.includes("@"))
+      host = host.slice(host.lastIndexOf("@") + 1);
+    return host.toLowerCase();
+  }
+
+  // src/setup.ts
+  var FEATURES = [
+    {
+      id: "tmdb",
+      name: "TMDB",
+      gives: "Everything. Posters, cast, runtimes, episode lists \u2014 Reel cannot add a title without it.",
+      essential: true,
+      effort: "2 minutes, free",
+      sends: "The title you search for, or its TMDB id. Nothing about your library.",
+      keys: ["tmdb"],
+      steps: [
+        {
+          text: "Create a free TMDB account, if you don't have one.",
+          url: "https://www.themoviedb.org/signup"
+        },
+        {
+          text: "Open your API settings and request a key. Pick \u201CDeveloper\u201D, and answer the form \u2014 any personal or hobby use is fine.",
+          url: "https://www.themoviedb.org/settings/api"
+        },
+        {
+          text: "Copy the API Read Access Token \u2014 the long one starting eyJ, not the short v3 key.",
+          note: "The token travels in a request header; the v3 key has to go in the URL, and URLs end up in logs. Reel accepts either, but this one is safer."
+        },
+        {
+          text: "Paste it below and press Save. You'll be asked for a passphrase \u2014 that encrypts the key inside your vault.",
+          key: "tmdb"
+        }
+      ]
+    },
+    {
+      id: "omdb",
+      name: "OMDb",
+      gives: "IMDb ratings, Rotten Tomatoes and Metacritic scores on every title.",
+      essential: false,
+      effort: "1 minute, free",
+      sends: "A film's IMDb id, when a note is created or refreshed.",
+      keys: ["omdb"],
+      steps: [
+        {
+          text: "Request a free key. The FREE tier is 1,000 requests a day, which Reel's cache makes ample.",
+          url: "https://www.omdbapi.com/apikey.aspx"
+        },
+        {
+          text: "Check your email and click the activation link. The key does not work until you do.",
+          note: "This one catches people out \u2014 the key arrives before it is active."
+        },
+        { text: "Paste the key below and press Save.", key: "omdb" }
+      ]
+    },
+    {
+      id: "dtdd",
+      name: "DoesTheDogDie",
+      gives: "Content warnings voted on per topic, so you can tell one upsetting scene from a film full of them.",
+      essential: false,
+      effort: "A few minutes, free \u2014 they approve by hand",
+      sends: "A film's title and year.",
+      keys: ["dtdd"],
+      steps: [
+        {
+          text: "Request an API key. Say what it's for \u2014 a personal Obsidian film tracker is a fine answer.",
+          url: "https://www.doesthedogdie.com/api"
+        },
+        {
+          text: "Wait for the reply. A person reads these, so it is not instant.",
+          note: "Everything else in Reel works meanwhile. Content filtering falls back to TMDB keywords until the key arrives."
+        },
+        { text: "Paste the key below and press Save.", key: "dtdd" }
+      ]
+    },
+    {
+      id: "openrouter",
+      name: "OpenRouter",
+      gives: "Ask \u2014 describe what you feel like watching and Reel finds it in your own library.",
+      essential: false,
+      effort: "2 minutes, and you pay per question",
+      sends: "Your question, plus a shortlist of titles from your library \u2014 names, years, genres, runtimes and your ratings. Never your reviews, your watch dates or your file paths.",
+      keys: ["openrouter"],
+      steps: [
+        { text: "Create an OpenRouter account.", url: "https://openrouter.ai/" },
+        {
+          text: "Add some credit. Questions cost a fraction of a penny each on the default model.",
+          url: "https://openrouter.ai/credits",
+          note: "Reel shows what every question cost in tokens, so this is checkable rather than a mystery bill."
+        },
+        { text: "Create an API key and copy it.", url: "https://openrouter.ai/keys" },
+        { text: "Paste it below, press Save, then turn Ask on.", key: "openrouter" }
+      ]
+    },
+    {
+      id: "trakt",
+      name: "Trakt",
+      gives: "Publishing a review to a public film profile, with your star rating alongside.",
+      essential: false,
+      effort: "5 minutes, free",
+      sends: "Only what you explicitly publish: one review's text, your rating, and the title's id. Nothing automatic.",
+      keys: ["traktApp", "trakt"],
+      steps: [
+        { text: "Create a Trakt account, if you don't have one.", url: "https://trakt.tv/auth/join" },
+        {
+          text: "Create an application. Any name will do \u2014 it is yours and nobody else sees it.",
+          url: "https://trakt.tv/oauth/applications/new",
+          note: "Reel asks you to register your own rather than shipping one, because Trakt's sign-in needs a client secret, and a secret compiled into an open-source plugin is printed in the repository for anyone to read."
+        },
+        {
+          text: "Set the Redirect URI to exactly this:",
+          copy: "urn:ietf:wg:oauth:2.0:oob",
+          note: "This is the standard value for an app with no website to return to. Getting it wrong is the usual reason sign-in fails."
+        },
+        {
+          text: "Save the application, then copy its Client ID and Client Secret into the two fields below.",
+          key: "traktApp"
+        },
+        {
+          text: "Press Sign in. Trakt shows a short code \u2014 type it on any device, and Reel waits for you.",
+          key: "trakt",
+          note: "No redirect back to the app is needed, which is what makes this work on a phone at all."
+        }
+      ]
+    },
+    {
+      id: "mastodon",
+      name: "Mastodon",
+      gives: "Publishing a review as a public post, with the title, your stars and the text.",
+      essential: false,
+      effort: "3 minutes, free",
+      sends: "Only what you explicitly publish: one post. Nothing automatic.",
+      keys: ["mastodon"],
+      steps: [
+        {
+          text: "Open your instance's development settings \u2014 that's your own server, e.g. mastodon.social/settings/applications.",
+          note: "Reel needs the server you post from; there is no central Mastodon."
+        },
+        { text: "Create a new application. Any name and website will do." },
+        {
+          text: "Tick only this scope, and untick the rest:",
+          copy: "write:statuses",
+          note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post."
+        },
+        { text: "Submit, open the application, and copy \u201CYour access token\u201D." },
+        /*
+         * Two steps, because they were two actions.
+         *
+         * "Enter your instance's address and paste the token below" asked
+         * for both in one line and could only be ticked by the token, so
+         * somebody who had typed their server and gone off to make a token
+         * came back to a guide reporting nothing done at all. The address
+         * is the one thing in this walkthrough Reel can watch you do.
+         */
+        { text: "Enter your instance's address below.", key: "mastodonHost" },
+        { text: "Paste the access token below.", key: "mastodon" }
+      ]
+    }
+  ];
+  function completedSteps(spec, has) {
+    let done = 0;
+    spec.steps.forEach((step, i) => {
+      if (step.key && has(step.key))
+        done = i + 1;
+    });
+    return done;
+  }
+  function isConfigured(plugin2, spec) {
+    return spec.keys.every((k) => plugin2.credentials.has(k));
+  }
+  function proves(plugin2, k) {
+    if (k === "mastodonHost")
+      return Boolean(normaliseHost(plugin2.settings.mastodonHost));
+    return plugin2.credentials.has(k);
+  }
+  function isPartial(plugin2, spec) {
+    if (isConfigured(plugin2, spec))
+      return false;
+    return spec.steps.some((s) => s.key && proves(plugin2, s.key));
+  }
+  function partialPhrase(partial) {
+    if (!partial.length)
+      return "";
+    if (partial.length === 1)
+      return `${partial[0].name} is half set up`;
+    if (partial.length === 2)
+      return `${partial[0].name} and ${partial[1].name} are half set up`;
+    return `${partial.length} are half set up`;
+  }
+  function setupState(plugin2) {
+    const essential = FEATURES.find((f) => f.essential);
+    const done = [];
+    const partial = [];
+    const todo = [];
+    for (const f of FEATURES) {
+      if (f.essential)
+        continue;
+      if (isConfigured(plugin2, f))
+        done.push(f);
+      else if (isPartial(plugin2, f))
+        partial.push(f);
+      else
+        todo.push(f);
+    }
+    return { done, partial, todo, blocked: !isConfigured(plugin2, essential), essential };
+  }
+
+  // src/health.ts
+  var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
+  var NEEDS_KEY_TO_CHECK = ["tmdb", "omdb", "dtdd", "openrouter", "trakt"];
+  function lastCheckFailed(records, id) {
+    return records[id]?.ok === false;
+  }
+  var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
+  function ago(then, now) {
+    const ms = Math.max(0, now - then);
+    const min = Math.floor(ms / 6e4);
+    if (min < 1)
+      return "just now";
+    if (min < 60)
+      return `${min} minute${min === 1 ? "" : "s"} ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24)
+      return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 30)
+      return `${day} day${day === 1 ? "" : "s"} ago`;
+    const mon = Math.floor(day / 30);
+    return `${mon} month${mon === 1 ? "" : "s"} ago`;
+  }
+  function extra(rec, withProves = true) {
+    const said = [withProves ? rec.proves : "", rec.note].filter((s) => s && s.trim());
+    return said.length ? `. ${said.join(" ")}` : "";
+  }
+  function describeHealth(rec, configured, now) {
+    if (!configured)
+      return { text: "Not set up", tone: "info" };
+    if (!rec)
+      return { text: "Not checked yet", tone: "info" };
+    const when = ago(rec.at, now);
+    if (!rec.ok)
+      return { text: `Failed ${when}${rec.error ? ` \u2014 ${rec.error}` : ""}`, tone: "warn" };
+    if (rec.proves)
+      return { text: `Checked ${when}. ${rec.proves}${extra(rec, false)}`, tone: "info" };
+    if (now - rec.at > STALE_AFTER)
+      return { text: `Worked ${when}${extra(rec)}`, tone: "info" };
+    return { text: `Working \u2014 checked ${when}${extra(rec)}`, tone: "ok" };
+  }
+  var SOON = 7 * 24 * 60 * 60 * 1e3;
+  function traktState(hasToken, expires, now) {
+    if (!hasToken)
+      return { kind: "out" };
+    if (!expires)
+      return { kind: "unknown" };
+    if (expires <= now)
+      return { kind: "expired", expires };
+    if (expires - now < SOON)
+      return { kind: "soon", expires };
+    return { kind: "in", expires };
+  }
+  function describeTrakt(state, now, rec) {
+    if (rec && !rec.ok && state.kind !== "out") {
+      return { text: `Token refused ${ago(rec.at, now)} \u2014 sign in again`, tone: "warn" };
+    }
+    switch (state.kind) {
+      case "out":
+        return { text: "Not signed in", tone: "info" };
+      case "unknown":
+        return { text: "Signed in \u2014 Reel cannot tell when this expires", tone: "info" };
+      case "expired":
+        return { text: `Session expired ${ago(state.expires, now)} \u2014 sign in again`, tone: "warn" };
+      case "soon":
+        return { text: `Signed in \u2014 renews automatically this week${checked(rec, now)}`, tone: "ok" };
+      case "in":
+        return { text: `Signed in${checked(rec, now)}`, tone: "ok" };
+    }
+  }
+  function checked(rec, now) {
+    return rec?.ok ? `, checked ${ago(rec.at, now)}` : "";
+  }
+  function featureHealth(id, inputs, now) {
+    if (id === "trakt") {
+      return describeTrakt(traktState(inputs.hasTrakt, inputs.traktExpires, now), now, inputs.records.trakt);
+    }
+    if (!TESTABLE.includes(id))
+      return null;
+    const rec = inputs.records[id];
+    if (!rec && inputs.locked && NEEDS_KEY_TO_CHECK.includes(id)) {
+      return { text: "Keys are locked \u2014 unlock to check", tone: "info" };
+    }
+    return describeHealth(rec, true, now);
+  }
+
+  // src/checks.ts
+  function checkable(plugin2, id) {
+    if (!TESTABLE.includes(id))
+      return false;
+    if (NEEDS_KEY_TO_CHECK.includes(id) && plugin2.credentials.needsUnlock)
+      return false;
+    switch (id) {
+      case "mastodon":
+        return Boolean(normaliseHost(plugin2.settings.mastodonHost));
+      default:
+        return plugin2.credentials.has(id);
+    }
+  }
+  async function run(plugin2, id) {
+    switch (id) {
+      case "tmdb":
+        return plugin2.tmdb.testCredentials();
+      case "omdb":
+        return plugin2.omdb.test();
+      case "dtdd":
+        return plugin2.dtdd.test();
+      case "openrouter":
+        return plugin2.ai.test();
+      case "mastodon":
+        return plugin2.publish.mastodon.test();
+      case "trakt":
+        return plugin2.publish.trakt.test();
+      default:
+        return { ok: false, error: "Nothing to check." };
+    }
+  }
+  async function checkFeature(plugin2, id, now) {
+    if (!checkable(plugin2, id))
+      return null;
+    let out;
+    try {
+      out = await run(plugin2, id);
+    } catch (e) {
+      out = { ok: false, error: redact(e) };
+    }
+    const rec = out.ok ? { at: now, ok: true, ...out.proves ? { proves: out.proves } : {}, ...out.note ? { note: out.note } : {} } : { at: now, ok: false, error: redact(out.error) };
+    plugin2.settings.connectionHealth[id] = rec;
+    return rec;
+  }
+  async function checkAll(plugin2, now) {
+    const ids = TESTABLE.filter((id) => checkable(plugin2, id));
+    await Promise.all(ids.map((id) => checkFeature(plugin2, id, now)));
+    await plugin2.saveSettings();
+    return ids.filter((id) => plugin2.settings.connectionHealth[id]?.ok === false);
+  }
+
+  // src/ui/confirm.ts
+  function confirm(app2, opts) {
+    return new Promise((resolve) => new ConfirmModal(app2, opts, resolve).open());
+  }
+  var ConfirmModal = class extends Modal {
+    constructor(app2, opts, done) {
+      super(app2);
+      this.opts = opts;
+      this.done = done;
+      this.answered = false;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-confirm");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: this.opts.title });
+      contentEl.createDiv({ cls: "reel-log-sub", text: this.opts.body });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.finish(false));
+      const go = actions.createEl("button", {
+        cls: this.opts.danger ? "reel-btn reel-btn-danger" : "reel-btn mod-cta",
+        text: this.opts.confirmText
+      });
+      go.addEventListener("click", () => this.finish(true));
+      cancel.focus();
+    }
+    finish(ok) {
+      this.answered = true;
+      this.done(ok);
+      this.close();
+    }
+    onClose() {
+      this.contentEl.empty();
+      if (!this.answered)
+        this.done(false);
+    }
+  };
+
+  // src/publish/trakt.ts
+  var ACTIVATE_URL = "https://trakt.tv/activate";
+
+  // src/ui/traktSignIn.ts
+  var TraktSignIn = class extends Modal {
+    constructor(app2, plugin2, app_, onDone) {
+      super(app2);
+      this.plugin = plugin2;
+      this.app_ = app_;
+      this.onDone = onDone;
+      this.stop = false;
+      this.device = null;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-trakt");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
+      contentEl.createDiv({ cls: "reel-log-sub", text: "Asking Trakt for a code\u2026" });
+      void this.begin();
+    }
+    async begin() {
+      try {
+        this.device = await this.plugin.publish.trakt.requestDeviceCode(this.app_);
+      } catch (e) {
+        this.fail(redact(e));
+        return;
+      }
+      this.renderCode(this.device);
+      void this.poll(this.device);
+    }
+    renderCode(device) {
+      const { contentEl } = this;
+      contentEl.empty();
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
+      const steps = contentEl.createDiv({ cls: "reel-trakt-steps" });
+      steps.createDiv({ cls: "reel-trakt-step", text: "1. Open this page on any device:" });
+      const link = steps.createEl("a", {
+        cls: "reel-trakt-url",
+        text: device.verificationUrl || ACTIVATE_URL,
+        href: device.verificationUrl || ACTIVATE_URL
+      });
+      link.setAttr("target", "_blank");
+      link.setAttr("rel", "noopener");
+      steps.createDiv({ cls: "reel-trakt-step", text: "2. Enter this code:" });
+      const code = steps.createEl("button", { cls: "reel-trakt-code", text: device.userCode });
+      code.setAttr("aria-label", `Code ${device.userCode.split("").join(" ")}. Tap to copy.`);
+      code.addEventListener("click", () => {
+        navigator.clipboard?.writeText(device.userCode).then(() => new Notice("Reel: code copied.")).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
+      });
+      const status = contentEl.createDiv({ cls: "reel-trakt-status" });
+      status.createDiv({ cls: "reel-ask-spinner" });
+      status.createSpan({ text: "Waiting for you to approve it\u2026" });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+    }
+    /**
+     * Ask, wait, ask again, until Trakt says yes, no, or too late.
+     *
+     * The deadline is Trakt's own `expires_in` rather than a fixed number of
+     * attempts, because the interval can be raised mid-flow by a 429 and a loop
+     * counting attempts would then give up early — while the user is still
+     * typing, having done nothing wrong.
+     */
+    async poll(device) {
+      let wait = Math.max(1, device.interval) * 1e3;
+      const deadline = Date.now() + Math.max(60, device.expiresIn) * 1e3;
+      while (!this.stop && Date.now() < deadline) {
+        await sleep(wait);
+        if (this.stop)
+          return;
+        let token;
+        try {
+          token = await this.plugin.publish.trakt.pollDeviceToken(this.app_, device.deviceCode);
+        } catch (e) {
+          this.fail(redact(e));
+          return;
+        }
+        if (token) {
+          const saved = await this.plugin.publish.storeToken(JSON.stringify(token));
+          if (!saved) {
+            this.fail("Signed in, but the token wasn't saved \u2014 the passphrase prompt was cancelled.");
+            return;
+          }
+          this.succeed();
+          return;
+        }
+        wait = Math.min(wait + 500, 15e3);
+      }
+      if (!this.stop)
+        this.fail("The code expired before it was approved.");
+    }
+    succeed() {
+      const { contentEl } = this;
+      contentEl.empty();
+      const done = contentEl.createDiv({ cls: "reel-trakt-done" });
+      setIcon(done.createSpan({ cls: "reel-trakt-done-icon" }), "check");
+      done.createSpan({ text: "Signed in to Trakt." });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const ok = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
+      ok.addEventListener("click", () => this.close());
+      ok.focus();
+      this.stop = true;
+      this.onDone(true);
+      this.onDone = () => void 0;
+    }
+    fail(message) {
+      const { contentEl } = this;
+      contentEl.empty();
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Couldn't sign in" });
+      contentEl.createDiv({ cls: "reel-publish-warn", text: message });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const ok = actions.createEl("button", { cls: "reel-btn", text: "Close" });
+      ok.addEventListener("click", () => this.close());
+      this.stop = true;
+    }
+    onClose() {
+      this.stop = true;
+      this.contentEl.empty();
+      this.onDone(false);
+      this.onDone = () => void 0;
+    }
+  };
+  function sleep(ms) {
+    return new Promise((r) => window.setTimeout(r, ms));
+  }
+
+  // src/credentials.ts
+  var KEY_LABELS = {
+    tmdb: "TMDB",
+    omdb: "OMDb",
+    dtdd: "DoesTheDogDie",
+    openrouter: "OpenRouter",
+    trakt: "Trakt",
+    traktApp: "Trakt app",
+    mastodon: "Mastodon"
+  };
+  var READ_KEYS = ["tmdb", "omdb", "dtdd", "openrouter"];
+  var WRITE_KEYS = ["trakt", "traktApp", "mastodon"];
+  var MissingKeyError = class extends Error {
+    constructor(key = "tmdb", msg) {
+      super(msg ?? `No ${KEY_LABELS[key]} key. Add one in Settings \u2192 Reel.`);
+      this.key = key;
+      this.name = "MissingKeyError";
+    }
+  };
+
+  // src/ui/fields.ts
+  function keyField(el, ctx, name, label, desc, opts = {}) {
+    const store = ctx.plugin.credentials;
+    let input = null;
+    const setting = new Setting(el).setName(label).setDesc(desc).addText((t) => {
+      t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
+      t.inputEl.type = "password";
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      input = t.inputEl;
+    }).addButton((b) => {
+      if (!store.has(name))
+        b.setCta();
+      return b.setButtonText("Save").onClick(async () => {
+        const value = input?.value ?? "";
+        if (!value.trim()) {
+          new Notice("Reel: nothing to save.");
+          return;
+        }
+        const ok = await ctx.plugin.credentials.store(name, value);
+        if (input)
+          input.value = "";
+        new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
+        ctx.onChanged();
+      });
+    });
+    if (opts.remove && store.has(name)) {
+      setting.addButton(
+        (b) => b.setButtonText("Remove").onClick(async () => {
+          const ok = await confirm(ctx.app, {
+            title: `Remove the ${KEY_LABELS[name]} key`,
+            body: "Reel cannot recover it. You would need the original key again to re-add it.",
+            confirmText: "Remove",
+            danger: true
+          });
+          if (!ok)
+            return;
+          await ctx.plugin.credentials.remove(name);
+          new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
+          ctx.onChanged();
+        })
+      );
+    }
+  }
+  function traktAppField(el, ctx, opts = {}) {
+    const hasApp = ctx.plugin.credentials.has("traktApp");
+    let idEl = null;
+    let secretEl = null;
+    const setting = new Setting(el).setName("Trakt application").setDesc(
+      hasApp ? "Saved. Paste both again to replace them." : "From trakt.tv/oauth/applications. Both are stored with your other keys."
+    ).addText((t) => {
+      t.setPlaceholder("Client ID");
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      idEl = t.inputEl;
+    }).addText((t) => {
+      t.setPlaceholder("Client secret");
+      t.inputEl.type = "password";
+      t.inputEl.autocomplete = "off";
+      t.inputEl.spellcheck = false;
+      t.inputEl.addClass("reel-input");
+      secretEl = t.inputEl;
+    }).addButton((b) => {
+      if (!hasApp)
+        b.setCta();
+      return b.setButtonText("Save").onClick(async () => {
+        const clientId = (idEl?.value ?? "").trim();
+        const clientSecret = (secretEl?.value ?? "").trim();
+        if (!clientId || !clientSecret) {
+          new Notice("Reel: both the client ID and the secret are needed.");
+          return;
+        }
+        const ok = await ctx.plugin.credentials.store(
+          "traktApp",
+          JSON.stringify({ id: clientId, secret: clientSecret })
+        );
+        if (idEl)
+          idEl.value = "";
+        if (secretEl)
+          secretEl.value = "";
+        new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
+        ctx.onChanged();
+      });
+    });
+    if (opts.remove && hasApp) {
+      setting.addButton(
+        (b) => b.setButtonText("Remove").onClick(async () => {
+          const ok = await confirm(ctx.app, {
+            title: "Remove the Trakt application",
+            body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
+            confirmText: "Remove",
+            danger: true
+          });
+          if (!ok)
+            return;
+          await ctx.plugin.credentials.remove("traktApp");
+          await ctx.plugin.credentials.remove("trakt");
+          new Notice("Reel: Trakt application removed.");
+          ctx.onChanged();
+        })
+      );
+    }
+  }
+  function traktSignInField(el, ctx) {
+    const hasApp = ctx.plugin.credentials.has("traktApp");
+    const signedIn = ctx.plugin.credentials.has("trakt");
+    new Setting(el).setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
+      hasApp ? "Trakt shows a short code. Type it on any device \u2014 Reel waits." : "Save the application above first; the sign-in needs it."
+    ).addButton((b) => {
+      b.setButtonText(signedIn ? "Sign in again" : "Sign in");
+      if (!signedIn)
+        b.setCta();
+      b.setDisabled(!hasApp);
+      b.onClick(async () => {
+        const app2 = await ctx.plugin.publish.app();
+        if (!app2) {
+          new Notice("Reel: couldn't read the Trakt application.");
+          return;
+        }
+        new TraktSignIn(ctx.app, ctx.plugin, app2, (ok) => {
+          if (ok)
+            ctx.onChanged();
+        }).open();
+      });
+    });
+  }
+  function mastodonHostField(el, ctx) {
+    new Setting(el).setName("Instance").setDesc("The server you post from, e.g. mastodon.social. Not a secret, so it isn't encrypted.").addText(
+      (t) => t.setPlaceholder("mastodon.social").setValue(ctx.plugin.settings.mastodonHost).onChange(
+        debounce(async (v) => {
+          ctx.plugin.settings.mastodonHost = normaliseHost(v);
+          await ctx.plugin.saveSettings();
+        }, 500)
+      )
+    );
+  }
+  function askEnabledField(el, ctx) {
+    new Setting(el).setName("Enable Ask").setDesc("Off by default. With this off, no request is ever made, key or no key.").addToggle(
+      (t) => t.setValue(ctx.plugin.settings.aiEnabled).onChange(async (v) => {
+        ctx.plugin.settings.aiEnabled = v;
+        await ctx.plugin.saveSettings();
+        ctx.onChanged();
+      })
+    );
+  }
+  function publishEnabledField(el, ctx, id, label) {
+    const key = id === "trakt" ? "publishTrakt" : "publishMastodon";
+    new Setting(el).setName(`Publish to ${label}`).setDesc("Off by default. With this off there is no Publish button, key or no key.").addToggle(
+      (t) => t.setValue(ctx.plugin.settings[key]).onChange(async (v) => {
+        ctx.plugin.settings[key] = v;
+        await ctx.plugin.saveSettings();
+        ctx.onChanged();
+      })
+    );
+  }
+  function setupFields(el, ctx, spec) {
+    switch (spec.id) {
+      case "tmdb":
+        keyField(el, ctx, "tmdb", "TMDB key", "Pasted here, encrypted in your vault.");
+        return;
+      case "omdb":
+        keyField(el, ctx, "omdb", "OMDb key", "Pasted here, encrypted in your vault.");
+        return;
+      case "dtdd":
+        keyField(el, ctx, "dtdd", "DoesTheDogDie key", "Pasted here, encrypted in your vault.");
+        return;
+      case "openrouter":
+        keyField(el, ctx, "openrouter", "OpenRouter key", "Pasted here, encrypted in your vault.");
+        askEnabledField(el, ctx);
+        return;
+      case "trakt":
+        traktAppField(el, ctx);
+        traktSignInField(el, ctx);
+        publishEnabledField(el, ctx, "trakt", "Trakt");
+        return;
+      case "mastodon":
+        mastodonHostField(el, ctx);
+        keyField(el, ctx, "mastodon", "Access token", "The token from step 4, encrypted in your vault.");
+        publishEnabledField(el, ctx, "mastodon", "Mastodon");
+        return;
+      default:
+        return;
+    }
+  }
+
+  // src/ui/setupSheet.ts
+  var SetupSheet = class extends Modal {
+    constructor(app2, plugin2, spec, onDone) {
+      super(app2);
+      this.plugin = plugin2;
+      this.spec = spec;
+      this.onDone = onDone;
+      this.ticked = /* @__PURE__ */ new Set();
+    }
+    onOpen() {
+      const { modalEl } = this;
+      modalEl.addClass("reel-modal");
+      modalEl.addClass("reel-setup-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-modal-phone");
+      this.draw();
+    }
+    /**
+     * Redrawn in place after anything that changes the answer.
+     *
+     * Saving a key changes the state pill, the status line and whether the
+     * sign-in button is offered, and a guide that still described the state
+     * before you acted would be the same lie this plugin keeps finding: a
+     * screen reporting what it was told rather than what is.
+     */
+    draw() {
+      const { contentEl } = this;
+      this.seedTicks();
+      contentEl.empty();
+      contentEl.addClass("reel-setup");
+      this.renderHead(contentEl);
+      this.renderSteps(contentEl);
+      this.renderFields(contentEl);
+      this.renderFoot(contentEl);
+    }
+    /**
+     * Steps the vault can prove you have already done.
+     *
+     * Ticking was there and was purely manual, which means it only ever
+     * survived one sitting: come back tomorrow to a guide you half finished
+     * and the marks are gone, along with the answer to the only question you
+     * have. A saved credential is durable, and it settles the question
+     * directly — no new state to store, and nothing to go stale.
+     *
+     * Only ever adds. A tick you put there by hand is a statement about
+     * something Reel cannot see, and taking it away because the plugin has no
+     * evidence of it would be the screen overruling you about your own
+     * afternoon.
+     */
+    seedTicks() {
+      for (const i of this.plugin.settings.setupTicks[this.spec.id] ?? [])
+        this.ticked.add(i);
+      const done = completedSteps(this.spec, (k) => this.proves(k));
+      for (let i = 0; i < done; i++)
+        this.ticked.add(i);
+    }
+    /**
+     * Is this step's product in the vault?
+     *
+     * Delegated, because the settings row asks the same question and the two
+     * gave different answers for a release: the guide counted the Mastodon
+     * server as progress and the row that opens it did not.
+     */
+    proves(k) {
+      return proves(this.plugin, k);
+    }
+    /**
+     * Write the marks down.
+     *
+     * Only the ones you made: a step the credentials already prove is re-seeded
+     * on every open and storing it as well would freeze an inference that ought
+     * to be recomputed — remove the key and the guide should stop claiming the
+     * step is behind you.
+     */
+    async saveTicks() {
+      const proven = completedSteps(this.spec, (k) => this.proves(k));
+      const mine = [...this.ticked].filter((i) => i >= proven).sort((a, b) => a - b);
+      if (mine.length)
+        this.plugin.settings.setupTicks[this.spec.id] = mine;
+      else
+        delete this.plugin.settings.setupTicks[this.spec.id];
+      await this.plugin.saveSettings();
+    }
+    /**
+     * The fields the steps have been pointing at all along.
+     *
+     * Every guide ends by telling you to paste something "below" and there was
+     * nothing below — the field was on the settings screen underneath the sheet
+     * saying "look down". The instruction was right about what to do and wrong
+     * about where, so following it meant abandoning the walkthrough halfway to
+     * go and find a control among forty-nine others.
+     *
+     * The same controls as the settings screen, not a copy of them: they live
+     * in `ui/fields` and both screens call it, so a key saved here is saved
+     * there and there is no second implementation to drift.
+     */
+    renderFields(root) {
+      const box = root.createDiv({ cls: "reel-setup-fields" });
+      setupFields(box, { app: this.app, plugin: this.plugin, onChanged: () => this.draw() }, this.spec);
+      if (!box.childElementCount)
+        box.remove();
+    }
+    /* ------------------------------------------------------------------ */
+    renderHead(root) {
+      const head = root.createDiv({ cls: "reel-setup-head" });
+      const title = head.createDiv({ cls: "reel-setup-title" });
+      title.createSpan({ cls: "reel-setup-name", text: this.spec.name });
+      const done = isConfigured(this.plugin, this.spec);
+      const part = isPartial(this.plugin, this.spec);
+      const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
+      title.createSpan({
+        cls: done ? failed ? "reel-pill" : "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
+        text: done ? "Set up" : part ? "Half done" : this.spec.essential ? "Required" : "Not set up"
+      });
+      head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
+      head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
+      this.renderHealth(head, done);
+      const sends = root.createDiv({ cls: "reel-setup-sends" });
+      sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
+      sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
+    }
+    /**
+     * What this connection last did, and a way to find out now.
+     *
+     * Opening a guide for something already set up is almost always because it
+     * has stopped working, and the guide used to answer only the question you
+     * were not asking — how to set it up, which you already did.
+     *
+     * The button is the other half of that. Verification lived on a different
+     * screen from configuration, behind one control that tested all six
+     * services at once, so finishing this walkthrough meant closing it and
+     * going to look for something else in order to learn whether the key you
+     * had just pasted was right.
+     *
+     * Shown when the feature is set up *or* merely checkable, which are not the
+     * same thing and the difference is the point. Mastodon is checked by its
+     * server address rather than its token, so somebody who has typed a server
+     * and not yet made a token can find out the address is wrong — which is
+     * both the commonest mistake and the cheapest moment to fix it.
+     */
+    renderHealth(head, done) {
+      const can = checkable(this.plugin, this.spec.id);
+      if (!done && !can)
+        return;
+      const said = this.healthLine();
+      if (!said && !can)
+        return;
+      const wrap = head.createDiv({ cls: "reel-setup-check" });
+      const line = wrap.createDiv({ cls: "reel-setup-health" });
+      const draw2 = () => {
+        const now = this.healthLine();
+        line.setText(now?.text ?? "");
+        line.className = `reel-setup-health is-${now?.tone ?? "info"}`;
+      };
+      draw2();
+      if (!can) {
+        if (!this.locked())
+          return;
+        const open2 = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
+        open2.addEventListener("click", async () => {
+          open2.disabled = true;
+          open2.setText("Unlocking\u2026");
+          const opened = await this.plugin.credentials.unlock();
+          if (!opened) {
+            open2.disabled = false;
+            open2.setText("Unlock");
+            return;
+          }
+          this.draw();
+        });
+        return;
+      }
+      const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.setText("Checking\u2026");
+        try {
+          await checkFeature(this.plugin, this.spec.id, Date.now());
+          await this.plugin.saveSettings();
+        } finally {
+          btn.disabled = false;
+          btn.setText("Check now");
+          draw2();
+        }
+      });
+    }
+    /**
+     * Null for the features nothing can honestly report on.
+     *
+     * The routing lives in `health.ts` and is shared with the settings rows and
+     * the health table. It was written out here as well, which is how a guide
+     * and a row come to disagree about the same feature.
+     */
+    /** Sealed keys, and this feature is one of the ones that needs them. */
+    locked() {
+      return NEEDS_KEY_TO_CHECK.includes(this.spec.id) && this.plugin.credentials.needsUnlock && this.plugin.credentials.hasStoredKey;
+    }
+    healthLine() {
+      const s = this.plugin.settings;
+      return featureHealth(
+        this.spec.id,
+        {
+          records: s.connectionHealth,
+          hasTrakt: this.plugin.credentials.has("trakt"),
+          traktExpires: s.traktExpires,
+          locked: this.plugin.credentials.needsUnlock
+        },
+        Date.now()
+      );
+    }
+    /**
+     * The instructions, folded away once there is nothing left to follow.
+     *
+     * Opening a guide for a feature that is already working is a normal thing
+     * to do — it is where the status lives, and the Check now button, and the
+     * field you would use to replace a key. What you are not doing is reading
+     * how to create the account, and five completed steps between you and the
+     * three things you came for is a wall of settled questions.
+     *
+     * The settings list already reasons this way about its own descriptions: a
+     * pitch is for something you have not bought yet. This is the same rule one
+     * screen further in.
+     *
+     * Folded, never dropped. Making a second token a year from now means
+     * reading them again, and a guide that has quietly stopped containing its
+     * own guide would be a worse answer than a long screen.
+     */
+    renderSteps(root) {
+      const total = this.spec.steps.length;
+      const allDone = total > 0 && this.spec.steps.every((_, i) => this.ticked.has(i));
+      if (!allDone) {
+        const open2 = root.createEl("ol", { cls: "reel-setup-steps" });
+        this.spec.steps.forEach((step, i) => this.renderStep(open2, step, i));
+        return;
+      }
+      const toggle2 = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
+      const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
+      const list2 = root.createEl("ol", { cls: failed ? "reel-setup-steps" : "reel-setup-steps is-collapsed" });
+      const label = () => {
+        const shown2 = !list2.classList.contains("is-collapsed");
+        toggle2.setText(shown2 ? "Hide the steps" : `All ${total} steps done \u2014 show them`);
+        toggle2.setAttr("aria-expanded", String(shown2));
+      };
+      toggle2.addEventListener("click", () => {
+        list2.classList.toggle("is-collapsed");
+        label();
+      });
+      label();
+      this.spec.steps.forEach((step, i) => this.renderStep(list2, step, i));
+    }
+    renderStep(list2, step, i) {
+      const li = list2.createEl("li", { cls: "reel-setup-step" });
+      const row = li.createDiv({ cls: "reel-setup-step-row" });
+      const done = this.ticked.has(i);
+      if (done)
+        li.addClass("is-done");
+      const tick = row.createEl("button", { cls: "reel-setup-tick", text: done ? "\u2713" : String(i + 1) });
+      tick.setAttr("aria-label", `Step ${i + 1}. Tap to mark done.`);
+      tick.setAttr("aria-pressed", String(done));
+      row.createSpan({ cls: "reel-setup-step-text", text: step.text });
+      const mark = () => {
+        const on = this.ticked.has(i);
+        if (on)
+          this.ticked.delete(i);
+        else
+          this.ticked.add(i);
+        li.toggleClass("is-done", !on);
+        tick.setAttr("aria-pressed", String(!on));
+        tick.setText(!on ? "\u2713" : String(i + 1));
+        void this.saveTicks();
+      };
+      tick.addEventListener("click", mark);
+      if (step.copy)
+        this.renderCopy(li, step.copy);
+      if (step.url) {
+        const a = li.createEl("a", {
+          cls: "reel-btn reel-setup-go",
+          text: this.hostOf(step.url),
+          href: step.url
+        });
+        a.setAttr("target", "_blank");
+        a.setAttr("rel", "noopener");
+        a.addEventListener("click", () => {
+          if (!this.ticked.has(i))
+            mark();
+        });
+      }
+      if (step.note)
+        li.createDiv({ cls: "reel-setup-note", text: step.note });
+    }
+    /**
+     * A literal to be typed exactly, with a button that copies it.
+     *
+     * The two values in Reel's entire setup that must match character for
+     * character are Trakt's redirect URI and Mastodon's scope, and both are
+     * strings of punctuation that mean nothing to read. Copying either by eye
+     * is how a setup fails five minutes later with somebody else's error
+     * message attached.
+     */
+    renderCopy(li, value) {
+      const btn = li.createEl("button", { cls: "reel-setup-copy" });
+      btn.createSpan({ cls: "reel-setup-copy-value", text: value });
+      btn.createSpan({ cls: "reel-setup-copy-hint", text: "Copy" });
+      btn.setAttr("aria-label", `Copy ${value}`);
+      btn.addEventListener("click", () => {
+        navigator.clipboard?.writeText(value).then(() => {
+          new Notice("Reel: copied.");
+          btn.addClass("is-copied");
+        }).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
+      });
+    }
+    renderFoot(root) {
+      const foot = root.createDiv({ cls: "reel-setup-foot" });
+      const close = foot.createEl("button", { cls: "reel-btn mod-cta", text: "Back to settings" });
+      close.addEventListener("click", () => {
+        this.close();
+        this.onDone?.();
+      });
+    }
+    /** "Open themoviedb.org" reads better on a button than the whole URL does. */
+    hostOf(url) {
+      try {
+        return `Open ${new URL(url).hostname.replace(/^www\./, "")}`;
+      } catch {
+        return "Open";
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
+  // src/ui/publishSheet.ts
+  var PublishSheet = class extends Modal {
+    constructor(app2, plugin2, opts) {
+      super(app2);
+      this.plugin = plugin2;
+      this.opts = opts;
+      this.chosen = /* @__PURE__ */ new Set();
+      this.busy = false;
+      this.spoiler = plugin2.settings.publishSpoilerDefault;
+    }
+    get payload() {
+      return {
+        entry: this.opts.entry,
+        date: this.opts.date,
+        rating: this.opts.rating,
+        text: this.opts.text,
+        spoiler: this.spoiler
+      };
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-publish");
+      contentEl.createEl("h3", { cls: "reel-log-title", text: "Publish review" });
+      const sub = contentEl.createDiv({ cls: "reel-publish-sub" });
+      sub.createSpan({ cls: "reel-publish-title", text: this.opts.entry.title });
+      if (this.opts.rating != null && this.opts.rating > 0) {
+        renderStarsStatic(sub.createSpan({ cls: "reel-publish-stars" }), this.opts.rating);
+      }
+      if (this.opts.date)
+        sub.createSpan({ cls: "reel-publish-date", text: prettyDate(this.opts.date) });
+      const targets = this.plugin.publish.targets();
+      if (!targets.length) {
+        this.renderNowhere(contentEl);
+        return;
+      }
+      this.renderTargets(contentEl, targets);
+      this.renderSpoiler(contentEl);
+      this.previewHost = contentEl.createDiv({ cls: "reel-publish-previews" });
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
+      cancel.addEventListener("click", () => this.close());
+      this.goBtn = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Publish" });
+      this.goBtn.addEventListener("click", () => void this.run());
+      cancel.focus();
+      void this.repaint();
+    }
+    /**
+     * Publishing is on but nothing is configured.
+     *
+     * This said "Settings → Reel → Publishing has Trakt and Mastodon" and
+     * offered one button that opened the settings tab, which is the fault the
+     * walkthroughs exist to fix: the screen knows exactly which two features are
+     * missing and it threw that away to drop you at the top of a tab holding
+     * forty-nine controls.
+     *
+     * Two buttons rather than one, because there genuinely are two answers and
+     * they differ in kind — Trakt is a film profile, Mastodon is a public
+     * post. Choosing between them is the first real decision, and each guide
+     * says what leaves your vault before you commit to anything.
+     */
+    renderNowhere(el) {
+      el.createDiv({
+        cls: "reel-publish-empty",
+        text: "No publishing destination is set up yet. Trakt puts the review on your film profile; Mastodon posts it publicly. Either takes a few minutes, and neither sends anything until you press Publish."
+      });
+      const actions = el.createDiv({ cls: "reel-log-actions" });
+      for (const id of ["trakt", "mastodon"]) {
+        const spec = FEATURES.find((f) => f.id === id);
+        if (!spec)
+          continue;
+        const go = actions.createEl("button", {
+          cls: `reel-btn${id === "trakt" ? " mod-cta" : ""}`,
+          text: `Set up ${spec.name}`
+        });
+        go.addEventListener("click", () => {
+          this.close();
+          new SetupSheet(this.app, this.plugin, spec).open();
+        });
+      }
+    }
+    renderTargets(el, targets) {
+      const row = el.createDiv({ cls: "reel-publish-targets" });
+      for (const t of targets) {
+        const btn = row.createEl("button", { cls: "reel-publish-target" });
+        btn.createSpan({ cls: "reel-publish-target-name", text: t.label });
+        const already = this.plugin.publish.publishedTo(this.opts.entry)[t.id];
+        if (t.blocker) {
+          btn.addClass("is-blocked");
+          btn.createSpan({ cls: "reel-publish-target-note", text: t.blocker });
+          const spec = FEATURES.find((f) => f.id === t.id);
+          if (!spec) {
+            btn.disabled = true;
+            continue;
+          }
+          btn.setAttribute("aria-label", `Set up ${spec.name}`);
+          btn.addEventListener("click", () => {
+            this.close();
+            new SetupSheet(this.app, this.plugin, spec).open();
+          });
+          continue;
+        }
+        if (already) {
+          btn.createSpan({ cls: "reel-publish-target-note", text: "Already published once" });
+        }
+        btn.addEventListener("click", () => {
+          if (this.busy)
+            return;
+          if (this.chosen.has(t.id))
+            this.chosen.delete(t.id);
+          else
+            this.chosen.add(t.id);
+          btn.toggleClass("is-on", this.chosen.has(t.id));
+          void this.repaint();
+        });
+      }
+    }
+    renderSpoiler(el) {
+      const row = el.createDiv({ cls: "reel-publish-spoiler" });
+      const btn = row.createEl("button", { cls: "reel-publish-toggle" });
+      const paint = () => {
+        btn.empty();
+        btn.toggleClass("is-on", this.spoiler);
+        setIcon(btn.createSpan({ cls: "reel-publish-toggle-icon" }), this.spoiler ? "eye-off" : "eye");
+        btn.createSpan({ text: this.spoiler ? "Marked as spoilers" : "No spoilers" });
+      };
+      paint();
+      btn.addEventListener("click", () => {
+        this.spoiler = !this.spoiler;
+        paint();
+        void this.repaint();
+      });
+      row.createDiv({
+        cls: "reel-publish-hint",
+        text: "Trakt requires this either way. On Mastodon it goes behind a content warning."
+      });
+    }
+    /**
+     * Redraw the previews for whatever is currently ticked.
+     *
+     * Async because Mastodon's character limit is a property of the instance and
+     * has to be asked for. The sheet stays usable while that is in flight — a
+     * preview arriving a moment late is fine, a sheet that blocks on a network
+     * call before it will render is not.
+     */
+    async repaint() {
+      if (!this.previewHost)
+        return;
+      this.previewHost.empty();
+      this.goBtn.disabled = this.chosen.size === 0 || this.busy;
+      if (!this.chosen.size) {
+        this.previewHost.createDiv({
+          cls: "reel-publish-hint",
+          text: "Pick where this should go. Nothing is sent until you press Publish."
+        });
+        return;
+      }
+      for (const id of this.chosen) {
+        const box = this.previewHost.createDiv({ cls: "reel-publish-preview" });
+        const label = id === "trakt" ? "Trakt" : "Mastodon";
+        box.createDiv({ cls: "reel-publish-preview-head", text: label });
+        const complaint = this.plugin.publish.complaint(this.payload, id);
+        if (complaint) {
+          box.createDiv({ cls: "reel-publish-warn", text: complaint });
+          this.goBtn.disabled = true;
+          continue;
+        }
+        try {
+          const composed = await this.plugin.publish.preview(this.payload, id);
+          box.createDiv({ cls: "reel-publish-text", text: composed.text });
+          const meta = box.createDiv({ cls: "reel-publish-meta" });
+          meta.createSpan({ text: `${composed.text.length} characters` });
+          if (composed.truncated) {
+            box.createDiv({
+              cls: "reel-publish-warn",
+              text: "Too long for this instance \u2014 the post is cut where you see the ellipsis. The full review stays in your vault."
+            });
+          }
+          if (id === "trakt" && wordCount(this.opts.text) > TRAKT_REVIEW_WORDS) {
+            meta.createSpan({ text: " \xB7 filed as a review, not a shout" });
+          }
+        } catch (e) {
+          box.createDiv({ cls: "reel-publish-warn", text: redact(e) });
+        }
+      }
+    }
+    async run() {
+      if (this.busy || !this.chosen.size)
+        return;
+      this.busy = true;
+      this.goBtn.disabled = true;
+      this.goBtn.setText("Publishing\u2026");
+      let outcomes = [];
+      try {
+        outcomes = await this.plugin.publish.publish(this.payload, [...this.chosen]);
+      } catch (e) {
+        new Notice(`Reel: ${redact(e)}`, 8e3);
+        this.busy = false;
+        this.goBtn.disabled = false;
+        this.goBtn.setText("Publish");
+        return;
+      }
+      this.opts.onDone?.();
+      this.renderOutcome(outcomes);
+    }
+    /**
+     * What happened, per destination, without closing the sheet.
+     *
+     * Closing on success and firing a toast was the first version, and it was
+     * wrong: a toast that says "published" and vanishes leaves you with no way
+     * to get to the thing that was published, and no way to read the one target
+     * that failed while the other worked.
+     */
+    renderOutcome(outcomes) {
+      const { contentEl } = this;
+      contentEl.empty();
+      const good = outcomes.filter((o) => o.ok);
+      contentEl.createEl("h3", {
+        cls: "reel-log-title",
+        text: good.length === outcomes.length ? "Published" : good.length ? "Partly published" : "Not published"
+      });
+      const list2 = contentEl.createDiv({ cls: "reel-publish-outcomes" });
+      for (const o of outcomes) {
+        const row = list2.createDiv({ cls: `reel-publish-outcome ${o.ok ? "is-ok" : "is-bad"}` });
+        setIcon(row.createSpan({ cls: "reel-publish-outcome-icon" }), o.ok ? "check" : "alert-triangle");
+        row.createSpan({ cls: "reel-publish-outcome-name", text: o.label });
+        if (o.ok && o.url) {
+          const link = row.createEl("a", { cls: "reel-publish-outcome-link", text: "View", href: o.url });
+          link.setAttr("target", "_blank");
+          link.setAttr("rel", "noopener");
+        } else if (!o.ok) {
+          row.createSpan({ cls: "reel-publish-outcome-why", text: o.error ?? "Failed." });
+        }
+      }
+      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
+      const done = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
+      done.addEventListener("click", () => this.close());
+      done.focus();
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
+  // src/ui/reviewPane.ts
+  var EXCERPT = 220;
+  function fileFor(plugin2, entry) {
+    const f = plugin2.app.vault.getAbstractFileByPath(entry.path);
+    return f instanceof TFile ? f : null;
+  }
+  var cache = /* @__PURE__ */ new Map();
+  async function readReviews(plugin2, entry) {
+    const file = fileFor(plugin2, entry);
+    if (!file)
+      return [];
+    const hit = cache.get(file.path);
+    if (hit && hit.mtime === file.stat.mtime)
+      return hit.reviews;
+    try {
+      const reviews2 = reviewsNewestFirst(await plugin2.app.vault.cachedRead(file));
+      cache.set(file.path, { mtime: file.stat.mtime, reviews: reviews2 });
+      return reviews2;
+    } catch {
+      return [];
+    }
+  }
+  function forgetReviews(path) {
+    cache.delete(path);
+  }
+  function paintReviews(plugin2, container, entry, opts = {}) {
+    const pane = container.createDiv({ cls: "reel-yours is-loading" });
+    const fill = () => {
+      void readReviews(plugin2, entry).then((all2) => {
+        if (!pane.isConnected)
+          return;
+        pane.removeClass("is-loading");
+        draw(plugin2, pane, entry, all2, opts);
+      });
+    };
+    if (!opts.lazy || typeof IntersectionObserver === "undefined") {
+      fill();
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting))
+          return;
+        io.disconnect();
+        fill();
+      },
+      { rootMargin: "800px 0px" }
+    );
+    io.observe(pane);
+  }
+  function draw(plugin2, pane, entry, all2, opts) {
+    pane.empty();
+    const reviews2 = opts.onlyDate ? all2.filter((r) => r.date === opts.onlyDate) : all2;
+    const shown2 = opts.limit ? reviews2.slice(0, opts.limit) : reviews2;
+    const repaint = () => {
+      forgetReviews(entry.path);
+      void readReviews(plugin2, entry).then((fresh) => {
+        if (pane.isConnected)
+          draw(plugin2, pane, entry, fresh, opts);
+      });
+      opts.onChange?.();
+    };
+    if (!shown2.length) {
+      if (!opts.editable) {
+        pane.remove();
+        return;
+      }
+      const empty = pane.createDiv({ cls: "reel-yours-empty" });
+      empty.createDiv({ cls: "reel-yours-label", text: opts.heading ?? "Your review" });
+      empty.createDiv({
+        cls: "reel-dim",
+        text: entry.watched.length ? "You have not written about this one yet." : "Write about it now, or when you log it."
+      });
+      const write = empty.createEl("button", { cls: "reel-btn", attr: { type: "button" } });
+      setIcon(write.createSpan(), "pencil-line");
+      write.createSpan({ text: "Write a review" });
+      write.addEventListener("click", () => {
+        new ReviewEditor(plugin2, entry, null, repaint).open();
+      });
+      return;
+    }
+    if (opts.heading !== "")
+      pane.createDiv({ cls: "reel-yours-label", text: opts.heading ?? "Your review" });
+    for (const review of shown2) {
+      const box = pane.createDiv({ cls: "reel-yours-item" });
+      const head = box.createDiv({ cls: "reel-yours-head" });
+      const epLabel = episodeLabelOf(review.heading);
+      head.createSpan({
+        cls: "reel-yours-date",
+        text: review.date ? `${epLabel ? `${epLabel} \xB7 ` : ""}${prettyDate(review.date)}` : review.heading
+      });
+      if (review.rating != null)
+        renderStarsStatic(head.createSpan({ cls: "reel-yours-stars" }), review.rating);
+      if (opts.editable) {
+        if (plugin2.publish.anyEnabled) {
+          const already = plugin2.publish.publishedTo(entry);
+          const gone = Object.keys(already).length > 0;
+          const send = head.createEl("button", {
+            cls: `reel-yours-publish clickable-icon${gone ? " is-published" : ""}`,
+            attr: {
+              type: "button",
+              "aria-label": gone ? "Published \u2014 publish again" : "Publish this review"
+            }
+          });
+          setIcon(send, gone ? "check-circle-2" : "send");
+          send.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            new PublishSheet(plugin2.app, plugin2, {
+              entry,
+              date: review.date,
+              rating: review.rating ?? entry.rating,
+              text: review.text,
+              onDone: repaint
+            }).open();
+          });
+        }
+        const edit = head.createEl("button", {
+          cls: "reel-yours-edit clickable-icon",
+          attr: { type: "button", "aria-label": "Edit this review" }
+        });
+        setIcon(edit, "pencil-line");
+        edit.addEventListener("click", () => new ReviewEditor(plugin2, entry, review, repaint).open());
+      }
+      const long = review.text.length > EXCERPT;
+      const body = box.createDiv({ cls: "reel-yours-body" });
+      body.setText(long && !opts.editable ? `${review.text.slice(0, EXCERPT).trimEnd()}\u2026` : review.text);
+      if (long && !opts.editable) {
+        const more = box.createEl("button", { cls: "reel-yours-more", text: "Read the rest", attr: { type: "button" } });
+        more.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const file = fileFor(plugin2, entry);
+          if (file)
+            void plugin2.app.workspace.getLeaf(false).openFile(file);
+        });
+      }
+    }
+    if (opts.editable) {
+      const add = pane.createEl("button", { cls: "reel-yours-add", attr: { type: "button" } });
+      setIcon(add.createSpan(), "plus");
+      add.createSpan({ text: "Add another" });
+      add.addEventListener("click", () => new ReviewEditor(plugin2, entry, null, repaint).open());
+    } else if (opts.limit && reviews2.length > opts.limit) {
+      pane.createDiv({ cls: "reel-dim reel-yours-count", text: `${reviews2.length - opts.limit} more` });
+    }
+  }
+  var ReviewEditor = class extends Modal {
+    constructor(plugin2, entry, review, onSaved, episode) {
+      super(plugin2.app);
+      this.plugin = plugin2;
+      this.entry = entry;
+      this.review = review;
+      this.onSaved = onSaved;
+      this.episode = episode;
+      this.saving = false;
+      this.text = review?.text ?? "";
+      this.rating = review?.rating ?? (review ? void 0 : entry.rating);
+      this.date = review?.date ?? this.mostRecentWatch();
+    }
+    /**
+     * The date a fresh review belongs to.
+     *
+     * The last time you watched it, not today: you write the review after the
+     * film, sometimes days after, and dating it "today" quietly puts a viewing
+     * in your diary on a night you were doing something else.
+     */
+    mostRecentWatch() {
+      const dates = this.entry.watched.map((w) => w.date).filter(Boolean).sort();
+      return dates[dates.length - 1] ?? todayISO();
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      modalEl.addClass("reel-review-sheet");
+      contentEl.addClass("reel-review-content");
+      paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
+      const head = contentEl.createDiv({ cls: "reel-review-head" });
+      head.createEl("h3", { cls: "reel-log-title", text: this.entry.title });
+      head.createDiv({ cls: "reel-log-sub", text: this.episode ?? (this.review ? "Edit your review" : "Write a review") });
+      const body = contentEl.createDiv({ cls: "reel-review-body" });
+      const box = body.createEl("textarea", {
+        cls: "reel-input reel-review-box",
+        attr: { rows: "4", placeholder: "What did you think?" }
+      });
+      box.value = this.text;
+      const grow = () => {
+        const vh = window.visualViewport?.height ?? window.innerHeight;
+        const cap = Math.max(120, Math.round(vh * 0.4));
+        box.style.height = "auto";
+        box.style.height = `${Math.min(box.scrollHeight + 2, cap)}px`;
+        box.style.overflowY = box.scrollHeight + 2 > cap ? "auto" : "hidden";
+      };
+      box.addEventListener("input", () => {
+        this.text = box.value;
+        grow();
+      });
+      window.setTimeout(grow, 0);
+      window.setTimeout(grow, 350);
+      const meta = body.createDiv({ cls: "reel-review-meta" });
+      meta.createDiv({ cls: "reel-field-label", text: "Rating" });
+      renderStars(meta, {
+        value: this.rating,
+        onChange: (v) => {
+          this.rating = v;
+        }
+      });
+      meta.createDiv({ cls: "reel-field-label", text: "Date" });
+      const dateWrap = meta.createDiv({ cls: "reel-review-date-wrap" });
+      const dateEl = dateWrap.createEl("input", { cls: "reel-review-date-native", attr: { type: "date", tabindex: "-1", "aria-hidden": "true" } });
+      dateEl.value = this.date;
+      const dateBtn = dateWrap.createEl("button", { cls: "reel-review-date", attr: { type: "button" } });
+      const paintDate = () => dateBtn.setText(this.date ? prettyDate(this.date) : "Pick a date");
+      paintDate();
+      dateBtn.disabled = this.review != null;
+      dateBtn.addEventListener("click", () => {
+        try {
+          dateEl.showPicker();
+        } catch {
+          dateEl.focus();
+          dateEl.click();
+        }
+      });
+      dateEl.addEventListener("change", () => {
+        this.date = dateEl.value;
+        paintDate();
+      });
+      const actions = contentEl.createDiv({ cls: "reel-actions" });
+      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel", attr: { type: "button" } });
+      cancel.addEventListener("click", () => this.close());
+      const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Save", attr: { type: "button" } });
+      save.addEventListener("click", () => void this.save(save));
+      window.setTimeout(() => box.focus(), 0);
+    }
+    async save(button) {
+      if (this.saving)
+        return;
+      this.saving = true;
+      button.disabled = true;
+      button.setText("Saving\u2026");
+      const file = fileFor(this.plugin, this.entry);
+      if (!file) {
+        new Notice("That note has moved or been deleted.");
+        this.close();
+        return;
+      }
+      try {
+        const review = this.review;
+        await this.plugin.app.vault.process(file, (data) => {
+          if (!review)
+            return appendReviewSection(data, this.date, this.rating, this.text, this.episode);
+          const withHeading = replaceHeading(data, review, headingFor(review, this.rating));
+          const again = reviewsNewestFirst(withHeading).find(
+            (r) => r.date === review.date && episodeLabelOf(r.heading) === episodeLabelOf(review.heading)
+          );
+          return again ? replaceReview(withHeading, again, this.text) : withHeading;
+        });
+        forgetReviews(file.path);
+        this.onSaved();
+        this.close();
+      } catch (e) {
+        new Notice(`Reel could not save that review \u2014 ${redact(e)}`);
+        button.disabled = false;
+        button.setText("Save");
+        this.saving = false;
+      }
+    }
+    onClose() {
+      this.contentEl.empty();
+    }
+  };
+
   // src/util/status.ts
   var FROZEN_STATUSES = /* @__PURE__ */ new Set(["dropped", "paused", "watchlist"]);
   function hasBeenWatched(e) {
@@ -2805,6 +4486,93 @@
             paintCount();
           }
         });
+        const label = `S${this.season}E${n2}${ep.name ? ` ${ep.name}` : ""}`.replace(/\s*·\s*/g, " ");
+        const write = row.createEl("button", {
+          cls: "reel-episode-review",
+          attr: { type: "button", "aria-label": `Review episode ${n2}` }
+        });
+        setIcon(write, "pencil-line");
+        const openReview = () => void this.reviewEpisode(label);
+        write.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openReview();
+        });
+        let timer = null;
+        let sx = 0;
+        let sy = 0;
+        let held = false;
+        const menuAt = (x, y) => {
+          held = true;
+          haptic("hold");
+          const menu = new Menu();
+          const seen = this.watched.has(n2);
+          menu.addItem(
+            (i) => i.setTitle(seen ? "Mark not watched" : "Mark watched").setIcon("check").onClick(() => {
+              if (seen)
+                this.watched.delete(n2);
+              else
+                this.watched.add(n2);
+              this.dirty = true;
+              paintRow(row, n2);
+              paintCount();
+            })
+          );
+          menu.addItem(
+            (i) => i.setTitle("Mark watched up to here").setIcon("check-check").onClick(() => {
+              for (const e of this.episodes)
+                if (e.episode_number <= n2)
+                  this.watched.add(e.episode_number);
+              this.dirty = true;
+              rows2.forEach((r, k) => paintRow(r, k));
+              paintCount();
+            })
+          );
+          menu.addItem((i) => i.setTitle("Write a review").setIcon("pencil-line").onClick(openReview));
+          if (this.ratings[String(n2)] != null) {
+            menu.addItem(
+              (i) => i.setTitle("Clear rating").setIcon("star-off").onClick(() => {
+                delete this.ratings[String(n2)];
+                this.dirty = true;
+                paintRow(row, n2);
+              })
+            );
+          }
+          menu.showAtPosition({ x, y });
+        };
+        row.addEventListener("pointerdown", (e) => {
+          held = false;
+          sx = e.clientX;
+          sy = e.clientY;
+          timer = window.setTimeout(() => menuAt(e.clientX, e.clientY), 500);
+        });
+        row.addEventListener("pointermove", (e) => {
+          if (timer != null && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) {
+            window.clearTimeout(timer);
+            timer = null;
+          }
+        });
+        for (const ev of ["pointerup", "pointercancel", "pointerleave"]) {
+          row.addEventListener(ev, () => {
+            if (timer != null)
+              window.clearTimeout(timer);
+            timer = null;
+          });
+        }
+        row.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          menuAt(e.clientX, e.clientY);
+        });
+        row.addEventListener(
+          "click",
+          (e) => {
+            if (!held)
+              return;
+            held = false;
+            e.stopPropagation();
+            e.preventDefault();
+          },
+          true
+        );
         paintRow(row, n2);
       }
       paintCount();
@@ -2835,6 +4603,13 @@
      * One write for the whole season rather than one per episode — "mark all"
      * on a 23-episode season would otherwise queue 23 file writes.
      */
+    /** Open the editor on this episode's review, or a new one. */
+    async reviewEpisode(label) {
+      const all2 = await readReviews(this.plugin, this.entry);
+      const existing = all2.find((r) => episodeLabelOf(r.heading) === label) ?? null;
+      new ReviewEditor(this.plugin, this.entry, existing, () => {
+      }, label).open();
+    }
     async persist() {
       if (!this.dirty)
         return;
@@ -3183,6 +4958,7 @@
     row(entry) {
       const next = this.plugin.upNext.nextFor(entry);
       const row = createDiv({ cls: "reel-upnext-row" });
+      onHold(this.plugin, row, entry);
       const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
       this.plugin.posters.attach(thumb, entry);
       thumb.addEventListener("click", () => void this.plugin.openDetail(entry));
@@ -3275,6 +5051,7 @@
     }
     row(entry, today) {
       const row = createDiv({ cls: "reel-upnext-row" });
+      onHold(this.plugin, row, entry);
       const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
       this.plugin.posters.attach(thumb, entry);
       const body = row.createDiv({ cls: "reel-upnext-body" });
@@ -3286,11 +5063,7 @@
       meta.createSpan({ cls: "reel-dim", text: prettyDate(entry.nextAirDate) });
       if (gap <= 0)
         body.createDiv({ cls: "reel-badge new", text: "Out now" });
-      row.addEventListener("click", async () => {
-        const file = this.plugin.app.vault.getAbstractFileByPath(entry.path);
-        if (file instanceof TFile)
-          await this.plugin.app.workspace.getLeaf(false).openFile(file);
-      });
+      row.addEventListener("click", () => void this.plugin.openDetail(entry));
       return row;
     }
   };
@@ -3834,26 +5607,6 @@
       return true;
     return kind !== "offline";
   }
-
-  // src/credentials.ts
-  var KEY_LABELS = {
-    tmdb: "TMDB",
-    omdb: "OMDb",
-    dtdd: "DoesTheDogDie",
-    openrouter: "OpenRouter",
-    trakt: "Trakt",
-    traktApp: "Trakt app",
-    mastodon: "Mastodon"
-  };
-  var READ_KEYS = ["tmdb", "omdb", "dtdd", "openrouter"];
-  var WRITE_KEYS = ["trakt", "traktApp", "mastodon"];
-  var MissingKeyError = class extends Error {
-    constructor(key = "tmdb", msg) {
-      super(msg ?? `No ${KEY_LABELS[key]} key. Add one in Settings \u2192 Reel.`);
-      this.key = key;
-      this.name = "MissingKeyError";
-    }
-  };
 
   // src/tmdb.ts
   var TmdbError = class extends Error {
@@ -5993,1654 +7746,6 @@
             new Notice(`Reel: ${redact(e)}`);
           });
         });
-      }
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-
-  // src/reviews.ts
-  var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-  function dateFromHeading(heading) {
-    const iso2 = /(\d{4})-(\d{2})-(\d{2})/.exec(heading);
-    if (iso2)
-      return `${iso2[1]}-${iso2[2]}-${iso2[3]}`;
-    const pretty = /\b(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})\b/.exec(heading);
-    if (pretty) {
-      const month = MONTHS.indexOf(pretty[2].slice(0, 3).toLowerCase());
-      if (month >= 0) {
-        return `${pretty[3]}-${String(month + 1).padStart(2, "0")}-${pretty[1].padStart(2, "0")}`;
-      }
-    }
-    return void 0;
-  }
-  function ratingFromHeading(heading) {
-    const stars2 = (heading.match(/★/g) ?? []).length;
-    if (!stars2)
-      return void 0;
-    return stars2 + (heading.includes("\xBD") ? 0.5 : 0);
-  }
-  function parseReviews(content) {
-    const out = [];
-    const headings = [...content.matchAll(/^##[ \t]+(.+?)[ \t]*$/gm)];
-    headings.forEach((match, i) => {
-      const heading = match[1];
-      const date = dateFromHeading(heading);
-      if (!date)
-        return;
-      const from = (match.index ?? 0) + match[0].length;
-      const rest = content.slice(from);
-      const nextHeading = /^#{1,6}[ \t]+/m.exec(rest);
-      const to = nextHeading ? from + (nextHeading.index ?? 0) : content.length;
-      out.push({
-        date,
-        heading,
-        rating: ratingFromHeading(heading),
-        text: content.slice(from, to).trim(),
-        from,
-        to
-      });
-    });
-    return out;
-  }
-  function reviewsNewestFirst(content) {
-    return parseReviews(content).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-  }
-  function replaceReview(content, review, text) {
-    const body = text.trim();
-    const block = body ? `
-
-${body}
-` : "\n";
-    return content.slice(0, review.from) + block + content.slice(review.to);
-  }
-  function appendReviewSection(content, date, rating, text) {
-    const body = text.trim();
-    if (!body)
-      return content;
-    const stars2 = rating != null && rating > 0 ? ` \xB7 ${starString(rating)}` : "";
-    const heading = `## ${prettyDate(date) || date}${stars2}`;
-    const gap = content.endsWith("\n") ? "\n" : "\n\n";
-    return `${content}${gap}${heading}
-
-${body}
-`;
-  }
-  function headingFor(review, rating) {
-    const base = review.date ? prettyDate(review.date) || review.date : review.heading.replace(/\s*·.*$/, "").trim();
-    const stars2 = rating != null && rating > 0 ? ` \xB7 ${starString(rating)}` : "";
-    return `## ${base}${stars2}`;
-  }
-  function replaceHeading(content, review, heading) {
-    const lineStart = content.lastIndexOf("\n", review.from - 1) + 1;
-    return content.slice(0, lineStart) + heading + content.slice(review.from);
-  }
-
-  // src/publish/compose.ts
-  var TRAKT_MIN_WORDS = 5;
-  var TRAKT_REVIEW_WORDS = 200;
-  function wordCount(text) {
-    return text.trim().split(/\s+/).filter(Boolean).length;
-  }
-  function traktComplaint(payload) {
-    const body = payload.text.trim();
-    if (!body)
-      return "There's nothing written to post.";
-    const words = wordCount(body);
-    if (words < TRAKT_MIN_WORDS) {
-      return `Trakt needs at least ${TRAKT_MIN_WORDS} words \u2014 this is ${words}.`;
-    }
-    if (!payload.entry.tmdbId) {
-      return "This note has no TMDB id, so Trakt can't tell which title it's about.";
-    }
-    return null;
-  }
-
-  // src/publish/mastodon.ts
-  function normaliseHost(raw) {
-    let host = (raw ?? "").trim();
-    if (!host)
-      return "";
-    host = host.replace(/^https?:\/\//i, "");
-    host = host.split("/")[0];
-    if (host.includes("@"))
-      host = host.slice(host.lastIndexOf("@") + 1);
-    return host.toLowerCase();
-  }
-
-  // src/setup.ts
-  var FEATURES = [
-    {
-      id: "tmdb",
-      name: "TMDB",
-      gives: "Everything. Posters, cast, runtimes, episode lists \u2014 Reel cannot add a title without it.",
-      essential: true,
-      effort: "2 minutes, free",
-      sends: "The title you search for, or its TMDB id. Nothing about your library.",
-      keys: ["tmdb"],
-      steps: [
-        {
-          text: "Create a free TMDB account, if you don't have one.",
-          url: "https://www.themoviedb.org/signup"
-        },
-        {
-          text: "Open your API settings and request a key. Pick \u201CDeveloper\u201D, and answer the form \u2014 any personal or hobby use is fine.",
-          url: "https://www.themoviedb.org/settings/api"
-        },
-        {
-          text: "Copy the API Read Access Token \u2014 the long one starting eyJ, not the short v3 key.",
-          note: "The token travels in a request header; the v3 key has to go in the URL, and URLs end up in logs. Reel accepts either, but this one is safer."
-        },
-        {
-          text: "Paste it below and press Save. You'll be asked for a passphrase \u2014 that encrypts the key inside your vault.",
-          key: "tmdb"
-        }
-      ]
-    },
-    {
-      id: "omdb",
-      name: "OMDb",
-      gives: "IMDb ratings, Rotten Tomatoes and Metacritic scores on every title.",
-      essential: false,
-      effort: "1 minute, free",
-      sends: "A film's IMDb id, when a note is created or refreshed.",
-      keys: ["omdb"],
-      steps: [
-        {
-          text: "Request a free key. The FREE tier is 1,000 requests a day, which Reel's cache makes ample.",
-          url: "https://www.omdbapi.com/apikey.aspx"
-        },
-        {
-          text: "Check your email and click the activation link. The key does not work until you do.",
-          note: "This one catches people out \u2014 the key arrives before it is active."
-        },
-        { text: "Paste the key below and press Save.", key: "omdb" }
-      ]
-    },
-    {
-      id: "dtdd",
-      name: "DoesTheDogDie",
-      gives: "Content warnings voted on per topic, so you can tell one upsetting scene from a film full of them.",
-      essential: false,
-      effort: "A few minutes, free \u2014 they approve by hand",
-      sends: "A film's title and year.",
-      keys: ["dtdd"],
-      steps: [
-        {
-          text: "Request an API key. Say what it's for \u2014 a personal Obsidian film tracker is a fine answer.",
-          url: "https://www.doesthedogdie.com/api"
-        },
-        {
-          text: "Wait for the reply. A person reads these, so it is not instant.",
-          note: "Everything else in Reel works meanwhile. Content filtering falls back to TMDB keywords until the key arrives."
-        },
-        { text: "Paste the key below and press Save.", key: "dtdd" }
-      ]
-    },
-    {
-      id: "openrouter",
-      name: "OpenRouter",
-      gives: "Ask \u2014 describe what you feel like watching and Reel finds it in your own library.",
-      essential: false,
-      effort: "2 minutes, and you pay per question",
-      sends: "Your question, plus a shortlist of titles from your library \u2014 names, years, genres, runtimes and your ratings. Never your reviews, your watch dates or your file paths.",
-      keys: ["openrouter"],
-      steps: [
-        { text: "Create an OpenRouter account.", url: "https://openrouter.ai/" },
-        {
-          text: "Add some credit. Questions cost a fraction of a penny each on the default model.",
-          url: "https://openrouter.ai/credits",
-          note: "Reel shows what every question cost in tokens, so this is checkable rather than a mystery bill."
-        },
-        { text: "Create an API key and copy it.", url: "https://openrouter.ai/keys" },
-        { text: "Paste it below, press Save, then turn Ask on.", key: "openrouter" }
-      ]
-    },
-    {
-      id: "trakt",
-      name: "Trakt",
-      gives: "Publishing a review to a public film profile, with your star rating alongside.",
-      essential: false,
-      effort: "5 minutes, free",
-      sends: "Only what you explicitly publish: one review's text, your rating, and the title's id. Nothing automatic.",
-      keys: ["traktApp", "trakt"],
-      steps: [
-        { text: "Create a Trakt account, if you don't have one.", url: "https://trakt.tv/auth/join" },
-        {
-          text: "Create an application. Any name will do \u2014 it is yours and nobody else sees it.",
-          url: "https://trakt.tv/oauth/applications/new",
-          note: "Reel asks you to register your own rather than shipping one, because Trakt's sign-in needs a client secret, and a secret compiled into an open-source plugin is printed in the repository for anyone to read."
-        },
-        {
-          text: "Set the Redirect URI to exactly this:",
-          copy: "urn:ietf:wg:oauth:2.0:oob",
-          note: "This is the standard value for an app with no website to return to. Getting it wrong is the usual reason sign-in fails."
-        },
-        {
-          text: "Save the application, then copy its Client ID and Client Secret into the two fields below.",
-          key: "traktApp"
-        },
-        {
-          text: "Press Sign in. Trakt shows a short code \u2014 type it on any device, and Reel waits for you.",
-          key: "trakt",
-          note: "No redirect back to the app is needed, which is what makes this work on a phone at all."
-        }
-      ]
-    },
-    {
-      id: "mastodon",
-      name: "Mastodon",
-      gives: "Publishing a review as a public post, with the title, your stars and the text.",
-      essential: false,
-      effort: "3 minutes, free",
-      sends: "Only what you explicitly publish: one post. Nothing automatic.",
-      keys: ["mastodon"],
-      steps: [
-        {
-          text: "Open your instance's development settings \u2014 that's your own server, e.g. mastodon.social/settings/applications.",
-          note: "Reel needs the server you post from; there is no central Mastodon."
-        },
-        { text: "Create a new application. Any name and website will do." },
-        {
-          text: "Tick only this scope, and untick the rest:",
-          copy: "write:statuses",
-          note: "The defaults include read access to your whole timeline and follow list. Reel never needs either, and a token that can only post is a token that can only post."
-        },
-        { text: "Submit, open the application, and copy \u201CYour access token\u201D." },
-        /*
-         * Two steps, because they were two actions.
-         *
-         * "Enter your instance's address and paste the token below" asked
-         * for both in one line and could only be ticked by the token, so
-         * somebody who had typed their server and gone off to make a token
-         * came back to a guide reporting nothing done at all. The address
-         * is the one thing in this walkthrough Reel can watch you do.
-         */
-        { text: "Enter your instance's address below.", key: "mastodonHost" },
-        { text: "Paste the access token below.", key: "mastodon" }
-      ]
-    }
-  ];
-  function completedSteps(spec, has) {
-    let done = 0;
-    spec.steps.forEach((step, i) => {
-      if (step.key && has(step.key))
-        done = i + 1;
-    });
-    return done;
-  }
-  function isConfigured(plugin2, spec) {
-    return spec.keys.every((k) => plugin2.credentials.has(k));
-  }
-  function proves(plugin2, k) {
-    if (k === "mastodonHost")
-      return Boolean(normaliseHost(plugin2.settings.mastodonHost));
-    return plugin2.credentials.has(k);
-  }
-  function isPartial(plugin2, spec) {
-    if (isConfigured(plugin2, spec))
-      return false;
-    return spec.steps.some((s) => s.key && proves(plugin2, s.key));
-  }
-  function partialPhrase(partial) {
-    if (!partial.length)
-      return "";
-    if (partial.length === 1)
-      return `${partial[0].name} is half set up`;
-    if (partial.length === 2)
-      return `${partial[0].name} and ${partial[1].name} are half set up`;
-    return `${partial.length} are half set up`;
-  }
-  function setupState(plugin2) {
-    const essential = FEATURES.find((f) => f.essential);
-    const done = [];
-    const partial = [];
-    const todo = [];
-    for (const f of FEATURES) {
-      if (f.essential)
-        continue;
-      if (isConfigured(plugin2, f))
-        done.push(f);
-      else if (isPartial(plugin2, f))
-        partial.push(f);
-      else
-        todo.push(f);
-    }
-    return { done, partial, todo, blocked: !isConfigured(plugin2, essential), essential };
-  }
-
-  // src/health.ts
-  var TESTABLE = ["tmdb", "omdb", "dtdd", "openrouter", "mastodon", "trakt"];
-  var NEEDS_KEY_TO_CHECK = ["tmdb", "omdb", "dtdd", "openrouter", "trakt"];
-  function lastCheckFailed(records, id) {
-    return records[id]?.ok === false;
-  }
-  var STALE_AFTER = 14 * 24 * 60 * 60 * 1e3;
-  function ago(then, now) {
-    const ms = Math.max(0, now - then);
-    const min = Math.floor(ms / 6e4);
-    if (min < 1)
-      return "just now";
-    if (min < 60)
-      return `${min} minute${min === 1 ? "" : "s"} ago`;
-    const hr = Math.floor(min / 60);
-    if (hr < 24)
-      return `${hr} hour${hr === 1 ? "" : "s"} ago`;
-    const day = Math.floor(hr / 24);
-    if (day < 30)
-      return `${day} day${day === 1 ? "" : "s"} ago`;
-    const mon = Math.floor(day / 30);
-    return `${mon} month${mon === 1 ? "" : "s"} ago`;
-  }
-  function extra(rec, withProves = true) {
-    const said = [withProves ? rec.proves : "", rec.note].filter((s) => s && s.trim());
-    return said.length ? `. ${said.join(" ")}` : "";
-  }
-  function describeHealth(rec, configured, now) {
-    if (!configured)
-      return { text: "Not set up", tone: "info" };
-    if (!rec)
-      return { text: "Not checked yet", tone: "info" };
-    const when = ago(rec.at, now);
-    if (!rec.ok)
-      return { text: `Failed ${when}${rec.error ? ` \u2014 ${rec.error}` : ""}`, tone: "warn" };
-    if (rec.proves)
-      return { text: `Checked ${when}. ${rec.proves}${extra(rec, false)}`, tone: "info" };
-    if (now - rec.at > STALE_AFTER)
-      return { text: `Worked ${when}${extra(rec)}`, tone: "info" };
-    return { text: `Working \u2014 checked ${when}${extra(rec)}`, tone: "ok" };
-  }
-  var SOON = 7 * 24 * 60 * 60 * 1e3;
-  function traktState(hasToken, expires, now) {
-    if (!hasToken)
-      return { kind: "out" };
-    if (!expires)
-      return { kind: "unknown" };
-    if (expires <= now)
-      return { kind: "expired", expires };
-    if (expires - now < SOON)
-      return { kind: "soon", expires };
-    return { kind: "in", expires };
-  }
-  function describeTrakt(state, now, rec) {
-    if (rec && !rec.ok && state.kind !== "out") {
-      return { text: `Token refused ${ago(rec.at, now)} \u2014 sign in again`, tone: "warn" };
-    }
-    switch (state.kind) {
-      case "out":
-        return { text: "Not signed in", tone: "info" };
-      case "unknown":
-        return { text: "Signed in \u2014 Reel cannot tell when this expires", tone: "info" };
-      case "expired":
-        return { text: `Session expired ${ago(state.expires, now)} \u2014 sign in again`, tone: "warn" };
-      case "soon":
-        return { text: `Signed in \u2014 renews automatically this week${checked(rec, now)}`, tone: "ok" };
-      case "in":
-        return { text: `Signed in${checked(rec, now)}`, tone: "ok" };
-    }
-  }
-  function checked(rec, now) {
-    return rec?.ok ? `, checked ${ago(rec.at, now)}` : "";
-  }
-  function featureHealth(id, inputs, now) {
-    if (id === "trakt") {
-      return describeTrakt(traktState(inputs.hasTrakt, inputs.traktExpires, now), now, inputs.records.trakt);
-    }
-    if (!TESTABLE.includes(id))
-      return null;
-    const rec = inputs.records[id];
-    if (!rec && inputs.locked && NEEDS_KEY_TO_CHECK.includes(id)) {
-      return { text: "Keys are locked \u2014 unlock to check", tone: "info" };
-    }
-    return describeHealth(rec, true, now);
-  }
-
-  // src/checks.ts
-  function checkable(plugin2, id) {
-    if (!TESTABLE.includes(id))
-      return false;
-    if (NEEDS_KEY_TO_CHECK.includes(id) && plugin2.credentials.needsUnlock)
-      return false;
-    switch (id) {
-      case "mastodon":
-        return Boolean(normaliseHost(plugin2.settings.mastodonHost));
-      default:
-        return plugin2.credentials.has(id);
-    }
-  }
-  async function run(plugin2, id) {
-    switch (id) {
-      case "tmdb":
-        return plugin2.tmdb.testCredentials();
-      case "omdb":
-        return plugin2.omdb.test();
-      case "dtdd":
-        return plugin2.dtdd.test();
-      case "openrouter":
-        return plugin2.ai.test();
-      case "mastodon":
-        return plugin2.publish.mastodon.test();
-      case "trakt":
-        return plugin2.publish.trakt.test();
-      default:
-        return { ok: false, error: "Nothing to check." };
-    }
-  }
-  async function checkFeature(plugin2, id, now) {
-    if (!checkable(plugin2, id))
-      return null;
-    let out;
-    try {
-      out = await run(plugin2, id);
-    } catch (e) {
-      out = { ok: false, error: redact(e) };
-    }
-    const rec = out.ok ? { at: now, ok: true, ...out.proves ? { proves: out.proves } : {}, ...out.note ? { note: out.note } : {} } : { at: now, ok: false, error: redact(out.error) };
-    plugin2.settings.connectionHealth[id] = rec;
-    return rec;
-  }
-  async function checkAll(plugin2, now) {
-    const ids = TESTABLE.filter((id) => checkable(plugin2, id));
-    await Promise.all(ids.map((id) => checkFeature(plugin2, id, now)));
-    await plugin2.saveSettings();
-    return ids.filter((id) => plugin2.settings.connectionHealth[id]?.ok === false);
-  }
-
-  // src/ui/confirm.ts
-  function confirm(app2, opts) {
-    return new Promise((resolve) => new ConfirmModal(app2, opts, resolve).open());
-  }
-  var ConfirmModal = class extends Modal {
-    constructor(app2, opts, done) {
-      super(app2);
-      this.opts = opts;
-      this.done = done;
-      this.answered = false;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.addClass("reel-confirm");
-      contentEl.createEl("h3", { cls: "reel-log-title", text: this.opts.title });
-      contentEl.createDiv({ cls: "reel-log-sub", text: this.opts.body });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
-      cancel.addEventListener("click", () => this.finish(false));
-      const go = actions.createEl("button", {
-        cls: this.opts.danger ? "reel-btn reel-btn-danger" : "reel-btn mod-cta",
-        text: this.opts.confirmText
-      });
-      go.addEventListener("click", () => this.finish(true));
-      cancel.focus();
-    }
-    finish(ok) {
-      this.answered = true;
-      this.done(ok);
-      this.close();
-    }
-    onClose() {
-      this.contentEl.empty();
-      if (!this.answered)
-        this.done(false);
-    }
-  };
-
-  // src/publish/trakt.ts
-  var ACTIVATE_URL = "https://trakt.tv/activate";
-
-  // src/ui/traktSignIn.ts
-  var TraktSignIn = class extends Modal {
-    constructor(app2, plugin2, app_, onDone) {
-      super(app2);
-      this.plugin = plugin2;
-      this.app_ = app_;
-      this.onDone = onDone;
-      this.stop = false;
-      this.device = null;
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.addClass("reel-trakt");
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
-      contentEl.createDiv({ cls: "reel-log-sub", text: "Asking Trakt for a code\u2026" });
-      void this.begin();
-    }
-    async begin() {
-      try {
-        this.device = await this.plugin.publish.trakt.requestDeviceCode(this.app_);
-      } catch (e) {
-        this.fail(redact(e));
-        return;
-      }
-      this.renderCode(this.device);
-      void this.poll(this.device);
-    }
-    renderCode(device) {
-      const { contentEl } = this;
-      contentEl.empty();
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Sign in to Trakt" });
-      const steps = contentEl.createDiv({ cls: "reel-trakt-steps" });
-      steps.createDiv({ cls: "reel-trakt-step", text: "1. Open this page on any device:" });
-      const link = steps.createEl("a", {
-        cls: "reel-trakt-url",
-        text: device.verificationUrl || ACTIVATE_URL,
-        href: device.verificationUrl || ACTIVATE_URL
-      });
-      link.setAttr("target", "_blank");
-      link.setAttr("rel", "noopener");
-      steps.createDiv({ cls: "reel-trakt-step", text: "2. Enter this code:" });
-      const code = steps.createEl("button", { cls: "reel-trakt-code", text: device.userCode });
-      code.setAttr("aria-label", `Code ${device.userCode.split("").join(" ")}. Tap to copy.`);
-      code.addEventListener("click", () => {
-        navigator.clipboard?.writeText(device.userCode).then(() => new Notice("Reel: code copied.")).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
-      });
-      const status = contentEl.createDiv({ cls: "reel-trakt-status" });
-      status.createDiv({ cls: "reel-ask-spinner" });
-      status.createSpan({ text: "Waiting for you to approve it\u2026" });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
-      cancel.addEventListener("click", () => this.close());
-    }
-    /**
-     * Ask, wait, ask again, until Trakt says yes, no, or too late.
-     *
-     * The deadline is Trakt's own `expires_in` rather than a fixed number of
-     * attempts, because the interval can be raised mid-flow by a 429 and a loop
-     * counting attempts would then give up early — while the user is still
-     * typing, having done nothing wrong.
-     */
-    async poll(device) {
-      let wait = Math.max(1, device.interval) * 1e3;
-      const deadline = Date.now() + Math.max(60, device.expiresIn) * 1e3;
-      while (!this.stop && Date.now() < deadline) {
-        await sleep(wait);
-        if (this.stop)
-          return;
-        let token;
-        try {
-          token = await this.plugin.publish.trakt.pollDeviceToken(this.app_, device.deviceCode);
-        } catch (e) {
-          this.fail(redact(e));
-          return;
-        }
-        if (token) {
-          const saved = await this.plugin.publish.storeToken(JSON.stringify(token));
-          if (!saved) {
-            this.fail("Signed in, but the token wasn't saved \u2014 the passphrase prompt was cancelled.");
-            return;
-          }
-          this.succeed();
-          return;
-        }
-        wait = Math.min(wait + 500, 15e3);
-      }
-      if (!this.stop)
-        this.fail("The code expired before it was approved.");
-    }
-    succeed() {
-      const { contentEl } = this;
-      contentEl.empty();
-      const done = contentEl.createDiv({ cls: "reel-trakt-done" });
-      setIcon(done.createSpan({ cls: "reel-trakt-done-icon" }), "check");
-      done.createSpan({ text: "Signed in to Trakt." });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const ok = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
-      ok.addEventListener("click", () => this.close());
-      ok.focus();
-      this.stop = true;
-      this.onDone(true);
-      this.onDone = () => void 0;
-    }
-    fail(message) {
-      const { contentEl } = this;
-      contentEl.empty();
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Couldn't sign in" });
-      contentEl.createDiv({ cls: "reel-publish-warn", text: message });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const ok = actions.createEl("button", { cls: "reel-btn", text: "Close" });
-      ok.addEventListener("click", () => this.close());
-      this.stop = true;
-    }
-    onClose() {
-      this.stop = true;
-      this.contentEl.empty();
-      this.onDone(false);
-      this.onDone = () => void 0;
-    }
-  };
-  function sleep(ms) {
-    return new Promise((r) => window.setTimeout(r, ms));
-  }
-
-  // src/ui/fields.ts
-  function keyField(el, ctx, name, label, desc, opts = {}) {
-    const store = ctx.plugin.credentials;
-    let input = null;
-    const setting = new Setting(el).setName(label).setDesc(desc).addText((t) => {
-      t.setPlaceholder(store.has(name) ? "Saved \u2014 paste to replace" : "Paste key, then Save");
-      t.inputEl.type = "password";
-      t.inputEl.autocomplete = "off";
-      t.inputEl.spellcheck = false;
-      t.inputEl.addClass("reel-input");
-      input = t.inputEl;
-    }).addButton((b) => {
-      if (!store.has(name))
-        b.setCta();
-      return b.setButtonText("Save").onClick(async () => {
-        const value = input?.value ?? "";
-        if (!value.trim()) {
-          new Notice("Reel: nothing to save.");
-          return;
-        }
-        const ok = await ctx.plugin.credentials.store(name, value);
-        if (input)
-          input.value = "";
-        new Notice(ok ? `Reel: ${KEY_LABELS[name]} key saved.` : "Reel: key not saved.");
-        ctx.onChanged();
-      });
-    });
-    if (opts.remove && store.has(name)) {
-      setting.addButton(
-        (b) => b.setButtonText("Remove").onClick(async () => {
-          const ok = await confirm(ctx.app, {
-            title: `Remove the ${KEY_LABELS[name]} key`,
-            body: "Reel cannot recover it. You would need the original key again to re-add it.",
-            confirmText: "Remove",
-            danger: true
-          });
-          if (!ok)
-            return;
-          await ctx.plugin.credentials.remove(name);
-          new Notice(`Reel: ${KEY_LABELS[name]} key removed.`);
-          ctx.onChanged();
-        })
-      );
-    }
-  }
-  function traktAppField(el, ctx, opts = {}) {
-    const hasApp = ctx.plugin.credentials.has("traktApp");
-    let idEl = null;
-    let secretEl = null;
-    const setting = new Setting(el).setName("Trakt application").setDesc(
-      hasApp ? "Saved. Paste both again to replace them." : "From trakt.tv/oauth/applications. Both are stored with your other keys."
-    ).addText((t) => {
-      t.setPlaceholder("Client ID");
-      t.inputEl.autocomplete = "off";
-      t.inputEl.spellcheck = false;
-      t.inputEl.addClass("reel-input");
-      idEl = t.inputEl;
-    }).addText((t) => {
-      t.setPlaceholder("Client secret");
-      t.inputEl.type = "password";
-      t.inputEl.autocomplete = "off";
-      t.inputEl.spellcheck = false;
-      t.inputEl.addClass("reel-input");
-      secretEl = t.inputEl;
-    }).addButton((b) => {
-      if (!hasApp)
-        b.setCta();
-      return b.setButtonText("Save").onClick(async () => {
-        const clientId = (idEl?.value ?? "").trim();
-        const clientSecret = (secretEl?.value ?? "").trim();
-        if (!clientId || !clientSecret) {
-          new Notice("Reel: both the client ID and the secret are needed.");
-          return;
-        }
-        const ok = await ctx.plugin.credentials.store(
-          "traktApp",
-          JSON.stringify({ id: clientId, secret: clientSecret })
-        );
-        if (idEl)
-          idEl.value = "";
-        if (secretEl)
-          secretEl.value = "";
-        new Notice(ok ? "Reel: Trakt application saved." : "Reel: not saved.");
-        ctx.onChanged();
-      });
-    });
-    if (opts.remove && hasApp) {
-      setting.addButton(
-        (b) => b.setButtonText("Remove").onClick(async () => {
-          const ok = await confirm(ctx.app, {
-            title: "Remove the Trakt application",
-            body: "This also signs you out of Trakt. You would need the client ID and secret again to reconnect.",
-            confirmText: "Remove",
-            danger: true
-          });
-          if (!ok)
-            return;
-          await ctx.plugin.credentials.remove("traktApp");
-          await ctx.plugin.credentials.remove("trakt");
-          new Notice("Reel: Trakt application removed.");
-          ctx.onChanged();
-        })
-      );
-    }
-  }
-  function traktSignInField(el, ctx) {
-    const hasApp = ctx.plugin.credentials.has("traktApp");
-    const signedIn = ctx.plugin.credentials.has("trakt");
-    new Setting(el).setName(signedIn ? "Signed in to Trakt" : "Sign in to Trakt").setDesc(
-      hasApp ? "Trakt shows a short code. Type it on any device \u2014 Reel waits." : "Save the application above first; the sign-in needs it."
-    ).addButton((b) => {
-      b.setButtonText(signedIn ? "Sign in again" : "Sign in");
-      if (!signedIn)
-        b.setCta();
-      b.setDisabled(!hasApp);
-      b.onClick(async () => {
-        const app2 = await ctx.plugin.publish.app();
-        if (!app2) {
-          new Notice("Reel: couldn't read the Trakt application.");
-          return;
-        }
-        new TraktSignIn(ctx.app, ctx.plugin, app2, (ok) => {
-          if (ok)
-            ctx.onChanged();
-        }).open();
-      });
-    });
-  }
-  function mastodonHostField(el, ctx) {
-    new Setting(el).setName("Instance").setDesc("The server you post from, e.g. mastodon.social. Not a secret, so it isn't encrypted.").addText(
-      (t) => t.setPlaceholder("mastodon.social").setValue(ctx.plugin.settings.mastodonHost).onChange(
-        debounce(async (v) => {
-          ctx.plugin.settings.mastodonHost = normaliseHost(v);
-          await ctx.plugin.saveSettings();
-        }, 500)
-      )
-    );
-  }
-  function askEnabledField(el, ctx) {
-    new Setting(el).setName("Enable Ask").setDesc("Off by default. With this off, no request is ever made, key or no key.").addToggle(
-      (t) => t.setValue(ctx.plugin.settings.aiEnabled).onChange(async (v) => {
-        ctx.plugin.settings.aiEnabled = v;
-        await ctx.plugin.saveSettings();
-        ctx.onChanged();
-      })
-    );
-  }
-  function publishEnabledField(el, ctx, id, label) {
-    const key = id === "trakt" ? "publishTrakt" : "publishMastodon";
-    new Setting(el).setName(`Publish to ${label}`).setDesc("Off by default. With this off there is no Publish button, key or no key.").addToggle(
-      (t) => t.setValue(ctx.plugin.settings[key]).onChange(async (v) => {
-        ctx.plugin.settings[key] = v;
-        await ctx.plugin.saveSettings();
-        ctx.onChanged();
-      })
-    );
-  }
-  function setupFields(el, ctx, spec) {
-    switch (spec.id) {
-      case "tmdb":
-        keyField(el, ctx, "tmdb", "TMDB key", "Pasted here, encrypted in your vault.");
-        return;
-      case "omdb":
-        keyField(el, ctx, "omdb", "OMDb key", "Pasted here, encrypted in your vault.");
-        return;
-      case "dtdd":
-        keyField(el, ctx, "dtdd", "DoesTheDogDie key", "Pasted here, encrypted in your vault.");
-        return;
-      case "openrouter":
-        keyField(el, ctx, "openrouter", "OpenRouter key", "Pasted here, encrypted in your vault.");
-        askEnabledField(el, ctx);
-        return;
-      case "trakt":
-        traktAppField(el, ctx);
-        traktSignInField(el, ctx);
-        publishEnabledField(el, ctx, "trakt", "Trakt");
-        return;
-      case "mastodon":
-        mastodonHostField(el, ctx);
-        keyField(el, ctx, "mastodon", "Access token", "The token from step 4, encrypted in your vault.");
-        publishEnabledField(el, ctx, "mastodon", "Mastodon");
-        return;
-      default:
-        return;
-    }
-  }
-
-  // src/ui/setupSheet.ts
-  var SetupSheet = class extends Modal {
-    constructor(app2, plugin2, spec, onDone) {
-      super(app2);
-      this.plugin = plugin2;
-      this.spec = spec;
-      this.onDone = onDone;
-      this.ticked = /* @__PURE__ */ new Set();
-    }
-    onOpen() {
-      const { modalEl } = this;
-      modalEl.addClass("reel-modal");
-      modalEl.addClass("reel-setup-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-modal-phone");
-      this.draw();
-    }
-    /**
-     * Redrawn in place after anything that changes the answer.
-     *
-     * Saving a key changes the state pill, the status line and whether the
-     * sign-in button is offered, and a guide that still described the state
-     * before you acted would be the same lie this plugin keeps finding: a
-     * screen reporting what it was told rather than what is.
-     */
-    draw() {
-      const { contentEl } = this;
-      this.seedTicks();
-      contentEl.empty();
-      contentEl.addClass("reel-setup");
-      this.renderHead(contentEl);
-      this.renderSteps(contentEl);
-      this.renderFields(contentEl);
-      this.renderFoot(contentEl);
-    }
-    /**
-     * Steps the vault can prove you have already done.
-     *
-     * Ticking was there and was purely manual, which means it only ever
-     * survived one sitting: come back tomorrow to a guide you half finished
-     * and the marks are gone, along with the answer to the only question you
-     * have. A saved credential is durable, and it settles the question
-     * directly — no new state to store, and nothing to go stale.
-     *
-     * Only ever adds. A tick you put there by hand is a statement about
-     * something Reel cannot see, and taking it away because the plugin has no
-     * evidence of it would be the screen overruling you about your own
-     * afternoon.
-     */
-    seedTicks() {
-      for (const i of this.plugin.settings.setupTicks[this.spec.id] ?? [])
-        this.ticked.add(i);
-      const done = completedSteps(this.spec, (k) => this.proves(k));
-      for (let i = 0; i < done; i++)
-        this.ticked.add(i);
-    }
-    /**
-     * Is this step's product in the vault?
-     *
-     * Delegated, because the settings row asks the same question and the two
-     * gave different answers for a release: the guide counted the Mastodon
-     * server as progress and the row that opens it did not.
-     */
-    proves(k) {
-      return proves(this.plugin, k);
-    }
-    /**
-     * Write the marks down.
-     *
-     * Only the ones you made: a step the credentials already prove is re-seeded
-     * on every open and storing it as well would freeze an inference that ought
-     * to be recomputed — remove the key and the guide should stop claiming the
-     * step is behind you.
-     */
-    async saveTicks() {
-      const proven = completedSteps(this.spec, (k) => this.proves(k));
-      const mine = [...this.ticked].filter((i) => i >= proven).sort((a, b) => a - b);
-      if (mine.length)
-        this.plugin.settings.setupTicks[this.spec.id] = mine;
-      else
-        delete this.plugin.settings.setupTicks[this.spec.id];
-      await this.plugin.saveSettings();
-    }
-    /**
-     * The fields the steps have been pointing at all along.
-     *
-     * Every guide ends by telling you to paste something "below" and there was
-     * nothing below — the field was on the settings screen underneath the sheet
-     * saying "look down". The instruction was right about what to do and wrong
-     * about where, so following it meant abandoning the walkthrough halfway to
-     * go and find a control among forty-nine others.
-     *
-     * The same controls as the settings screen, not a copy of them: they live
-     * in `ui/fields` and both screens call it, so a key saved here is saved
-     * there and there is no second implementation to drift.
-     */
-    renderFields(root) {
-      const box = root.createDiv({ cls: "reel-setup-fields" });
-      setupFields(box, { app: this.app, plugin: this.plugin, onChanged: () => this.draw() }, this.spec);
-      if (!box.childElementCount)
-        box.remove();
-    }
-    /* ------------------------------------------------------------------ */
-    renderHead(root) {
-      const head = root.createDiv({ cls: "reel-setup-head" });
-      const title = head.createDiv({ cls: "reel-setup-title" });
-      title.createSpan({ cls: "reel-setup-name", text: this.spec.name });
-      const done = isConfigured(this.plugin, this.spec);
-      const part = isPartial(this.plugin, this.spec);
-      const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
-      title.createSpan({
-        cls: done ? failed ? "reel-pill" : "reel-pill ok" : part ? "reel-pill warn" : "reel-pill",
-        text: done ? "Set up" : part ? "Half done" : this.spec.essential ? "Required" : "Not set up"
-      });
-      head.createDiv({ cls: "reel-setup-gives", text: this.spec.gives });
-      head.createDiv({ cls: "reel-setup-effort", text: this.spec.effort });
-      this.renderHealth(head, done);
-      const sends = root.createDiv({ cls: "reel-setup-sends" });
-      sends.createDiv({ cls: "reel-setup-sends-label", text: "What leaves your vault" });
-      sends.createDiv({ cls: "reel-setup-sends-text", text: this.spec.sends });
-    }
-    /**
-     * What this connection last did, and a way to find out now.
-     *
-     * Opening a guide for something already set up is almost always because it
-     * has stopped working, and the guide used to answer only the question you
-     * were not asking — how to set it up, which you already did.
-     *
-     * The button is the other half of that. Verification lived on a different
-     * screen from configuration, behind one control that tested all six
-     * services at once, so finishing this walkthrough meant closing it and
-     * going to look for something else in order to learn whether the key you
-     * had just pasted was right.
-     *
-     * Shown when the feature is set up *or* merely checkable, which are not the
-     * same thing and the difference is the point. Mastodon is checked by its
-     * server address rather than its token, so somebody who has typed a server
-     * and not yet made a token can find out the address is wrong — which is
-     * both the commonest mistake and the cheapest moment to fix it.
-     */
-    renderHealth(head, done) {
-      const can = checkable(this.plugin, this.spec.id);
-      if (!done && !can)
-        return;
-      const said = this.healthLine();
-      if (!said && !can)
-        return;
-      const wrap = head.createDiv({ cls: "reel-setup-check" });
-      const line = wrap.createDiv({ cls: "reel-setup-health" });
-      const draw2 = () => {
-        const now = this.healthLine();
-        line.setText(now?.text ?? "");
-        line.className = `reel-setup-health is-${now?.tone ?? "info"}`;
-      };
-      draw2();
-      if (!can) {
-        if (!this.locked())
-          return;
-        const open2 = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
-        open2.addEventListener("click", async () => {
-          open2.disabled = true;
-          open2.setText("Unlocking\u2026");
-          const opened = await this.plugin.credentials.unlock();
-          if (!opened) {
-            open2.disabled = false;
-            open2.setText("Unlock");
-            return;
-          }
-          this.draw();
-        });
-        return;
-      }
-      const btn = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Check now" });
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        btn.setText("Checking\u2026");
-        try {
-          await checkFeature(this.plugin, this.spec.id, Date.now());
-          await this.plugin.saveSettings();
-        } finally {
-          btn.disabled = false;
-          btn.setText("Check now");
-          draw2();
-        }
-      });
-    }
-    /**
-     * Null for the features nothing can honestly report on.
-     *
-     * The routing lives in `health.ts` and is shared with the settings rows and
-     * the health table. It was written out here as well, which is how a guide
-     * and a row come to disagree about the same feature.
-     */
-    /** Sealed keys, and this feature is one of the ones that needs them. */
-    locked() {
-      return NEEDS_KEY_TO_CHECK.includes(this.spec.id) && this.plugin.credentials.needsUnlock && this.plugin.credentials.hasStoredKey;
-    }
-    healthLine() {
-      const s = this.plugin.settings;
-      return featureHealth(
-        this.spec.id,
-        {
-          records: s.connectionHealth,
-          hasTrakt: this.plugin.credentials.has("trakt"),
-          traktExpires: s.traktExpires,
-          locked: this.plugin.credentials.needsUnlock
-        },
-        Date.now()
-      );
-    }
-    /**
-     * The instructions, folded away once there is nothing left to follow.
-     *
-     * Opening a guide for a feature that is already working is a normal thing
-     * to do — it is where the status lives, and the Check now button, and the
-     * field you would use to replace a key. What you are not doing is reading
-     * how to create the account, and five completed steps between you and the
-     * three things you came for is a wall of settled questions.
-     *
-     * The settings list already reasons this way about its own descriptions: a
-     * pitch is for something you have not bought yet. This is the same rule one
-     * screen further in.
-     *
-     * Folded, never dropped. Making a second token a year from now means
-     * reading them again, and a guide that has quietly stopped containing its
-     * own guide would be a worse answer than a long screen.
-     */
-    renderSteps(root) {
-      const total = this.spec.steps.length;
-      const allDone = total > 0 && this.spec.steps.every((_, i) => this.ticked.has(i));
-      if (!allDone) {
-        const open2 = root.createEl("ol", { cls: "reel-setup-steps" });
-        this.spec.steps.forEach((step, i) => this.renderStep(open2, step, i));
-        return;
-      }
-      const toggle2 = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
-      const failed = lastCheckFailed(this.plugin.settings.connectionHealth, this.spec.id);
-      const list2 = root.createEl("ol", { cls: failed ? "reel-setup-steps" : "reel-setup-steps is-collapsed" });
-      const label = () => {
-        const shown2 = !list2.classList.contains("is-collapsed");
-        toggle2.setText(shown2 ? "Hide the steps" : `All ${total} steps done \u2014 show them`);
-        toggle2.setAttr("aria-expanded", String(shown2));
-      };
-      toggle2.addEventListener("click", () => {
-        list2.classList.toggle("is-collapsed");
-        label();
-      });
-      label();
-      this.spec.steps.forEach((step, i) => this.renderStep(list2, step, i));
-    }
-    renderStep(list2, step, i) {
-      const li = list2.createEl("li", { cls: "reel-setup-step" });
-      const row = li.createDiv({ cls: "reel-setup-step-row" });
-      const done = this.ticked.has(i);
-      if (done)
-        li.addClass("is-done");
-      const tick = row.createEl("button", { cls: "reel-setup-tick", text: done ? "\u2713" : String(i + 1) });
-      tick.setAttr("aria-label", `Step ${i + 1}. Tap to mark done.`);
-      tick.setAttr("aria-pressed", String(done));
-      row.createSpan({ cls: "reel-setup-step-text", text: step.text });
-      const mark = () => {
-        const on = this.ticked.has(i);
-        if (on)
-          this.ticked.delete(i);
-        else
-          this.ticked.add(i);
-        li.toggleClass("is-done", !on);
-        tick.setAttr("aria-pressed", String(!on));
-        tick.setText(!on ? "\u2713" : String(i + 1));
-        void this.saveTicks();
-      };
-      tick.addEventListener("click", mark);
-      if (step.copy)
-        this.renderCopy(li, step.copy);
-      if (step.url) {
-        const a = li.createEl("a", {
-          cls: "reel-btn reel-setup-go",
-          text: this.hostOf(step.url),
-          href: step.url
-        });
-        a.setAttr("target", "_blank");
-        a.setAttr("rel", "noopener");
-        a.addEventListener("click", () => {
-          if (!this.ticked.has(i))
-            mark();
-        });
-      }
-      if (step.note)
-        li.createDiv({ cls: "reel-setup-note", text: step.note });
-    }
-    /**
-     * A literal to be typed exactly, with a button that copies it.
-     *
-     * The two values in Reel's entire setup that must match character for
-     * character are Trakt's redirect URI and Mastodon's scope, and both are
-     * strings of punctuation that mean nothing to read. Copying either by eye
-     * is how a setup fails five minutes later with somebody else's error
-     * message attached.
-     */
-    renderCopy(li, value) {
-      const btn = li.createEl("button", { cls: "reel-setup-copy" });
-      btn.createSpan({ cls: "reel-setup-copy-value", text: value });
-      btn.createSpan({ cls: "reel-setup-copy-hint", text: "Copy" });
-      btn.setAttr("aria-label", `Copy ${value}`);
-      btn.addEventListener("click", () => {
-        navigator.clipboard?.writeText(value).then(() => {
-          new Notice("Reel: copied.");
-          btn.addClass("is-copied");
-        }).catch(() => new Notice("Reel: couldn't copy \u2014 type it from the screen."));
-      });
-    }
-    renderFoot(root) {
-      const foot = root.createDiv({ cls: "reel-setup-foot" });
-      const close = foot.createEl("button", { cls: "reel-btn mod-cta", text: "Back to settings" });
-      close.addEventListener("click", () => {
-        this.close();
-        this.onDone?.();
-      });
-    }
-    /** "Open themoviedb.org" reads better on a button than the whole URL does. */
-    hostOf(url) {
-      try {
-        return `Open ${new URL(url).hostname.replace(/^www\./, "")}`;
-      } catch {
-        return "Open";
-      }
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-
-  // src/ui/publishSheet.ts
-  var PublishSheet = class extends Modal {
-    constructor(app2, plugin2, opts) {
-      super(app2);
-      this.plugin = plugin2;
-      this.opts = opts;
-      this.chosen = /* @__PURE__ */ new Set();
-      this.busy = false;
-      this.spoiler = plugin2.settings.publishSpoilerDefault;
-    }
-    get payload() {
-      return {
-        entry: this.opts.entry,
-        date: this.opts.date,
-        rating: this.opts.rating,
-        text: this.opts.text,
-        spoiler: this.spoiler
-      };
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      contentEl.addClass("reel-publish");
-      contentEl.createEl("h3", { cls: "reel-log-title", text: "Publish review" });
-      const sub = contentEl.createDiv({ cls: "reel-publish-sub" });
-      sub.createSpan({ cls: "reel-publish-title", text: this.opts.entry.title });
-      if (this.opts.rating != null && this.opts.rating > 0) {
-        renderStarsStatic(sub.createSpan({ cls: "reel-publish-stars" }), this.opts.rating);
-      }
-      if (this.opts.date)
-        sub.createSpan({ cls: "reel-publish-date", text: prettyDate(this.opts.date) });
-      const targets = this.plugin.publish.targets();
-      if (!targets.length) {
-        this.renderNowhere(contentEl);
-        return;
-      }
-      this.renderTargets(contentEl, targets);
-      this.renderSpoiler(contentEl);
-      this.previewHost = contentEl.createDiv({ cls: "reel-publish-previews" });
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel" });
-      cancel.addEventListener("click", () => this.close());
-      this.goBtn = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Publish" });
-      this.goBtn.addEventListener("click", () => void this.run());
-      cancel.focus();
-      void this.repaint();
-    }
-    /**
-     * Publishing is on but nothing is configured.
-     *
-     * This said "Settings → Reel → Publishing has Trakt and Mastodon" and
-     * offered one button that opened the settings tab, which is the fault the
-     * walkthroughs exist to fix: the screen knows exactly which two features are
-     * missing and it threw that away to drop you at the top of a tab holding
-     * forty-nine controls.
-     *
-     * Two buttons rather than one, because there genuinely are two answers and
-     * they differ in kind — Trakt is a film profile, Mastodon is a public
-     * post. Choosing between them is the first real decision, and each guide
-     * says what leaves your vault before you commit to anything.
-     */
-    renderNowhere(el) {
-      el.createDiv({
-        cls: "reel-publish-empty",
-        text: "No publishing destination is set up yet. Trakt puts the review on your film profile; Mastodon posts it publicly. Either takes a few minutes, and neither sends anything until you press Publish."
-      });
-      const actions = el.createDiv({ cls: "reel-log-actions" });
-      for (const id of ["trakt", "mastodon"]) {
-        const spec = FEATURES.find((f) => f.id === id);
-        if (!spec)
-          continue;
-        const go = actions.createEl("button", {
-          cls: `reel-btn${id === "trakt" ? " mod-cta" : ""}`,
-          text: `Set up ${spec.name}`
-        });
-        go.addEventListener("click", () => {
-          this.close();
-          new SetupSheet(this.app, this.plugin, spec).open();
-        });
-      }
-    }
-    renderTargets(el, targets) {
-      const row = el.createDiv({ cls: "reel-publish-targets" });
-      for (const t of targets) {
-        const btn = row.createEl("button", { cls: "reel-publish-target" });
-        btn.createSpan({ cls: "reel-publish-target-name", text: t.label });
-        const already = this.plugin.publish.publishedTo(this.opts.entry)[t.id];
-        if (t.blocker) {
-          btn.addClass("is-blocked");
-          btn.createSpan({ cls: "reel-publish-target-note", text: t.blocker });
-          const spec = FEATURES.find((f) => f.id === t.id);
-          if (!spec) {
-            btn.disabled = true;
-            continue;
-          }
-          btn.setAttribute("aria-label", `Set up ${spec.name}`);
-          btn.addEventListener("click", () => {
-            this.close();
-            new SetupSheet(this.app, this.plugin, spec).open();
-          });
-          continue;
-        }
-        if (already) {
-          btn.createSpan({ cls: "reel-publish-target-note", text: "Already published once" });
-        }
-        btn.addEventListener("click", () => {
-          if (this.busy)
-            return;
-          if (this.chosen.has(t.id))
-            this.chosen.delete(t.id);
-          else
-            this.chosen.add(t.id);
-          btn.toggleClass("is-on", this.chosen.has(t.id));
-          void this.repaint();
-        });
-      }
-    }
-    renderSpoiler(el) {
-      const row = el.createDiv({ cls: "reel-publish-spoiler" });
-      const btn = row.createEl("button", { cls: "reel-publish-toggle" });
-      const paint = () => {
-        btn.empty();
-        btn.toggleClass("is-on", this.spoiler);
-        setIcon(btn.createSpan({ cls: "reel-publish-toggle-icon" }), this.spoiler ? "eye-off" : "eye");
-        btn.createSpan({ text: this.spoiler ? "Marked as spoilers" : "No spoilers" });
-      };
-      paint();
-      btn.addEventListener("click", () => {
-        this.spoiler = !this.spoiler;
-        paint();
-        void this.repaint();
-      });
-      row.createDiv({
-        cls: "reel-publish-hint",
-        text: "Trakt requires this either way. On Mastodon it goes behind a content warning."
-      });
-    }
-    /**
-     * Redraw the previews for whatever is currently ticked.
-     *
-     * Async because Mastodon's character limit is a property of the instance and
-     * has to be asked for. The sheet stays usable while that is in flight — a
-     * preview arriving a moment late is fine, a sheet that blocks on a network
-     * call before it will render is not.
-     */
-    async repaint() {
-      if (!this.previewHost)
-        return;
-      this.previewHost.empty();
-      this.goBtn.disabled = this.chosen.size === 0 || this.busy;
-      if (!this.chosen.size) {
-        this.previewHost.createDiv({
-          cls: "reel-publish-hint",
-          text: "Pick where this should go. Nothing is sent until you press Publish."
-        });
-        return;
-      }
-      for (const id of this.chosen) {
-        const box = this.previewHost.createDiv({ cls: "reel-publish-preview" });
-        const label = id === "trakt" ? "Trakt" : "Mastodon";
-        box.createDiv({ cls: "reel-publish-preview-head", text: label });
-        const complaint = this.plugin.publish.complaint(this.payload, id);
-        if (complaint) {
-          box.createDiv({ cls: "reel-publish-warn", text: complaint });
-          this.goBtn.disabled = true;
-          continue;
-        }
-        try {
-          const composed = await this.plugin.publish.preview(this.payload, id);
-          box.createDiv({ cls: "reel-publish-text", text: composed.text });
-          const meta = box.createDiv({ cls: "reel-publish-meta" });
-          meta.createSpan({ text: `${composed.text.length} characters` });
-          if (composed.truncated) {
-            box.createDiv({
-              cls: "reel-publish-warn",
-              text: "Too long for this instance \u2014 the post is cut where you see the ellipsis. The full review stays in your vault."
-            });
-          }
-          if (id === "trakt" && wordCount(this.opts.text) > TRAKT_REVIEW_WORDS) {
-            meta.createSpan({ text: " \xB7 filed as a review, not a shout" });
-          }
-        } catch (e) {
-          box.createDiv({ cls: "reel-publish-warn", text: redact(e) });
-        }
-      }
-    }
-    async run() {
-      if (this.busy || !this.chosen.size)
-        return;
-      this.busy = true;
-      this.goBtn.disabled = true;
-      this.goBtn.setText("Publishing\u2026");
-      let outcomes = [];
-      try {
-        outcomes = await this.plugin.publish.publish(this.payload, [...this.chosen]);
-      } catch (e) {
-        new Notice(`Reel: ${redact(e)}`, 8e3);
-        this.busy = false;
-        this.goBtn.disabled = false;
-        this.goBtn.setText("Publish");
-        return;
-      }
-      this.opts.onDone?.();
-      this.renderOutcome(outcomes);
-    }
-    /**
-     * What happened, per destination, without closing the sheet.
-     *
-     * Closing on success and firing a toast was the first version, and it was
-     * wrong: a toast that says "published" and vanishes leaves you with no way
-     * to get to the thing that was published, and no way to read the one target
-     * that failed while the other worked.
-     */
-    renderOutcome(outcomes) {
-      const { contentEl } = this;
-      contentEl.empty();
-      const good = outcomes.filter((o) => o.ok);
-      contentEl.createEl("h3", {
-        cls: "reel-log-title",
-        text: good.length === outcomes.length ? "Published" : good.length ? "Partly published" : "Not published"
-      });
-      const list2 = contentEl.createDiv({ cls: "reel-publish-outcomes" });
-      for (const o of outcomes) {
-        const row = list2.createDiv({ cls: `reel-publish-outcome ${o.ok ? "is-ok" : "is-bad"}` });
-        setIcon(row.createSpan({ cls: "reel-publish-outcome-icon" }), o.ok ? "check" : "alert-triangle");
-        row.createSpan({ cls: "reel-publish-outcome-name", text: o.label });
-        if (o.ok && o.url) {
-          const link = row.createEl("a", { cls: "reel-publish-outcome-link", text: "View", href: o.url });
-          link.setAttr("target", "_blank");
-          link.setAttr("rel", "noopener");
-        } else if (!o.ok) {
-          row.createSpan({ cls: "reel-publish-outcome-why", text: o.error ?? "Failed." });
-        }
-      }
-      const actions = contentEl.createDiv({ cls: "reel-log-actions" });
-      const done = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Done" });
-      done.addEventListener("click", () => this.close());
-      done.focus();
-    }
-    onClose() {
-      this.contentEl.empty();
-    }
-  };
-
-  // src/ui/reviewPane.ts
-  var EXCERPT = 220;
-  function fileFor(plugin2, entry) {
-    const f = plugin2.app.vault.getAbstractFileByPath(entry.path);
-    return f instanceof TFile ? f : null;
-  }
-  var cache = /* @__PURE__ */ new Map();
-  async function readReviews(plugin2, entry) {
-    const file = fileFor(plugin2, entry);
-    if (!file)
-      return [];
-    const hit = cache.get(file.path);
-    if (hit && hit.mtime === file.stat.mtime)
-      return hit.reviews;
-    try {
-      const reviews2 = reviewsNewestFirst(await plugin2.app.vault.cachedRead(file));
-      cache.set(file.path, { mtime: file.stat.mtime, reviews: reviews2 });
-      return reviews2;
-    } catch {
-      return [];
-    }
-  }
-  function forgetReviews(path) {
-    cache.delete(path);
-  }
-  function paintReviews(plugin2, container, entry, opts = {}) {
-    const pane = container.createDiv({ cls: "reel-yours is-loading" });
-    const fill = () => {
-      void readReviews(plugin2, entry).then((all2) => {
-        if (!pane.isConnected)
-          return;
-        pane.removeClass("is-loading");
-        draw(plugin2, pane, entry, all2, opts);
-      });
-    };
-    if (!opts.lazy || typeof IntersectionObserver === "undefined") {
-      fill();
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((e) => e.isIntersecting))
-          return;
-        io.disconnect();
-        fill();
-      },
-      { rootMargin: "800px 0px" }
-    );
-    io.observe(pane);
-  }
-  function draw(plugin2, pane, entry, all2, opts) {
-    pane.empty();
-    const reviews2 = opts.onlyDate ? all2.filter((r) => r.date === opts.onlyDate) : all2;
-    const shown2 = opts.limit ? reviews2.slice(0, opts.limit) : reviews2;
-    const repaint = () => {
-      forgetReviews(entry.path);
-      void readReviews(plugin2, entry).then((fresh) => {
-        if (pane.isConnected)
-          draw(plugin2, pane, entry, fresh, opts);
-      });
-      opts.onChange?.();
-    };
-    if (!shown2.length) {
-      if (!opts.editable) {
-        pane.remove();
-        return;
-      }
-      const empty = pane.createDiv({ cls: "reel-yours-empty" });
-      empty.createDiv({ cls: "reel-yours-label", text: opts.heading ?? "Your review" });
-      empty.createDiv({
-        cls: "reel-dim",
-        text: entry.watched.length ? "You have not written about this one yet." : "Write about it now, or when you log it."
-      });
-      const write = empty.createEl("button", { cls: "reel-btn", attr: { type: "button" } });
-      setIcon(write.createSpan(), "pencil-line");
-      write.createSpan({ text: "Write a review" });
-      write.addEventListener("click", () => {
-        new ReviewEditor(plugin2, entry, null, repaint).open();
-      });
-      return;
-    }
-    if (opts.heading !== "")
-      pane.createDiv({ cls: "reel-yours-label", text: opts.heading ?? "Your review" });
-    for (const review of shown2) {
-      const box = pane.createDiv({ cls: "reel-yours-item" });
-      const head = box.createDiv({ cls: "reel-yours-head" });
-      head.createSpan({ cls: "reel-yours-date", text: review.date ? prettyDate(review.date) : review.heading });
-      if (review.rating != null)
-        renderStarsStatic(head.createSpan({ cls: "reel-yours-stars" }), review.rating);
-      if (opts.editable) {
-        if (plugin2.publish.anyEnabled) {
-          const already = plugin2.publish.publishedTo(entry);
-          const gone = Object.keys(already).length > 0;
-          const send = head.createEl("button", {
-            cls: `reel-yours-publish clickable-icon${gone ? " is-published" : ""}`,
-            attr: {
-              type: "button",
-              "aria-label": gone ? "Published \u2014 publish again" : "Publish this review"
-            }
-          });
-          setIcon(send, gone ? "check-circle-2" : "send");
-          send.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            new PublishSheet(plugin2.app, plugin2, {
-              entry,
-              date: review.date,
-              rating: review.rating ?? entry.rating,
-              text: review.text,
-              onDone: repaint
-            }).open();
-          });
-        }
-        const edit = head.createEl("button", {
-          cls: "reel-yours-edit clickable-icon",
-          attr: { type: "button", "aria-label": "Edit this review" }
-        });
-        setIcon(edit, "pencil-line");
-        edit.addEventListener("click", () => new ReviewEditor(plugin2, entry, review, repaint).open());
-      }
-      const long = review.text.length > EXCERPT;
-      const body = box.createDiv({ cls: "reel-yours-body" });
-      body.setText(long && !opts.editable ? `${review.text.slice(0, EXCERPT).trimEnd()}\u2026` : review.text);
-      if (long && !opts.editable) {
-        const more = box.createEl("button", { cls: "reel-yours-more", text: "Read the rest", attr: { type: "button" } });
-        more.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          const file = fileFor(plugin2, entry);
-          if (file)
-            void plugin2.app.workspace.getLeaf(false).openFile(file);
-        });
-      }
-    }
-    if (opts.editable) {
-      const add = pane.createEl("button", { cls: "reel-yours-add", attr: { type: "button" } });
-      setIcon(add.createSpan(), "plus");
-      add.createSpan({ text: "Add another" });
-      add.addEventListener("click", () => new ReviewEditor(plugin2, entry, null, repaint).open());
-    } else if (opts.limit && reviews2.length > opts.limit) {
-      pane.createDiv({ cls: "reel-dim reel-yours-count", text: `${reviews2.length - opts.limit} more` });
-    }
-  }
-  var ReviewEditor = class extends Modal {
-    constructor(plugin2, entry, review, onSaved) {
-      super(plugin2.app);
-      this.plugin = plugin2;
-      this.entry = entry;
-      this.review = review;
-      this.onSaved = onSaved;
-      this.saving = false;
-      this.text = review?.text ?? "";
-      this.rating = review?.rating ?? (review ? void 0 : entry.rating);
-      this.date = review?.date ?? this.mostRecentWatch();
-    }
-    /**
-     * The date a fresh review belongs to.
-     *
-     * The last time you watched it, not today: you write the review after the
-     * film, sometimes days after, and dating it "today" quietly puts a viewing
-     * in your diary on a night you were doing something else.
-     */
-    mostRecentWatch() {
-      const dates = this.entry.watched.map((w) => w.date).filter(Boolean).sort();
-      return dates[dates.length - 1] ?? todayISO();
-    }
-    onOpen() {
-      const { contentEl, modalEl } = this;
-      modalEl.addClass("reel-modal");
-      if (Platform.isPhone)
-        modalEl.addClass("reel-sheet");
-      modalEl.addClass("reel-review-sheet");
-      contentEl.addClass("reel-review-content");
-      paintWash(contentEl, this.plugin.posters.displayUrl(this.entry));
-      const head = contentEl.createDiv({ cls: "reel-review-head" });
-      head.createEl("h3", { cls: "reel-log-title", text: this.entry.title });
-      head.createDiv({ cls: "reel-log-sub", text: this.review ? "Edit your review" : "Write a review" });
-      const body = contentEl.createDiv({ cls: "reel-review-body" });
-      const box = body.createEl("textarea", {
-        cls: "reel-input reel-review-box",
-        attr: { rows: "4", placeholder: "What did you think?" }
-      });
-      box.value = this.text;
-      const grow = () => {
-        const vh = window.visualViewport?.height ?? window.innerHeight;
-        const cap = Math.max(120, Math.round(vh * 0.4));
-        box.style.height = "auto";
-        box.style.height = `${Math.min(box.scrollHeight + 2, cap)}px`;
-        box.style.overflowY = box.scrollHeight + 2 > cap ? "auto" : "hidden";
-      };
-      box.addEventListener("input", () => {
-        this.text = box.value;
-        grow();
-      });
-      window.setTimeout(grow, 0);
-      window.setTimeout(grow, 350);
-      const meta = body.createDiv({ cls: "reel-review-meta" });
-      meta.createDiv({ cls: "reel-field-label", text: "Rating" });
-      renderStars(meta, {
-        value: this.rating,
-        onChange: (v) => {
-          this.rating = v;
-        }
-      });
-      meta.createDiv({ cls: "reel-field-label", text: "Date" });
-      const dateWrap = meta.createDiv({ cls: "reel-review-date-wrap" });
-      const dateEl = dateWrap.createEl("input", { cls: "reel-review-date-native", attr: { type: "date", tabindex: "-1", "aria-hidden": "true" } });
-      dateEl.value = this.date;
-      const dateBtn = dateWrap.createEl("button", { cls: "reel-review-date", attr: { type: "button" } });
-      const paintDate = () => dateBtn.setText(this.date ? prettyDate(this.date) : "Pick a date");
-      paintDate();
-      dateBtn.disabled = this.review != null;
-      dateBtn.addEventListener("click", () => {
-        try {
-          dateEl.showPicker();
-        } catch {
-          dateEl.focus();
-          dateEl.click();
-        }
-      });
-      dateEl.addEventListener("change", () => {
-        this.date = dateEl.value;
-        paintDate();
-      });
-      const actions = contentEl.createDiv({ cls: "reel-actions" });
-      const cancel = actions.createEl("button", { cls: "reel-btn", text: "Cancel", attr: { type: "button" } });
-      cancel.addEventListener("click", () => this.close());
-      const save = actions.createEl("button", { cls: "reel-btn mod-cta", text: "Save", attr: { type: "button" } });
-      save.addEventListener("click", () => void this.save(save));
-      window.setTimeout(() => box.focus(), 0);
-    }
-    async save(button) {
-      if (this.saving)
-        return;
-      this.saving = true;
-      button.disabled = true;
-      button.setText("Saving\u2026");
-      const file = fileFor(this.plugin, this.entry);
-      if (!file) {
-        new Notice("That note has moved or been deleted.");
-        this.close();
-        return;
-      }
-      try {
-        const review = this.review;
-        await this.plugin.app.vault.process(file, (data) => {
-          if (!review)
-            return appendReviewSection(data, this.date, this.rating, this.text);
-          const withHeading = replaceHeading(data, review, headingFor(review, this.rating));
-          const again = reviewsNewestFirst(withHeading).find((r) => r.date === review.date);
-          return again ? replaceReview(withHeading, again, this.text) : withHeading;
-        });
-        forgetReviews(file.path);
-        this.onSaved();
-        this.close();
-      } catch (e) {
-        new Notice(`Reel could not save that review \u2014 ${redact(e)}`);
-        button.disabled = false;
-        button.setText("Save");
-        this.saving = false;
       }
     }
     onClose() {

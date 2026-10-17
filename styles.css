@@ -19882,3 +19882,30 @@ body.is-mobile .modal-container .modal.reel-modal.reel-person-sheet {
 .reel-facets .reel-facet-tab:hover {
 	background: transparent;
 }
+
+/* One-episode review button in the season sheet */
+.reel-episode-review {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+	border: none;
+	color: var(--text-muted);
+}
+
+.reel-episode-review svg {
+	width: 18px;
+	height: 18px;
+}
+
+@media (pointer: fine) and (min-width: 700px) {
+	.reel-episode-review {
+		width: 34px;
+		height: 34px;
+	}
+}

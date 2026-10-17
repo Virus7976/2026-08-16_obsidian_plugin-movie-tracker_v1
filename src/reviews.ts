@@ -136,11 +136,26 @@ export function replaceReview(content: string, review: NoteReview, text: string)
  * rewriting the middle of somebody's file to keep a sort order is a much larger
  * liberty than adding to the end of it. Every reader here sorts anyway.
  */
-export function appendReviewSection(content: string, date: string, rating: number | undefined, text: string): string {
+/**
+ * The episode label a heading carries, "S1E2 · Name", if it is an episode's
+ * review rather than the whole title's.
+ */
+export function episodeLabelOf(heading: string): string | undefined {
+	const m = /^(S\d+E\d+[^·]*?)\s*·\s/.exec(heading);
+	return m ? m[1].trim() : undefined;
+}
+
+export function appendReviewSection(
+	content: string,
+	date: string,
+	rating: number | undefined,
+	text: string,
+	episode?: string
+): string {
 	const body = text.trim();
 	if (!body) return content;
 	const stars = rating != null && rating > 0 ? ` · ${starString(rating)}` : "";
-	const heading = `## ${prettyDate(date) || date}${stars}`;
+	const heading = `## ${episode ? `${episode} · ` : ""}${prettyDate(date) || date}${stars}`;
 	const gap = content.endsWith("\n") ? "\n" : "\n\n";
 	return `${content}${gap}${heading}\n\n${body}\n`;
 }
@@ -153,7 +168,9 @@ export function appendReviewSection(content: string, date: string, rating: numbe
  * is a three is worse than no stars at all.
  */
 export function headingFor(review: NoteReview, rating: number | undefined): string {
-	const base = review.date ? prettyDate(review.date) || review.date : review.heading.replace(/\s*·.*$/, "").trim();
+	const label = episodeLabelOf(review.heading);
+	const when = review.date ? prettyDate(review.date) || review.date : review.heading.replace(/\s*·.*$/, "").trim();
+	const base = label ? `${label} · ${when}` : when;
 	const stars = rating != null && rating > 0 ? ` · ${starString(rating)}` : "";
 	return `## ${base}${stars}`;
 }

@@ -23,6 +23,7 @@ import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import {
 	appendReviewSection,
+	episodeLabelOf,
 	headingFor,
 	replaceHeading,
 	replaceReview,
@@ -188,7 +189,11 @@ function draw(
 	for (const review of shown) {
 		const box = pane.createDiv({ cls: "reel-yours-item" });
 		const head = box.createDiv({ cls: "reel-yours-head" });
-		head.createSpan({ cls: "reel-yours-date", text: review.date ? prettyDate(review.date) : review.heading });
+		const epLabel = episodeLabelOf(review.heading);
+		head.createSpan({
+			cls: "reel-yours-date",
+			text: review.date ? `${epLabel ? `${epLabel} · ` : ""}${prettyDate(review.date)}` : review.heading,
+		});
 		if (review.rating != null) renderStarsStatic(head.createSpan({ cls: "reel-yours-stars" }), review.rating);
 
 		if (opts.editable) {
@@ -281,7 +286,9 @@ export class ReviewEditor extends Modal {
 		private plugin: ReelPlugin,
 		private entry: Entry,
 		private review: NoteReview | null,
-		private onSaved: () => void
+		private onSaved: () => void,
+		/** "S1E2 · Name" when this is one episode's review. */
+		private episode?: string
 	) {
 		super(plugin.app);
 		this.text = review?.text ?? "";
@@ -313,7 +320,7 @@ export class ReviewEditor extends Modal {
 		const head = contentEl.createDiv({ cls: "reel-review-head" });
 		// The film first, because it is what the sheet is about; the verb under it.
 		head.createEl("h3", { cls: "reel-log-title", text: this.entry.title });
-		head.createDiv({ cls: "reel-log-sub", text: this.review ? "Edit your review" : "Write a review" });
+		head.createDiv({ cls: "reel-log-sub", text: this.episode ?? (this.review ? "Edit your review" : "Write a review") });
 		// Head, a body that scrolls on its own, then the buttons: a column, so
 		// nothing is layered over anything and the keyboard cannot cover the box.
 		const body = contentEl.createDiv({ cls: "reel-review-body" });
@@ -424,7 +431,7 @@ export class ReviewEditor extends Modal {
 		try {
 			const review = this.review;
 			await this.plugin.app.vault.process(file, (data) => {
-				if (!review) return appendReviewSection(data, this.date, this.rating, this.text);
+				if (!review) return appendReviewSection(data, this.date, this.rating, this.text, this.episode);
 				/*
 				 * Heading first, then body — and re-parse in between.
 				 *
@@ -435,7 +442,9 @@ export class ReviewEditor extends Modal {
 				 * over one note and removes the whole class of bug.
 				 */
 				const withHeading = replaceHeading(data, review, headingFor(review, this.rating));
-				const again = reviewsNewestFirst(withHeading).find((r) => r.date === review.date);
+				const again = reviewsNewestFirst(withHeading).find(
+					(r) => r.date === review.date && episodeLabelOf(r.heading) === episodeLabelOf(review.heading)
+				);
 				return again ? replaceReview(withHeading, again, this.text) : withHeading;
 			});
 

@@ -10,7 +10,7 @@
  * opened and cached permanently once the show has ended.
  */
 
-import { App, Modal, Notice, Platform, TFile } from "obsidian";
+import { App, Menu, Modal, Notice, Platform, TFile, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
 import type { Entry, TmdbEpisode } from "../types";
 import { redact } from "../secrets";
@@ -18,6 +18,9 @@ import { formatRange, parseRange } from "../util/ranges";
 import { prettyDate } from "../util/dates";
 import { renderStars } from "./stars";
 import { paintWash } from "./titleExtras";
+import { haptic } from "../util/haptics";
+import { ReviewEditor, readReviews } from "./reviewPane";
+import { episodeLabelOf } from "../reviews";
 
 export class SeasonSheet extends Modal {
 	private watched: Set<number>;
@@ -125,6 +128,92 @@ export class SeasonSheet extends Modal {
 				},
 			});
 
+			// Write about this one episode: a section in the note headed with
+			// its number, so it reads as part of the same page as the rest.
+			const label = `S${this.season}E${n}${ep.name ? ` ${ep.name}` : ""}`.replace(/\s*·\s*/g, " ");
+			const write = row.createEl("button", {
+				cls: "reel-episode-review",
+				attr: { type: "button", "aria-label": `Review episode ${n}` },
+			});
+			setIcon(write, "pencil-line");
+			const openReview = (): void => void this.reviewEpisode(label);
+			write.addEventListener("click", (e) => {
+				e.stopPropagation();
+				openReview();
+			});
+
+			// Press and hold the row for everything you can do to one episode.
+			let timer: number | null = null;
+			let sx = 0;
+			let sy = 0;
+			let held = false;
+			const menuAt = (x: number, y: number): void => {
+				held = true;
+				haptic("hold");
+				const menu = new Menu();
+				const seen = this.watched.has(n);
+				menu.addItem((i) =>
+					i.setTitle(seen ? "Mark not watched" : "Mark watched").setIcon("check").onClick(() => {
+						if (seen) this.watched.delete(n);
+						else this.watched.add(n);
+						this.dirty = true;
+						paintRow(row, n);
+						paintCount();
+					})
+				);
+				menu.addItem((i) =>
+					i.setTitle("Mark watched up to here").setIcon("check-check").onClick(() => {
+						for (const e of this.episodes) if (e.episode_number <= n) this.watched.add(e.episode_number);
+						this.dirty = true;
+						rows.forEach((r, k) => paintRow(r, k));
+						paintCount();
+					})
+				);
+				menu.addItem((i) => i.setTitle("Write a review").setIcon("pencil-line").onClick(openReview));
+				if (this.ratings[String(n)] != null) {
+					menu.addItem((i) =>
+						i.setTitle("Clear rating").setIcon("star-off").onClick(() => {
+							delete this.ratings[String(n)];
+							this.dirty = true;
+							paintRow(row, n);
+						})
+					);
+				}
+				menu.showAtPosition({ x, y });
+			};
+			row.addEventListener("pointerdown", (e) => {
+				held = false;
+				sx = e.clientX;
+				sy = e.clientY;
+				timer = window.setTimeout(() => menuAt(e.clientX, e.clientY), 500);
+			});
+			row.addEventListener("pointermove", (e) => {
+				if (timer != null && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) {
+					window.clearTimeout(timer);
+					timer = null;
+				}
+			});
+			for (const ev of ["pointerup", "pointercancel", "pointerleave"]) {
+				row.addEventListener(ev, () => {
+					if (timer != null) window.clearTimeout(timer);
+					timer = null;
+				});
+			}
+			row.addEventListener("contextmenu", (e) => {
+				e.preventDefault();
+				menuAt(e.clientX, e.clientY);
+			});
+			row.addEventListener(
+				"click",
+				(e) => {
+					if (!held) return;
+					held = false;
+					e.stopPropagation();
+					e.preventDefault();
+				},
+				true
+			);
+
 			paintRow(row, n);
 		}
 		paintCount();
@@ -158,6 +247,13 @@ export class SeasonSheet extends Modal {
 	 * One write for the whole season rather than one per episode — "mark all"
 	 * on a 23-episode season would otherwise queue 23 file writes.
 	 */
+	/** Open the editor on this episode's review, or a new one. */
+	private async reviewEpisode(label: string): Promise<void> {
+		const all = await readReviews(this.plugin, this.entry);
+		const existing = all.find((r) => episodeLabelOf(r.heading) === label) ?? null;
+		new ReviewEditor(this.plugin, this.entry, existing, () => {}, label).open();
+	}
+
 	private async persist(): Promise<void> {
 		if (!this.dirty) return;
 		const file = this.app.vault.getAbstractFileByPath(this.entry.path);
