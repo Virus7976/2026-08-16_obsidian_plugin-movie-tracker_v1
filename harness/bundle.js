@@ -1,5 +1,128 @@
 "use strict";
 (() => {
+  // src/content.ts
+  var CONTENT_FLAGS = ["sex", "nudity", "profanity", "violence", "gore", "drugs", "horror"];
+  var FLAG_LABELS = {
+    sex: "Sex",
+    nudity: "Nudity",
+    profanity: "Swearing",
+    violence: "Violence",
+    gore: "Gore",
+    drugs: "Drugs",
+    horror: "Horror"
+  };
+  var KEYWORD_RULES = {
+    sex: [/\bsex\b/, /sex scene/, /sexual/, /erotic/, /lovemaking/, /seduction/, /prostitut/, /brothel/, /orgy/, /affair/],
+    nudity: [/nudity/, /nude/, /topless/, /full frontal/, /strip club/, /stripper/],
+    profanity: [/profanity/, /swearing/, /obscenit/, /f-word/, /foul language/, /strong language/],
+    violence: [/violence/, /violent/, /brutal/, /torture/, /massacre/, /shootout/, /war crime/],
+    gore: [/gore\b/, /gory/, /dismember/, /decapitat/, /mutilat/, /splatter/, /body horror/],
+    drugs: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/],
+    horror: [/horror/, /slasher/, /supernatural/, /haunting/, /demonic/, /zombie/]
+  };
+  function flagsFromKeywords(keywords) {
+    const found = /* @__PURE__ */ new Set();
+    for (const raw of keywords) {
+      const k = raw.toLowerCase();
+      for (const flag of CONTENT_FLAGS) {
+        if (KEYWORD_RULES[flag].some((re) => re.test(k)))
+          found.add(flag);
+      }
+    }
+    return CONTENT_FLAGS.filter((f) => found.has(f));
+  }
+  var CERT_RANK = {
+    G: 0,
+    "TV-Y": 0,
+    "TV-Y7": 0,
+    "TV-G": 0,
+    PG: 1,
+    "TV-PG": 1,
+    "PG-13": 2,
+    "TV-14": 2,
+    R: 3,
+    "TV-MA": 4,
+    "NC-17": 5,
+    X: 5
+  };
+  function certificationRank(cert) {
+    if (!cert)
+      return null;
+    const rank2 = CERT_RANK[cert.toUpperCase().trim()];
+    return rank2 == null ? null : rank2;
+  }
+  function knownCertifications() {
+    return Object.keys(CERT_RANK);
+  }
+  function certificationFromReleaseDates(data, region = "US") {
+    const results = data?.results;
+    if (!Array.isArray(results))
+      return void 0;
+    const row = results.find((r) => r.iso_3166_1 === region);
+    const cert = row?.release_dates?.map((d) => d.certification).find((c) => c && c.trim());
+    return cert?.trim() || void 0;
+  }
+  function certificationFromContentRatings(data, region = "US") {
+    const results = data?.results;
+    if (!Array.isArray(results))
+      return void 0;
+    const row = results.find((r) => r.iso_3166_1 === region);
+    return row?.rating?.trim() || void 0;
+  }
+  var GUIDE_LEVELS = ["None", "Mild", "Moderate", "Severe"];
+  var CATEGORY_RULES = [
+    {
+      category: "Sex and nudity",
+      keywords: [/nudity/, /\bnude\b/, /\bsex\b/, /sex scene/, /sexual/, /erotic/, /topless/, /strip/, /prostitut/, /seduc/, /affair/, /lust/],
+      floor: [0, 0, 0, 1, 2, 3]
+    },
+    {
+      category: "Violence and gore",
+      keywords: [/violence/, /violent/, /gore\b/, /gory/, /brutal/, /torture/, /massacre/, /murder/, /serial killer/, /shootout/, /war crime/, /dismember/, /decapitat/, /mutilat/, /splatter/, /blood/],
+      genres: ["War", "Crime", "Action"],
+      floor: [0, 0, 1, 2, 3, 3]
+    },
+    {
+      category: "Profanity",
+      keywords: [/profan/, /swear/, /\bf-word\b/, /vulgar/, /crude/],
+      floor: [0, 0, 1, 2, 3, 3]
+    },
+    {
+      category: "Alcohol, drugs and smoking",
+      keywords: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/, /alcohol/, /drunk/, /smoking/, /cartel/, /overdose/],
+      floor: [0, 0, 0, 1, 2, 3]
+    },
+    {
+      category: "Frightening and intense scenes",
+      keywords: [/horror/, /slasher/, /haunting/, /demonic/, /zombie/, /supernatural/, /jump scare/, /terror/, /psychological thriller/, /disturbing/],
+      genres: ["Horror", "Thriller"],
+      floor: [0, 0, 1, 2, 2, 3]
+    }
+  ];
+  function estimateGuide(keywords, genres, cert) {
+    const rank2 = certificationRank(cert);
+    const lower2 = keywords.map((k) => k.toLowerCase());
+    const rows2 = [];
+    for (const rule of CATEGORY_RULES) {
+      const hits = lower2.filter((k) => rule.keywords.some((re) => re.test(k)));
+      const genreHits = (rule.genres ?? []).filter((g) => genres.includes(g));
+      let level = rank2 == null ? 0 : rule.floor[Math.min(rank2, rule.floor.length - 1)];
+      const because = [];
+      if (rank2 != null && level > 0 && cert)
+        because.push(`rated ${cert}`);
+      const evidence = hits.length + (genreHits.length ? 0.5 : 0);
+      const fromEvidence = evidence >= 3 ? 3 : evidence >= 1.5 ? 2 : evidence > 0 ? 1 : 0;
+      if (fromEvidence > level)
+        level = fromEvidence;
+      if (hits.length)
+        because.push(`tagged ${hits.slice(0, 3).join(", ")}`);
+      if (genreHits.length)
+        because.push(genreHits.join(", ").toLowerCase());
+      rows2.push({ category: rule.category, level, because });
+    }
+    return rows2;
+  }
+
   // harness/shim.ts
   function applyOptions(el, o = {}) {
     if (o.cls) {
@@ -863,129 +986,6 @@
     const text2 = pipe >= 0 ? inner.slice(pipe + 1) : inner;
     const slash = text2.lastIndexOf("/");
     return (slash >= 0 ? text2.slice(slash + 1) : text2).trim();
-  }
-
-  // src/content.ts
-  var CONTENT_FLAGS = ["sex", "nudity", "profanity", "violence", "gore", "drugs", "horror"];
-  var FLAG_LABELS = {
-    sex: "Sex",
-    nudity: "Nudity",
-    profanity: "Swearing",
-    violence: "Violence",
-    gore: "Gore",
-    drugs: "Drugs",
-    horror: "Horror"
-  };
-  var KEYWORD_RULES = {
-    sex: [/\bsex\b/, /sex scene/, /sexual/, /erotic/, /lovemaking/, /seduction/, /prostitut/, /brothel/, /orgy/, /affair/],
-    nudity: [/nudity/, /nude/, /topless/, /full frontal/, /strip club/, /stripper/],
-    profanity: [/profanity/, /swearing/, /obscenit/, /f-word/, /foul language/, /strong language/],
-    violence: [/violence/, /violent/, /brutal/, /torture/, /massacre/, /shootout/, /war crime/],
-    gore: [/gore\b/, /gory/, /dismember/, /decapitat/, /mutilat/, /splatter/, /body horror/],
-    drugs: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/],
-    horror: [/horror/, /slasher/, /supernatural/, /haunting/, /demonic/, /zombie/]
-  };
-  function flagsFromKeywords(keywords) {
-    const found = /* @__PURE__ */ new Set();
-    for (const raw of keywords) {
-      const k = raw.toLowerCase();
-      for (const flag of CONTENT_FLAGS) {
-        if (KEYWORD_RULES[flag].some((re) => re.test(k)))
-          found.add(flag);
-      }
-    }
-    return CONTENT_FLAGS.filter((f) => found.has(f));
-  }
-  var CERT_RANK = {
-    G: 0,
-    "TV-Y": 0,
-    "TV-Y7": 0,
-    "TV-G": 0,
-    PG: 1,
-    "TV-PG": 1,
-    "PG-13": 2,
-    "TV-14": 2,
-    R: 3,
-    "TV-MA": 4,
-    "NC-17": 5,
-    X: 5
-  };
-  function certificationRank(cert) {
-    if (!cert)
-      return null;
-    const rank2 = CERT_RANK[cert.toUpperCase().trim()];
-    return rank2 == null ? null : rank2;
-  }
-  function knownCertifications() {
-    return Object.keys(CERT_RANK);
-  }
-  function certificationFromReleaseDates(data, region = "US") {
-    const results = data?.results;
-    if (!Array.isArray(results))
-      return void 0;
-    const row = results.find((r) => r.iso_3166_1 === region);
-    const cert = row?.release_dates?.map((d) => d.certification).find((c) => c && c.trim());
-    return cert?.trim() || void 0;
-  }
-  function certificationFromContentRatings(data, region = "US") {
-    const results = data?.results;
-    if (!Array.isArray(results))
-      return void 0;
-    const row = results.find((r) => r.iso_3166_1 === region);
-    return row?.rating?.trim() || void 0;
-  }
-  var GUIDE_LEVELS = ["None", "Mild", "Moderate", "Severe"];
-  var CATEGORY_RULES = [
-    {
-      category: "Sex and nudity",
-      keywords: [/nudity/, /\bnude\b/, /\bsex\b/, /sex scene/, /sexual/, /erotic/, /topless/, /strip/, /prostitut/, /seduc/, /affair/, /lust/],
-      floor: [0, 0, 0, 1, 2, 3]
-    },
-    {
-      category: "Violence and gore",
-      keywords: [/violence/, /violent/, /gore\b/, /gory/, /brutal/, /torture/, /massacre/, /murder/, /serial killer/, /shootout/, /war crime/, /dismember/, /decapitat/, /mutilat/, /splatter/, /blood/],
-      genres: ["War", "Crime", "Action"],
-      floor: [0, 0, 1, 2, 3, 3]
-    },
-    {
-      category: "Profanity",
-      keywords: [/profan/, /swear/, /\bf-word\b/, /vulgar/, /crude/],
-      floor: [0, 0, 1, 2, 3, 3]
-    },
-    {
-      category: "Alcohol, drugs and smoking",
-      keywords: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/, /alcohol/, /drunk/, /smoking/, /cartel/, /overdose/],
-      floor: [0, 0, 0, 1, 2, 3]
-    },
-    {
-      category: "Frightening and intense scenes",
-      keywords: [/horror/, /slasher/, /haunting/, /demonic/, /zombie/, /supernatural/, /jump scare/, /terror/, /psychological thriller/, /disturbing/],
-      genres: ["Horror", "Thriller"],
-      floor: [0, 0, 1, 2, 2, 3]
-    }
-  ];
-  function estimateGuide(keywords, genres, cert) {
-    const rank2 = certificationRank(cert);
-    const lower2 = keywords.map((k) => k.toLowerCase());
-    const rows2 = [];
-    for (const rule of CATEGORY_RULES) {
-      const hits = lower2.filter((k) => rule.keywords.some((re) => re.test(k)));
-      const genreHits = (rule.genres ?? []).filter((g) => genres.includes(g));
-      let level = rank2 == null ? 0 : rule.floor[Math.min(rank2, rule.floor.length - 1)];
-      const because = [];
-      if (rank2 != null && level > 0 && cert)
-        because.push(`rated ${cert}`);
-      const evidence = hits.length + (genreHits.length ? 0.5 : 0);
-      const fromEvidence = evidence >= 3 ? 3 : evidence >= 1.5 ? 2 : evidence > 0 ? 1 : 0;
-      if (fromEvidence > level)
-        level = fromEvidence;
-      if (hits.length)
-        because.push(`tagged ${hits.slice(0, 3).join(", ")}`);
-      if (genreHits.length)
-        because.push(genreHits.join(", ").toLowerCase());
-      rows2.push({ category: rule.category, level, because });
-    }
-    return rows2;
   }
 
   // src/render/query.ts
@@ -14401,6 +14401,38 @@ ${body}
     mountSheet(root, new ReviewEditor(plugin, LIBRARY[0], null, () => {
     }));
   }
+  function parentsguide(root) {
+    root.addClass("reel-view-body");
+    const el = root.createDiv({ cls: "reel-detail", attr: { style: "padding:16px" } });
+    const rows2 = estimateGuide(["nudity", "sex scene", "violence", "murder", "drug", "horror"], ["Thriller", "Crime"], "R");
+    const box = el.createDiv({ cls: "reel-fl reel-guide" });
+    box.createDiv({ cls: "reel-fl-title", text: "Estimated guide" });
+    for (const g of rows2) {
+      const row = box.createDiv({ cls: `reel-guide-row level-${g.level}` });
+      const head = row.createDiv({ cls: "reel-guide-head" });
+      head.createSpan({ cls: "reel-guide-name", text: g.category });
+      head.createSpan({ cls: "reel-guide-level", text: GUIDE_LEVELS[g.level] });
+      const meter = row.createDiv({ cls: "reel-guide-meter" });
+      for (let i = 1; i <= 3; i++)
+        meter.createSpan({ cls: i <= g.level ? "is-on" : "" });
+      if (g.because.length)
+        row.createDiv({ cls: "reel-guide-because reel-dim", text: g.because.join(" \xB7 ") });
+    }
+    box.createDiv({ cls: "reel-dim reel-fl-note", text: "An estimate from the rating, TMDB keywords and genres." });
+    const rd = el.createDiv({ cls: "reel-fl reel-guide-reader", attr: { style: "margin-top:16px" } });
+    rd.createDiv({ cls: "reel-fl-title", text: "From IMDb" });
+    for (const [t, sev, items] of [["Violence & Gore", "Moderate", ["A character is shot twice in the chest.", "A fight leaves blood on the floor."]], ["Profanity", "Mild", ["A few uses of strong language."]]]) {
+      const sec = rd.createEl("details", { cls: "reel-guide-sec" });
+      if (t.startsWith("Violence"))
+        sec.setAttr("open", "");
+      const sum = sec.createEl("summary");
+      sum.createSpan({ cls: "reel-guide-name", text: t });
+      sum.createSpan({ cls: `reel-guide-pill sev-${sev.toLowerCase()}`, text: sev });
+      const list2 = sec.createEl("ul", { cls: "reel-guide-list" });
+      for (const i of items)
+        list2.createEl("li", { text: i });
+    }
+  }
   function titlepage(root) {
     root.addClass("reel-view-body");
     mountSheet(
@@ -14900,6 +14932,7 @@ ${body}
     reviews,
     reviewsheet,
     titlepage,
+    parentsguide,
     rows,
     rate,
     stats,

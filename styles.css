@@ -20658,3 +20658,159 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 		min-height: 34px;
 	}
 }
+
+/* Parents guide, finished: one surface, quiet rows, meters that read at a glance. */
+.reel-guide,
+.reel-guide-reader {
+	padding: 14px 16px 12px;
+	border-radius: 14px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+}
+.reel-guide .reel-fl-title,
+.reel-guide-reader .reel-fl-title {
+	margin-bottom: 6px;
+}
+.reel-guide-row {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	column-gap: 12px;
+	row-gap: 6px;
+	padding: 11px 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.reel-guide-row:first-of-type {
+	border-top: 0;
+}
+.reel-guide-head {
+	display: contents;
+}
+.reel-guide-name {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	color: var(--text-normal);
+}
+.reel-guide-level {
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	color: var(--text-muted);
+	align-self: center;
+}
+.reel-guide-row.level-1 .reel-guide-level {
+	color: var(--color-green);
+}
+.reel-guide-row.level-2 .reel-guide-level {
+	color: var(--color-yellow);
+}
+.reel-guide-row.level-3 .reel-guide-level {
+	color: var(--color-red);
+}
+.reel-guide-meter {
+	grid-column: 1 / -1;
+	gap: 5px;
+	margin-top: 0;
+}
+.reel-guide-meter span {
+	height: 5px;
+	border-radius: 999px;
+	background: var(--background-modifier-hover);
+	transform-origin: left center;
+}
+.reel-guide-meter span.is-on {
+	animation: reel-fill 130ms ease-out both;
+}
+.reel-guide-because {
+	grid-column: 1 / -1;
+	margin-top: 0;
+	font-size: 12px;
+	line-height: 1.4;
+}
+.reel-guide .reel-fl-note,
+.reel-guide-reader .reel-fl-note {
+	margin: 8px 0 0;
+}
+
+/* IMDb's guide: fold-out categories on the same surface. */
+.reel-guide-reader .reel-btn {
+	width: 100%;
+}
+.reel-guide-sec summary {
+	padding: 0;
+}
+.reel-guide-sec summary::after {
+	content: "";
+	flex: 0 0 auto;
+	width: 7px;
+	height: 7px;
+	margin-left: 4px;
+	border-right: 2px solid var(--text-faint);
+	border-bottom: 2px solid var(--text-faint);
+	transform: rotate(45deg) translateY(-2px);
+	transition: transform 130ms ease-out;
+}
+.reel-guide-sec[open] summary::after {
+	transform: rotate(-135deg) translateY(-2px);
+}
+.reel-guide-sec summary .reel-guide-name {
+	margin-right: auto;
+}
+.reel-guide-pill {
+	font-weight: 600;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+}
+.reel-guide-list {
+	list-style: none;
+	padding: 0 0 4px;
+}
+.reel-guide-list li {
+	position: relative;
+	margin: 0;
+	padding: 8px 0 8px 14px;
+	border-top: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+}
+.reel-guide-list li:first-child {
+	border-top: 0;
+}
+.reel-guide-list li::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 15px;
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--text-faint);
+}
+@media (prefers-reduced-motion: reduce) {
+	.reel-guide-meter span.is-on,
+	.reel-guide-sec summary::after {
+		animation: none;
+		transition: none;
+	}
+}
+.reel-guide-meter span.is-on {
+	animation: none;
+}
+.reel-guide-sec {
+	margin: 0;
+	padding: 0;
+	border-radius: 0;
+	border-width: 1px 0 0;
+	background: none;
+}
+.reel-guide-sec[open] {
+	background: none;
+}
+.reel-guide-row.level-1 .reel-guide-meter span.is-on { background: var(--color-green, #3fa66a); }
+.reel-guide-row.level-2 .reel-guide-meter span.is-on { background: var(--color-yellow, #d9a32b); }
+.reel-guide-row.level-3 .reel-guide-meter span.is-on { background: var(--color-red, #d9534f); }
+.reel-guide-row.level-2 .reel-guide-level { color: var(--color-yellow, #d9a32b); }
+.reel-guide-row.level-3 .reel-guide-level { color: var(--color-red, #d9534f); }
+.reel-guide-row.level-1 .reel-guide-level,
+.reel-guide-row.level-2 .reel-guide-level,
+.reel-guide-row.level-3 .reel-guide-level {
+	color: var(--text-normal);
+}

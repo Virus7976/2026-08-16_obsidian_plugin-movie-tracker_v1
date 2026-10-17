@@ -1,3 +1,4 @@
+import { estimateGuide, GUIDE_LEVELS } from "../src/content";
 /**
  * The harness: real renderers, real stylesheet, real browser, phone width.
  *
@@ -1502,6 +1503,35 @@ function reviewsheet(root: HTMLElement): void {
 	mountSheet(root, new ReviewEditor(plugin, LIBRARY[0], null, () => {}) as never);
 }
 
+function parentsguide(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const el = root.createDiv({ cls: "reel-detail", attr: { style: "padding:16px" } });
+	const rows = estimateGuide(["nudity", "sex scene", "violence", "murder", "drug", "horror"], ["Thriller", "Crime"], "R");
+	const box = el.createDiv({ cls: "reel-fl reel-guide" });
+	box.createDiv({ cls: "reel-fl-title", text: "Estimated guide" });
+	for (const g of rows) {
+		const row = box.createDiv({ cls: `reel-guide-row level-${g.level}` });
+		const head = row.createDiv({ cls: "reel-guide-head" });
+		head.createSpan({ cls: "reel-guide-name", text: g.category });
+		head.createSpan({ cls: "reel-guide-level", text: GUIDE_LEVELS[g.level] });
+		const meter = row.createDiv({ cls: "reel-guide-meter" });
+		for (let i = 1; i <= 3; i++) meter.createSpan({ cls: i <= g.level ? "is-on" : "" });
+		if (g.because.length) row.createDiv({ cls: "reel-guide-because reel-dim", text: g.because.join(" · ") });
+	}
+	box.createDiv({ cls: "reel-dim reel-fl-note", text: "An estimate from the rating, TMDB keywords and genres." });
+	const rd = el.createDiv({ cls: "reel-fl reel-guide-reader", attr: { style: "margin-top:16px" } });
+	rd.createDiv({ cls: "reel-fl-title", text: "From IMDb" });
+	for (const [t, sev, items] of [["Violence & Gore", "Moderate", ["A character is shot twice in the chest.", "A fight leaves blood on the floor."]], ["Profanity", "Mild", ["A few uses of strong language."]]] as const) {
+		const sec = rd.createEl("details", { cls: "reel-guide-sec" });
+		if (t.startsWith("Violence")) sec.setAttr("open", "");
+		const sum = sec.createEl("summary");
+		sum.createSpan({ cls: "reel-guide-name", text: t });
+		sum.createSpan({ cls: `reel-guide-pill sev-${sev.toLowerCase()}`, text: sev });
+		const list = sec.createEl("ul", { cls: "reel-guide-list" });
+		for (const i of items) list.createEl("li", { text: i });
+	}
+}
+
 function titlepage(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	mountSheet(
@@ -2352,6 +2382,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	reviews,
 	reviewsheet,
 	titlepage,
+	parentsguide,
 	rows,
 	rate,
 	stats,
