@@ -823,8 +823,8 @@
         () => this.plugin.notes.toggleRewatch(this.file)
       );
       const row = contentEl.createDiv({ cls: "reel-log-actions" });
-      const open = row.createEl("button", { cls: "reel-btn mod-cta", text: "Open note" });
-      open.addEventListener("click", async () => {
+      const open2 = row.createEl("button", { cls: "reel-btn mod-cta", text: "Open note" });
+      open2.addEventListener("click", async () => {
         this.close();
         await this.plugin.app.workspace.getLeaf(false).openFile(this.file);
       });
@@ -1186,39 +1186,108 @@
         )
       );
     }
+    menu.addSeparator();
     menu.addItem(
       (i) => i.setTitle("Lists\u2026").setIcon("list").onClick(() => new ListPicker(plugin2.app, plugin2, entry, file).open())
     );
-    menu.addSeparator();
-    menu.addItem(
-      (i) => i.setTitle("Open note").setIcon("file-text").onClick(() => void plugin2.app.workspace.getLeaf(false).openFile(file))
-    );
-    menu.addItem(
-      (i) => i.setTitle("More\u2026").setIcon("more-horizontal").onClick(() => showMore(plugin2, entry, x, y))
-    );
+    door(menu, "Change status", "circle-dot", x, y, entry.title, (m) => statusItems(m, plugin2, entry, file, run2));
+    door(menu, "Find more like this", "sparkles", x, y, entry.title, (m) => findMoreItems(m, plugin2, entry));
+    door(menu, "Look it up", "external-link", x, y, entry.title, (m) => lookUpItems(m, entry));
+    door(menu, "Where to watch", "tv", x, y, entry.title, (m) => whereItems(m, plugin2, entry));
+    door(menu, "Note", "file-text", x, y, entry.title, (m) => noteItems(m, plugin2, entry, file));
     menu.showAtPosition({ x, y });
   }
-  function showMore(plugin2, entry, x, y) {
-    const menu = new Menu();
-    const isTv = entry.type === "tv";
-    const open = (url) => window.open(url, "_blank", "noopener");
-    const link = (title, icon, url) => {
+  function door(menu, title, icon, x, y, heading, fill) {
+    menu.addItem(
+      (i) => i.setTitle(`${title}\u2026`).setIcon(icon).onClick(() => {
+        const m = new Menu();
+        m.addItem((h) => h.setTitle(heading).setDisabled(true));
+        m.addSeparator();
+        fill(m);
+        m.showAtPosition({ x, y });
+      })
+    );
+  }
+  var open = (url) => void window.open(url, "_blank", "noopener");
+  function statusItems(m, plugin2, entry, file, run2) {
+    const options = entry.type === "tv" ? [["watchlist", "Watchlist"], ["watching", "Watching"], ["completed", "Completed"], ["paused", "Paused"], ["dropped", "Dropped"]] : [["watchlist", "Watchlist"], ["watched", "Watched"], ["dropped", "Dropped"]];
+    for (const [value, label] of options) {
+      m.addItem(
+        (i) => i.setTitle(label).setChecked(entry.status === value).onClick(() => {
+          if (entry.status === value)
+            return;
+          run2(plugin2.notes.setStatus(file, value).then(() => plugin2.undo.offer(`${entry.title}: ${label.toLowerCase()}`)));
+        })
+      );
+    }
+  }
+  function findMoreItems(m, plugin2, entry) {
+    const search = (query) => plugin2.openOmni(query, "all");
+    const row = (label, icon, query) => {
+      if (!query)
+        return;
+      m.addItem((i) => i.setTitle(label).setIcon(icon).onClick(() => search(query)));
+    };
+    row(`Directed by ${entry.director[0] ?? ""}`, "clapperboard", entry.director[0]);
+    row(`Created by ${entry.creators[0] ?? ""}`, "clapperboard", entry.creators[0]);
+    row(`With ${entry.cast[0] ?? ""}`, "user", entry.cast[0]);
+    if (entry.cast[1])
+      row(`With ${entry.cast[1]}`, "user", entry.cast[1]);
+    for (const g of entry.genres.slice(0, 3))
+      row(g, "tag", g);
+    row(`${entry.collection ?? ""}`, "layers", entry.collection);
+    m.addSeparator();
+    m.addItem(
+      (i) => i.setTitle("Similar titles on Discover").setIcon("compass").onClick(() => plugin2.openOmni(entry.title, "new"))
+    );
+  }
+  function lookUpItems(m, entry) {
+    const link = (title, url) => {
       if (!url)
         return;
-      menu.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => open(url)));
+      m.addItem((i) => i.setTitle(title).setIcon("external-link").onClick(() => open(url)));
     };
+    const isTv = entry.type === "tv";
     const imdb = imdbUrl(entry.imdbId);
-    link("IMDb", "external-link", imdb);
-    link("IMDb parents guide", "shield", imdb ? `${imdb}parentalguide` : void 0);
-    link("TMDB", "external-link", tmdbUrl(entry.tmdbId, entry.type));
-    menu.addSeparator();
-    link("Trakt", "external-link", `https://trakt.tv/search/tmdb/${entry.tmdbId}?id_type=${isTv ? "show" : "movie"}`);
+    link("IMDb", imdb);
+    link("IMDb parents guide", imdb ? `${imdb}parentalguide` : void 0);
+    link("TMDB", tmdbUrl(entry.tmdbId, entry.type));
+    link("Trakt", `https://trakt.tv/search/tmdb/${entry.tmdbId}?id_type=${isTv ? "show" : "movie"}`);
     if (!isTv)
-      link("Letterboxd", "external-link", `https://letterboxd.com/tmdb/${entry.tmdbId}`);
-    const q = encodeURIComponent(entry.title);
-    link("Where to watch", "tv", `https://www.justwatch.com/${(plugin2.settings.region || "us").toLowerCase()}/search?q=${q}`);
-    link("Search the web", "search", `https://www.google.com/search?q=${q}${entry.year ? `+${entry.year}` : ""}`);
-    menu.showAtPosition({ x, y });
+      link("Letterboxd", `https://letterboxd.com/tmdb/${entry.tmdbId}`);
+    const q = encodeURIComponent(`${entry.title}${entry.year ? ` ${entry.year}` : ""}`);
+    link("Search the web", `https://www.google.com/search?q=${q}`);
+  }
+  function whereItems(m, plugin2, entry) {
+    const region = (plugin2.settings.region || "us").toLowerCase();
+    if (entry.providers.length) {
+      for (const name of entry.providers.slice(0, 6)) {
+        m.addItem(
+          (i) => i.setTitle(name).setIcon("play-circle").onClick(() => open(`https://www.justwatch.com/${region}/search?q=${encodeURIComponent(entry.title)}`))
+        );
+      }
+      m.addSeparator();
+    }
+    m.addItem(
+      (i) => i.setTitle("Open JustWatch").setIcon("external-link").onClick(() => open(`https://www.justwatch.com/${region}/search?q=${encodeURIComponent(entry.title)}`))
+    );
+  }
+  function noteItems(m, plugin2, entry, file) {
+    m.addItem(
+      (i) => i.setTitle("Open note").setIcon("file-text").onClick(() => void plugin2.app.workspace.getLeaf(false).openFile(file))
+    );
+    m.addItem(
+      (i) => i.setTitle("Open in new tab").setIcon("file-plus").onClick(() => void plugin2.app.workspace.getLeaf("tab").openFile(file))
+    );
+    m.addSeparator();
+    m.addItem(
+      (i) => i.setTitle("Copy link").setIcon("link").onClick(() => void navigator.clipboard.writeText(`[[${file.basename}]]`).then(() => new Notice("Link copied")))
+    );
+    m.addItem(
+      (i) => i.setTitle("Copy title and year").setIcon("copy").onClick(
+        () => void navigator.clipboard.writeText(`${entry.title}${entry.year ? ` (${entry.year})` : ""}`).then(() => new Notice("Copied"))
+      )
+    );
   }
   function describe(el, entry) {
     const bits = [entry.title];
@@ -1591,13 +1660,13 @@
         cell.setAttr("role", "button");
         cell.setAttr("tabindex", "0");
         cell.setAttr("aria-label", e.title);
-        const open = () => void plugin2.openDetail(e);
-        cell.addEventListener("click", open);
+        const open2 = () => void plugin2.openDetail(e);
+        cell.addEventListener("click", open2);
         cell.addEventListener("keydown", (ev) => {
           if (ev.key !== "Enter" && ev.key !== " ")
             return;
           ev.preventDefault();
-          open();
+          open2();
         });
       }
       if (all2.length > CAP) {
@@ -1787,12 +1856,12 @@
         row.setAttr("role", "button");
         row.setAttr("tabindex", "0");
         row.setAttr("aria-label", `${f.label}: ${entry.title}. Open it.`);
-        const open = () => void plugin2.openDetail(entry);
-        row.addEventListener("click", open);
+        const open2 = () => void plugin2.openDetail(entry);
+        row.addEventListener("click", open2);
         row.addEventListener("keydown", (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            open();
+            open2();
           }
         });
       }
@@ -2036,9 +2105,9 @@
     }
     toggle2.createDiv({ cls: "reel-fold-count", text: `${data.length}` });
     const body = box.createDiv({ cls: "reel-chart-body" });
-    const setOpen = (open) => {
-      box.toggleClass("is-open", open);
-      toggle2.setAttr("aria-expanded", String(open));
+    const setOpen = (open2) => {
+      box.toggleClass("is-open", open2);
+      toggle2.setAttr("aria-expanded", String(open2));
     };
     const view = el.closest(".reel-view");
     const roomy = !!view && view.classList.contains("is-w700") && !view.classList.contains("is-phone");
@@ -2087,12 +2156,12 @@
         const matches = plugin2.visible(plugin2.library.all()).filter(
           (e) => [e.title, ...e.genres ?? [], ...e.director ?? [], ...e.cast ?? [], ...e.creators ?? []].filter(Boolean).some((v) => String(v).toLowerCase().includes(term))
         );
-        const open = d.go ?? (matches.length ? () => new TitlesSheet(plugin2, d.label, matches, `${title} \u2014 ${d.n}`).open() : () => void plugin2.openViewWithSearch(d.search ?? d.label, "stats"));
-        row.addEventListener("click", open);
+        const open2 = d.go ?? (matches.length ? () => new TitlesSheet(plugin2, d.label, matches, `${title} \u2014 ${d.n}`).open() : () => void plugin2.openViewWithSearch(d.search ?? d.label, "stats"));
+        row.addEventListener("click", open2);
         row.addEventListener("keydown", (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            open();
+            open2();
           }
         });
       }
@@ -2245,13 +2314,13 @@
         cell.setAttr("role", "button");
         cell.setAttr("tabindex", "0");
         cell.setAttr("aria-label", `${prettyDate(key)}, ${hits.length} watched`);
-        const open = show(prettyDate(key), hits, `${hits.length} watched that day`);
-        cell.addEventListener("click", open);
+        const open2 = show(prettyDate(key), hits, `${hits.length} watched that day`);
+        cell.addEventListener("click", open2);
         cell.addEventListener("keydown", (ev) => {
           if (ev.key !== "Enter" && ev.key !== " ")
             return;
           ev.preventDefault();
-          open();
+          open2();
         });
       }
     }
@@ -4221,15 +4290,15 @@
         cell.setAttr("role", "button");
         cell.setAttr("tabindex", "0");
         cell.setAttr("aria-label", `${name} \u2014 open their filmography`);
-        const open = () => {
+        const open2 = () => {
           new PersonSheet(this.plugin, p.id, name).open();
         };
-        cell.addEventListener("click", open);
+        cell.addEventListener("click", open2);
         cell.addEventListener("keydown", (ev) => {
           if (ev.key !== "Enter" && ev.key !== " ")
             return;
           ev.preventDefault();
-          open();
+          open2();
         });
       }
     }
@@ -4949,12 +5018,12 @@
         if (bits.length)
           card.createDiv({ cls: "reel-person-credit-sub", text: bits.join(" \xB7 ") });
         attachHold(card, () => new RoleSheet(this.plugin, person, c, mine).open());
-        const open = () => this.toggleRole(card, c, mine, role);
-        card.addEventListener("click", open);
+        const open2 = () => this.toggleRole(card, c, mine, role);
+        card.addEventListener("click", open2);
         card.addEventListener("keydown", (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            open();
+            open2();
           }
         });
       }
@@ -6154,14 +6223,14 @@ ${body}
       if (!can) {
         if (!this.locked())
           return;
-        const open = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
-        open.addEventListener("click", async () => {
-          open.disabled = true;
-          open.setText("Unlocking\u2026");
+        const open2 = wrap.createEl("button", { cls: "reel-btn reel-setup-check-btn", text: "Unlock" });
+        open2.addEventListener("click", async () => {
+          open2.disabled = true;
+          open2.setText("Unlocking\u2026");
           const opened = await this.plugin.credentials.unlock();
           if (!opened) {
-            open.disabled = false;
-            open.setText("Unlock");
+            open2.disabled = false;
+            open2.setText("Unlock");
             return;
           }
           this.draw();
@@ -6227,8 +6296,8 @@ ${body}
       const total = this.spec.steps.length;
       const allDone = total > 0 && this.spec.steps.every((_, i) => this.ticked.has(i));
       if (!allDone) {
-        const open = root.createEl("ol", { cls: "reel-setup-steps" });
-        this.spec.steps.forEach((step, i) => this.renderStep(open, step, i));
+        const open2 = root.createEl("ol", { cls: "reel-setup-steps" });
+        this.spec.steps.forEach((step, i) => this.renderStep(open2, step, i));
         return;
       }
       const toggle2 = root.createEl("button", { cls: "reel-btn reel-setup-steps-toggle" });
@@ -7140,12 +7209,12 @@ ${body}
         const part = p.character ?? p.roles?.[0]?.character ?? "";
         if (part)
           cell.createDiv({ cls: "reel-caststrip-role", text: part });
-        const open = () => this.openPerson(p);
-        cell.addEventListener("click", open);
+        const open2 = () => this.openPerson(p);
+        cell.addEventListener("click", open2);
         cell.addEventListener("keydown", (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            open();
+            open2();
           }
         });
       }
@@ -7196,12 +7265,12 @@ ${body}
         const sub = asCast ? p.character ?? p.roles?.[0]?.character ?? "" : p.job ?? "";
         if (sub)
           body.createDiv({ cls: "reel-person-role", text: sub });
-        const open = () => this.openPerson(p);
-        row.addEventListener("click", open);
+        const open2 = () => this.openPerson(p);
+        row.addEventListener("click", open2);
         row.addEventListener("keydown", (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            open();
+            open2();
           }
         });
       }
@@ -7492,18 +7561,18 @@ ${body}
           title: r.title ?? r.name ?? ""
         });
         card.createDiv({ cls: "reel-related-title", text: r.title ?? r.name ?? "Untitled" });
-        const open = () => {
+        const open2 = () => {
           const mine = this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film");
           if (mine)
             void this.plugin.openDetail(mine);
           else
             this.plugin.openSearch({ query: r.title ?? r.name ?? "" });
         };
-        card.addEventListener("click", open);
+        card.addEventListener("click", open2);
         card.addEventListener("keydown", (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            open();
+            open2();
           }
         });
       }
@@ -8768,10 +8837,10 @@ ${body}
           attr: { type: "button", "aria-expanded": "false" }
         });
         more?.addEventListener("click", () => {
-          const open = more.getAttr("aria-expanded") !== "true";
-          hidden.forEach((c) => c.toggleClass("is-folded", !open));
-          more.setAttr("aria-expanded", String(open));
-          more.setText(open ? "Show less" : `Show ${hidden.length} more`);
+          const open2 = more.getAttr("aria-expanded") !== "true";
+          hidden.forEach((c) => c.toggleClass("is-folded", !open2));
+          more.setAttr("aria-expanded", String(open2));
+          more.setText(open2 ? "Show less" : `Show ${hidden.length} more`);
         });
       };
       const withCount = (b, label, n2) => {
@@ -9311,12 +9380,12 @@ ${body}
     }
     renderSection(root, spec) {
       const card = root.createDiv({ cls: `reel-settings-section${spec.cls ? ` ${spec.cls}` : ""}` });
-      const open = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
-      card.toggleClass("is-open", open);
+      const open2 = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
+      card.toggleClass("is-open", open2);
       if (spec.pinned)
         card.addClass("is-pinned");
       const head = card.createEl("button", { cls: "reel-section-head" });
-      head.setAttr("aria-expanded", String(open));
+      head.setAttr("aria-expanded", String(open2));
       const label = head.createDiv({ cls: "reel-section-label" });
       label.createSpan({ cls: "reel-section-title", text: spec.title });
       label.createSpan({ cls: "reel-section-summary", text: spec.summary() });
@@ -9376,8 +9445,8 @@ ${body}
           rows2.forEach((r) => r.removeClass("is-filtered-out"));
           prose.forEach((p) => p.removeClass("is-filtered-out"));
           if (head) {
-            const open = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
-            head.setAttr("aria-expanded", String(open));
+            const open2 = spec.pinned || this.plugin.settings.settingsOpen.includes(spec.id);
+            head.setAttr("aria-expanded", String(open2));
             if (!spec.pinned)
               head.removeAttribute("disabled");
           }
@@ -11053,15 +11122,15 @@ ${body}
         facts.createSpan({ text: entry.genres.slice(0, 2).join(", ") });
       if (entry.rating != null)
         renderStarsStatic(facts, entry.rating);
-      const open = () => {
+      const open2 = () => {
         this.close();
         this.onOpenEntry(entry);
       };
-      row.addEventListener("click", open);
+      row.addEventListener("click", open2);
       row.addEventListener("keydown", (ev) => {
         if (ev.key === "Enter" || ev.key === " ") {
           ev.preventDefault();
-          open();
+          open2();
         }
       });
     }
@@ -12265,11 +12334,11 @@ ${body}
   }
   function filterBar(into, active, sort = true) {
     const bar = into.createDiv({ cls: "reel-chips reel-filterbar" });
-    const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
-    open.createSpan({ cls: "reel-filter-btn-icon", text: "\u2699" });
-    open.createSpan({ text: "Filters" });
+    const open2 = bar.createEl("button", { cls: "reel-chip reel-filter-btn" });
+    open2.createSpan({ cls: "reel-filter-btn-icon", text: "\u2699" });
+    open2.createSpan({ text: "Filters" });
     if (active.length)
-      open.createSpan({ cls: "reel-filter-count", text: String(active.length) });
+      open2.createSpan({ cls: "reel-filter-count", text: String(active.length) });
     if (sort) {
       const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg" });
       ["\u25A6", "\u25AA", "\u2630"].forEach((g, i) => seg.createEl("button", { cls: `reel-seg-btn${i === 0 ? " is-active" : ""}`, text: g }));
