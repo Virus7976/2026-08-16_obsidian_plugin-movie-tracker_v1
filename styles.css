@@ -18742,7 +18742,7 @@ select.reel-select {
 
 .reel-view:not(.is-w700) .reel-dcard-actions {
 	gap: 0;
-	margin: 0 -6px -6px;
+	margin: auto -6px -6px;
 }
 
 .reel-view:not(.is-w700) .reel-dcard {
@@ -18757,7 +18757,8 @@ select.reel-select {
 /* ==================================================================== */
 /* Prompt sheets (unlock, confirm): a short column, no dead gap           */
 /* ==================================================================== */
-.reel-modal.reel-sheet .reel-prompt {
+.reel-modal.reel-sheet .reel-prompt,
+.reel-modal.reel-sheet.reel-prompt {
 	display: flex;
 	flex-direction: column;
 	gap: var(--reel-space-2);
@@ -18822,4 +18823,62 @@ select.reel-select {
 	letter-spacing: 0.05em;
 	text-transform: uppercase;
 	box-shadow: none;
+}
+
+.reel-modal.reel-sheet .reel-prompt .reel-input,
+.reel-modal.reel-sheet.reel-prompt .reel-input,
+.reel-modal.reel-sheet.reel-prompt > .reel-input {
+	margin: 0;
+}
+
+.reel-modal.reel-sheet .reel-prompt .reel-prompt-actions .reel-btn,
+.reel-modal.reel-sheet.reel-prompt .reel-prompt-actions .reel-btn {
+	justify-content: center;
+	text-align: center;
+}
+
+.reel-modal.reel-sheet.reel-prompt .reel-prompt-actions {
+	position: static;
+	margin: var(--reel-space-2) 0 0;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+/* Discover lines up with the Library: the same left edge, and cards in a
+   shelf share a height so their buttons share a line. */
+.reel-view:not(.is-w700) .reel-discover {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.reel-view:not(.is-w700) .reel-drow-strip .reel-dcard {
+	display: flex;
+	flex-direction: column;
+}
+
+.reel-view .reel-drow-strip {
+	align-items: stretch;
+}
+
+.reel-view .reel-drow-strip > .reel-dcard {
+	align-self: stretch;
+	height: auto;
+}
+
+.reel-view .reel-drow-strip .reel-dcard-body {
+	flex: 1 1 auto;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-actions {
+	width: calc(100% + 12px);
+	box-sizing: border-box;
+}
+
+.reel-view:not(.is-w700) .reel-dcard-btn {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: 0;
 }
