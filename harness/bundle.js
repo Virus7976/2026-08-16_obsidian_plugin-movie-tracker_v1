@@ -3080,12 +3080,12 @@ ${body}
         value: this.rating,
         onChange: (v) => {
           this.rating = v;
-          readout.setText(v != null ? `${v}` : "\u2014");
+          readout.setText(v != null ? `${v}` : "");
         }
       });
       const readout = ratingValue.createSpan({
         cls: "reel-rating-readout",
-        text: this.rating != null ? `${this.rating}` : "\u2014"
+        text: this.rating != null ? `${this.rating}` : ""
       });
       const likeRow = detailsEl.createDiv({ cls: "reel-field reel-field-inline" });
       likeRow.createDiv({ cls: "reel-field-label", text: "Liked" });

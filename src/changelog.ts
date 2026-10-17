@@ -52,6 +52,15 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.58",
+		date: "2026-10-17",
+		headline: "A cleaner Log sheet.",
+		changes: [
+			{ kind: "fixed", text: "The date field on the Log sheet no longer draws its calendar icon on top of the year. Tap anywhere in the field to pick a date." },
+			{ kind: "better", text: "The stray dash beside the stars is gone until you rate something." },
+		],
+	},
+	{
 		version: "0.9.57",
 		date: "2026-10-17",
 		headline: "One title page everywhere, with the Parents guide inside it.",

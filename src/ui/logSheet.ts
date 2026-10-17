@@ -134,12 +134,12 @@ export class LogSheet extends Modal {
 			value: this.rating,
 			onChange: (v) => {
 				this.rating = v;
-				readout.setText(v != null ? `${v}` : "—");
+				readout.setText(v != null ? `${v}` : "");
 			},
 		});
 		const readout = ratingValue.createSpan({
 			cls: "reel-rating-readout",
-			text: this.rating != null ? `${this.rating}` : "—",
+			text: this.rating != null ? `${this.rating}` : "",
 		});
 
 		/* ---- liked --------------------------------------------------- */

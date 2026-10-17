@@ -20846,3 +20846,33 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 		min-height: 30px;
 	}
 }
+
+/* Log sheet: a date field that does not draw its glyph over the year, and a
+   mode toggle in the same rounded language as the rest of the sheet. */
+.reel-log .reel-input[type="date"] {
+	position: relative;
+	width: 100%;
+	max-width: none;
+	min-height: 48px;
+	padding: 0 var(--reel-space-3, 12px);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
+	font-size: var(--font-ui-medium);
+}
+.reel-log .reel-input[type="date"]::-webkit-calendar-picker-indicator {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+.reel-log .reel-rating-readout:empty {
+	display: none;
+}
+@media (pointer: fine) and (min-width: 700px) {
+	.reel-log .reel-input[type="date"] {
+		min-height: 34px;
+	}
+}
