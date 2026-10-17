@@ -3200,6 +3200,128 @@
     }
   };
 
+  // src/ui/discoverFilterSheet.ts
+  var DiscoverFilterSheet = class extends Modal {
+    constructor(app2, filters, hooks) {
+      super(app2);
+      this.filters = filters;
+      this.hooks = hooks;
+    }
+    onOpen() {
+      const { contentEl, modalEl } = this;
+      modalEl.addClass("reel-modal");
+      modalEl.addClass("reel-filter-sheet");
+      if (Platform.isPhone)
+        modalEl.addClass("reel-sheet");
+      contentEl.addClass("reel-filter-content");
+      const head = contentEl.createDiv({ cls: "reel-filter-head" });
+      head.createEl("h3", { cls: "reel-log-title", text: "Filters" });
+      this.body = contentEl.createDiv({ cls: "reel-filter-body" });
+      this.redraw();
+      const foot = contentEl.createDiv({ cls: "reel-log-actions reel-filter-actions" });
+      const clear = foot.createEl("button", { cls: "reel-btn reel-filter-clear", text: "Clear all", attr: { type: "button" } });
+      clear.addEventListener("click", () => {
+        this.hooks.clearAll();
+        this.redraw();
+      });
+      const done = foot.createEl("button", { cls: "reel-btn mod-cta reel-filter-done", attr: { type: "button" } });
+      done.createSpan({ text: "Show results" });
+      done.addEventListener("click", () => this.close());
+    }
+    /** Called when the genre list arrives after the sheet is already open. */
+    refresh() {
+      if (this.body?.isConnected)
+        this.redraw();
+    }
+    redraw() {
+      const el = this.body;
+      const keep = el.scrollTop;
+      el.empty();
+      const section = (label, asOptions = false) => {
+        const box = el.createDiv({ cls: "reel-filter-section" });
+        box.createDiv({ cls: "reel-filter-label", text: label });
+        return box.createDiv({ cls: asOptions ? "reel-opts" : "reel-chips reel-filter-chips" });
+      };
+      const pick = (into, label, active, onClick) => {
+        const b = into.createEl("button", { cls: into.hasClass("reel-opts") ? "reel-opt" : "reel-chip", attr: { type: "button" } });
+        if (b.hasClass("reel-opt")) {
+          b.createSpan({ cls: "reel-opt-mark" });
+          b.createSpan({ cls: "reel-opt-label", text: label });
+        } else
+          b.setText(label);
+        setSelected(b, active);
+        b.addEventListener("click", () => {
+          onClick();
+          this.hooks.onChange();
+          this.redraw();
+        });
+        return b;
+      };
+      const kinds = section("Type", true);
+      pick(kinds, "Films", this.filters.type === "movie", () => this.hooks.setType("movie"));
+      pick(kinds, "Series", this.filters.type === "tv", () => this.hooks.setType("tv"));
+      const like = section("Similar to");
+      const seed = this.hooks.seedTitle();
+      if (seed)
+        pick(like, `${seed}  \u2715`, true, () => this.hooks.clearSeed());
+      else {
+        const b = like.createEl("button", { cls: "reel-chip", text: "Pick a title\u2026", attr: { type: "button" } });
+        b.addEventListener("click", () => {
+          this.hooks.pickSeed(() => {
+            this.hooks.onChange();
+            this.redraw();
+          });
+        });
+      }
+      const genres = this.hooks.genres();
+      const gbox = section("Genre");
+      if (!genres.length)
+        gbox.createSpan({ cls: "reel-dim", text: "Loading\u2026" });
+      for (const g of genres) {
+        pick(gbox, g.name, this.filters.genreId === g.id, () => {
+          const on = this.filters.genreId === g.id;
+          this.filters.genreId = on ? null : g.id;
+          this.filters.genreName = on ? null : g.name;
+        });
+      }
+      this.fold(gbox, 8);
+      const decades = section("Decade", true);
+      const nowDecade = Math.floor((/* @__PURE__ */ new Date()).getFullYear() / 10) * 10;
+      for (let d = nowDecade; d >= 1950; d -= 10) {
+        pick(decades, `${d}s`, this.filters.decade === d, () => {
+          this.filters.decade = this.filters.decade === d ? null : d;
+        });
+      }
+      this.fold(decades, 6);
+      const score2 = section("Minimum score");
+      for (const r of [6, 7, 8]) {
+        pick(score2, `${r}+`, this.filters.minRating === r, () => {
+          this.filters.minRating = this.filters.minRating === r ? null : r;
+        });
+      }
+      el.scrollTop = keep;
+    }
+    /** Long groups show their first few, the rest behind one button. */
+    fold(group, limit) {
+      const all2 = Array.from(group.children);
+      const hidden = all2.slice(limit).filter((c) => !c.hasClass("is-active"));
+      if (!hidden.length)
+        return;
+      hidden.forEach((c) => c.addClass("is-folded"));
+      const more = group.parentElement?.createEl("button", {
+        cls: "reel-filter-more",
+        text: `Show ${hidden.length} more`,
+        attr: { type: "button", "aria-expanded": "false" }
+      });
+      more?.addEventListener("click", () => {
+        const open2 = more.getAttr("aria-expanded") !== "true";
+        hidden.forEach((c) => c.toggleClass("is-folded", !open2));
+        more.setAttr("aria-expanded", String(open2));
+        more.setText(open2 ? "Show less" : `Show ${hidden.length} more`);
+      });
+    }
+  };
+
   // src/util/failure.ts
   function diagnose(status, online) {
     if (!online) {
@@ -3385,6 +3507,7 @@
       this.results = null;
       this.genres = [];
       this.filters = { ...EMPTY };
+      this.filterSheet = null;
       this.loading = false;
       this.error = null;
       this.handled = /* @__PURE__ */ new Set();
@@ -3793,22 +3916,13 @@
     /* ------------------------------------------------------------------ */
     paintFilters(container) {
       const wrap = container.createDiv({ cls: "reel-discover-filters" });
-      const row1 = wrap.createDiv({ cls: "reel-chips" });
-      const chip = (parent, label, active, onClick) => {
-        const b = parent.createEl("button", { cls: "reel-chip", text: label });
-        setSelected(b, active);
-        b.addEventListener("click", () => {
-          onClick();
-          this.results = null;
-          this.page = 1;
-          this.exhausted = false;
-          this.render(container);
-        });
-        return b;
+      const bar = wrap.createDiv({ cls: "reel-chips reel-filterbar" });
+      const apply = () => {
+        this.results = null;
+        this.page = 1;
+        this.exhausted = false;
+        this.render(container);
       };
-      chip(row1, "For you", !this.filtered, () => {
-        this.filters = { ...EMPTY, type: this.filters.type };
-      });
       const setType = (next) => {
         if (this.filters.type === next)
           return;
@@ -3819,70 +3933,110 @@
         this.genres = [];
         this.filters.genreId = null;
         this.filters.genreName = null;
+        this.loadGenres();
       };
-      chip(row1, "Films", this.filters.type === "movie", () => setType("movie"));
-      chip(row1, "Series", this.filters.type === "tv", () => setType("tv"));
-      const seedLabel = this.seed ? `Like ${this.seed.title}` : "Like\u2026";
-      const seedChip = chip(row1, seedLabel, !!this.seed, () => {
-        if (this.seed) {
-          this.seed = null;
-          return;
-        }
-        new SearchModal(this.plugin.app, this.plugin, {
-          placeholder: "Find me something like\u2026",
-          onPick: (item) => {
-            this.seed = {
-              id: item.id,
-              type: item.media_type === "tv" ? "tv" : "movie",
-              title: (item.media_type === "tv" ? item.name : item.title) ?? "that"
-            };
-            this.results = null;
-            this.render(container);
+      if (!this.genres.length)
+        this.loadGenres();
+      const set = [];
+      if (this.seed)
+        set.push({ label: `Like ${this.seed.title}`, clear: () => this.seed = null });
+      if (this.filters.genreName) {
+        set.push({
+          label: this.filters.genreName,
+          clear: () => {
+            this.filters.genreId = null;
+            this.filters.genreName = null;
           }
-        }).open();
+        });
+      }
+      if (this.filters.decade != null)
+        set.push({ label: `${this.filters.decade}s`, clear: () => this.filters.decade = null });
+      if (this.filters.minRating != null)
+        set.push({ label: `${this.filters.minRating}+`, clear: () => this.filters.minRating = null });
+      const open2 = bar.createEl("button", { cls: "reel-chip reel-filter-btn", attr: { type: "button" } });
+      setIcon(open2.createSpan({ cls: "reel-filter-btn-icon" }), "sliders-horizontal");
+      open2.createSpan({ text: "Filters" });
+      if (set.length)
+        open2.createSpan({ cls: "reel-filter-count", text: String(set.length) });
+      open2.addEventListener("click", () => {
+        const sheet = new DiscoverFilterSheet(this.plugin.app, this.filters, {
+          onChange: apply,
+          setType,
+          genres: () => this.genres,
+          seedTitle: () => this.seed?.title ?? null,
+          pickSeed: (done) => new SearchModal(this.plugin.app, this.plugin, {
+            placeholder: "Find me something like\u2026",
+            onPick: (item) => {
+              this.seed = {
+                id: item.id,
+                type: item.media_type === "tv" ? "tv" : "movie",
+                title: (item.media_type === "tv" ? item.name : item.title) ?? "that"
+              };
+              done();
+            }
+          }).open(),
+          clearSeed: () => this.seed = null,
+          clearAll: () => {
+            this.seed = null;
+            this.filters = { ...EMPTY, type: this.filters.type };
+            apply();
+          }
+        });
+        this.filterSheet = sheet;
+        sheet.open();
       });
-      seedChip.addClass("reel-chip-seed");
-      const quick2 = chip(row1, "Quick", this.quick, () => {
+      const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg", attr: { role: "group", "aria-label": "Type" } });
+      for (const [id, label, icon] of [
+        ["movie", "Films", "film"],
+        ["tv", "Series", "tv"]
+      ]) {
+        const b = seg.createEl("button", {
+          cls: "reel-seg-btn",
+          attr: { type: "button", "aria-label": label, "aria-pressed": String(this.filters.type === id) }
+        });
+        b.toggleClass("is-active", this.filters.type === id);
+        setIcon(b, icon);
+        b.addEventListener("click", () => {
+          setType(id);
+          apply();
+        });
+      }
+      const quick2 = bar.createEl("button", { cls: "reel-chip reel-chip-mode", attr: { type: "button" } });
+      setIcon(quick2.createSpan({ cls: "reel-filter-btn-icon" }), "zap");
+      quick2.createSpan({ text: "Quick" });
+      setSelected(quick2, this.quick);
+      quick2.addEventListener("click", () => {
         this.quick = !this.quick;
         this.quickAt = 0;
+        apply();
       });
-      quick2.addClass("reel-chip-mode");
-      if (!this.genres.length) {
-        void this.plugin.tmdb.genreList(this.filters.type).then((list2) => {
-          this.genres = list2;
-          this.render(container);
-        }).catch(() => {
+      for (const f of set) {
+        const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
+        tag.setAttr("role", "group");
+        tag.setAttr("aria-label", `${f.label} filter`);
+        const label = tag.createEl("button", { cls: "reel-filter-tag-label", text: f.label, attr: { type: "button" } });
+        label.addEventListener("click", () => open2.click());
+        const drop = tag.createEl("button", {
+          cls: "reel-filter-tag-x",
+          attr: { type: "button", "aria-label": `Remove the ${f.label} filter` }
+        });
+        setIcon(drop.createSpan({ cls: "reel-filter-x" }), "x");
+        drop.addEventListener("click", () => {
+          f.clear();
+          apply();
         });
       }
-      for (const g of this.genres) {
-        chip(row1, g.name, this.filters.genreId === g.id, () => {
-          const on = this.filters.genreId === g.id;
-          this.filters.genreId = on ? null : g.id;
-          this.filters.genreName = on ? null : g.name;
-        });
-      }
-      const row2 = wrap.createDiv({ cls: "reel-chips" });
-      row2.createSpan({ cls: "reel-dim", text: "Decade" });
-      const nowDecade = Math.floor((/* @__PURE__ */ new Date()).getFullYear() / 10) * 10;
-      for (let d = nowDecade; d >= 1950; d -= 10) {
-        chip(row2, `${d}s`, this.filters.decade === d, () => {
-          this.filters.decade = this.filters.decade === d ? null : d;
-        });
-      }
-      row2.createSpan({ cls: "reel-dim", text: "At least" });
-      for (const r of [6, 7, 8]) {
-        chip(row2, `${r}+`, this.filters.minRating === r, () => {
-          this.filters.minRating = this.filters.minRating === r ? null : r;
-        });
-      }
-      if (this.filtered) {
-        const clear = row2.createEl("button", { cls: "reel-chip", text: "\u2715 Clear" });
-        clear.addEventListener("click", () => {
-          this.filters = { ...EMPTY, type: this.filters.type };
-          this.results = null;
-          this.render(container);
-        });
-      }
+    }
+    /** The genre list for the current type; the sheet and the tags both read it. */
+    loadGenres() {
+      const type = this.filters.type;
+      void this.plugin.tmdb.genreList(type).then((list2) => {
+        if (this.filters.type !== type)
+          return;
+        this.genres = list2;
+        this.filterSheet?.refresh();
+      }).catch(() => {
+      });
     }
     /* ------------------------------------------------------------------ */
     /* For you                                                             */

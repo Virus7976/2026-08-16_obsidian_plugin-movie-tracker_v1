@@ -19,6 +19,7 @@ import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { renderStars } from "./stars";
 import { SearchModal } from "./searchModal";
+import { DiscoverFilterSheet } from "./discoverFilterSheet";
 import { LogSheet } from "./logSheet";
 import { trailerUrl, providerNames, imdbUrl, tmdbUrl } from "../extract";
 import { formatMinutes } from "../util/dates";
@@ -112,6 +113,7 @@ export class DiscoverScreen {
 	private results: TmdbSearchResult[] | null = null;
 	private genres: { id: number; name: string }[] = [];
 	private filters: Filters = { ...EMPTY };
+	private filterSheet: DiscoverFilterSheet | null = null;
 	private loading = false;
 	private error: string | null = null;
 	private handled = new Set<number>();
@@ -617,122 +619,143 @@ export class DiscoverScreen {
 
 	private paintFilters(container: HTMLElement): void {
 		const wrap = container.createDiv({ cls: "reel-discover-filters" });
+		// The Library's own control row: Filters, then the view switch, then the
+		// one mode toggle. Same classes, so it is the same control in every way
+		// that can be styled.
+		const bar = wrap.createDiv({ cls: "reel-chips reel-filterbar" });
 
-		const row1 = wrap.createDiv({ cls: "reel-chips" });
-		const chip = (parent: HTMLElement, label: string, active: boolean, onClick: () => void) => {
-			const b = parent.createEl("button", { cls: "reel-chip", text: label });
-			setSelected(b, active);
-			b.addEventListener("click", () => {
-				onClick();
-				this.results = null;
-				this.page = 1;
-				this.exhausted = false;
-				this.render(container);
-			});
-			return b;
+		const apply = (): void => {
+			this.results = null;
+			this.page = 1;
+			this.exhausted = false;
+			this.render(container);
 		};
 
-		// "For you" is a real choice, not just the absence of filters.
-		chip(row1, "For you", !this.filtered, () => {
-			this.filters = { ...EMPTY, type: this.filters.type };
-		});
-		// Both directions must clear the genre: ids are per-endpoint, so a
-		// selection carried across would silently query the wrong genre. The
-		// previous version only cleared one way.
-		const setType = (next: "movie" | "tv") => {
+		const setType = (next: "movie" | "tv"): void => {
 			if (this.filters.type === next) return;
 			this.filters.type = next;
-			// A different medium is a different feed, not a filtered one.
+			// A different medium is a different feed, not a filtered one. Genre ids
+			// are per-endpoint, so a carried-over selection would query the wrong one.
 			this.sources = null;
 			this.feed = [];
 			this.nextSource = 0;
 			this.genres = [];
 			this.filters.genreId = null;
 			this.filters.genreName = null;
+			this.loadGenres();
 		};
-		chip(row1, "Films", this.filters.type === "movie", () => setType("movie"));
-		chip(row1, "Series", this.filters.type === "tv", () => setType("tv"));
 
-		// "Like this one." A seed title, not a genre — it changes what the pool
-		// is drawn from rather than narrowing what is already there, which is
-		// why it sits apart from the genre chips.
-		const seedLabel = this.seed ? `Like ${this.seed.title}` : "Like…";
-		const seedChip = chip(row1, seedLabel, !!this.seed, () => {
-			if (this.seed) {
-				this.seed = null;
-				return;
-			}
-			new SearchModal(this.plugin.app, this.plugin, {
-				placeholder: "Find me something like…",
-				onPick: (item) => {
-					this.seed = {
-						id: item.id,
-						type: item.media_type === "tv" ? "tv" : "movie",
-						title: (item.media_type === "tv" ? item.name : item.title) ?? "that",
-					};
-					this.results = null;
-					this.render(container);
+		// The genre list has to be fetched; the sheet reads it when it opens.
+		if (!this.genres.length) this.loadGenres();
+
+		const set: { label: string; clear: () => void }[] = [];
+		if (this.seed) set.push({ label: `Like ${this.seed.title}`, clear: () => (this.seed = null) });
+		if (this.filters.genreName) {
+			set.push({
+				label: this.filters.genreName,
+				clear: () => {
+					this.filters.genreId = null;
+					this.filters.genreName = null;
 				},
-			}).open();
-		});
-		seedChip.addClass("reel-chip-seed");
+			});
+		}
+		if (this.filters.decade != null) set.push({ label: `${this.filters.decade}s`, clear: () => (this.filters.decade = null) });
+		if (this.filters.minRating != null) set.push({ label: `${this.filters.minRating}+`, clear: () => (this.filters.minRating = null) });
 
-		// Browsing mode, not a filter — it changes how the same pool is shown.
-		// Rows are for skimming a shelf; this is for getting through a lot of
-		// titles quickly without your eye having to re-find the buttons.
-		const quick = chip(row1, "Quick", this.quick, () => {
+		const open = bar.createEl("button", { cls: "reel-chip reel-filter-btn", attr: { type: "button" } });
+		setIcon(open.createSpan({ cls: "reel-filter-btn-icon" }), "sliders-horizontal");
+		open.createSpan({ text: "Filters" });
+		if (set.length) open.createSpan({ cls: "reel-filter-count", text: String(set.length) });
+		open.addEventListener("click", () => {
+			const sheet = new DiscoverFilterSheet(this.plugin.app, this.filters, {
+				onChange: apply,
+				setType,
+				genres: () => this.genres,
+				seedTitle: () => this.seed?.title ?? null,
+				pickSeed: (done) =>
+					new SearchModal(this.plugin.app, this.plugin, {
+						placeholder: "Find me something like…",
+						onPick: (item) => {
+							this.seed = {
+								id: item.id,
+								type: item.media_type === "tv" ? "tv" : "movie",
+								title: (item.media_type === "tv" ? item.name : item.title) ?? "that",
+							};
+							done();
+						},
+					}).open(),
+				clearSeed: () => (this.seed = null),
+				clearAll: () => {
+					this.seed = null;
+					this.filters = { ...EMPTY, type: this.filters.type };
+					apply();
+				},
+			});
+			this.filterSheet = sheet;
+			sheet.open();
+		});
+
+		// Films | Series, as the Library's view switch.
+		const seg = bar.createDiv({ cls: "reel-seg reel-layout-seg", attr: { role: "group", "aria-label": "Type" } });
+		for (const [id, label, icon] of [
+			["movie", "Films", "film"],
+			["tv", "Series", "tv"],
+		] as const) {
+			const b = seg.createEl("button", {
+				cls: "reel-seg-btn",
+				attr: { type: "button", "aria-label": label, "aria-pressed": String(this.filters.type === id) },
+			});
+			b.toggleClass("is-active", this.filters.type === id);
+			setIcon(b, icon);
+			b.addEventListener("click", () => {
+				setType(id);
+				apply();
+			});
+		}
+
+		// Browsing mode, not a filter: one title at a time instead of shelves.
+		const quick = bar.createEl("button", { cls: "reel-chip reel-chip-mode", attr: { type: "button" } });
+		setIcon(quick.createSpan({ cls: "reel-filter-btn-icon" }), "zap");
+		quick.createSpan({ text: "Quick" });
+		setSelected(quick, this.quick);
+		quick.addEventListener("click", () => {
 			this.quick = !this.quick;
 			this.quickAt = 0;
+			apply();
 		});
-		quick.addClass("reel-chip-mode");
 
-
-		// The genre list has to be fetched; until it arrives, show nothing
-		// rather than a row that pops in and shifts everything down.
-		if (!this.genres.length) {
-			void this.plugin.tmdb
-				.genreList(this.filters.type)
-				.then((list) => {
-					this.genres = list;
-					this.render(container);
-				})
-				.catch(() => {
-					/* genre filtering is optional; the rows still work */
-				});
-		}
-
-		for (const g of this.genres) {
-			chip(row1, g.name, this.filters.genreId === g.id, () => {
-				const on = this.filters.genreId === g.id;
-				this.filters.genreId = on ? null : g.id;
-				this.filters.genreName = on ? null : g.name;
+		// What is set, as tags you can tap away: the same pills the Library draws.
+		for (const f of set) {
+			const tag = bar.createDiv({ cls: "reel-chip is-active reel-filter-tag" });
+			tag.setAttr("role", "group");
+			tag.setAttr("aria-label", `${f.label} filter`);
+			const label = tag.createEl("button", { cls: "reel-filter-tag-label", text: f.label, attr: { type: "button" } });
+			label.addEventListener("click", () => open.click());
+			const drop = tag.createEl("button", {
+				cls: "reel-filter-tag-x",
+				attr: { type: "button", "aria-label": `Remove the ${f.label} filter` },
+			});
+			setIcon(drop.createSpan({ cls: "reel-filter-x" }), "x");
+			drop.addEventListener("click", () => {
+				f.clear();
+				apply();
 			});
 		}
+	}
 
-		const row2 = wrap.createDiv({ cls: "reel-chips" });
-		row2.createSpan({ cls: "reel-dim", text: "Decade" });
-		const nowDecade = Math.floor(new Date().getFullYear() / 10) * 10;
-		for (let d = nowDecade; d >= 1950; d -= 10) {
-			chip(row2, `${d}s`, this.filters.decade === d, () => {
-				this.filters.decade = this.filters.decade === d ? null : d;
+	/** The genre list for the current type; the sheet and the tags both read it. */
+	private loadGenres(): void {
+		const type = this.filters.type;
+		void this.plugin.tmdb
+			.genreList(type)
+			.then((list) => {
+				if (this.filters.type !== type) return;
+				this.genres = list;
+				this.filterSheet?.refresh();
+			})
+			.catch(() => {
+				/* genre filtering is optional; the shelves still work */
 			});
-		}
-
-		row2.createSpan({ cls: "reel-dim", text: "At least" });
-		for (const r of [6, 7, 8]) {
-			chip(row2, `${r}+`, this.filters.minRating === r, () => {
-				this.filters.minRating = this.filters.minRating === r ? null : r;
-			});
-		}
-
-		if (this.filtered) {
-			const clear = row2.createEl("button", { cls: "reel-chip", text: "✕ Clear" });
-			clear.addEventListener("click", () => {
-				this.filters = { ...EMPTY, type: this.filters.type };
-				this.results = null;
-				this.render(container);
-			});
-		}
 	}
 
 	/* ------------------------------------------------------------------ */
