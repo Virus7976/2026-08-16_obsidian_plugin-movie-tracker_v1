@@ -11,7 +11,8 @@
  * is something you could estimate; those aren't.
  */
 
-import { MarkdownPostProcessorContext, MarkdownRenderChild } from "obsidian";
+import { MarkdownPostProcessorContext, MarkdownRenderChild, Menu, Notice } from "obsidian";
+import { holdAt, onHold } from "../ui/titleMenu";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { unlink } from "../library";
@@ -316,6 +317,21 @@ export function paintStats(plugin: ReelPlugin, el: HTMLElement, opts: StatsOptio
 		t.createDiv({ cls: "reel-tile-value", text: value });
 		t.createDiv({ cls: "reel-tile-label", text: label });
 		if (sub) t.createDiv({ cls: "reel-tile-sub", text: sub });
+		// Press and hold: a tile that is about a title gives that title's menu; any
+		// other gives the set it counts and a way to copy the figure.
+		if (art) onHold(plugin, t, art);
+		else {
+			holdAt(t, (x, y) => {
+				const m = new Menu();
+				if (go) m.addItem((i) => i.setTitle("Show them").setIcon("list").onClick(go));
+				m.addItem((i) =>
+					i.setTitle("Copy").setIcon("copy").onClick(() => {
+						void navigator.clipboard.writeText(`${label}: ${value}`).then(() => new Notice(`Copied "${label}: ${value}"`));
+					})
+				);
+				m.showAtPosition({ x, y });
+			});
+		}
 		if (!go) return;
 		/*
 		 * Half these tiles open the set they are counting and half cannot, and

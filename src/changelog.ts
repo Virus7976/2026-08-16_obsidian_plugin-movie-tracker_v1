@@ -52,6 +52,14 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.60",
+		date: "2026-10-17",
+		headline: "Press and hold on the stats tiles.",
+		changes: [
+			{ kind: "new", text: "Press and hold (or right-click) a stats tile. A tile about a title gives that title's menu. Any other gives Show them and Copy." },
+		],
+	},
+	{
 		version: "0.9.59",
 		date: "2026-10-17",
 		headline: "Rating no longer throws you back to the start, and every title opens the same way.",

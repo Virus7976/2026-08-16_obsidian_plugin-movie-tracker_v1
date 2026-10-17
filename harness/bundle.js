@@ -3931,6 +3931,21 @@ ${body}
       t.createDiv({ cls: "reel-tile-label", text: label });
       if (sub)
         t.createDiv({ cls: "reel-tile-sub", text: sub });
+      if (art)
+        onHold(plugin2, t, art);
+      else {
+        holdAt(t, (x, y) => {
+          const m = new Menu();
+          if (go)
+            m.addItem((i) => i.setTitle("Show them").setIcon("list").onClick(go));
+          m.addItem(
+            (i) => i.setTitle("Copy").setIcon("copy").onClick(() => {
+              void navigator.clipboard.writeText(`${label}: ${value}`).then(() => new Notice(`Copied "${label}: ${value}"`));
+            })
+          );
+          m.showAtPosition({ x, y });
+        });
+      }
       if (!go)
         return;
       t.createDiv({ cls: "reel-tile-go" });
