@@ -52,6 +52,17 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.50",
+		date: "2026-10-17",
+		headline: "Searches from the menu now search, and sheets sit above the keyboard.",
+		changes: [
+			{ kind: "fixed", text: "Find more like this, Search your library for it, and the other menu searches now fill the search box with what you chose. Obsidian was clearing the box as it opened." },
+			{ kind: "fixed", text: "The words carried over from a library search to the add-a-title search, and back after unlocking your keys, were being lost the same way." },
+			{ kind: "new", text: "Similar titles opens TMDB's recommendations for that title, without the ones you already have." },
+			{ kind: "fixed", text: "Sheets, such as the review box, now lift by the keyboard's height as Obsidian reports it. If a phone does not report one, the sheet pins to the top as before." },
+		],
+	},
+	{
 		version: "0.9.49",
 		date: "2026-10-17",
 		headline: "A real menu for every title.",
