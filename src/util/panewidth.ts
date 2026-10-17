@@ -326,7 +326,7 @@ export function typingLift(): () => void {
 		const vv = window.visualViewport;
 		const full = window.innerHeight;
 		const shrunk = vv && vv.height < full * 0.9 ? vv.height : 0;
-		const cap = shrunk ? shrunk - 16 : full * 0.5;
+		const cap = shrunk ? shrunk - 16 : full * 0.56;
 		document.body.setCssProps({ "--reel-typing-max": `${Math.round(cap)}px` });
 	};
 
@@ -334,8 +334,6 @@ export function typingLift(): () => void {
 		if (!isField(ev.target)) return;
 		const sheet = ev.target.closest<HTMLElement>(".reel-modal.reel-sheet");
 		if (!sheet) return;
-		setCap();
-		sheet.addClass("is-typing");
 		window.setTimeout(() => ev.target instanceof HTMLElement && ev.target.scrollIntoView({ block: "center" }), 60);
 	};
 	const onOut = (ev: FocusEvent): void => {
@@ -343,7 +341,7 @@ export function typingLift(): () => void {
 		if (!sheet) return;
 		// Moving between two fields fires out then in; wait to see if focus stayed.
 		window.setTimeout(() => {
-			if (!isField(document.activeElement) || !sheet.contains(document.activeElement)) sheet.removeClass("is-typing");
+			void sheet;
 		}, 120);
 	};
 	document.addEventListener("focusin", onIn);

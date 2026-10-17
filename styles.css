@@ -16995,13 +16995,7 @@ body:not(.is-phone) .reel-modal .reel-setup-copy {
 /* ==================================================================== */
 /* Typing in a sheet: pinned to the top so the keyboard cannot cover it  */
 /* ==================================================================== */
-.reel-modal.reel-sheet.is-typing {
-	inset: 0 0 auto 0;
-	bottom: auto;
-	max-height: var(--reel-typing-max, 50dvh);
-	border-radius: 0 0 16px 16px;
-	animation: none;
-}
+
 
 /* ==================================================================== */
 /* Omni search                                                           */
@@ -18944,4 +18938,41 @@ body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-close-button
 body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-header,
 body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-title {
 	display: none;
+}
+
+/* ==================================================================== */
+/* Sheets live in Obsidian's own flow, so the keyboard lifts them          */
+/* ==================================================================== */
+/*
+ * WHY the sheets kept going under the keyboard, found by reading Obsidian's
+ * own stylesheet rather than guessing at it:
+ *
+ *   The app publishes the keyboard's height as `--keyboard-height` and shrinks
+ *   `.app-container` by that much. `.modal-container` is `position: absolute`
+ *   inside it, so it shrinks too, and anything laid out *inside* it ends up
+ *   above the keyboard for free. That is why the search works: it sits in the
+ *   container's flow.
+ *
+ *   Reel's sheets were `position: fixed`. Fixed is measured against the whole
+ *   screen, not the shrunken container, so they never heard about the keyboard.
+ *   Every attempt to guess the keyboard from `visualViewport` failed because
+ *   Android's overlay keyboard never reports itself there.
+ *
+ * So no measuring at all: the sheet stops being fixed, the container aligns it
+ * to the bottom the way Obsidian aligns its own confirmation sheets, and the
+ * app lifts it.
+ */
+.modal-container:has(> .modal.reel-sheet) {
+	align-items: flex-end;
+}
+
+.reel-modal.reel-sheet,
+.reel-modal.reel-sheet.is-typing {
+	position: relative;
+	inset: auto;
+	margin: auto 0 0 0;
+	width: 100%;
+	max-width: 100%;
+	max-height: calc(100% - var(--size-4-4, 16px));
+	border-radius: 16px 16px 0 0;
 }

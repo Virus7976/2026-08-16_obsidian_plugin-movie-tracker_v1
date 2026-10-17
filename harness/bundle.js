@@ -12770,7 +12770,9 @@ ${body}
     renderStars(compact.createDiv({ cls: "reel-rating-row" }), { value: 4, compact: true });
   }
   function mountSheet(root, sheet) {
-    const shell = root.createDiv({ cls: "reel-modal-shell" });
+    const container = root.createDiv({ cls: "modal-container" });
+    container.setCssProps({ position: "absolute", inset: "0", display: "flex" });
+    const shell = container.createDiv({ cls: "reel-modal-shell modal" });
     sheet.modalEl = shell;
     shell.addClass("reel-modal");
     if (phone2)

@@ -1386,7 +1386,11 @@ function stars(root: HTMLElement): void {
  * reason these are here — would not apply.
  */
 function mountSheet(root: HTMLElement, sheet: { contentEl: HTMLElement; modalEl: HTMLElement; onOpen(): void }): void {
-	const shell = root.createDiv({ cls: "reel-modal-shell" });
+	// Obsidian's own structure: a container that fills the screen and aligns the
+	// modal inside it. The sheet's keyboard behaviour depends on being in it.
+	const container = root.createDiv({ cls: "modal-container" });
+	container.setCssProps({ position: "absolute", inset: "0", display: "flex" });
+	const shell = container.createDiv({ cls: "reel-modal-shell modal" });
 	sheet.modalEl = shell;
 	shell.addClass("reel-modal");
 	if (phone) shell.addClass("reel-sheet");
