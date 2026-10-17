@@ -1054,6 +1054,34 @@
     return String(Math.round(n2));
   }
 
+  // src/extract.ts
+  function trailerUrl(videos) {
+    if (!videos?.length)
+      return void 0;
+    const youtube = videos.filter((v) => v.site === "YouTube" && v.key);
+    const pick = youtube.find((v) => v.type === "Trailer" && v.official) ?? youtube.find((v) => v.type === "Trailer") ?? youtube.find((v) => v.type === "Teaser") ?? youtube[0];
+    return pick?.key ? `https://www.youtube.com/watch?v=${pick.key}` : void 0;
+  }
+  function providerNames(block, region) {
+    const results = block?.results;
+    const row = results?.[region];
+    if (!row)
+      return [];
+    const names = [...row.flatrate ?? [], ...row.free ?? []].map((p) => p.provider_name);
+    return [...new Set(names)];
+  }
+  function keywordNames(film2) {
+    const asFilm = film2.keywords?.keywords;
+    const asShow = film2.keywords?.results;
+    return (asFilm ?? asShow ?? []).map((k) => k.name).filter(Boolean);
+  }
+  function imdbUrl(imdbId) {
+    return imdbId ? `https://www.imdb.com/title/${imdbId}/` : void 0;
+  }
+  function tmdbUrl(tmdbId, type) {
+    return `https://www.themoviedb.org/${type === "tv" ? "tv" : "movie"}/${tmdbId}`;
+  }
+
   // src/render/grid.ts
   function wireCell(plugin2, cell, entry, onSelect) {
     let timer = null;
@@ -1165,6 +1193,31 @@
     menu.addItem(
       (i) => i.setTitle("Open note").setIcon("file-text").onClick(() => void plugin2.app.workspace.getLeaf(false).openFile(file))
     );
+    menu.addItem(
+      (i) => i.setTitle("More\u2026").setIcon("more-horizontal").onClick(() => showMore(plugin2, entry, x, y))
+    );
+    menu.showAtPosition({ x, y });
+  }
+  function showMore(plugin2, entry, x, y) {
+    const menu = new Menu();
+    const isTv = entry.type === "tv";
+    const open = (url) => window.open(url, "_blank", "noopener");
+    const link = (title, icon, url) => {
+      if (!url)
+        return;
+      menu.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => open(url)));
+    };
+    const imdb = imdbUrl(entry.imdbId);
+    link("IMDb", "external-link", imdb);
+    link("IMDb parents guide", "shield", imdb ? `${imdb}parentalguide` : void 0);
+    link("TMDB", "external-link", tmdbUrl(entry.tmdbId, entry.type));
+    menu.addSeparator();
+    link("Trakt", "external-link", `https://trakt.tv/search/tmdb/${entry.tmdbId}?id_type=${isTv ? "show" : "movie"}`);
+    if (!isTv)
+      link("Letterboxd", "external-link", `https://letterboxd.com/tmdb/${entry.tmdbId}`);
+    const q = encodeURIComponent(entry.title);
+    link("Where to watch", "tv", `https://www.justwatch.com/${(plugin2.settings.region || "us").toLowerCase()}/search?q=${q}`);
+    link("Search the web", "search", `https://www.google.com/search?q=${q}${entry.year ? `+${entry.year}` : ""}`);
     menu.showAtPosition({ x, y });
   }
   function describe(el, entry) {
@@ -2222,34 +2275,6 @@
   }
   function diffDays(a, b) {
     return Math.round((b.getTime() - a.getTime()) / 864e5);
-  }
-
-  // src/extract.ts
-  function trailerUrl(videos) {
-    if (!videos?.length)
-      return void 0;
-    const youtube = videos.filter((v) => v.site === "YouTube" && v.key);
-    const pick = youtube.find((v) => v.type === "Trailer" && v.official) ?? youtube.find((v) => v.type === "Trailer") ?? youtube.find((v) => v.type === "Teaser") ?? youtube[0];
-    return pick?.key ? `https://www.youtube.com/watch?v=${pick.key}` : void 0;
-  }
-  function providerNames(block, region) {
-    const results = block?.results;
-    const row = results?.[region];
-    if (!row)
-      return [];
-    const names = [...row.flatrate ?? [], ...row.free ?? []].map((p) => p.provider_name);
-    return [...new Set(names)];
-  }
-  function keywordNames(film2) {
-    const asFilm = film2.keywords?.keywords;
-    const asShow = film2.keywords?.results;
-    return (asFilm ?? asShow ?? []).map((k) => k.name).filter(Boolean);
-  }
-  function imdbUrl(imdbId) {
-    return imdbId ? `https://www.imdb.com/title/${imdbId}/` : void 0;
-  }
-  function tmdbUrl(tmdbId, type) {
-    return `https://www.themoviedb.org/${type === "tv" ? "tv" : "movie"}/${tmdbId}`;
   }
 
   // src/ui/titleExtras.ts

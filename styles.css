@@ -18882,3 +18882,66 @@ select.reel-select {
 	min-width: 0;
 	padding: 0;
 }
+
+/* ==================================================================== */
+/* Sheets: no dead band above the title                                  */
+/* ==================================================================== */
+/* Obsidian reserves a tall strip at the top of a modal for its close
+   button. A sheet has Cancel and a tap-outside, so the button shrinks into
+   the corner and the strip goes. */
+.reel-modal.reel-sheet {
+	padding-top: var(--reel-space-2);
+}
+
+.reel-modal.reel-sheet .modal-close-button {
+	top: 6px;
+	right: 8px;
+	width: 32px;
+	height: 32px;
+	z-index: 5;
+}
+
+.reel-modal.reel-sheet .modal-content,
+.reel-modal.reel-sheet .reel-prompt,
+.reel-modal.reel-sheet.reel-prompt {
+	margin-top: 0;
+	padding-top: 0;
+}
+
+.reel-modal.reel-sheet .reel-prompt-title,
+.reel-modal.reel-sheet .reel-log-title {
+	padding-right: 40px;
+}
+
+/* Review sheet: rating and date both fit above the buttons. */
+.reel-review-body .reel-review-box {
+	min-height: 72px;
+	height: 72px;
+}
+
+.reel-review-body .reel-review-meta {
+	gap: var(--reel-space-1) var(--reel-space-3);
+}
+
+.reel-review-body .reel-review-date {
+	height: 40px;
+	min-height: 40px;
+}
+
+.reel-review-body .reel-stars:not(.is-readonly) .reel-star {
+	height: 40px;
+}
+
+/* Beat the app's own top padding on a phone, so the title sits near the top. */
+body.is-mobile .modal-container .modal.reel-modal.reel-sheet {
+	padding-top: calc(env(safe-area-inset-top, 0px) + var(--reel-space-3)) !important;
+}
+
+body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-close-button {
+	top: calc(env(safe-area-inset-top, 0px) + 4px);
+}
+
+body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-header,
+body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-title {
+	display: none;
+}

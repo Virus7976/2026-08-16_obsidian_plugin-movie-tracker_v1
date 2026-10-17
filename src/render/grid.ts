@@ -19,6 +19,7 @@ import { prettyDate, formatMinutes } from "../util/dates";
 import { rangeCount } from "../util/ranges";
 import { compactCount } from "../util/format";
 import { unlink } from "../library";
+import { imdbUrl, tmdbUrl } from "../extract";
 
 /**
  * Tap opens the title; long-press (or right-click) opens the actions menu.
@@ -205,7 +206,40 @@ function showActions(
 			.setIcon("file-text")
 			.onClick(() => void plugin.app.workspace.getLeaf(false).openFile(file))
 	);
+	menu.addItem((i) =>
+		i
+			.setTitle("More…")
+			.setIcon("more-horizontal")
+			.onClick(() => showMore(plugin, entry, x, y))
+	);
 
+	menu.showAtPosition({ x, y });
+}
+
+/**
+ * Where else to look at a title: IMDb and friends. A second menu rather than a
+ * submenu, because a phone's menu is a bottom sheet and a submenu there is a
+ * flyout with nowhere to fly.
+ */
+function showMore(plugin: ReelPlugin, entry: Entry, x: number, y: number): void {
+	const menu = new Menu();
+	const isTv = entry.type === "tv";
+	const open = (url: string) => window.open(url, "_blank", "noopener");
+	const link = (title: string, icon: string, url: string | undefined) => {
+		if (!url) return;
+		menu.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => open(url)));
+	};
+
+	const imdb = imdbUrl(entry.imdbId);
+	link("IMDb", "external-link", imdb);
+	link("IMDb parents guide", "shield", imdb ? `${imdb}parentalguide` : undefined);
+	link("TMDB", "external-link", tmdbUrl(entry.tmdbId, entry.type));
+	menu.addSeparator();
+	link("Trakt", "external-link", `https://trakt.tv/search/tmdb/${entry.tmdbId}?id_type=${isTv ? "show" : "movie"}`);
+	if (!isTv) link("Letterboxd", "external-link", `https://letterboxd.com/tmdb/${entry.tmdbId}`);
+	const q = encodeURIComponent(entry.title);
+	link("Where to watch", "tv", `https://www.justwatch.com/${(plugin.settings.region || "us").toLowerCase()}/search?q=${q}`);
+	link("Search the web", "search", `https://www.google.com/search?q=${q}${entry.year ? `+${entry.year}` : ""}`);
 	menu.showAtPosition({ x, y });
 }
 
