@@ -142,6 +142,7 @@ function makeVault(
 			offer: () => {},
 		},
 		tmdb: {
+			posterUrl: (path: string | null | undefined) => (path ? `https://image.tmdb.org/t/p/w342${path}` : null),
 			getFilm: async (id: number) => {
 				fetched++;
 				return { id, title: "Fetched Film", release_date: "2026-01-01" };
