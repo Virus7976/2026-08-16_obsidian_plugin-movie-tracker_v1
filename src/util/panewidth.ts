@@ -322,18 +322,38 @@ export function typingLift(): () => void {
 	const isField = (el: EventTarget | null): el is HTMLElement =>
 		el instanceof HTMLElement && (el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
 
+	/**
+	 * Only for a webview that reports the keyboard through visualViewport. The
+	 * Android overlay keyboard does not; there the sheet reads Obsidian's own
+	 * `--keyboard-height` in CSS, and this stays 0.
+	 */
 	const setCap = (): void => {
 		const vv = window.visualViewport;
-		const full = window.innerHeight;
-		const shrunk = vv && vv.height < full * 0.9 ? vv.height : 0;
-		const cap = shrunk ? shrunk - 16 : full * 0.56;
-		document.body.setCssProps({ "--reel-typing-max": `${Math.round(cap)}px` });
+		const covered = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+		document.body.setCssProps({ "--reel-vv-kb": `${covered > 80 ? Math.round(covered) : 0}px` });
 	};
 
 	const onIn = (ev: FocusEvent): void => {
 		if (!isField(ev.target)) return;
 		const sheet = ev.target.closest<HTMLElement>(".reel-modal.reel-sheet");
 		if (!sheet) return;
+		setCap();
+		/*
+		 * The safety net. The sheet rides above the keyboard on Obsidian's
+		 * `--keyboard-height`. If a device never publishes it, the sheet would sit
+		 * under the keyboard, which is the original fault. Once the keyboard has
+		 * had time to open, if neither source reports one, pin to the top instead.
+		 */
+		window.setTimeout(() => {
+			if (!sheet.isConnected) return;
+			const kb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--keyboard-height")) || 0;
+			const vvKb = parseFloat(document.body.style.getPropertyValue("--reel-vv-kb")) || 0;
+			const full = window.innerHeight;
+			if (kb <= 0 && vvKb <= 0) {
+				document.body.setCssProps({ "--reel-typing-max": `${Math.round(full * 0.56)}px` });
+				sheet.addClass("is-typing");
+			}
+		}, 450);
 		window.setTimeout(() => ev.target instanceof HTMLElement && ev.target.scrollIntoView({ block: "center" }), 60);
 	};
 	const onOut = (ev: FocusEvent): void => {
@@ -341,7 +361,7 @@ export function typingLift(): () => void {
 		if (!sheet) return;
 		// Moving between two fields fires out then in; wait to see if focus stayed.
 		window.setTimeout(() => {
-			void sheet;
+			if (!isField(document.activeElement) || !sheet.contains(document.activeElement)) sheet.removeClass("is-typing");
 		}, 120);
 	};
 	document.addEventListener("focusin", onIn);
@@ -351,7 +371,7 @@ export function typingLift(): () => void {
 		document.removeEventListener("focusin", onIn);
 		document.removeEventListener("focusout", onOut);
 		window.visualViewport?.removeEventListener("resize", setCap);
-		document.body.style.removeProperty("--reel-typing-max");
+		document.body.style.removeProperty("--reel-vv-kb");
 	};
 }
 

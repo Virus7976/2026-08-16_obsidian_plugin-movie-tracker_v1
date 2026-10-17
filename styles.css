@@ -18941,38 +18941,38 @@ body.is-mobile .modal-container .modal.reel-modal.reel-sheet .modal-title {
 }
 
 /* ==================================================================== */
-/* Sheets live in Obsidian's own flow, so the keyboard lifts them          */
+/* Sheets ride above the keyboard using the number Obsidian publishes     */
 /* ==================================================================== */
 /*
- * WHY the sheets kept going under the keyboard, found by reading Obsidian's
- * own stylesheet rather than guessing at it:
+ * Read out of Obsidian's own source and stylesheet, not guessed:
  *
- *   The app publishes the keyboard's height as `--keyboard-height` and shrinks
- *   `.app-container` by that much. `.modal-container` is `position: absolute`
- *   inside it, so it shrinks too, and anything laid out *inside* it ends up
- *   above the keyboard for free. That is why the search works: it sits in the
- *   container's flow.
+ *   - The app writes the keyboard's height to `--keyboard-height` on :root and
+ *     uses it for its own mobile toolbar (`top: 100vh - keyboard-height -
+ *     toolbar`), which does stay above the Android keyboard.
+ *   - Modals are appended to <body>, outside the `.app-container` it shrinks,
+ *     and Reel's sheets are `position: fixed`. Neither follows the keyboard,
+ *     and the Android overlay keyboard never reports itself to `visualViewport`.
  *
- *   Reel's sheets were `position: fixed`. Fixed is measured against the whole
- *   screen, not the shrunken container, so they never heard about the keyboard.
- *   Every attempt to guess the keyboard from `visualViewport` failed because
- *   Android's overlay keyboard never reports itself there.
- *
- * So no measuring at all: the sheet stops being fixed, the container aligns it
- * to the bottom the way Obsidian aligns its own confirmation sheets, and the
- * app lifts it.
+ * So the sheet lifts itself by that same number. `--reel-vv-kb` covers the
+ * other case, a webview that does report the keyboard through visualViewport;
+ * the larger of the two wins, so the two never add up.
  */
-.modal-container:has(> .modal.reel-sheet) {
-	align-items: flex-end;
-}
-
 .reel-modal.reel-sheet,
 .reel-modal.reel-sheet.is-typing {
-	position: relative;
-	inset: auto;
-	margin: auto 0 0 0;
+	position: fixed;
+	inset: auto 0 max(var(--keyboard-height, 0px), var(--reel-vv-kb, 0px)) 0;
+	margin: 0;
 	width: 100%;
 	max-width: 100%;
-	max-height: calc(100% - var(--size-4-4, 16px));
+	max-height: calc(100dvh - max(var(--keyboard-height, 0px), var(--reel-vv-kb, 0px)) - env(safe-area-inset-top, 0px) - 12px);
 	border-radius: 16px 16px 0 0;
+	transition: bottom 150ms var(--reel-ease), max-height 150ms var(--reel-ease);
+}
+
+/* Only if the device never published a keyboard height (see typingLift). */
+.reel-modal.reel-sheet.is-typing {
+	inset: 0 0 auto 0;
+	max-height: var(--reel-typing-max, 56dvh);
+	border-radius: 0 0 16px 16px;
+	animation: none;
 }
