@@ -321,7 +321,7 @@ export class TmdbClient {
 
 		// The cache key has to include the certification limit, or changing it
 		// would return the previous, unfiltered results.
-		const key = `disc-${opts.type}-${opts.genreId ?? 0}-${opts.decade ?? 0}-${opts.minRating ?? 0}-${maxCert ?? "any"}-p${opts.page ?? 1}`;
+		const key = `disc-${opts.type}-${opts.genreId ?? 0}-${(opts.genreIds ?? []).join("+")}-${opts.decade ?? 0}-${opts.minRating ?? 0}-${maxCert ?? "any"}-p${opts.page ?? 1}`;
 		if (opts.page && opts.page > 1) params.page = String(opts.page);
 		const data = await this.cached(key, () =>
 			this.request<{ results?: TmdbSearchResult[] }>(`/discover/${opts.type}`, params)

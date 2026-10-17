@@ -11,7 +11,7 @@ import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { nextEpisode, rangeCount } from "../util/ranges";
 import { prettyDate, todayISO, formatMinutes } from "../util/dates";
-import { showTitleMenu } from "../ui/titleMenu";
+import { onHold, showTitleMenu } from "../ui/titleMenu";
 import { pickTonight } from "../picks";
 import { redact } from "../secrets";
 import { haptic } from "../util/haptics";
@@ -112,12 +112,23 @@ export function paintUpNext(
 let pickSalt = 0;
 
 /** The Watchlist section's own choices, kept across repaints for the session. */
-const watchState: { kind: "all" | "film" | "tv"; sort: "added" | "short" | "rated" | "title" } = { kind: "all", sort: "added" };
+type WatchSort = "added" | "oldest" | "short" | "long" | "rated" | "newest" | "oldrelease" | "title" | "service";
+const watchState: { kind: "all" | "film" | "tv"; sort: WatchSort; genres: string[]; streaming: boolean } = {
+	kind: "all",
+	sort: "added",
+	genres: [],
+	streaming: false,
+};
 
-const WATCH_SORTS: ["added" | "short" | "rated" | "title", string][] = [
+const WATCH_SORTS: [WatchSort, string][] = [
 	["added", "Recently added"],
+	["oldest", "Waiting longest"],
 	["short", "Shortest first"],
+	["long", "Longest first"],
 	["rated", "Highest rated"],
+	["newest", "Newest release"],
+	["oldrelease", "Oldest release"],
+	["service", "On a service first"],
 	["title", "Title A to Z"],
 ];
 
@@ -248,13 +259,61 @@ class UpNextPainter {
 			menu.showAtMouseEvent(ev);
 		});
 
+		// Genre and streaming narrow the list, like the Library's filters.
+		const allGenres = [...new Set(all.flatMap((e) => e.genres))].sort();
+		if (allGenres.length) {
+			const g = watchState.genres;
+			const genre = bar.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+			setIcon(genre.createSpan({ cls: "reel-filter-btn-icon" }), "tags");
+			genre.createSpan({ text: g.length ? g.join(", ") : "Genre" });
+			genre.toggleClass("is-active", g.length > 0);
+			genre.addEventListener("click", (ev) => {
+				const menu = new Menu();
+				for (const name of allGenres) {
+					menu.addItem((i) =>
+						i
+							.setTitle(name)
+							.setChecked(watchState.genres.includes(name))
+							.onClick(() => {
+								watchState.genres = watchState.genres.includes(name)
+									? watchState.genres.filter((x) => x !== name)
+									: [...watchState.genres, name];
+								this.render();
+							})
+					);
+				}
+				menu.showAtMouseEvent(ev);
+			});
+		}
+		if (all.some((e) => e.providers.length)) {
+			const svc = bar.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+			svc.createSpan({ text: "On a service" });
+			svc.toggleClass("is-active", watchState.streaming);
+			svc.setAttr("aria-pressed", String(watchState.streaming));
+			svc.addEventListener("click", () => {
+				watchState.streaming = !watchState.streaming;
+				this.render();
+			});
+		}
+
 		let rows = watchState.kind === "all" ? all : all.filter((e) => e.type === watchState.kind);
+		if (watchState.genres.length) rows = rows.filter((e) => watchState.genres.every((x) => e.genres.includes(x)));
+		if (watchState.streaming) rows = rows.filter((e) => e.providers.length > 0);
+		const year = (e: Entry): number => e.year ?? e.firstAirYear ?? 0;
 		rows = [...rows].sort((a, b) => {
-			if (watchState.sort === "short") return (a.runtime ?? 1e6) - (b.runtime ?? 1e6);
-			if (watchState.sort === "rated") return (b.tmdbRating ?? 0) - (a.tmdbRating ?? 0);
-			if (watchState.sort === "title") return a.title.localeCompare(b.title);
-			return (b.added ?? 0) - (a.added ?? 0);
+			switch (watchState.sort) {
+				case "oldest": return (a.added ?? 1e15) - (b.added ?? 1e15);
+				case "short": return (a.runtime ?? 1e6) - (b.runtime ?? 1e6);
+				case "long": return (b.runtime ?? 0) - (a.runtime ?? 0);
+				case "rated": return (b.tmdbRating ?? 0) - (a.tmdbRating ?? 0);
+				case "newest": return year(b) - year(a);
+				case "oldrelease": return (year(a) || 1e6) - (year(b) || 1e6);
+				case "service": return b.providers.length - a.providers.length || (b.added ?? 0) - (a.added ?? 0);
+				case "title": return a.title.localeCompare(b.title);
+				default: return (b.added ?? 0) - (a.added ?? 0);
+			}
 		});
+		if (!rows.length) wrap.createDiv({ cls: "reel-dim", text: "Nothing on your watchlist matches." });
 
 		const list = wrap.createDiv({ cls: "reel-upnext reel-watchlist-list" });
 		for (const entry of rows.slice(0, 40)) list.appendChild(this.watchRow(entry));
@@ -356,12 +415,8 @@ class UpNextPainter {
 				}
 			});
 		}
-		const more = actions.createEl("button", { cls: "reel-more", text: "⋯", attr: { type: "button", "aria-label": `More for ${entry.title}` } });
-		more.addEventListener("click", (e) => {
-			e.stopPropagation();
-			const r = more.getBoundingClientRect();
-			showTitleMenu(this.plugin, entry, r.right, r.bottom);
-		});
+		// No dots: press and hold the row for everything else.
+		onHold(this.plugin, row, entry);
 		return row;
 	}
 

@@ -19489,3 +19489,216 @@ body.is-mobile .reel-review-sheet .reel-sheet-wash {
 		min-height: 34px;
 	}
 }
+
+/* ==================================================================== */
+/* Person sheet, in the Library's style                                  */
+/* ==================================================================== */
+.reel-person-sheet .modal-close-button {
+	display: none !important;
+}
+
+body.is-mobile .modal-container .modal.reel-modal.reel-person-sheet {
+	padding: var(--reel-space-3, 12px) var(--reel-space-4, 16px) var(--reel-space-4, 16px) !important;
+}
+
+/* The portrait's tint fills the sheet instead of sitting in a card. */
+.reel-person-sheet .reel-person-head {
+	position: relative;
+	display: grid;
+	grid-template-columns: 84px 1fr;
+	align-items: center;
+	gap: var(--reel-space-3, 12px) var(--reel-space-4, 16px);
+	padding: var(--reel-space-2, 8px) 0 var(--reel-space-3, 12px);
+	margin: 0;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.reel-person-sheet .reel-person-wash {
+	position: absolute;
+	inset: -20px -16px -24px -16px;
+	z-index: -1;
+	opacity: 0.35;
+	filter: blur(28px) saturate(1.2);
+	background: var(--reel-person-wash) center / cover no-repeat;
+	pointer-events: none;
+}
+
+.reel-person-sheet .reel-person-hero-shot {
+	width: 84px;
+	height: 84px;
+	border-radius: 50%;
+	overflow: hidden;
+	flex: none;
+}
+
+.reel-person-sheet .reel-person-hero-shot img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.reel-person-sheet .reel-person-hero-name {
+	font-size: var(--font-ui-large, 18px);
+	font-weight: 650;
+	line-height: 1.2;
+	margin: 0 0 2px;
+}
+
+.reel-person-sheet .reel-person-hero-body > .reel-dim {
+	font-size: var(--font-ui-smaller);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.reel-person-sheet .reel-person-opinion {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--reel-space-1, 4px) var(--reel-space-3, 12px);
+	margin-top: var(--reel-space-2, 8px);
+}
+
+.reel-person-sheet .reel-person-stars .reel-star {
+	width: 30px;
+	height: 44px;
+	font-size: 22px;
+}
+
+.reel-person-sheet .reel-person-bio {
+	font-size: var(--font-ui-small, 14px);
+	line-height: 1.5;
+	color: var(--text-muted);
+	margin: var(--reel-space-1, 4px) 0 0;
+}
+
+.reel-person-sheet button.reel-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 0;
+	margin: 0;
+	background: transparent;
+	box-shadow: none;
+	border: none;
+	text-decoration: none;
+	color: var(--interactive-accent);
+	font-size: var(--font-ui-small, 14px);
+	font-weight: 600;
+}
+
+.reel-person-sheet .reel-person-fold,
+.reel-person-sheet .reel-person-hint {
+	font-size: var(--font-ui-smaller);
+}
+
+.reel-person-sheet .reel-person-fold {
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: var(--text-muted);
+	margin-top: var(--reel-space-2, 8px);
+}
+
+.reel-person-sheet .reel-person-hint {
+	color: var(--text-faint);
+	margin: 2px 0 var(--reel-space-3, 12px);
+}
+
+.reel-person-sheet .reel-person-credits {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--reel-space-4, 16px) var(--reel-space-3, 12px);
+	align-items: start;
+}
+
+.reel-person-sheet .reel-person-credit-poster {
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.reel-person-sheet .reel-person-credit-title {
+	margin-top: 6px;
+	font-size: var(--font-ui-small, 14px);
+	font-weight: 600;
+	line-height: 1.25;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.reel-person-sheet .reel-person-credit-role,
+.reel-person-sheet .reel-person-credit-sub {
+	font-size: var(--font-ui-smaller);
+	line-height: 1.3;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-decoration: none;
+	font-weight: 400;
+}
+
+/* Name and facts beside the portrait; Like and the stars on their own row. */
+.reel-person-sheet .reel-person-hero-body {
+	display: contents;
+}
+
+.reel-person-sheet .reel-person-hero-shot {
+	grid-column: 1;
+	grid-row: 1 / span 2;
+	align-self: center;
+}
+
+.reel-person-sheet .reel-person-hero-name {
+	grid-column: 2;
+	grid-row: 1;
+	align-self: end;
+}
+
+.reel-person-sheet .reel-person-hero-body > .reel-dim {
+	grid-column: 2;
+	grid-row: 2;
+	align-self: start;
+}
+
+.reel-person-sheet .reel-person-opinion {
+	grid-column: 1 / -1;
+	grid-row: 3;
+	margin-top: 0;
+	justify-content: space-between;
+}
+
+/* ==================================================================== */
+/* Shelves scroll freely                                                 */
+/* ==================================================================== */
+/* Snap points made a flick settle on a card with an animation, and a long
+   flick could not travel further. Free scrolling keeps the finger's momentum. */
+.reel-drow-strip,
+.reel-view:not(.is-w700) .reel-drow-strip {
+	scroll-snap-type: none;
+	scroll-behavior: auto;
+	overscroll-behavior-x: contain;
+	-webkit-overflow-scrolling: touch;
+}
+
+.reel-drow-strip > .reel-dcard,
+.reel-dcard {
+	scroll-snap-align: none;
+}
+
+.reel-person-sheet .reel-person-credit-title {
+	min-height: 2.5em;
+}
+
+.reel-person-sheet button.reel-link {
+	color: var(--text-accent);
+}
+
+.reel-person-sheet .reel-person-hint {
+	color: var(--text-muted);
+}

@@ -73,6 +73,8 @@ export interface TasteProfile {
 
 export interface DiscoverFilters {
 	genreId?: number;
+	/** Every one of these, together: Action and Comedy is action comedies. */
+	genreIds?: number[];
 	decade?: number;
 	minRating?: number;
 	type: "movie" | "tv";

@@ -33,14 +33,14 @@ import { gestureIntent } from "../util/gesture";
 import { paintExtras, paintLinks as paintLinksShared, paintTrailer as paintTrailerShared, paintCast, paintWash } from "./titleExtras";
 
 interface Filters {
-	genreId: number | null;
-	genreName: string | null;
+	genreIds: number[];
+	genreNames: string[];
 	decade: number | null;
 	minRating: number | null;
 	type: "movie" | "tv";
 }
 
-const EMPTY: Filters = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
+const EMPTY: Filters = { genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" };
 
 /** A mounted shelf: what it holds, how deep it has been read, and whether it is spent. */
 interface FeedRow {
@@ -159,7 +159,7 @@ export class DiscoverScreen {
 	private get filtered(): boolean {
 		return (
 			this.seed != null ||
-			this.filters.genreId != null ||
+			this.filters.genreIds.length > 0 ||
 			this.filters.decade != null ||
 			this.filters.minRating != null
 		);
@@ -640,8 +640,8 @@ export class DiscoverScreen {
 			this.feed = [];
 			this.nextSource = 0;
 			this.genres = [];
-			this.filters.genreId = null;
-			this.filters.genreName = null;
+			this.filters.genreIds = [];
+			this.filters.genreNames = [];
 			this.loadGenres();
 		};
 
@@ -650,15 +650,15 @@ export class DiscoverScreen {
 
 		const set: { label: string; clear: () => void }[] = [];
 		if (this.seed) set.push({ label: `Like ${this.seed.title}`, clear: () => (this.seed = null) });
-		if (this.filters.genreName) {
+		this.filters.genreIds.forEach((id, i) => {
 			set.push({
-				label: this.filters.genreName,
+				label: this.filters.genreNames[i] ?? String(id),
 				clear: () => {
-					this.filters.genreId = null;
-					this.filters.genreName = null;
+					this.filters.genreIds = this.filters.genreIds.filter((g) => g !== id);
+					this.filters.genreNames = this.filters.genreNames.filter((_, at) => at !== i);
 				},
 			});
-		}
+		});
 		if (this.filters.decade != null) set.push({ label: `${this.filters.decade}s`, clear: () => (this.filters.decade = null) });
 		if (this.filters.minRating != null) set.push({ label: `${this.filters.minRating}+`, clear: () => (this.filters.minRating = null) });
 
@@ -773,7 +773,7 @@ export class DiscoverScreen {
 	private matchesFilters(item: TmdbSearchResult): boolean {
 		const f = this.filters;
 		if (f.minRating != null && (item.vote_average ?? 0) < f.minRating) return false;
-		if (f.genreId != null && !(item.genre_ids ?? []).includes(f.genreId)) return false;
+		if (f.genreIds.some((g) => !(item.genre_ids ?? []).includes(g))) return false;
 		if (f.decade != null) {
 			const year = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
 			if (!Number.isFinite(year) || year < f.decade || year >= f.decade + 10) return false;
@@ -1390,14 +1390,14 @@ export class DiscoverScreen {
 					this.plugin.discover.like(
 						{ id: this.seed.id, type: this.seed.type },
 						{
-							genreIds: this.filters.genreId ? [this.filters.genreId] : [],
+							genreIds: this.filters.genreIds,
 							decade: this.filters.decade,
 							minRating: this.filters.minRating,
 						}
 					)
 				: this.plugin.discover.search({
 						type: this.filters.type,
-						genreId: this.filters.genreId ?? undefined,
+						genreIds: this.filters.genreIds,
 						decade: this.filters.decade ?? undefined,
 						minRating: this.filters.minRating ?? undefined,
 					});
@@ -1419,7 +1419,7 @@ export class DiscoverScreen {
 		const items = this.results.filter((i) => !this.handled.has(i.id));
 		const label = [
 			this.filters.minRating ? `${this.filters.minRating}+` : "",
-			this.filters.genreName ?? "",
+			this.filters.genreNames.join(" "),
 			this.filters.type === "tv" ? "series" : "films",
 			this.filters.decade ? `from the ${this.filters.decade}s` : "",
 			// Naming the seed matters: otherwise a narrowed set looks identical
@@ -1468,7 +1468,7 @@ export class DiscoverScreen {
 					.search(
 						{
 							type: this.filters.type,
-							genreId: this.filters.genreId ?? undefined,
+							genreIds: this.filters.genreIds,
 							decade: this.filters.decade ?? undefined,
 							minRating: this.filters.minRating ?? undefined,
 						},

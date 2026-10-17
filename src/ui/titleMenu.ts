@@ -6,6 +6,7 @@
 
 import { Menu, Notice, TFile } from "obsidian";
 import { redact } from "../secrets";
+import { haptic } from "../util/haptics";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { QuickRate } from "./quickRate";
@@ -254,3 +255,50 @@ function noteItems(m: Menu, plugin: ReelPlugin, entry: Entry, file: TFile): void
 	);
 }
 
+
+
+/**
+ * Press and hold anywhere on an element for the title's menu; right-click does
+ * the same. 500ms with an 8px movement allowance, so a scroll that starts on
+ * the row never opens it. The click that follows a hold is swallowed.
+ */
+export function onHold(plugin: ReelPlugin, el: HTMLElement, entry: Entry): void {
+	let timer: number | null = null;
+	let held = false;
+	let sx = 0;
+	let sy = 0;
+	const cancel = (): void => {
+		if (timer != null) window.clearTimeout(timer);
+		timer = null;
+	};
+	const open = (x: number, y: number): void => {
+		held = true;
+		cancel();
+		haptic("hold");
+		showTitleMenu(plugin, entry, x, y);
+	};
+	el.addEventListener("pointerdown", (e) => {
+		held = false;
+		sx = e.clientX;
+		sy = e.clientY;
+		timer = window.setTimeout(() => open(e.clientX, e.clientY), 500);
+	});
+	el.addEventListener("pointermove", (e) => {
+		if (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) cancel();
+	});
+	for (const ev of ["pointerup", "pointercancel", "pointerleave"]) el.addEventListener(ev, cancel);
+	el.addEventListener("contextmenu", (e) => {
+		e.preventDefault();
+		open(e.clientX, e.clientY);
+	});
+	el.addEventListener(
+		"click",
+		(e) => {
+			if (!held) return;
+			held = false;
+			e.stopPropagation();
+			e.preventDefault();
+		},
+		true
+	);
+}

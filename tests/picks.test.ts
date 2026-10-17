@@ -4,7 +4,7 @@
  * The point of the engine is that the watchlist does not show the same rows on
  * every visit. These pin that, and the rules that make it trustworthy.
  */
-import { pickTonight } from "../src/picks";
+import { pickTonight, plainName } from "../src/picks";
 import type { Entry } from "../src/types";
 
 let passed = 0;
@@ -95,6 +95,14 @@ ok("at most one series", mixed.filter((p) => p.entry.type === "tv").length <= 1)
 ok("empty watchlist gives nothing", pickTonight([], [loved], { now: NOW }).length === 0);
 ok("fewer than three gives what there is", pickTonight(list.slice(0, 2), [], { now: NOW }).length === 2);
 ok("a saturday still works", pickTonight(list, [loved], { now: SAT }).length === 3);
+
+/* ---- names written as wikilinks ------------------------------------- */
+ok("a piped wikilink reads as its alias", plainName("[[Movies/People/Mel Gibson|Mel Gibson]]") === "Mel Gibson");
+ok("a bare wikilink reads as its last segment", plainName("[[People/Heath Ledger]]") === "Heath Ledger");
+ok("plain text is untouched", plainName("Denzel Washington") === "Denzel Washington");
+const linked = film(400, { director: ["[[People/Michael Mann|Michael Mann]]"], title: "Linked" });
+const lp = pickTonight([...list.slice(0, 6), linked], [loved], { now: NOW, count: 7 });
+ok("a linked director still matches taste and the reason has no brackets", lp.every((p) => !p.reason.includes("[[")));
 
 if (failed) {
 	console.error(`picks: ${failed} failed, ${passed} passed`);

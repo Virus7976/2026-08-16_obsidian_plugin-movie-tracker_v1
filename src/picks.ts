@@ -49,6 +49,16 @@ export interface PickOptions {
 
 const DAY = 86400000;
 
+/** A person in a note may be a wikilink, [[Folder/Name|Name]]. Words only here. */
+export function plainName(raw: string): string {
+	const m = /^\[\[([^\]]*)\]\]$/.exec(raw.trim());
+	if (!m) return raw;
+	const inner = m[1];
+	const bar = inner.indexOf("|");
+	if (bar >= 0) return inner.slice(bar + 1).trim();
+	return inner.split("/").pop()?.trim() ?? inner;
+}
+
 /** A stable number in [0, 1) from a string, so the same day gives the same noise. */
 export function seeded(text: string): number {
 	let h = 2166136261;
@@ -82,8 +92,8 @@ function tasteOf(all: Entry[]): Taste {
 			}
 		};
 		for (const g of e.genres) add(t.genres, g, w);
-		for (const d of e.director) add(t.people, d, w * 1.5);
-		for (const c of e.cast.slice(0, 3)) add(t.people, c, w * 0.5);
+		for (const d of e.director) add(t.people, plainName(d), w * 1.5);
+		for (const c of e.cast.slice(0, 3)) add(t.people, plainName(c), w * 0.5);
 	}
 	return t;
 }
@@ -109,7 +119,7 @@ function scoreOf(e: Entry, taste: Taste, o: Required<Pick<PickOptions, "now" | "
 	let person = 0;
 	let personKey = "";
 	let personBest = 0;
-	for (const p of [...e.director, ...e.cast.slice(0, 3)]) {
+	for (const p of [...e.director, ...e.cast.slice(0, 3)].map(plainName)) {
 		const w = taste.people.get(p) ?? 0;
 		person += w;
 		if (w > personBest) {

@@ -11,8 +11,8 @@ import { App, Modal, Platform } from "obsidian";
 import { setSelected } from "./a11y";
 
 export interface DiscoverFilters {
-	genreId: number | null;
-	genreName: string | null;
+	genreIds: number[];
+	genreNames: string[];
 	decade: number | null;
 	minRating: number | null;
 	type: "movie" | "tv";
@@ -119,10 +119,16 @@ export class DiscoverFilterSheet extends Modal {
 		const gbox = section("Genre");
 		if (!genres.length) gbox.createSpan({ cls: "reel-dim", text: "Loading…" });
 		for (const g of genres) {
-			pick(gbox, g.name, this.filters.genreId === g.id, () => {
-				const on = this.filters.genreId === g.id;
-				this.filters.genreId = on ? null : g.id;
-				this.filters.genreName = on ? null : g.name;
+			// Several at once: Action and Comedy together means action comedies.
+			pick(gbox, g.name, this.filters.genreIds.includes(g.id), () => {
+				const at = this.filters.genreIds.indexOf(g.id);
+				if (at >= 0) {
+					this.filters.genreIds.splice(at, 1);
+					this.filters.genreNames.splice(at, 1);
+				} else {
+					this.filters.genreIds.push(g.id);
+					this.filters.genreNames.push(g.name);
+				}
 			});
 		}
 		this.fold(gbox, 8);

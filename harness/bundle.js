@@ -1228,6 +1228,50 @@
       )
     );
   }
+  function onHold(plugin2, el, entry) {
+    let timer = null;
+    let held = false;
+    let sx = 0;
+    let sy = 0;
+    const cancel = () => {
+      if (timer != null)
+        window.clearTimeout(timer);
+      timer = null;
+    };
+    const open2 = (x, y) => {
+      held = true;
+      cancel();
+      haptic("hold");
+      showTitleMenu(plugin2, entry, x, y);
+    };
+    el.addEventListener("pointerdown", (e) => {
+      held = false;
+      sx = e.clientX;
+      sy = e.clientY;
+      timer = window.setTimeout(() => open2(e.clientX, e.clientY), 500);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)
+        cancel();
+    });
+    for (const ev of ["pointerup", "pointercancel", "pointerleave"])
+      el.addEventListener(ev, cancel);
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      open2(e.clientX, e.clientY);
+    });
+    el.addEventListener(
+      "click",
+      (e) => {
+        if (!held)
+          return;
+        held = false;
+        e.stopPropagation();
+        e.preventDefault();
+      },
+      true
+    );
+  }
 
   // src/render/grid.ts
   function wireCell(plugin2, cell, entry, onSelect) {
@@ -2353,6 +2397,16 @@
 
   // src/picks.ts
   var DAY = 864e5;
+  function plainName(raw) {
+    const m = /^\[\[([^\]]*)\]\]$/.exec(raw.trim());
+    if (!m)
+      return raw;
+    const inner = m[1];
+    const bar = inner.indexOf("|");
+    if (bar >= 0)
+      return inner.slice(bar + 1).trim();
+    return inner.split("/").pop()?.trim() ?? inner;
+  }
   function seeded(text) {
     let h = 2166136261;
     for (let i = 0; i < text.length; i++) {
@@ -2383,9 +2437,9 @@
       for (const g of e.genres)
         add(t.genres, g, w);
       for (const d of e.director)
-        add(t.people, d, w * 1.5);
+        add(t.people, plainName(d), w * 1.5);
       for (const c of e.cast.slice(0, 3))
-        add(t.people, c, w * 0.5);
+        add(t.people, plainName(c), w * 0.5);
     }
     return t;
   }
@@ -2406,7 +2460,7 @@
     let person = 0;
     let personKey = "";
     let personBest = 0;
-    for (const p of [...e.director, ...e.cast.slice(0, 3)]) {
+    for (const p of [...e.director, ...e.cast.slice(0, 3)].map(plainName)) {
       const w = taste.people.get(p) ?? 0;
       person += w;
       if (w > personBest) {
@@ -2844,11 +2898,21 @@
     new UpNextPainter(plugin2, containerEl, limit, heading, entries).render();
   }
   var pickSalt = 0;
-  var watchState = { kind: "all", sort: "added" };
+  var watchState = {
+    kind: "all",
+    sort: "added",
+    genres: [],
+    streaming: false
+  };
   var WATCH_SORTS = [
     ["added", "Recently added"],
+    ["oldest", "Waiting longest"],
     ["short", "Shortest first"],
+    ["long", "Longest first"],
     ["rated", "Highest rated"],
+    ["newest", "Newest release"],
+    ["oldrelease", "Oldest release"],
+    ["service", "On a service first"],
     ["title", "Title A to Z"]
   ];
   var UpNextPainter = class {
@@ -2952,16 +3016,66 @@
         }
         menu.showAtMouseEvent(ev);
       });
+      const allGenres = [...new Set(all2.flatMap((e) => e.genres))].sort();
+      if (allGenres.length) {
+        const g = watchState.genres;
+        const genre = bar.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        setIcon(genre.createSpan({ cls: "reel-filter-btn-icon" }), "tags");
+        genre.createSpan({ text: g.length ? g.join(", ") : "Genre" });
+        genre.toggleClass("is-active", g.length > 0);
+        genre.addEventListener("click", (ev) => {
+          const menu = new Menu();
+          for (const name of allGenres) {
+            menu.addItem(
+              (i) => i.setTitle(name).setChecked(watchState.genres.includes(name)).onClick(() => {
+                watchState.genres = watchState.genres.includes(name) ? watchState.genres.filter((x) => x !== name) : [...watchState.genres, name];
+                this.render();
+              })
+            );
+          }
+          menu.showAtMouseEvent(ev);
+        });
+      }
+      if (all2.some((e) => e.providers.length)) {
+        const svc = bar.createEl("button", { cls: "reel-chip", attr: { type: "button" } });
+        svc.createSpan({ text: "On a service" });
+        svc.toggleClass("is-active", watchState.streaming);
+        svc.setAttr("aria-pressed", String(watchState.streaming));
+        svc.addEventListener("click", () => {
+          watchState.streaming = !watchState.streaming;
+          this.render();
+        });
+      }
       let rows2 = watchState.kind === "all" ? all2 : all2.filter((e) => e.type === watchState.kind);
+      if (watchState.genres.length)
+        rows2 = rows2.filter((e) => watchState.genres.every((x) => e.genres.includes(x)));
+      if (watchState.streaming)
+        rows2 = rows2.filter((e) => e.providers.length > 0);
+      const year2 = (e) => e.year ?? e.firstAirYear ?? 0;
       rows2 = [...rows2].sort((a, b) => {
-        if (watchState.sort === "short")
-          return (a.runtime ?? 1e6) - (b.runtime ?? 1e6);
-        if (watchState.sort === "rated")
-          return (b.tmdbRating ?? 0) - (a.tmdbRating ?? 0);
-        if (watchState.sort === "title")
-          return a.title.localeCompare(b.title);
-        return (b.added ?? 0) - (a.added ?? 0);
+        switch (watchState.sort) {
+          case "oldest":
+            return (a.added ?? 1e15) - (b.added ?? 1e15);
+          case "short":
+            return (a.runtime ?? 1e6) - (b.runtime ?? 1e6);
+          case "long":
+            return (b.runtime ?? 0) - (a.runtime ?? 0);
+          case "rated":
+            return (b.tmdbRating ?? 0) - (a.tmdbRating ?? 0);
+          case "newest":
+            return year2(b) - year2(a);
+          case "oldrelease":
+            return (year2(a) || 1e6) - (year2(b) || 1e6);
+          case "service":
+            return b.providers.length - a.providers.length || (b.added ?? 0) - (a.added ?? 0);
+          case "title":
+            return a.title.localeCompare(b.title);
+          default:
+            return (b.added ?? 0) - (a.added ?? 0);
+        }
       });
+      if (!rows2.length)
+        wrap.createDiv({ cls: "reel-dim", text: "Nothing on your watchlist matches." });
       const list2 = wrap.createDiv({ cls: "reel-upnext reel-watchlist-list" });
       for (const entry of rows2.slice(0, 40))
         list2.appendChild(this.watchRow(entry));
@@ -3062,12 +3176,7 @@
           }
         });
       }
-      const more = actions.createEl("button", { cls: "reel-more", text: "\u22EF", attr: { type: "button", "aria-label": `More for ${entry.title}` } });
-      more.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const r = more.getBoundingClientRect();
-        showTitleMenu(this.plugin, entry, r.right, r.bottom);
-      });
+      onHold(this.plugin, row, entry);
       return row;
     }
     /** One row. Detached, so it can be appended lazily by 'show more'. */
@@ -3625,10 +3734,15 @@
       if (!genres.length)
         gbox.createSpan({ cls: "reel-dim", text: "Loading\u2026" });
       for (const g of genres) {
-        pick(gbox, g.name, this.filters.genreId === g.id, () => {
-          const on = this.filters.genreId === g.id;
-          this.filters.genreId = on ? null : g.id;
-          this.filters.genreName = on ? null : g.name;
+        pick(gbox, g.name, this.filters.genreIds.includes(g.id), () => {
+          const at = this.filters.genreIds.indexOf(g.id);
+          if (at >= 0) {
+            this.filters.genreIds.splice(at, 1);
+            this.filters.genreNames.splice(at, 1);
+          } else {
+            this.filters.genreIds.push(g.id);
+            this.filters.genreNames.push(g.name);
+          }
         });
       }
       this.fold(gbox, 8);
@@ -3804,7 +3918,7 @@
   }
 
   // src/ui/discoverView.ts
-  var EMPTY = { genreId: null, genreName: null, decade: null, minRating: null, type: "movie" };
+  var EMPTY = { genreIds: [], genreNames: [], decade: null, minRating: null, type: "movie" };
   var DiscoverScreen = class {
     constructor(plugin2) {
       this.plugin = plugin2;
@@ -3907,7 +4021,7 @@
       return this.feed.map((f) => ({ id: f.source.id, title: f.source.title, reason: f.source.reason, items: f.items }));
     }
     get filtered() {
-      return this.seed != null || this.filters.genreId != null || this.filters.decade != null || this.filters.minRating != null;
+      return this.seed != null || this.filters.genreIds.length > 0 || this.filters.decade != null || this.filters.minRating != null;
     }
     reset() {
       this.seed = null;
@@ -4278,8 +4392,8 @@
         this.feed = [];
         this.nextSource = 0;
         this.genres = [];
-        this.filters.genreId = null;
-        this.filters.genreName = null;
+        this.filters.genreIds = [];
+        this.filters.genreNames = [];
         this.loadGenres();
       };
       if (!this.genres.length)
@@ -4287,15 +4401,15 @@
       const set = [];
       if (this.seed)
         set.push({ label: `Like ${this.seed.title}`, clear: () => this.seed = null });
-      if (this.filters.genreName) {
+      this.filters.genreIds.forEach((id, i) => {
         set.push({
-          label: this.filters.genreName,
+          label: this.filters.genreNames[i] ?? String(id),
           clear: () => {
-            this.filters.genreId = null;
-            this.filters.genreName = null;
+            this.filters.genreIds = this.filters.genreIds.filter((g) => g !== id);
+            this.filters.genreNames = this.filters.genreNames.filter((_, at) => at !== i);
           }
         });
-      }
+      });
       if (this.filters.decade != null)
         set.push({ label: `${this.filters.decade}s`, clear: () => this.filters.decade = null });
       if (this.filters.minRating != null)
@@ -4400,7 +4514,7 @@
       const f = this.filters;
       if (f.minRating != null && (item.vote_average ?? 0) < f.minRating)
         return false;
-      if (f.genreId != null && !(item.genre_ids ?? []).includes(f.genreId))
+      if (f.genreIds.some((g) => !(item.genre_ids ?? []).includes(g)))
         return false;
       if (f.decade != null) {
         const year2 = Number((item.release_date ?? item.first_air_date ?? "").slice(0, 4));
@@ -4921,14 +5035,14 @@
           this.plugin.discover.like(
             { id: this.seed.id, type: this.seed.type },
             {
-              genreIds: this.filters.genreId ? [this.filters.genreId] : [],
+              genreIds: this.filters.genreIds,
               decade: this.filters.decade,
               minRating: this.filters.minRating
             }
           )
         ) : this.plugin.discover.search({
           type: this.filters.type,
-          genreId: this.filters.genreId ?? void 0,
+          genreIds: this.filters.genreIds,
           decade: this.filters.decade ?? void 0,
           minRating: this.filters.minRating ?? void 0
         });
@@ -4945,7 +5059,7 @@
       const items = this.results.filter((i) => !this.handled.has(i.id));
       const label = [
         this.filters.minRating ? `${this.filters.minRating}+` : "",
-        this.filters.genreName ?? "",
+        this.filters.genreNames.join(" "),
         this.filters.type === "tv" ? "series" : "films",
         this.filters.decade ? `from the ${this.filters.decade}s` : "",
         // Naming the seed matters: otherwise a narrowed set looks identical
@@ -4980,7 +5094,7 @@
           void this.plugin.discover.search(
             {
               type: this.filters.type,
-              genreId: this.filters.genreId ?? void 0,
+              genreIds: this.filters.genreIds,
               decade: this.filters.decade ?? void 0,
               minRating: this.filters.minRating ?? void 0
             },
