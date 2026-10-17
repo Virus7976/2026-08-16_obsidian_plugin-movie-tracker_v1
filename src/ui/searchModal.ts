@@ -17,6 +17,7 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 	private results: TmdbSearchResult[] = [];
 	private lastQuery = "";
 	private seq = 0;
+	private startQuery = "";
 	private resolveResults: ((r: TmdbSearchResult[]) => void) | null = null;
 
 	constructor(
@@ -54,11 +55,15 @@ export class SearchModal extends SuggestModal<TmdbSearchResult> {
 
 		// Arriving from a library search that found nothing: carry the words
 		// across rather than making you type them a second time.
-		if (opts.query) {
-			this.inputEl.value = opts.query;
-			// The input has no value when SuggestModal binds its listener, so
-			// the first search has to be kicked off by hand.
-			window.setTimeout(() => this.inputEl.dispatchEvent(new Event("input")), 0);
+		this.startQuery = opts.query ?? "";
+	}
+
+	/** Obsidian's onOpen empties the box, so a carried-over query is set after it. */
+	onOpen(): void {
+		super.onOpen();
+		if (this.startQuery) {
+			this.inputEl.value = this.startQuery;
+			this.inputEl.dispatchEvent(new Event("input"));
 		}
 	}
 

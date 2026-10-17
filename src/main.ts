@@ -331,8 +331,8 @@ export default class ReelPlugin extends Plugin {
 	}
 
 	/** One box for the library and TMDB. See OmniSearch. */
-	openOmni(query = "", scope: OmniScope = "all"): void {
-		new OmniSearch(this.app, this, query, scope).open();
+	openOmni(query = "", scope: OmniScope = "all", similar?: { id: number; type: "movie" | "tv"; title: string }): void {
+		new OmniSearch(this.app, this, query, scope, undefined, similar).open();
 	}
 
 	openSearch(opts: { watchlist?: boolean; query?: string } = {}): void {

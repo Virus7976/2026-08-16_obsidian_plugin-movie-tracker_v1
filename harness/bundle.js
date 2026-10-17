@@ -1177,7 +1177,7 @@
     row(`${entry.collection ?? ""}`, "layers", entry.collection);
     m.addSeparator();
     m.addItem(
-      (i) => i.setTitle("Similar titles on Discover").setIcon("compass").onClick(() => plugin2.openOmni(entry.title, "new"))
+      (i) => i.setTitle("Similar titles").setIcon("compass").onClick(() => plugin2.openOmni("", "new", { id: entry.tmdbId, type: entry.type === "tv" ? "tv" : "movie", title: entry.title }))
     );
   }
   function lookUpItems(m, entry) {
@@ -3088,6 +3088,7 @@
       this.results = [];
       this.lastQuery = "";
       this.seq = 0;
+      this.startQuery = "";
       this.resolveResults = null;
       /** 300ms debounce, with a sequence guard so a slow reply can't overwrite a fast one. */
       this.runSearch = debounce(
@@ -3123,9 +3124,14 @@
         // looks like TMDB doesn't have it rather than like a cut-off list.
         { command: "20 max", purpose: "add words to narrow" }
       ]);
-      if (opts.query) {
-        this.inputEl.value = opts.query;
-        window.setTimeout(() => this.inputEl.dispatchEvent(new Event("input")), 0);
+      this.startQuery = opts.query ?? "";
+    }
+    /** Obsidian's onOpen empties the box, so a carried-over query is set after it. */
+    onOpen() {
+      super.onOpen();
+      if (this.startQuery) {
+        this.inputEl.value = this.startQuery;
+        this.inputEl.dispatchEvent(new Event("input"));
       }
     }
     async getSuggestions(query) {

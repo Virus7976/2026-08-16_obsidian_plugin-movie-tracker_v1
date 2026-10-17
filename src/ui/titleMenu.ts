@@ -180,9 +180,9 @@ function findMoreItems(m: Menu, plugin: ReelPlugin, entry: Entry): void {
 	m.addSeparator();
 	m.addItem((i) =>
 		i
-			.setTitle("Similar titles on Discover")
+			.setTitle("Similar titles")
 			.setIcon("compass")
-			.onClick(() => plugin.openOmni(entry.title, "new"))
+			.onClick(() => plugin.openOmni("", "new", { id: entry.tmdbId, type: entry.type === "tv" ? "tv" : "movie", title: entry.title }))
 	);
 }
 
