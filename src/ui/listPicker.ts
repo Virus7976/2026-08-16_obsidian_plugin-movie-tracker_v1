@@ -29,7 +29,7 @@ export class ListPicker extends Modal {
 		modalEl.addClass("reel-modal");
 		if (Platform.isPhone) modalEl.addClass("reel-sheet");
 
-		contentEl.createEl("h3", { cls: "reel-log-title", text: "Lists" });
+		contentEl.createEl("h3", { cls: "reel-log-title", text: "Tags and lists" });
 		contentEl.createDiv({ cls: "reel-log-sub", text: this.entry.title });
 
 		const chipRow = contentEl.createDiv({ cls: "reel-flag-row" });
@@ -47,10 +47,10 @@ export class ListPicker extends Modal {
 		};
 
 		[...known].sort().forEach(addChip);
-		if (!known.size) contentEl.createDiv({ cls: "reel-dim", text: "No lists yet — create one below." });
+		if (!known.size) contentEl.createDiv({ cls: "reel-dim", text: "No tags yet — create one below." });
 
 		const newRow = contentEl.createDiv({ cls: "reel-field" });
-		newRow.createDiv({ cls: "reel-field-label", text: "New list" });
+		newRow.createDiv({ cls: "reel-field-label", text: "New tag or list" });
 		const input = newRow.createEl("input", {
 			cls: "reel-input",
 			attr: { type: "text", placeholder: "e.g. Halloween 2026", enterkeyhint: "done" },

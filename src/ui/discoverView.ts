@@ -24,6 +24,7 @@ import { LogSheet } from "./logSheet";
 import { trailerUrl, providerNames, imdbUrl, tmdbUrl } from "../extract";
 import { formatMinutes } from "../util/dates";
 import { PersonSheet } from "./personSheet";
+import { holdAt, showResultMenu } from "./titleMenu";
 import { badgePerson } from "./personBadge";
 import { skeletonCards, skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
@@ -1990,6 +1991,8 @@ export class PreviewSheet extends Modal {
 			});
 		}
 
+		this.paintMoreLikeThis(slot, meta, isTv);
+
 		const cast = (credits?.cast ?? []).slice(0, 10);
 		if (!cast.length) return;
 		slot.createDiv({ cls: "reel-block-title", text: "Cast" });
@@ -2011,6 +2014,72 @@ export class PreviewSheet extends Modal {
 			cell.setAttr("tabindex", "0");
 			cell.setAttr("aria-label", `${p.name} — open their filmography`);
 			cell.addEventListener("click", () => new PersonSheet(this.plugin, id, p.name).open());
+		}
+	}
+
+	/**
+	 * Titles like this one, as IMDb's "More like this": tap any of them for the
+	 * same sheet about that title, which has its own strip, and so on. Press and
+	 * hold for the places that know more.
+	 */
+	private paintMoreLikeThis(slot: HTMLElement, meta: TmdbFilm | TmdbShow, isTv: boolean): void {
+		const rows: TmdbSearchResult[] = [];
+		for (const r of [...(meta.recommendations?.results ?? []), ...(meta.similar?.results ?? [])]) {
+			if (r.id === this.item.id || r.adult || !r.poster_path || rows.some((x) => x.id === r.id)) continue;
+			rows.push({ ...r, media_type: r.media_type ?? (isTv ? "tv" : "movie") });
+		}
+		if (!rows.length) return;
+
+		slot.createDiv({ cls: "reel-block-title", text: "More like this" });
+		const strip = slot.createDiv({ cls: "reel-related reel-morelike" });
+		for (const r of rows.slice(0, 20)) {
+			const rTv = r.media_type === "tv";
+			const rTitle = (rTv ? r.name : r.title) ?? "Untitled";
+			const card = strip.createDiv({ cls: "reel-related-card" });
+			card.setAttr("role", "button");
+			card.setAttr("tabindex", "0");
+			card.setAttr("aria-label", `${rTitle} — see details`);
+			const poster = card.createDiv({ cls: "reel-related-poster" });
+			const src = this.plugin.tmdb.posterUrl(r.poster_path, "w342");
+			if (src) poster.createEl("img", { attr: { src, alt: "", loading: "lazy" } });
+			card.createDiv({ cls: "reel-related-title", text: rTitle });
+			const year = String(yearOf(rTv ? r.first_air_date : r.release_date) ?? "");
+			const bits = [year, r.vote_average ? `\u2605 ${r.vote_average.toFixed(1)}` : ""].filter(Boolean);
+			if (bits.length) card.createDiv({ cls: "reel-related-sub", text: bits.join("  ") });
+
+			const open = (): void => {
+				const mine = this.plugin.library.byTmdbId(r.id, rTv ? "tv" : "film");
+				if (mine) {
+					this.close();
+					void this.plugin.openDetail(mine);
+				} else {
+					new PreviewSheet(this.plugin, r, this.onAdded).open();
+				}
+			};
+			holdAt(card, (x, y) =>
+				showResultMenu(
+					this.plugin,
+					{ id: r.id, title: rTitle, year, isTv: rTv },
+					x,
+					y,
+					open,
+					this.plugin.library.byTmdbId(r.id, rTv ? "tv" : "film")
+						? undefined
+						: () => {
+								void this.plugin.notes
+									.createFromResult(r, { date: todayISO(), watchlist: true })
+									.then(() => this.plugin.undo.offer(`Added ${rTitle} to your watchlist`))
+									.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
+							}
+				)
+			);
+			card.addEventListener("click", open);
+			card.addEventListener("keydown", (ev: KeyboardEvent) => {
+				if (ev.key === "Enter" || ev.key === " ") {
+					ev.preventDefault();
+					open();
+				}
+			});
 		}
 	}
 

@@ -98,7 +98,7 @@ export class DiscoverFilterSheet extends Modal {
 			return b;
 		};
 
-		const kinds = section("Type", true);
+		const kinds = section("Type");
 		pick(kinds, "Films", this.filters.type === "movie", () => this.hooks.setType("movie"));
 		pick(kinds, "Series", this.filters.type === "tv", () => this.hooks.setType("tv"));
 
@@ -131,16 +131,16 @@ export class DiscoverFilterSheet extends Modal {
 				}
 			});
 		}
-		this.fold(gbox, 8);
+		// A phone folds the long list; a wide window has room for all of it.
+		this.fold(gbox, Platform.isPhone ? 8 : 99);
 
-		const decades = section("Decade", true);
+		const decades = section("Decade");
 		const nowDecade = Math.floor(new Date().getFullYear() / 10) * 10;
 		for (let d = nowDecade; d >= 1950; d -= 10) {
 			pick(decades, `${d}s`, this.filters.decade === d, () => {
 				this.filters.decade = this.filters.decade === d ? null : d;
 			});
 		}
-		this.fold(decades, 6);
 
 		const score = section("Minimum score");
 		for (const r of [6, 7, 8]) {

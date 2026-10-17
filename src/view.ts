@@ -219,10 +219,8 @@ export class ReelView extends ItemView {
 		 * Reel's own header row was competing for that space and losing.
 		 */
 		this.addAction("plus", "Log a film or series", () => this.plugin.openSearch());
-		// Search lives in Obsidian's header, next to its own controls. It was
-		// briefly in Reel's row instead, which put two magnifiers a centimetre
-		// apart; the top bar is the one that reads as part of the app.
-		this.addAction("search", "Search everything", () => this.openOmni());
+		// No search button here: the search bar inside the view is the one search,
+		// and a second magnifier in the header only duplicated it.
 
 		this.build();
 		this.registerEvent(this.plugin.library.on("changed", () => this.paint()));

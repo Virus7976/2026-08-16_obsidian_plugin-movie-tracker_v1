@@ -4,13 +4,15 @@
  * One builder, so every place a title appears offers the same doors.
  */
 
-import { Menu, Notice, TFile } from "obsidian";
+import { Menu, Notice, Platform, TFile } from "obsidian";
 import { redact } from "../secrets";
 import { haptic } from "../util/haptics";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { QuickRate } from "./quickRate";
 import { ListPicker } from "./listPicker";
+import { ReviewEditor } from "./reviewPane";
+import { LogSheet } from "./logSheet";
 import { imdbUrl, tmdbUrl } from "../extract";
 
 /**
@@ -48,7 +50,7 @@ export function showTitleMenu(
 				.setIcon("panel-right-open")
 				.onClick(() => {
 					if (onSelect) onSelect(entry);
-					else void plugin.app.workspace.getLeaf(false).openFile(file);
+					else void plugin.openDetail(entry);
 				})
 		);
 	}
@@ -65,6 +67,13 @@ export function showTitleMenu(
 			.setTitle(entry.liked ? "Unlike" : "Like")
 			.setIcon("heart")
 			.onClick(() => run(plugin.notes.toggleLiked(file).then((on) => plugin.undo.offer(on ? "Liked" : "Unliked"))))
+	);
+
+	menu.addItem((i) =>
+		i.setTitle("Write a review").setIcon("pencil-line").onClick(() => new ReviewEditor(plugin, entry, null, () => {}).open())
+	);
+	menu.addItem((i) =>
+		i.setTitle("Log a viewing").setIcon("calendar-plus").onClick(() => new LogSheet(plugin.app, plugin, { entry, file }).open())
 	);
 
 	if (entry.status === "watchlist") {
@@ -106,7 +115,7 @@ export function showTitleMenu(
 	menu.addSeparator();
 	menu.addItem((i) =>
 		i
-			.setTitle("Lists…")
+			.setTitle("Tags and lists…")
 			.setIcon("list")
 			.onClick(() => new ListPicker(plugin.app, plugin, entry, file).open())
 	);
@@ -119,7 +128,14 @@ export function showTitleMenu(
 	menu.showAtPosition({ x, y });
 }
 
-/** A menu row that opens a second, named menu where the first one was. */
+/**
+ * A menu row that opens a second, named menu.
+ *
+ * On a desktop it is a real flyout that opens on hover, like every other menu
+ * in Obsidian. `setSubmenu` is not in the published typings, so it is
+ * feature-tested; on a phone (or where it is missing) the row opens a second
+ * menu in place instead, since a phone's menu is a bottom sheet.
+ */
 function door(
 	menu: Menu,
 	title: string,
@@ -129,9 +145,14 @@ function door(
 	heading: string,
 	fill: (m: Menu) => void
 ): void {
-	menu.addItem((i) =>
-		i
-			.setTitle(`${title}…`)
+	menu.addItem((i) => {
+		const withSub = i as unknown as { setSubmenu?: () => Menu };
+		if (!Platform.isMobile && typeof withSub.setSubmenu === "function") {
+			i.setTitle(title).setIcon(icon);
+			fill(withSub.setSubmenu());
+			return;
+		}
+		i.setTitle(`${title}…`)
 			.setIcon(icon)
 			.onClick(() => {
 				const m = new Menu();
@@ -141,8 +162,8 @@ function door(
 				m.addSeparator();
 				fill(m);
 				m.showAtPosition({ x, y });
-			})
-	);
+			});
+	});
 }
 
 const open = (url: string): void => void window.open(url, "_blank", "noopener");
@@ -258,11 +279,11 @@ function noteItems(m: Menu, plugin: ReelPlugin, entry: Entry, file: TFile): void
 
 
 /**
- * Press and hold anywhere on an element for the title's menu; right-click does
- * the same. 500ms with an 8px movement allowance, so a scroll that starts on
- * the row never opens it. The click that follows a hold is swallowed.
+ * Press and hold an element (or right-click it) and call back with where.
+ * 500ms with an 8px movement allowance, so a scroll that starts on the element
+ * never opens it. The click that follows a hold is swallowed.
  */
-export function onHold(plugin: ReelPlugin, el: HTMLElement, entry: Entry): void {
+export function holdAt(el: HTMLElement, cb: (x: number, y: number) => void): void {
 	let timer: number | null = null;
 	let held = false;
 	let sx = 0;
@@ -275,7 +296,7 @@ export function onHold(plugin: ReelPlugin, el: HTMLElement, entry: Entry): void 
 		held = true;
 		cancel();
 		haptic("hold");
-		showTitleMenu(plugin, entry, x, y);
+		cb(x, y);
 	};
 	el.addEventListener("pointerdown", (e) => {
 		held = false;
@@ -301,4 +322,64 @@ export function onHold(plugin: ReelPlugin, el: HTMLElement, entry: Entry): void 
 		},
 		true
 	);
+}
+
+/** Press and hold anywhere on an element for the title's menu. */
+export function onHold(plugin: ReelPlugin, el: HTMLElement, entry: Entry): void {
+	holdAt(el, (x, y) => showTitleMenu(plugin, entry, x, y));
+}
+
+const link = (m: Menu, title: string, url: string): void => {
+	m.addItem((i) => i.setTitle(title).setIcon("external-link").onClick(() => open(url)));
+};
+
+/** A person: their screen, your library, and the places that know more. */
+export function showPersonMenu(
+	plugin: ReelPlugin,
+	person: { id?: number; name: string },
+	x: number,
+	y: number,
+	onOpen?: () => void
+): void {
+	const menu = new Menu();
+	if (onOpen) menu.addItem((i) => i.setTitle("Open").setIcon("user").onClick(onOpen));
+	menu.addItem((i) =>
+		i.setTitle("Search your library").setIcon("search").onClick(() => void plugin.openViewWithSearch(person.name))
+	);
+	const q = encodeURIComponent(person.name);
+	door(menu, "Look them up", "external-link", x, y, person.name, (m) => {
+		if (person.id) link(m, "TMDB", `https://www.themoviedb.org/person/${person.id}`);
+		link(m, "IMDb", `https://www.imdb.com/find/?q=${q}&s=nm`);
+		link(m, "Wikipedia", `https://en.wikipedia.org/w/index.php?search=${q}`);
+		link(m, "Letterboxd", `https://letterboxd.com/search/${q}/`);
+		link(m, "Trakt", `https://trakt.tv/search/people?query=${q}`);
+		link(m, "Search the web", `https://www.google.com/search?q=${q}`);
+	});
+	menu.showAtPosition({ x, y });
+}
+
+/** A title from TMDB that may not be yours yet. */
+export function showResultMenu(
+	plugin: ReelPlugin,
+	r: { id: number; title: string; year?: string; isTv: boolean },
+	x: number,
+	y: number,
+	onOpen: () => void,
+	onAdd?: () => void
+): void {
+	const menu = new Menu();
+	menu.addItem((i) => i.setTitle("Open").setIcon("panel-right").onClick(onOpen));
+	if (onAdd) menu.addItem((i) => i.setTitle("Add to watchlist").setIcon("bookmark").onClick(onAdd));
+	const q = encodeURIComponent(`${r.title}${r.year ? ` ${r.year}` : ""}`);
+	const kind = r.isTv ? "tv" : "movie";
+	const region = (plugin.settings.region || "us").toLowerCase();
+	door(menu, "Look it up", "external-link", x, y, r.title, (m) => {
+		link(m, "TMDB", `https://www.themoviedb.org/${kind}/${r.id}`);
+		link(m, "IMDb", `https://www.imdb.com/find/?q=${q}&s=tt`);
+		if (!r.isTv) link(m, "Letterboxd", `https://letterboxd.com/tmdb/${r.id}`);
+		link(m, "Trakt", `https://trakt.tv/search/tmdb/${r.id}?id_type=${r.isTv ? "show" : "movie"}`);
+		link(m, "Where to watch", `https://www.justwatch.com/${region}/search?q=${encodeURIComponent(r.title)}`);
+		link(m, "Search the web", `https://www.google.com/search?q=${q}`);
+	});
+	menu.showAtPosition({ x, y });
 }

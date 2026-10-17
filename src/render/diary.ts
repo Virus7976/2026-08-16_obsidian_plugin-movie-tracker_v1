@@ -7,6 +7,7 @@
  * invisible anywhere else. Here it gets its own row.
  */
 
+import { onHold } from "../ui/titleMenu";
 import { MarkdownPostProcessorContext, MarkdownRenderChild, TFile } from "obsidian";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
@@ -209,6 +210,7 @@ export function paintDiaryRows(
 
 		opts.extras?.(body, v);
 
+		onHold(plugin, row, v.entry);
 		row.addEventListener("click", () => onOpen(v));
 		row.addEventListener("keydown", (ev: KeyboardEvent) => {
 			if (ev.key === "Enter" || ev.key === " ") {

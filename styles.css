@@ -19954,3 +19954,273 @@ body.is-mobile .modal-container .modal.reel-modal.reel-person-sheet {
 .reel-view.is-w700 .reel-dcard-btn.add:hover {
 	background: var(--interactive-accent-hover, var(--interactive-accent));
 }
+
+/* ==================================================================== */
+/* Desktop: title sections laid out for a wide pane                      */
+/* ==================================================================== */
+/* Lists sit in columns instead of one row a thousand pixels wide, with the
+   label close to its value; prose keeps a readable line length. */
+.reel-view.is-w700 .reel-facet-body {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+	gap: 0 var(--reel-space-8, 40px);
+	align-items: start;
+}
+
+.reel-view.is-w700 .reel-facet-body > * {
+	min-width: 0;
+}
+
+/* Things that should span the whole width keep to one column of the grid. */
+.reel-view.is-w700 .reel-facet-body > .reel-money,
+.reel-view.is-w700 .reel-facet-body > .reel-money-bars,
+.reel-view.is-w700 .reel-facet-body > .reel-fl-note,
+.reel-view.is-w700 .reel-facet-body > .reel-related,
+.reel-view.is-w700 .reel-facet-body > .reel-people,
+.reel-view.is-w700 .reel-facet-body > .reel-tagline,
+.reel-view.is-w700 .reel-facet-body > .reel-facet-prose {
+	grid-column: 1 / -1;
+}
+
+.reel-view.is-w700 .reel-facet-prose,
+.reel-view.is-w700 .reel-tagline {
+	max-width: 70ch;
+}
+
+.reel-view.is-w700 .reel-fl-row {
+	grid-template-columns: 150px 1fr;
+	padding: 9px 0;
+}
+
+.reel-view.is-w700 .reel-money {
+	grid-template-columns: repeat(3, minmax(0, 220px));
+	gap: var(--reel-space-4, 16px);
+}
+
+.reel-view.is-w700 .reel-money-bars {
+	max-width: 720px;
+}
+
+.reel-view.is-w700 .reel-facet-body .reel-related {
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+.reel-view.is-w700 .reel-facet-tabs {
+	gap: var(--reel-space-2, 8px);
+}
+
+.reel-view.is-w700 .reel-facet-tab {
+	padding: 0 var(--reel-space-4, 16px);
+}
+
+/* Discover: the caption sits close under the controls on a wide pane too */
+.reel-view.is-w700 .reel-discover {
+	gap: var(--reel-space-3, 12px);
+}
+
+/* ==================================================================== */
+/* Filters sheet on desktop                                              */
+/* ==================================================================== */
+body:not(.is-phone) .modal.reel-filter-sheet {
+	width: min(560px, 92vw);
+	max-width: 560px;
+	padding: var(--reel-space-5, 20px) var(--reel-space-6, 24px) var(--reel-space-4, 16px);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-filter-body {
+	max-height: min(60vh, 560px);
+	overflow-y: auto;
+	padding-right: var(--reel-space-1, 4px);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-filter-head .reel-log-title {
+	text-align: left;
+	font-size: var(--font-ui-large, 18px);
+	margin: 0 0 var(--reel-space-3, 12px);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-filter-section {
+	margin-bottom: var(--reel-space-4, 16px);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-filter-label {
+	font-size: var(--font-ui-smaller);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: var(--text-muted);
+	margin-bottom: var(--reel-space-2, 8px);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-chips {
+	flex-wrap: wrap;
+	overflow: visible;
+	gap: var(--reel-space-2, 8px);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-chip {
+	box-shadow: none;
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-filter-actions {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--reel-space-3, 12px);
+	padding-top: var(--reel-space-3, 12px);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-filter-done {
+	flex: 0 0 auto;
+	min-width: 160px;
+	border-radius: var(--radius-m, 8px);
+}
+
+body:not(.is-phone) .reel-filter-sheet .reel-filter-clear {
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+}
+
+/* ==================================================================== */
+/* Episode rows: tick, title and stars, review button                    */
+/* ==================================================================== */
+.reel-episodes > .reel-episode,
+.reel-view.is-w620 .reel-episodes > .reel-episode,
+.reel-modal.is-w620 .reel-episodes > .reel-episode {
+	display: grid;
+	grid-template-columns: 40px minmax(0, 1fr) 44px;
+	align-items: center;
+	gap: 0 var(--reel-space-2, 8px);
+	padding: var(--reel-space-2, 8px) 0;
+}
+
+.reel-episodes > .reel-episode .reel-episode-tick {
+	grid-column: 1;
+	width: 36px;
+	height: 36px;
+	margin: 0;
+	flex: none;
+	justify-self: center;
+}
+
+.reel-episodes > .reel-episode .reel-episode-body {
+	grid-column: 2;
+	min-width: 0;
+}
+
+.reel-episodes > .reel-episode .reel-episode-stars,
+.reel-view.is-w620 .reel-episodes .reel-episode-stars,
+.reel-modal.is-w620 .reel-episodes .reel-episode-stars {
+	grid-column: auto;
+	margin-top: 0;
+	display: flex;
+	justify-content: flex-start;
+}
+
+.reel-episodes > .reel-episode .reel-episode-review {
+	grid-column: 3;
+	justify-self: end;
+}
+
+.reel-episodes > .reel-episode .reel-episode-body {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+}
+
+.reel-episodes > .reel-episode .reel-episode-meta {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: var(--reel-space-3, 12px);
+	white-space: nowrap;
+}
+
+.reel-episodes > .reel-episode .reel-episode-title {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ==================================================================== */
+/* Stats, refreshed                                                       */
+/* ==================================================================== */
+/* One calm surface for every figure: no tint per tile, the number first, its
+   label under it in small caps, and a quiet line of context. */
+.reel-tiles {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--reel-space-3, 12px);
+}
+
+@media (min-width: 700px) {
+	.reel-tiles {
+		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	}
+}
+
+.reel-tile {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	gap: 2px;
+	min-width: 0;
+	padding: var(--reel-space-4, 16px);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--reel-card-radius, 12px);
+	background: var(--background-secondary);
+	box-shadow: none;
+}
+
+.reel-tile .reel-tile-wash {
+	display: none;
+}
+
+.reel-tile .reel-tile-value {
+	order: 1;
+	font-size: 26px;
+	font-weight: 650;
+	line-height: 1.1;
+	letter-spacing: -0.01em;
+	color: var(--text-normal);
+}
+
+.reel-tile .reel-tile-label {
+	order: 2;
+	margin-top: 4px;
+	font-size: var(--font-ui-smaller);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.reel-tile .reel-tile-sub {
+	order: 3;
+	margin-top: 2px;
+	font-size: var(--font-ui-smaller);
+	line-height: 1.35;
+	color: var(--text-muted);
+}
+
+.reel-tile.is-lead {
+	grid-column: 1 / -1;
+	background: var(--background-secondary);
+}
+
+.reel-tile.is-lead .reel-tile-value {
+	font-size: 40px;
+}
+
+.reel-tile.is-clickable:hover {
+	border-color: var(--background-modifier-border-hover, var(--interactive-accent));
+}
+
+.reel-tile .reel-tile-go {
+	position: absolute;
+	top: var(--reel-space-4, 16px);
+	right: var(--reel-space-4, 16px);
+}

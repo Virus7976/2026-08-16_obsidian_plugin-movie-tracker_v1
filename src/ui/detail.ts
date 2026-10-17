@@ -15,7 +15,7 @@
  * is the worst question a tracker can leave you asking.
  */
 
-import { Notice, TFile, setIcon } from "obsidian";
+import { Menu, Notice, TFile, setIcon } from "obsidian";
 import type ReelPlugin from "../main";
 import type {
 	Entry,
@@ -28,12 +28,13 @@ import type {
 	TmdbReview,
 } from "../types";
 import { redact } from "../secrets";
-import { formatMinutes, prettyDate } from "../util/dates";
+import { formatMinutes, prettyDate, todayISO } from "../util/dates";
 import { formatRange, parseRange, rangeCount } from "../util/ranges";
 import { renderStars } from "./stars";
 import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
+import { PreviewSheet } from "./discoverView";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { paintTrailerFor } from "./titleExtras";
 import { unlink } from "../library";
@@ -41,8 +42,9 @@ import { compactCount } from "../util/format";
 import { ContentFlag, FLAG_LABELS } from "../content";
 import { haptic } from "../util/haptics";
 import { badgePerson } from "./personBadge";
-import { paintReviews } from "./reviewPane";
-import { showTitleMenu } from "./titleMenu";
+import { ReviewEditor, paintReviews, readReviews } from "./reviewPane";
+import { episodeLabelOf } from "../reviews";
+import { holdAt, showPersonMenu, showResultMenu, showTitleMenu } from "./titleMenu";
 
 /**
  * "GB" → 🇬🇧.
@@ -463,6 +465,7 @@ export class DetailScreen {
 				if (i) names.createSpan({ cls: "reel-dim", text: " · " });
 				const a = names.createEl("button", { cls: "reel-credit-name", text: p.name, attr: { type: "button" } });
 				a.addEventListener("click", () => this.openPerson(p));
+				holdAt(a, (x, y) => showPersonMenu(this.plugin, p, x, y, () => this.openPerson(p)));
 			});
 		}
 	}
@@ -510,6 +513,7 @@ export class DetailScreen {
 			if (part) cell.createDiv({ cls: "reel-caststrip-role", text: part });
 
 			const open = () => this.openPerson(p);
+			holdAt(cell, (x, y) => showPersonMenu(this.plugin, p, x, y, open));
 			cell.addEventListener("click", open);
 			cell.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {
@@ -573,6 +577,7 @@ export class DetailScreen {
 			if (sub) body.createDiv({ cls: "reel-person-role", text: sub });
 
 			const open = () => this.openPerson(p);
+			holdAt(row, (x, y) => showPersonMenu(this.plugin, p, x, y, open));
 			row.addEventListener("click", open);
 			row.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {
@@ -1041,8 +1046,25 @@ export class DetailScreen {
 			const open = () => {
 				const mine = this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film");
 				if (mine) void this.plugin.openDetail(mine);
-				else this.plugin.openSearch({ query: r.title ?? r.name ?? "" });
+				else new PreviewSheet(this.plugin, { ...r, media_type: r.media_type ?? (r.name && !r.title ? "tv" : "movie") }, () => {}).open();
 			};
+			holdAt(card, (x, y) =>
+				showResultMenu(
+					this.plugin,
+					{ id: r.id, title: r.title ?? r.name ?? "", year: (r.release_date ?? r.first_air_date ?? "").slice(0, 4), isTv: r.media_type === "tv" || (!!r.name && !r.title) },
+					x,
+					y,
+					open,
+					this.plugin.library.byTmdbId(r.id, r.media_type === "tv" ? "tv" : "film")
+						? undefined
+						: () => {
+								void this.plugin.notes
+									.createFromResult(r, { date: todayISO(), watchlist: true })
+									.then(() => this.plugin.undo.offer(`Added ${r.title ?? r.name ?? "it"} to your watchlist`))
+									.catch((e: unknown) => new Notice(`Reel: ${redact(e)}`));
+							}
+				)
+			);
 			card.addEventListener("click", open);
 			card.addEventListener("keydown", (ev: KeyboardEvent) => {
 				if (ev.key === "Enter" || ev.key === " ") {
@@ -1426,6 +1448,35 @@ export class DetailScreen {
 					await this.plugin.notes.rateEpisode(file, season, n, v ?? null);
 					this.plugin.undo.offer(v == null ? `S${season}E${n} cleared` : `S${season}E${n} rated ${v}`);
 				},
+			});
+
+			// Write about this one episode, or press and hold the row for more.
+			const epLabel = `S${season}E${n}${ep.name ? ` ${ep.name}` : ""}`.replace(/\s*\u00b7\s*/g, " ");
+			const openEpReview = (): void => {
+				void readReviews(this.plugin, this.entry).then((all) => {
+					const existing = all.find((r) => episodeLabelOf(r.heading) === epLabel) ?? null;
+					new ReviewEditor(this.plugin, this.entry, existing, () => {}, epLabel).open();
+				});
+			};
+			const pen = epRow.createEl("button", {
+				cls: "reel-episode-review",
+				attr: { type: "button", "aria-label": `Review episode ${n}` },
+			});
+			setIcon(pen, "pencil-line");
+			pen.addEventListener("click", (e) => {
+				e.stopPropagation();
+				openEpReview();
+			});
+			holdAt(epRow, (x, y) => {
+				const menu = new Menu();
+				menu.addItem((i) =>
+					i
+						.setTitle(watched.has(n) ? "Mark not watched" : "Mark watched")
+						.setIcon("check")
+						.onClick(() => tick.click())
+				);
+				menu.addItem((i) => i.setTitle("Write a review").setIcon("pencil-line").onClick(openEpReview));
+				menu.showAtPosition({ x, y });
 			});
 
 			// Opening season 4 of a show you're 18 episodes into should land on
