@@ -52,6 +52,14 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.66",
+		date: "2026-10-19",
+		headline: "Episode rating, smoother on slow phones.",
+		changes: [
+			{ kind: "fixed", text: "On a slow phone the screen could still repaint a moment after you rated an episode. It now stays still for as long as the changes keep coming in, and Undo still refreshes the rows." },
+		],
+	},
+	{
 		version: "0.9.65",
 		date: "2026-10-19",
 		headline: "Rating episodes no longer jumps around.",

@@ -222,6 +222,7 @@ export class ReelView extends ItemView {
 				// the whole screen for the note write that follows made it jump.
 				if (this.detail?.isQuiet) {
 					this.detail.syncFromIndex();
+					this.detail.extendQuiet();
 					return;
 				}
 				this.paint();
@@ -379,6 +380,7 @@ export class ReelView extends ItemView {
 		this.register(
 			this.plugin.undo.onUndone(() => {
 				this.discoverScreen?.restoreLast();
+				this.detail?.endQuiet();
 				if (this.tab !== "discover") this.paint();
 			})
 		);

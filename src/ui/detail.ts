@@ -1416,6 +1416,20 @@ export class DetailScreen {
 	}
 
 	private quiet(): void {
+		this.quietUntil = Date.now() + 3000;
+	}
+
+	/**
+	 * A change arrived while quiet. Writes on a slow phone can reach the index a
+	 * second or two late, and a rating burst makes several, so each one buys a
+	 * little more quiet rather than the first one's window running out under it.
+	 */
+	/** After an undo the rows are stale, so the next change must repaint. */
+	endQuiet(): void {
+		this.quietUntil = 0;
+	}
+
+	extendQuiet(): void {
 		this.quietUntil = Date.now() + 1500;
 	}
 
