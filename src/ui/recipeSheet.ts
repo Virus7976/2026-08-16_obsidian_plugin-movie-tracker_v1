@@ -33,7 +33,6 @@ import { setSelected } from "./a11y";
 import { skeletonGrid } from "./skeleton";
 import { haptic } from "../util/haptics";
 import { reportFailure } from "./failure";
-import { TitlePage } from "./titlePage";
 
 type Step = "seeds" | "mood" | "results";
 

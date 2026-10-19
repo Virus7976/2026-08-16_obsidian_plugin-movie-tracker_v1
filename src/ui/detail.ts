@@ -28,7 +28,7 @@ import type {
 	TmdbReview,
 } from "../types";
 import { redact } from "../secrets";
-import { formatMinutes, prettyDate, todayISO } from "../util/dates";
+import { formatMinutes, prettyDate } from "../util/dates";
 import { formatRange, parseRange, rangeCount } from "../util/ranges";
 import { renderStars } from "./stars";
 import { LogSheet } from "./logSheet";
@@ -46,7 +46,7 @@ import { haptic } from "../util/haptics";
 import { badgePerson } from "./personBadge";
 import { ReviewEditor, paintReviews, readReviews } from "./reviewPane";
 import { episodeLabelOf } from "../reviews";
-import { holdAt, showChipMenu, showPersonMenu, showResultMenu, showTitleMenu } from "./titleMenu";
+import { holdAt, showChipMenu, showPersonMenu, showTitleMenu } from "./titleMenu";
 
 /**
  * "GB" → 🇬🇧.
@@ -482,7 +482,7 @@ export class DetailScreen {
 			b.addEventListener("click", () => show(i));
 		});
 		show(0);
-		if (this.startTab) requestAnimationFrame(() => this.jumpToTab?.(this.startTab as string));
+		if (this.startTab) window.requestAnimationFrame(() => this.jumpToTab?.(this.startTab as string));
 	}
 
 	/**

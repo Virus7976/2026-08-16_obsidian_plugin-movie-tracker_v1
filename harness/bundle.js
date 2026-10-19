@@ -2888,9 +2888,11 @@ ${body}
       const grow = () => {
         const vh = window.visualViewport?.height ?? window.innerHeight;
         const cap = Math.max(120, Math.round(vh * 0.4));
-        box.style.height = "auto";
-        box.style.height = `${Math.min(box.scrollHeight + 2, cap)}px`;
-        box.style.overflowY = box.scrollHeight + 2 > cap ? "auto" : "hidden";
+        box.setCssStyles({ height: "auto" });
+        box.setCssStyles({
+          height: `${Math.min(box.scrollHeight + 2, cap)}px`,
+          overflowY: box.scrollHeight + 2 > cap ? "auto" : "hidden"
+        });
       };
       box.addEventListener("input", () => {
         this.text = box.value;
@@ -6157,7 +6159,7 @@ ${body}
           return { cats: usable };
         }
         notes.push(`${name} ${status}${status < 400 ? " (no guide in reply)" : ""}`);
-      } catch (e) {
+      } catch {
         notes.push(`${name} failed`);
       }
     }
@@ -6519,7 +6521,7 @@ ${body}
       });
       show(0);
       if (this.startTab)
-        requestAnimationFrame(() => this.jumpToTab?.(this.startTab));
+        window.requestAnimationFrame(() => this.jumpToTab?.(this.startTab));
     }
     /**
      * Director / Writer / Stars, as named rows of tappable names.
@@ -8587,7 +8589,7 @@ ${body}
       const kept = this.stripScroll.get(key);
       if (kept) {
         strip.scrollLeft = kept;
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
           if (strip.isConnected)
             strip.scrollLeft = kept;
         });
@@ -8770,7 +8772,7 @@ ${body}
       const kept = this.stripScroll.get(key);
       if (kept) {
         strip.scrollLeft = kept;
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
           if (strip.isConnected)
             strip.scrollLeft = kept;
         });
@@ -11876,8 +11878,8 @@ ${body}
         600,
         true
       );
-      const status = document.createElement("div");
-      const list2 = document.createElement("div");
+      const status = createDiv();
+      const list2 = createDiv();
       list2.className = "reel-folder-suggest";
       const refresh = (raw) => {
         const state = folderState(raw, vault.folders, vault.files);
@@ -11980,10 +11982,10 @@ ${body}
         this.plugin.settings.aiModel = v.trim() || DEFAULT_SETTINGS.aiModel;
         await this.plugin.saveSettings();
       }, 500);
-      const status = document.createElement("div");
-      const list2 = document.createElement("div");
+      const status = createDiv();
+      const list2 = createDiv();
       list2.className = "reel-folder-suggest";
-      const source = document.createElement("div");
+      const source = createDiv();
       source.className = "reel-model-source";
       const refresh = (raw) => {
         const problem = slugProblem(raw);
@@ -12073,8 +12075,8 @@ ${body}
         600,
         true
       );
-      const status = document.createElement("div");
-      const list2 = document.createElement("div");
+      const status = createDiv();
+      const list2 = createDiv();
       list2.className = "reel-folder-suggest";
       const refresh = (raw) => {
         const said = dailyStatus(raw, scan, today);
@@ -12119,7 +12121,7 @@ ${body}
      */
     dailyPrefixField(el) {
       const wrap = el.createDiv({ cls: "reel-folder-field" });
-      const preview2 = document.createElement("div");
+      const preview2 = createDiv();
       preview2.className = "reel-daily-preview";
       const apply = debounce(
         async (v) => {

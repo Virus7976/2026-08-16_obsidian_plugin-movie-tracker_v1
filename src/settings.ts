@@ -5,7 +5,7 @@ import { KeyMode, SecretBlob } from "./secrets";
 import { CONTENT_FLAGS, ContentFlag, ContentPolicy, FLAG_LABELS, knownCertifications } from "./content";
 import { KEY_LABELS, KeyBundle, KeyName, PassphraseChange, READ_KEYS, WRITE_KEYS } from "./credentials";
 import { TraktSignIn } from "./ui/traktSignIn";
-import { FEATURES, FeatureId, FeatureSpec, isConfigured, isPartial, partialPhrase, setupState } from "./setup";
+import { FEATURES, FeatureSpec, isConfigured, isPartial, partialPhrase, setupState } from "./setup";
 import { describeFolder, folderState, matchFolders, normaliseFolder } from "./util/folders";
 import { checkAll, checkable } from "./checks";
 import { FieldContext, keyField, traktAppField } from "./ui/fields";
@@ -1807,7 +1807,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			true
 		);
 
-		const status = document.createElement("div");
+		const status = createDiv();
 		/*
 		 * The class matters. It was missing until 0.9.7, which meant every rule
 		 * written for this container — the flex row, the wrapping, the gap
@@ -1815,7 +1815,7 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * With a single suggestion the result was indistinguishable from
 		 * correct, which is exactly why a screenshot did not catch it.
 		 */
-		const list = document.createElement("div");
+		const list = createDiv();
 		list.className = "reel-folder-suggest";
 
 		const refresh = (raw: string): void => {
@@ -1982,7 +1982,7 @@ export class ReelSettingTab extends PluginSettingTab {
 			await this.plugin.saveSettings();
 		}, 500);
 
-		const status = document.createElement("div");
+		const status = createDiv();
 		/*
 		 * The class matters. It was missing until 0.9.7, which meant every rule
 		 * written for this container — the flex row, the wrapping, the gap
@@ -1990,7 +1990,7 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * With a single suggestion the result was indistinguishable from
 		 * correct, which is exactly why a screenshot did not catch it.
 		 */
-		const list = document.createElement("div");
+		const list = createDiv();
 		list.className = "reel-folder-suggest";
 
 		/*
@@ -2007,7 +2007,7 @@ export class ReelSettingTab extends PluginSettingTab {
 		 * And the price is the whole reason to fetch. Not knowing whether the
 		 * numbers in front of you are real is worse than having no numbers.
 		 */
-		const source = document.createElement("div");
+		const source = createDiv();
 		source.className = "reel-model-source";
 
 		const refresh = (raw: string): void => {
@@ -2139,8 +2139,8 @@ export class ReelSettingTab extends PluginSettingTab {
 			true
 		);
 
-		const status = document.createElement("div");
-		const list = document.createElement("div");
+		const status = createDiv();
+		const list = createDiv();
 		list.className = "reel-folder-suggest";
 
 		const refresh = (raw: string): void => {
@@ -2201,7 +2201,7 @@ export class ReelSettingTab extends PluginSettingTab {
 	 */
 	private dailyPrefixField(el: HTMLElement): void {
 		const wrap = el.createDiv({ cls: "reel-folder-field" });
-		const preview = document.createElement("div");
+		const preview = createDiv();
 		preview.className = "reel-daily-preview";
 
 		const apply = debounce(

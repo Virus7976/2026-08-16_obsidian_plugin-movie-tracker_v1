@@ -6,7 +6,7 @@
  * frontmatter, like everything else.
  */
 
-import { MarkdownPostProcessorContext, MarkdownRenderChild, TFile } from "obsidian";
+import { MarkdownPostProcessorContext, MarkdownRenderChild } from "obsidian";
 import { upnextTitle } from "./upnext";
 import { onHold } from "../ui/titleMenu";
 import type ReelPlugin from "../main";

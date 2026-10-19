@@ -21,10 +21,9 @@ import { renderStars } from "./stars";
 import { SearchModal } from "./searchModal";
 import { DiscoverFilterSheet } from "./discoverFilterSheet";
 import { LogSheet } from "./logSheet";
-import { trailerUrl, providerNames, imdbUrl, tmdbUrl } from "../extract";
+import { trailerUrl, providerNames, tmdbUrl } from "../extract";
 import { formatMinutes } from "../util/dates";
 import { PersonSheet } from "./personSheet";
-import { holdAt, showResultMenu } from "./titleMenu";
 import { paintRelatedFeed } from "./relatedFeed";
 import { badgePerson } from "./personBadge";
 import { skeletonCards, skeletonGrid } from "./skeleton";
@@ -32,8 +31,7 @@ import { haptic } from "../util/haptics";
 import { setSelected } from "./a11y";
 import { diagnoseError } from "./failure";
 import { gestureIntent } from "../util/gesture";
-import { TitlePage } from "./titlePage";
-import { paintExtras, paintLinks as paintLinksShared, paintTrailer as paintTrailerShared, paintCast, paintWash } from "./titleExtras";
+import { paintExtras, paintLinks as paintLinksShared, paintTrailer as paintTrailerShared, paintWash } from "./titleExtras";
 
 interface Filters {
 	genreIds: number[];
@@ -875,7 +873,7 @@ export class DiscoverScreen {
 		const kept = this.stripScroll.get(key);
 		if (kept) {
 			strip.scrollLeft = kept;
-			requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
 				if (strip.isConnected) strip.scrollLeft = kept;
 			});
 		}
@@ -1078,7 +1076,7 @@ export class DiscoverScreen {
 		const kept = this.stripScroll.get(key);
 		if (kept) {
 			strip.scrollLeft = kept;
-			requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
 				if (strip.isConnected) strip.scrollLeft = kept;
 			});
 		}

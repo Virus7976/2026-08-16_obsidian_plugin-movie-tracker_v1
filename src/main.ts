@@ -415,7 +415,7 @@ export default class ReelPlugin extends Plugin {
 		// that thing it said?" is a question with an answer.
 		this.addCommand({
 			id: "whats-new",
-			name: "What's new in Reel",
+			name: "What's new",
 			icon: "reel",
 			callback: () => showChangelog(this),
 		});

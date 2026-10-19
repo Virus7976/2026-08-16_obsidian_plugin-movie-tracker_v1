@@ -347,9 +347,11 @@ export class ReviewEditor extends Modal {
 		const grow = (): void => {
 			const vh = window.visualViewport?.height ?? window.innerHeight;
 			const cap = Math.max(120, Math.round(vh * 0.4));
-			box.style.height = "auto";
-			box.style.height = `${Math.min(box.scrollHeight + 2, cap)}px`;
-			box.style.overflowY = box.scrollHeight + 2 > cap ? "auto" : "hidden";
+			box.setCssStyles({ height: "auto" });
+			box.setCssStyles({
+				height: `${Math.min(box.scrollHeight + 2, cap)}px`,
+				overflowY: box.scrollHeight + 2 > cap ? "auto" : "hidden",
+			});
 		};
 		box.addEventListener("input", () => {
 			this.text = box.value;

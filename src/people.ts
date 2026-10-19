@@ -191,7 +191,7 @@ export class PeopleStore {
 		files.sort((a, b) => a.stat.ctime - b.stat.ctime);
 		for (const f of files.slice(0, files.length - max)) {
 			try {
-				await this.plugin.app.vault.delete(f);
+				await this.plugin.app.fileManager.trashFile(f);
 			} catch {
 				/* already gone */
 			}
@@ -203,7 +203,7 @@ export class PeopleStore {
 		const files = this.cachedFiles();
 		for (const f of files) {
 			try {
-				await this.plugin.app.vault.delete(f);
+				await this.plugin.app.fileManager.trashFile(f);
 			} catch {
 				/* already gone */
 			}

@@ -52,6 +52,14 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.64",
+		date: "2026-10-19",
+		headline: "Tidy-up for the Obsidian plugin review.",
+		changes: [
+			{ kind: "better", text: "Fixes the one error the plugin review reported, and clears several of its warnings: unused code, deletions now go through your trash setting, and a shorter command name." },
+		],
+	},
+	{
 		version: "0.9.63",
 		date: "2026-10-17",
 		headline: "Hold any tab for other sites, and Discover keeps your place.",

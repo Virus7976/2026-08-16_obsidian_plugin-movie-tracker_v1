@@ -22,26 +22,14 @@ import { paintUpcoming } from "./render/calendar";
 import { paintStats } from "./render/stats";
 import { viewings, paintDiaryRows } from "./render/diary";
 import { sortEntries } from "./render/query";
-import { prettyDate } from "./util/dates";
 import { redact } from "./secrets";
-import { renderStarsStatic } from "./ui/stars";
 import { renderEmpty } from "./ui/empty";
 import { paintReviews } from "./ui/reviewPane";
 import { openAsk } from "./ui/askSheet";
-import { paintHero, heroSubject } from "./ui/hero";
+import { paintHero } from "./ui/hero";
 import { setSelected } from "./ui/a11y";
 import { suggestions, rememberSearch } from "./util/suggest";
-import {
-	FilterSheet,
-	LAYOUTS,
-	activeFilters,
-	clearFilter,
-	emptyFilters,
-	narrow,
-	SORT_OPTIONS,
-	type FilterState,
-	type LibraryLayout,
-} from "./ui/filterSheet";
+import { FilterSheet, LAYOUTS, activeFilters, clearFilter, emptyFilters, narrow, SORT_OPTIONS, type FilterState } from "./ui/filterSheet";
 import { unlink } from "./library";
 import { measure, stampWidth, stampChromeInsets, topInset, sizeBody } from "./util/panewidth";
 
@@ -415,7 +403,7 @@ export class ReelView extends ItemView {
 				queued = true;
 				// One measurement per frame. A screen that appends thirty cards in a
 				// loop would otherwise force thirty layouts.
-				requestAnimationFrame(() => {
+				window.requestAnimationFrame(() => {
 					queued = false;
 					if (this.bodyEl?.isConnected) sizeBody(this.mainEl, this.bodyEl);
 				});
@@ -450,7 +438,7 @@ export class ReelView extends ItemView {
 			sizeBody(this.mainEl, this.bodyEl);
 		};
 		if (typeof ResizeObserver !== "undefined") {
-			const ro = new ResizeObserver(() => requestAnimationFrame(remeasure));
+			const ro = new ResizeObserver(() => window.requestAnimationFrame(remeasure));
 			// The border box, not the content box. `remeasure` stamps the top
 			// inset as padding on this very element, which changes its content
 			// box and would wake the observer that just ran it.

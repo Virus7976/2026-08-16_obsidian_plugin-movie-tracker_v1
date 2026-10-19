@@ -99,7 +99,7 @@ export class SwatchStore {
 		const w = 48;
 		const h = Math.max(1, Math.round((img.naturalHeight / Math.max(1, img.naturalWidth)) * w));
 
-		const canvas = document.createElement("canvas");
+		const canvas = createEl("canvas");
 		canvas.width = w;
 		canvas.height = h;
 		const ctx = canvas.getContext("2d", { willReadFrequently: true });

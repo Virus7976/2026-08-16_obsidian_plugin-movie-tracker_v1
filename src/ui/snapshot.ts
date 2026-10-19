@@ -156,7 +156,7 @@ async function waitForOverlays(): Promise<void> {
 		await new Promise((r) => window.setTimeout(r, 50));
 	}
 	// Two frames after that, so a closing transition has finished laying out.
-	await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+	await new Promise((r) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => r(null))));
 }
 
 export async function uiSnapshot(): Promise<string> {

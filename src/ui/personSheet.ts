@@ -15,8 +15,6 @@
 
 import { Modal, Notice, Platform } from "obsidian";
 import type ReelPlugin from "../main";
-import { TitlePage } from "./titlePage";
-import { badgePerson } from "./personBadge";
 import type { TmdbPerson, TmdbPersonCredit } from "../types";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";

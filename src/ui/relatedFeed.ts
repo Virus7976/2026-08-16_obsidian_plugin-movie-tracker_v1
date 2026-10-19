@@ -17,7 +17,6 @@ import type { TmdbSearchResult } from "../types";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { holdAt, showResultMenu } from "./titleMenu";
-import { TitlePage } from "./titlePage";
 
 /** Stop asking after this many, so a very long chain cannot grow forever. */
 const CAP = 240;

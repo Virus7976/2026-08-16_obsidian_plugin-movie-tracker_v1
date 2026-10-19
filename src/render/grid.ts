@@ -6,13 +6,11 @@
  * both, instead of drifting until they behave subtly differently.
  */
 
-import { Menu, Notice, TFile, setIcon } from "obsidian";
+import { Notice, TFile, setIcon } from "obsidian";
 import { redact } from "../secrets";
 import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { renderStarsStatic } from "../ui/stars";
-import { QuickRate } from "../ui/quickRate";
-import { ListPicker } from "../ui/listPicker";
 import { haptic } from "../util/haptics";
 import { lastWatchDate } from "./query";
 import { prettyDate, formatMinutes } from "../util/dates";

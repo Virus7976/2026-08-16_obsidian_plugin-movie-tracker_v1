@@ -220,7 +220,7 @@ export function stampChromeInsets(el: HTMLElement, root: ParentNode = document):
 	 * Cleared to "" rather than "0px" when there is nothing to clear, so a theme
 	 * that legitimately wants padding there still gets it.
 	 */
-	el.style.paddingTop = top > 0 ? `${top}px` : "";
+	el.setCssStyles({ paddingTop: top > 0 ? `${top}px` : "" });
 	// Mirrored onto <body> so sheets get them too. A modal is not inside the
 	// view, and its action row is pinned to the bottom — which is exactly where
 	// the floating toolbar is. A "Save" button you cannot reach is worse than a

@@ -143,7 +143,7 @@ export async function fetchImdbGuide(plugin: ReelPlugin, imdbId: string): Promis
 				return { cats: usable };
 			}
 			notes.push(`${name} ${status}${status < 400 ? " (no guide in reply)" : ""}`);
-		} catch (e) {
+		} catch {
 			notes.push(`${name} failed`);
 		}
 	}

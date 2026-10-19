@@ -17,7 +17,6 @@ import type { TmdbSearchResult } from "../types";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { PersonSheet } from "./personSheet";
-import { TitlePage } from "./titlePage";
 import { holdAt, showResultMenu } from "./titleMenu";
 
 interface Row {

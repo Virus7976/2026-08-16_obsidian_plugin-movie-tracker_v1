@@ -11,7 +11,7 @@ import type ReelPlugin from "../main";
 import type { Entry } from "../types";
 import { nextEpisode, rangeCount } from "../util/ranges";
 import { prettyDate, todayISO, formatMinutes } from "../util/dates";
-import { onHold, showTitleMenu } from "../ui/titleMenu";
+import { onHold } from "../ui/titleMenu";
 import { pickTonight } from "../picks";
 import { redact } from "../secrets";
 import { haptic } from "../util/haptics";
