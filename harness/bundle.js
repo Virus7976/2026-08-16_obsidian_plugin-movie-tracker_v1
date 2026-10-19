@@ -4871,7 +4871,7 @@ ${body}
           meta.createSpan({ text: prettyDate(ep.air_date) });
         if (ep.runtime)
           meta.createSpan({ text: `${ep.runtime}m` });
-        renderStars(body.createDiv({ cls: "reel-episode-stars" }), {
+        renderStars(row.createDiv({ cls: "reel-episode-stars" }), {
           value: this.ratings[String(n2)],
           compact: true,
           onChange: (v) => {
@@ -6243,6 +6243,11 @@ ${body}
       this.openSeason = null;
       this.episodeCache = /* @__PURE__ */ new Map();
       this.rootEl = null;
+      /** Until when a library change should not repaint this screen. */
+      this.quietUntil = 0;
+      /** The season whose list has already been scrolled to its first unwatched episode. */
+      this.scrolledSeason = null;
+      this.pills = /* @__PURE__ */ new Map();
       /** Set once the tabs exist: switch to one by id and bring it into view. */
       this.jumpToTab = null;
     }
@@ -7361,8 +7366,76 @@ ${body}
       }
     }
     /* ------------------------------------------------------------------ */
+    /**
+     * Ticking or rating an episode already updates its row. The note write that
+     * follows makes the library announce a change, and repainting the whole page
+     * for that is what made the list jump after every star. For a moment after
+     * one of those actions the screen leaves itself alone.
+     */
+    get isQuiet() {
+      return Date.now() < this.quietUntil;
+    }
+    quiet() {
+      this.quietUntil = Date.now() + 1500;
+    }
+    /** The season pill's count and colour, in place, from the episodes now ticked. */
+    updateSeasonPill(season, seen) {
+      const p = this.pills.get(season);
+      if (!p)
+        return;
+      p.count.setText(p.total ? `${seen}/${p.total}` : String(seen));
+      p.el.toggleClass("is-complete", !!p.total && seen >= p.total);
+      p.el.toggleClass("is-partial", seen > 0 && !(p.total && seen >= p.total));
+      p.el.setCssProps({ "--reel-fill": p.total ? String(Math.min(1, seen / p.total)) : "0" });
+    }
+    /** Everything you can do to a whole season, from its pill. */
+    seasonMenu(n2, x, y) {
+      const file = this.file;
+      const seasons = this.entry.seasons;
+      const row = seasons.find((s) => s.n === n2);
+      const total = row?.total ?? this.episodeCache.get(n2)?.length ?? 0;
+      const menu = new Menu();
+      menu.addItem(
+        (i) => i.setTitle(this.openSeason === n2 ? "Hide episodes" : "Show episodes").setIcon("list").onClick(() => {
+          this.scrolledSeason = null;
+          this.openSeason = this.openSeason === n2 ? null : n2;
+          this.rerender();
+        })
+      );
+      menu.addItem(
+        (i) => i.setTitle("Rate or edit season\u2026").setIcon("star").onClick(() => new SeasonSheet(this.plugin.app, this.plugin, this.entry, n2).open())
+      );
+      if (file && total) {
+        menu.addItem(
+          (i) => i.setTitle("Mark season watched").setIcon("check").onClick(() => {
+            void this.plugin.notes.setSeasonRange(file, n2, `1-${total}`).then(() => this.plugin.undo.offer(`Season ${n2} marked watched`));
+          })
+        );
+        menu.addItem(
+          (i) => i.setTitle("Mark watched up to this season").setIcon("check-check").onClick(() => {
+            void (async () => {
+              for (const s of seasons) {
+                if (s.n > n2 || !s.total)
+                  continue;
+                await this.plugin.notes.setSeasonRange(file, s.n, `1-${s.total}`);
+              }
+              this.plugin.undo.offer(`Marked watched up to season ${n2}`);
+            })();
+          })
+        );
+      }
+      if (file) {
+        menu.addItem(
+          (i) => i.setTitle("Clear season").setIcon("x").onClick(() => {
+            void this.plugin.notes.setSeasonRange(file, n2, "").then(() => this.plugin.undo.offer(`Season ${n2} cleared`));
+          })
+        );
+      }
+      menu.showAtPosition({ x, y });
+    }
     renderSeasons(main) {
       const e = this.entry;
+      this.pills.clear();
       const wrap = main.createDiv({ cls: "reel-panel" });
       wrap.createDiv({ cls: "reel-panel-title", text: "Seasons" });
       const strip = wrap.createDiv({ cls: "reel-seasons" });
@@ -7371,7 +7444,8 @@ ${body}
         const seen = rangeCount(s.watched);
         const pill = strip.createDiv({ cls: "reel-season-pill" });
         pill.createSpan({ cls: "reel-season-n", text: `S${s.n}` });
-        pill.createSpan({ cls: "reel-dim", text: total ? `${seen}/${total}` : String(seen) });
+        const countEl = pill.createSpan({ cls: "reel-dim", text: total ? `${seen}/${total}` : String(seen) });
+        this.pills.set(s.n, { el: pill, count: countEl, total });
         if (s.rating != null)
           pill.createSpan({ cls: "reel-season-rating", text: `${s.rating}\u2605` });
         if (total && seen >= total)
@@ -7383,9 +7457,11 @@ ${body}
         pill.setAttr("aria-expanded", String(this.openSeason === s.n));
         pill.setCssProps({ "--reel-fill": total ? String(Math.min(1, seen / total)) : "0" });
         pill.addEventListener("click", () => {
+          this.scrolledSeason = null;
           this.openSeason = this.openSeason === s.n ? null : s.n;
           this.rerender();
         });
+        holdAt(pill, (x, y) => this.seasonMenu(s.n, x, y));
       }
       if (this.openSeason != null)
         void this.renderEpisodes(wrap, this.openSeason);
@@ -7412,13 +7488,14 @@ ${body}
       const ratings = { ...row?.episode_ratings ?? {} };
       listEl.empty();
       let firstUnwatched = null;
-      const remaining = episodes.filter((x) => !watched.has(x.episode_number)).length;
-      if (remaining) {
-        listEl.createDiv({
-          cls: "reel-block-count",
-          text: `${remaining} of ${episodes.length} left in season ${season}`
-        });
-      }
+      const countLine = listEl.createDiv({ cls: "reel-block-count" });
+      const paintRemaining = () => {
+        const left = (episodes ?? []).filter((x) => !watched.has(x.episode_number)).length;
+        countLine.setText(left ? `${left} of ${episodes?.length ?? 0} left in season ${season}` : "");
+        countLine.toggleClass("is-empty", !left);
+        this.updateSeasonPill(season, watched.size);
+      };
+      paintRemaining();
       const bulk = listEl.createDiv({ cls: "reel-season-bulk" });
       const markAll = bulk.createEl("button", { cls: "reel-chip", text: "Mark all watched" });
       markAll.addEventListener("click", async () => {
@@ -7450,11 +7527,13 @@ ${body}
           if (!file)
             return;
           haptic("tick");
+          this.quiet();
           if (watched.has(n2))
             watched.delete(n2);
           else
             watched.add(n2);
           epRow.toggleClass("is-watched", watched.has(n2));
+          paintRemaining();
           const range = formatRange([...watched]);
           await this.plugin.notes.setSeasonRange(file, season, range);
           this.entry = {
@@ -7485,6 +7564,8 @@ ${body}
               watched.add(n2);
               epRow.addClass("is-watched");
             }
+            this.quiet();
+            paintRemaining();
             await this.plugin.notes.rateEpisode(file, season, n2, v ?? null);
             this.plugin.undo.offer(v == null ? `S${season}E${n2} cleared` : `S${season}E${n2} rated ${v}`);
           }
@@ -7518,7 +7599,8 @@ ${body}
           firstUnwatched = epRow;
         }
       }
-      if (firstUnwatched) {
+      if (firstUnwatched && this.scrolledSeason !== season) {
+        this.scrolledSeason = season;
         window.setTimeout(() => firstUnwatched?.scrollIntoView({ block: "nearest" }), 0);
       }
     }
@@ -13477,7 +13559,7 @@ ${body}
       "--reel-bottom-right-inset": `${right}px`
     };
     el.setCssProps(vars);
-    el.style.paddingTop = top > 0 ? `${top}px` : "";
+    el.setCssStyles({ paddingTop: top > 0 ? `${top}px` : "" });
     if (el !== document.body)
       document.body.setCssProps(vars);
   }

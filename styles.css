@@ -20896,3 +20896,84 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 .reel-guide-fail {
 	margin-top: 8px;
 }
+
+/* ==================================================================== */
+/* Episode rows, one layout for the season sheet and the title page        */
+/* ==================================================================== */
+/* Tick on the left, title and date beside it, the pencil at the end, and the
+   stars on a line of their own under the title. Every part has a named place,
+   so nothing can land on top of another and a row is the same height whether
+   its title is short or long. */
+.reel-episodes > .reel-episode,
+.reel-view.is-w620 .reel-episodes > .reel-episode,
+.reel-modal.is-w620 .reel-episodes > .reel-episode {
+	display: grid;
+	grid-template-columns: 40px minmax(0, 1fr) 44px;
+	grid-template-areas:
+		"tick body pen"
+		"tick stars stars";
+	align-items: center;
+	gap: 0 var(--reel-space-2, 8px);
+	padding: 6px 0 8px;
+	border-top: 1px solid var(--background-modifier-border);
+	min-height: 0;
+}
+.reel-episodes > .reel-episode:first-of-type {
+	border-top: 0;
+}
+.reel-episodes > .reel-episode .reel-episode-tick {
+	grid-area: tick;
+	align-self: start;
+	margin-top: 4px;
+}
+.reel-episodes > .reel-episode .reel-episode-body {
+	grid-area: body;
+	min-width: 0;
+}
+.reel-episodes > .reel-episode .reel-episode-review {
+	grid-area: pen;
+	align-self: start;
+}
+.reel-episodes > .reel-episode .reel-episode-stars,
+.reel-view.is-w620 .reel-episodes .reel-episode-stars,
+.reel-modal.is-w620 .reel-episodes .reel-episode-stars {
+	grid-area: stars;
+	grid-column: 2 / 4;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	justify-content: flex-start;
+	min-width: 0;
+}
+.reel-episodes > .reel-episode .reel-stars {
+	gap: 0;
+}
+.reel-block-count.is-empty {
+	display: none;
+}
+/* A row you just ticked or rated eases to its new state; nothing moves. */
+.reel-episodes > .reel-episode {
+	transition: background-color 120ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+	.reel-episodes > .reel-episode {
+		transition: none;
+	}
+}
+.reel-episodes > .reel-episode .reel-episode-stars .reel-stars,
+.reel-episodes > .reel-episode .reel-episode-stars > * {
+	justify-content: flex-start;
+	margin-left: 0;
+	margin-right: auto;
+}
+.reel-episodes > .reel-episode .reel-episode-review,
+.reel-episodes > .reel-episode .reel-episode-review:hover {
+	background: transparent;
+	box-shadow: none;
+	border: 0;
+}
+.reel-episodes > .reel-episode .reel-episode-stars,
+.reel-view.is-w620 .reel-episodes .reel-episode-stars,
+.reel-modal.is-w620 .reel-episodes .reel-episode-stars {
+	justify-self: stretch;
+}

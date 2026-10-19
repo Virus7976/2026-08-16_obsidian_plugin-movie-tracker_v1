@@ -35,6 +35,7 @@ import { LogSheet } from "./logSheet";
 import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
 import { paintRelatedFeed } from "./relatedFeed";
+import { SeasonSheet } from "./seasonSheet";
 import { fetchImdbGuide } from "../imdbGuide";
 import { attachSources } from "./sources";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
@@ -84,6 +85,11 @@ export class DetailScreen {
 	private openSeason: number | null = null;
 	private episodeCache = new Map<number, TmdbEpisode[]>();
 	private rootEl: HTMLElement | null = null;
+	/** Until when a library change should not repaint this screen. */
+	private quietUntil = 0;
+	/** The season whose list has already been scrolled to its first unwatched episode. */
+	private scrolledSeason: number | null = null;
+	private pills = new Map<number, { el: HTMLElement; count: HTMLElement; total: number }>();
 	/** Set once the tabs exist: switch to one by id and bring it into view. */
 	private jumpToTab: ((id: string) => void) | null = null;
 
@@ -1399,8 +1405,81 @@ export class DetailScreen {
 
 	/* ------------------------------------------------------------------ */
 
+	/**
+	 * Ticking or rating an episode already updates its row. The note write that
+	 * follows makes the library announce a change, and repainting the whole page
+	 * for that is what made the list jump after every star. For a moment after
+	 * one of those actions the screen leaves itself alone.
+	 */
+	get isQuiet(): boolean {
+		return Date.now() < this.quietUntil;
+	}
+
+	private quiet(): void {
+		this.quietUntil = Date.now() + 1500;
+	}
+
+	/** The season pill's count and colour, in place, from the episodes now ticked. */
+	private updateSeasonPill(season: number, seen: number): void {
+		const p = this.pills.get(season);
+		if (!p) return;
+		p.count.setText(p.total ? `${seen}/${p.total}` : String(seen));
+		p.el.toggleClass("is-complete", !!p.total && seen >= p.total);
+		p.el.toggleClass("is-partial", seen > 0 && !(p.total && seen >= p.total));
+		p.el.setCssProps({ "--reel-fill": p.total ? String(Math.min(1, seen / p.total)) : "0" });
+	}
+
+	/** Everything you can do to a whole season, from its pill. */
+	private seasonMenu(n: number, x: number, y: number): void {
+		const file = this.file;
+		const seasons = this.entry.seasons;
+		const row = seasons.find((s) => s.n === n);
+		const total = row?.total ?? this.episodeCache.get(n)?.length ?? 0;
+		const menu = new Menu();
+		menu.addItem((i) =>
+			i
+				.setTitle(this.openSeason === n ? "Hide episodes" : "Show episodes")
+				.setIcon("list")
+				.onClick(() => {
+					this.scrolledSeason = null;
+					this.openSeason = this.openSeason === n ? null : n;
+					this.rerender();
+				})
+		);
+		menu.addItem((i) =>
+			i.setTitle("Rate or edit season…").setIcon("star").onClick(() => new SeasonSheet(this.plugin.app, this.plugin, this.entry, n).open())
+		);
+		if (file && total) {
+			menu.addItem((i) =>
+				i.setTitle("Mark season watched").setIcon("check").onClick(() => {
+					void this.plugin.notes.setSeasonRange(file, n, `1-${total}`).then(() => this.plugin.undo.offer(`Season ${n} marked watched`));
+				})
+			);
+			menu.addItem((i) =>
+				i.setTitle("Mark watched up to this season").setIcon("check-check").onClick(() => {
+					void (async () => {
+						for (const s of seasons) {
+							if (s.n > n || !s.total) continue;
+							await this.plugin.notes.setSeasonRange(file, s.n, `1-${s.total}`);
+						}
+						this.plugin.undo.offer(`Marked watched up to season ${n}`);
+					})();
+				})
+			);
+		}
+		if (file) {
+			menu.addItem((i) =>
+				i.setTitle("Clear season").setIcon("x").onClick(() => {
+					void this.plugin.notes.setSeasonRange(file, n, "").then(() => this.plugin.undo.offer(`Season ${n} cleared`));
+				})
+			);
+		}
+		menu.showAtPosition({ x, y });
+	}
+
 	private renderSeasons(main: HTMLElement): void {
 		const e = this.entry;
+		this.pills.clear();
 		const wrap = main.createDiv({ cls: "reel-panel" });
 		wrap.createDiv({ cls: "reel-panel-title", text: "Seasons" });
 
@@ -1410,7 +1489,8 @@ export class DetailScreen {
 			const seen = rangeCount(s.watched);
 			const pill = strip.createDiv({ cls: "reel-season-pill" });
 			pill.createSpan({ cls: "reel-season-n", text: `S${s.n}` });
-			pill.createSpan({ cls: "reel-dim", text: total ? `${seen}/${total}` : String(seen) });
+			const countEl = pill.createSpan({ cls: "reel-dim", text: total ? `${seen}/${total}` : String(seen) });
+			this.pills.set(s.n, { el: pill, count: countEl, total });
 			if (s.rating != null) pill.createSpan({ cls: "reel-season-rating", text: `${s.rating}★` });
 			if (total && seen >= total) pill.addClass("is-complete");
 			else if (seen > 0) pill.addClass("is-partial");
@@ -1418,9 +1498,12 @@ export class DetailScreen {
 			pill.setAttr("aria-expanded", String(this.openSeason === s.n));
 			pill.setCssProps({ "--reel-fill": total ? String(Math.min(1, seen / total)) : "0" });
 			pill.addEventListener("click", () => {
+				this.scrolledSeason = null;
 				this.openSeason = this.openSeason === s.n ? null : s.n;
 				this.rerender();
 			});
+			// Press and hold, or right-click, a whole season.
+			holdAt(pill, (x, y) => this.seasonMenu(s.n, x, y));
 		}
 
 		if (this.openSeason != null) void this.renderEpisodes(wrap, this.openSeason);
@@ -1452,13 +1535,14 @@ export class DetailScreen {
 		listEl.empty();
 		let firstUnwatched: HTMLElement | null = null;
 
-		const remaining = episodes.filter((x) => !watched.has(x.episode_number)).length;
-		if (remaining) {
-			listEl.createDiv({
-				cls: "reel-block-count",
-				text: `${remaining} of ${episodes.length} left in season ${season}`,
-			});
-		}
+		const countLine = listEl.createDiv({ cls: "reel-block-count" });
+		const paintRemaining = (): void => {
+			const left = (episodes ?? []).filter((x) => !watched.has(x.episode_number)).length;
+			countLine.setText(left ? `${left} of ${episodes?.length ?? 0} left in season ${season}` : "");
+			countLine.toggleClass("is-empty", !left);
+			this.updateSeasonPill(season, watched.size);
+		};
+		paintRemaining();
 
 		const bulk = listEl.createDiv({ cls: "reel-season-bulk" });
 		const markAll = bulk.createEl("button", { cls: "reel-chip", text: "Mark all watched" });
@@ -1491,9 +1575,11 @@ export class DetailScreen {
 				const file = this.file;
 				if (!file) return;
 				haptic("tick");
+				this.quiet();
 				if (watched.has(n)) watched.delete(n);
 				else watched.add(n);
 				epRow.toggleClass("is-watched", watched.has(n));
+				paintRemaining();
 				const range = formatRange([...watched]);
 				await this.plugin.notes.setSeasonRange(file, season, range);
 				// Keep the in-memory entry in step so the season pill counts are
@@ -1528,6 +1614,8 @@ export class DetailScreen {
 						watched.add(n);
 						epRow.addClass("is-watched");
 					}
+					this.quiet();
+					paintRemaining();
 					await this.plugin.notes.rateEpisode(file, season, n, v ?? null);
 					this.plugin.undo.offer(v == null ? `S${season}E${n} cleared` : `S${season}E${n} rated ${v}`);
 				},
@@ -1569,7 +1657,10 @@ export class DetailScreen {
 			}
 		}
 
-		if (firstUnwatched) {
+		// Once per opening of a season. A repaint after a tick or a star must not
+		// pull you back to the first unwatched episode while you work down the list.
+		if (firstUnwatched && this.scrolledSeason !== season) {
+			this.scrolledSeason = season;
 			// After layout, or the offset is measured against nothing.
 			window.setTimeout(() => firstUnwatched?.scrollIntoView({ block: "nearest" }), 0);
 		}

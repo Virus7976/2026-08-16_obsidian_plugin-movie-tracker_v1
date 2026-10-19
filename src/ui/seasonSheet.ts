@@ -113,7 +113,7 @@ export class SeasonSheet extends Modal {
 			if (ep.air_date) meta.createSpan({ text: prettyDate(ep.air_date) });
 			if (ep.runtime) meta.createSpan({ text: `${ep.runtime}m` });
 
-			renderStars(body.createDiv({ cls: "reel-episode-stars" }), {
+			renderStars(row.createDiv({ cls: "reel-episode-stars" }), {
 				value: this.ratings[String(n)],
 				compact: true,
 				onChange: (v) => {

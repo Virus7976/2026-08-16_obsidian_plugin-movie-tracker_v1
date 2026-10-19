@@ -218,6 +218,12 @@ export class ReelView extends ItemView {
 				// is what changes the library, so repainting it here only threw you
 				// back to the start of every shelf. It repaints when you come back.
 				if (this.tab === "discover" && !this.detail) return;
+				// An episode tick or star has already updated its own row; repainting
+				// the whole screen for the note write that follows made it jump.
+				if (this.detail?.isQuiet) {
+					this.detail.syncFromIndex();
+					return;
+				}
 				this.paint();
 			})
 		);

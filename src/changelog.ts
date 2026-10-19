@@ -52,6 +52,17 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.65",
+		date: "2026-10-19",
+		headline: "Rating episodes no longer jumps around.",
+		changes: [
+			{ kind: "fixed", text: "Ticking or rating an episode on a series page no longer repaints the whole screen and throws you to another spot in the list. The row updates where it is, and the season count updates with it." },
+			{ kind: "fixed", text: "Opening a season no longer pulls you back to the first unwatched episode every time you tick one." },
+			{ kind: "better", text: "Episode rows have a clean layout on a phone: tick on the left, title and date beside it, the pencil at the end, and the stars on their own line, with nothing overlapping. The season sheet and the series page use the same row." },
+			{ kind: "new", text: "Press and hold (or right-click) a season at the top of a series page: show or hide its episodes, rate or edit it, mark it or everything up to it watched, or clear it." },
+		],
+	},
+	{
 		version: "0.9.64",
 		date: "2026-10-19",
 		headline: "Tidy-up for the Obsidian plugin review.",
