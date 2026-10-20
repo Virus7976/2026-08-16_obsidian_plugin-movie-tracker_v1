@@ -36,7 +36,7 @@ import { ListPicker } from "./listPicker";
 import { PersonSheet } from "./personSheet";
 import { paintRelatedFeed } from "./relatedFeed";
 import { SeasonSheet } from "./seasonSheet";
-import { fetchImdbGuide } from "../imdbGuide";
+import { fetchImdbGuide, type ImdbGuideCategory } from "../imdbGuide";
 import { attachSources } from "./sources";
 import { imdbUrl, tmdbUrl, keywordNames } from "../extract";
 import { paintTrailerFor } from "./titleExtras";
@@ -85,6 +85,12 @@ export class DetailScreen {
 	private openSeason: number | null = null;
 	private episodeCache = new Map<number, TmdbEpisode[]>();
 	private rootEl: HTMLElement | null = null;
+	/** The tab you are on, so a repaint puts you back on it instead of on About. */
+	private activeTab = "about";
+	/** What TMDB said, kept so a repaint draws at once instead of flashing "Loading". */
+	private metaMemo: TmdbFilm | TmdbShow | null = null;
+	/** IMDb's guide for this title, once read, so a repaint does not read it again. */
+	private guideMemo: ImdbGuideCategory[] | null = null;
 	/** Until when a library change should not repaint this screen. */
 	private quietUntil = 0;
 	/** The season whose list has already been scrolled to its first unwatched episode. */
@@ -344,7 +350,10 @@ export class DetailScreen {
 
 		let meta: TmdbFilm | TmdbShow;
 		try {
-			meta = isTv ? await this.plugin.tmdb.getShow(this.entry.tmdbId) : await this.plugin.tmdb.getFilm(this.entry.tmdbId);
+			meta =
+				this.metaMemo ??
+				(isTv ? await this.plugin.tmdb.getShow(this.entry.tmdbId) : await this.plugin.tmdb.getFilm(this.entry.tmdbId));
+			this.metaMemo = meta;
 		} catch (e) {
 			wrap.empty();
 			wrap.createDiv({ cls: "reel-error", text: redact(e) });
@@ -464,6 +473,7 @@ export class DetailScreen {
 
 		const show = (i: number) => {
 			buttons.forEach((b, n) => b.toggleClass("is-active", n === i));
+			this.activeTab = tabs[i].id;
 			body.empty();
 			tabs[i].render(body);
 			// Hold the tab for the other sites that cover it.
@@ -487,8 +497,14 @@ export class DetailScreen {
 			buttons.push(b);
 			b.addEventListener("click", () => show(i));
 		});
-		show(0);
-		if (this.startTab) window.requestAnimationFrame(() => this.jumpToTab?.(this.startTab as string));
+		// Back on the tab you were on after a repaint; a tab asked for on arrival wins once.
+		const wanted = tabs.findIndex((t) => t.id === (this.startTab ?? this.activeTab));
+		show(wanted < 0 ? 0 : wanted);
+		if (this.startTab) {
+			const go = this.startTab;
+			this.startTab = undefined;
+			window.requestAnimationFrame(() => this.jumpToTab?.(go));
+		}
 	}
 
 	/**
@@ -901,8 +917,28 @@ export class DetailScreen {
 		box.createDiv({ cls: "reel-fl-title", text: "From IMDb" });
 		const body = box.createDiv({ cls: "reel-guide-body" });
 
+		const paint = (cats: ImdbGuideCategory[]): void => {
+			cats.forEach((c, i) => {
+				const sec = body.createEl("details", { cls: "reel-guide-sec" });
+				// The first is open, so the tab shows something the moment it loads.
+				if (i === 0) sec.setAttr("open", "");
+				const sum = sec.createEl("summary");
+				sum.createSpan({ cls: "reel-guide-name", text: c.title });
+				if (c.severity) sum.createSpan({ cls: `reel-guide-pill sev-${c.severity.toLowerCase()}`, text: c.severity });
+				const list = sec.createEl("ul", { cls: "reel-guide-list" });
+				for (const t of c.items) list.createEl("li", { text: t });
+				if (!c.items.length) list.createEl("li", { cls: "reel-dim", text: "No notes yet." });
+			});
+			body.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
+		};
+
 		const load = (): void => {
 			body.empty();
+			// Already read this visit: draw it now, no loading line, no second request.
+			if (this.guideMemo) {
+				paint(this.guideMemo);
+				return;
+			}
 			body.createDiv({ cls: "reel-loading", text: "Loading the parents guide…", attr: { role: "status" } });
 			void fetchImdbGuide(this.plugin, imdbId).then(({ cats, reason }) => {
 				if (!body.isConnected) return;
@@ -916,18 +952,8 @@ export class DetailScreen {
 					retry.addEventListener("click", load);
 					return;
 				}
-				cats.forEach((c, i) => {
-					const sec = body.createEl("details", { cls: "reel-guide-sec" });
-					// The first is open, so the tab shows something the moment it loads.
-					if (i === 0) sec.setAttr("open", "");
-					const sum = sec.createEl("summary");
-					sum.createSpan({ cls: "reel-guide-name", text: c.title });
-					if (c.severity) sum.createSpan({ cls: `reel-guide-pill sev-${c.severity.toLowerCase()}`, text: c.severity });
-					const list = sec.createEl("ul", { cls: "reel-guide-list" });
-					for (const t of c.items) list.createEl("li", { text: t });
-					if (!c.items.length) list.createEl("li", { cls: "reel-dim", text: "No notes yet." });
-				});
-				body.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
+				this.guideMemo = cats;
+				paint(cats);
 			});
 		};
 		load();

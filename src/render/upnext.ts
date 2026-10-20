@@ -110,6 +110,8 @@ export function paintUpNext(
 
 /** Bumped by Shuffle; resets when Reel reloads. */
 let pickSalt = 0;
+/** "Show more" stays pressed across repaints; the painter is rebuilt on every library event. */
+const expanded = { upNext: false, watchlist: false };
 
 /** The Watchlist section's own choices, kept across repaints for the session. */
 type WatchSort = "added" | "oldest" | "short" | "long" | "rated" | "newest" | "oldrelease" | "title" | "service";
@@ -158,7 +160,7 @@ class UpNextPainter {
 			: inProgress;
 		// Up Next answers "what do I watch tonight", so a long tail of shows
 		// you last touched months ago is noise. The rest stay one tap away.
-		const cap = this.limit ?? 12;
+		const cap = expanded.upNext && !this.heading ? everything.length : (this.limit ?? 12);
 		let rows = everything.slice(0, cap);
 		const hidden = everything.length - rows.length;
 
@@ -194,9 +196,9 @@ class UpNextPainter {
 			const more = el.createDiv({ cls: "reel-block-count" });
 			const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${hidden} more` });
 			btn.addEventListener("click", () => {
-				// Append the rest rather than re-rendering: this painter is
-				// rebuilt on every library event, so any state set on it would
-				// be discarded the next time anything changed.
+				// Append the rest rather than re-rendering, and remember it, so a
+				// repaint after the next tick does not fold the list back up.
+				expanded.upNext = true;
 				for (const entry of everything.slice(cap)) list.appendChild(this.row(entry));
 				more.remove();
 			});
@@ -316,12 +318,14 @@ class UpNextPainter {
 		if (!rows.length) wrap.createDiv({ cls: "reel-dim", text: "Nothing on your watchlist matches." });
 
 		const list = wrap.createDiv({ cls: "reel-upnext reel-watchlist-list" });
-		for (const entry of rows.slice(0, 40)) list.appendChild(this.watchRow(entry));
-		if (rows.length > 40) {
+		const shownCap = expanded.watchlist ? rows.length : 40;
+		for (const entry of rows.slice(0, shownCap)) list.appendChild(this.watchRow(entry));
+		if (rows.length > shownCap) {
 			const more = wrap.createDiv({ cls: "reel-block-count" });
 			const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${rows.length - 40} more` });
 			btn.addEventListener("click", () => {
-				for (const entry of rows.slice(40)) list.appendChild(this.watchRow(entry));
+				expanded.watchlist = true;
+				for (const entry of rows.slice(shownCap)) list.appendChild(this.watchRow(entry));
 				more.remove();
 			});
 		}
@@ -383,6 +387,7 @@ class UpNextPainter {
 
 	private watchRow(entry: Entry): HTMLElement {
 		const row = createDiv({ cls: "reel-upnext-row reel-watch-row" });
+		row.dataset.reelPath = entry.path;
 		const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
 		this.plugin.posters.attach(thumb, entry);
 		const open = () => void this.plugin.openDetail(entry);
@@ -424,6 +429,7 @@ class UpNextPainter {
 	private row(entry: Entry): HTMLElement {
 		const next = this.plugin.upNext.nextFor(entry);
 		const row = createDiv({ cls: "reel-upnext-row" });
+		row.dataset.reelPath = entry.path;
 
 		onHold(this.plugin, row, entry);
 		const thumb = row.createDiv({ cls: "reel-upnext-thumb" });

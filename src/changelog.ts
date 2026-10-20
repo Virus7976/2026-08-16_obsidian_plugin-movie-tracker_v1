@@ -52,6 +52,16 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.67",
+		date: "2026-10-19",
+		headline: "The screen keeps your place.",
+		changes: [
+			{ kind: "fixed", text: "On a title page, rating, liking or changing the status no longer sends you back to the About tab. You stay on the tab you were on, and it redraws without a loading flash." },
+			{ kind: "fixed", text: "The IMDb parents guide is read once per visit and no longer reloads each time the page redraws." },
+			{ kind: "fixed", text: "Up Next keeps your place after you tick something: it holds the title you were looking at, and Show more stays open instead of folding back up." },
+		],
+	},
+	{
 		version: "0.9.66",
 		date: "2026-10-19",
 		headline: "Episode rating, smoother on slow phones.",

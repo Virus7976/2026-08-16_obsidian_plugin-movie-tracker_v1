@@ -5073,6 +5073,7 @@ ${body}
     new UpNextPainter(plugin2, containerEl, limit, heading, entries).render();
   }
   var pickSalt = 0;
+  var expanded = { upNext: false, watchlist: false };
   var watchState = {
     kind: "all",
     sort: "added",
@@ -5105,7 +5106,7 @@ ${body}
         el.createDiv({ cls: "reel-block-title", text: "Up next" });
       const inProgress = this.plugin.visible(this.plugin.library.inProgress());
       const everything = this.entries ? inProgress.filter((e) => this.entries?.some((v) => v.path === e.path)) : inProgress;
-      const cap = this.limit ?? 12;
+      const cap = expanded.upNext && !this.heading ? everything.length : this.limit ?? 12;
       let rows2 = everything.slice(0, cap);
       const hidden = everything.length - rows2.length;
       const watchAll = this.heading ? [] : this.watchlist();
@@ -5133,6 +5134,7 @@ ${body}
         const more = el.createDiv({ cls: "reel-block-count" });
         const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${hidden} more` });
         btn.addEventListener("click", () => {
+          expanded.upNext = true;
           for (const entry of everything.slice(cap))
             list2.appendChild(this.row(entry));
           more.remove();
@@ -5252,13 +5254,15 @@ ${body}
       if (!rows2.length)
         wrap.createDiv({ cls: "reel-dim", text: "Nothing on your watchlist matches." });
       const list2 = wrap.createDiv({ cls: "reel-upnext reel-watchlist-list" });
-      for (const entry of rows2.slice(0, 40))
+      const shownCap = expanded.watchlist ? rows2.length : 40;
+      for (const entry of rows2.slice(0, shownCap))
         list2.appendChild(this.watchRow(entry));
-      if (rows2.length > 40) {
+      if (rows2.length > shownCap) {
         const more = wrap.createDiv({ cls: "reel-block-count" });
         const btn = more.createEl("button", { cls: "reel-chip", text: `Show ${rows2.length - 40} more` });
         btn.addEventListener("click", () => {
-          for (const entry of rows2.slice(40))
+          expanded.watchlist = true;
+          for (const entry of rows2.slice(shownCap))
             list2.appendChild(this.watchRow(entry));
           more.remove();
         });
@@ -5316,6 +5320,7 @@ ${body}
     }
     watchRow(entry) {
       const row = createDiv({ cls: "reel-upnext-row reel-watch-row" });
+      row.dataset.reelPath = entry.path;
       const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
       this.plugin.posters.attach(thumb, entry);
       const open2 = () => void this.plugin.openDetail(entry);
@@ -5358,6 +5363,7 @@ ${body}
     row(entry) {
       const next = this.plugin.upNext.nextFor(entry);
       const row = createDiv({ cls: "reel-upnext-row" });
+      row.dataset.reelPath = entry.path;
       onHold(this.plugin, row, entry);
       const thumb = row.createDiv({ cls: "reel-upnext-thumb" });
       this.plugin.posters.attach(thumb, entry);
@@ -6243,6 +6249,12 @@ ${body}
       this.openSeason = null;
       this.episodeCache = /* @__PURE__ */ new Map();
       this.rootEl = null;
+      /** The tab you are on, so a repaint puts you back on it instead of on About. */
+      this.activeTab = "about";
+      /** What TMDB said, kept so a repaint draws at once instead of flashing "Loading". */
+      this.metaMemo = null;
+      /** IMDb's guide for this title, once read, so a repaint does not read it again. */
+      this.guideMemo = null;
       /** Until when a library change should not repaint this screen. */
       this.quietUntil = 0;
       /** The season whose list has already been scrolled to its first unwatched episode. */
@@ -6422,7 +6434,8 @@ ${body}
       wrap.createDiv({ cls: "reel-loading", text: "Loading details\u2026", attr: { role: "status" } });
       let meta;
       try {
-        meta = isTv ? await this.plugin.tmdb.getShow(this.entry.tmdbId) : await this.plugin.tmdb.getFilm(this.entry.tmdbId);
+        meta = this.metaMemo ?? (isTv ? await this.plugin.tmdb.getShow(this.entry.tmdbId) : await this.plugin.tmdb.getFilm(this.entry.tmdbId));
+        this.metaMemo = meta;
       } catch (e) {
         wrap.empty();
         wrap.createDiv({ cls: "reel-error", text: redact(e) });
@@ -6502,6 +6515,7 @@ ${body}
       const buttons = [];
       const show = (i) => {
         buttons.forEach((b, n2) => b.toggleClass("is-active", n2 === i));
+        this.activeTab = tabs[i].id;
         body.empty();
         tabs[i].render(body);
         attachSources(this.plugin, body, tabs[i].id, {
@@ -6524,9 +6538,13 @@ ${body}
         buttons.push(b);
         b.addEventListener("click", () => show(i));
       });
-      show(0);
-      if (this.startTab)
-        window.requestAnimationFrame(() => this.jumpToTab?.(this.startTab));
+      const wanted2 = tabs.findIndex((t) => t.id === (this.startTab ?? this.activeTab));
+      show(wanted2 < 0 ? 0 : wanted2);
+      if (this.startTab) {
+        const go = this.startTab;
+        this.startTab = void 0;
+        window.requestAnimationFrame(() => this.jumpToTab?.(go));
+      }
     }
     /**
      * Director / Writer / Stars, as named rows of tappable names.
@@ -6905,8 +6923,29 @@ ${body}
       const box = el.createDiv({ cls: "reel-fl reel-guide-reader" });
       box.createDiv({ cls: "reel-fl-title", text: "From IMDb" });
       const body = box.createDiv({ cls: "reel-guide-body" });
+      const paint = (cats) => {
+        cats.forEach((c, i) => {
+          const sec = body.createEl("details", { cls: "reel-guide-sec" });
+          if (i === 0)
+            sec.setAttr("open", "");
+          const sum = sec.createEl("summary");
+          sum.createSpan({ cls: "reel-guide-name", text: c.title });
+          if (c.severity)
+            sum.createSpan({ cls: `reel-guide-pill sev-${c.severity.toLowerCase()}`, text: c.severity });
+          const list2 = sec.createEl("ul", { cls: "reel-guide-list" });
+          for (const t of c.items)
+            list2.createEl("li", { text: t });
+          if (!c.items.length)
+            list2.createEl("li", { cls: "reel-dim", text: "No notes yet." });
+        });
+        body.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
+      };
       const load = () => {
         body.empty();
+        if (this.guideMemo) {
+          paint(this.guideMemo);
+          return;
+        }
         body.createDiv({ cls: "reel-loading", text: "Loading the parents guide\u2026", attr: { role: "status" } });
         void fetchImdbGuide(this.plugin, imdbId).then(({ cats, reason }) => {
           if (!body.isConnected)
@@ -6921,21 +6960,8 @@ ${body}
             retry.addEventListener("click", load);
             return;
           }
-          cats.forEach((c, i) => {
-            const sec = body.createEl("details", { cls: "reel-guide-sec" });
-            if (i === 0)
-              sec.setAttr("open", "");
-            const sum = sec.createEl("summary");
-            sum.createSpan({ cls: "reel-guide-name", text: c.title });
-            if (c.severity)
-              sum.createSpan({ cls: `reel-guide-pill sev-${c.severity.toLowerCase()}`, text: c.severity });
-            const list2 = sec.createEl("ul", { cls: "reel-guide-list" });
-            for (const t of c.items)
-              list2.createEl("li", { text: t });
-            if (!c.items.length)
-              list2.createEl("li", { cls: "reel-dim", text: "No notes yet." });
-          });
-          body.createDiv({ cls: "reel-dim reel-fl-note", text: "Written by IMDb viewers, shown here as it was on IMDb." });
+          this.guideMemo = cats;
+          paint(cats);
         });
       };
       load();
