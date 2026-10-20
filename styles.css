@@ -21027,7 +21027,7 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 }
 .reel-diary-month-stat {
 	font-size: var(--font-ui-smaller);
-	color: var(--text-faint);
+	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
 }
 .reel-diary-day {
@@ -21045,7 +21045,7 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 	font-variant-numeric: tabular-nums;
 }
 .reel-diary-weekday {
-	font-size: 11px;
+	font-size: 12px;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	color: var(--text-muted);
@@ -21054,7 +21054,7 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 	padding-top: 0;
 }
 .reel-diary-liked {
-	color: var(--color-red, #d9534f);
+	color: #c0322d;
 	font-size: var(--font-ui-small);
 }
 .reel-diary-day {
@@ -21066,4 +21066,15 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 .reel-diary-day {
 	width: 40px;
 	min-width: 40px;
+}
+
+.reel-titlepage-links {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-top: 8px;
+}
+
+.theme-dark .reel-diary-liked {
+	color: #ff6b66;
 }

@@ -19,6 +19,7 @@ import type { Entry, TmdbSearchResult } from "../types";
 import { redact } from "../secrets";
 import { todayISO, yearOf } from "../util/dates";
 import { DetailScreen } from "./detail";
+import { imdbUrl, tmdbUrl } from "../extract";
 import { LogSheet } from "./logSheet";
 import { paintTrailerFor, paintWash } from "./titleExtras";
 
@@ -101,6 +102,28 @@ export class TitlePage extends Modal {
 		const facts = body.createDiv({ cls: "reel-header-facts" });
 		facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
 		if (this.item.vote_average) facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
+
+		// Straight to IMDb: the page for the title if its id is known, a search until it is.
+		const links = body.createDiv({ cls: "reel-links reel-titlepage-links" });
+		const imdb = links.createEl("a", {
+			cls: "reel-link imdb",
+			text: "IMDb",
+			href: `https://www.imdb.com/find/?q=${encodeURIComponent(entry.title)}&s=tt`,
+			attr: { target: "_blank", rel: "noopener" },
+		});
+		links.createEl("a", {
+			cls: "reel-link tmdb",
+			text: "TMDB",
+			href: tmdbUrl(entry.tmdbId, entry.type),
+			attr: { target: "_blank", rel: "noopener" },
+		});
+		void (isTv ? this.plugin.tmdb.getShow(entry.tmdbId) : this.plugin.tmdb.getFilm(entry.tmdbId))
+			.then((m) => {
+				const id = m.external_ids?.imdb_id ?? (m as { imdb_id?: string | null }).imdb_id;
+				const url = imdbUrl(id ?? undefined);
+				if (url) imdb.setAttr("href", url);
+			})
+			.catch(() => {});
 
 		// The three decisions, up top where they are always in reach.
 		const actions = contentEl.createDiv({ cls: "reel-titlepage-actions" });

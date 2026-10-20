@@ -52,6 +52,15 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.69",
+		date: "2026-10-19",
+		headline: "IMDb is one tap away on any title page.",
+		changes: [
+			{ kind: "new", text: "A title you do not own now has IMDb and TMDB links right under its name. IMDb opens the title's own page." },
+			{ kind: "fixed", text: "Diary weekday, heart and month totals are easier to read." },
+		],
+	},
+	{
 		version: "0.9.68",
 		date: "2026-10-19",
 		headline: "A fresher Diary, and strips that scroll freely.",

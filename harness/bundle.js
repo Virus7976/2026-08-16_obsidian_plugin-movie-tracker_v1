@@ -10897,6 +10897,26 @@ ${body}
       facts.createSpan({ cls: `reel-badge ${isTv ? "tv" : "film"}`, text: isTv ? "Series" : "Film" });
       if (this.item.vote_average)
         facts.createSpan({ cls: "reel-dim", text: `TMDB ${this.item.vote_average.toFixed(1)}` });
+      const links = body.createDiv({ cls: "reel-links reel-titlepage-links" });
+      const imdb = links.createEl("a", {
+        cls: "reel-link imdb",
+        text: "IMDb",
+        href: `https://www.imdb.com/find/?q=${encodeURIComponent(entry.title)}&s=tt`,
+        attr: { target: "_blank", rel: "noopener" }
+      });
+      links.createEl("a", {
+        cls: "reel-link tmdb",
+        text: "TMDB",
+        href: tmdbUrl(entry.tmdbId, entry.type),
+        attr: { target: "_blank", rel: "noopener" }
+      });
+      void (isTv ? this.plugin.tmdb.getShow(entry.tmdbId) : this.plugin.tmdb.getFilm(entry.tmdbId)).then((m) => {
+        const id = m.external_ids?.imdb_id ?? m.imdb_id;
+        const url = imdbUrl(id ?? void 0);
+        if (url)
+          imdb.setAttr("href", url);
+      }).catch(() => {
+      });
       const actions = contentEl.createDiv({ cls: "reel-titlepage-actions" });
       const later = actions.createEl("button", { cls: "reel-btn mod-cta", text: "+ Watchlist", attr: { type: "button" } });
       later.addEventListener("click", () => void this.add(later));
