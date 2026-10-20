@@ -1,108 +1,5 @@
 "use strict";
 (() => {
-  // src/content.ts
-  var CONTENT_FLAGS = ["sex", "nudity", "profanity", "violence", "gore", "drugs", "horror"];
-  var FLAG_LABELS = {
-    sex: "Sex",
-    nudity: "Nudity",
-    profanity: "Swearing",
-    violence: "Violence",
-    gore: "Gore",
-    drugs: "Drugs",
-    horror: "Horror"
-  };
-  var CERT_RANK = {
-    G: 0,
-    "TV-Y": 0,
-    "TV-Y7": 0,
-    "TV-G": 0,
-    PG: 1,
-    "TV-PG": 1,
-    "PG-13": 2,
-    "TV-14": 2,
-    R: 3,
-    "TV-MA": 4,
-    "NC-17": 5,
-    X: 5
-  };
-  function certificationRank(cert) {
-    if (!cert)
-      return null;
-    const rank2 = CERT_RANK[cert.toUpperCase().trim()];
-    return rank2 == null ? null : rank2;
-  }
-  function knownCertifications() {
-    return Object.keys(CERT_RANK);
-  }
-  function certificationFromReleaseDates(data, region = "US") {
-    const results = data?.results;
-    if (!Array.isArray(results))
-      return void 0;
-    const row = results.find((r) => r.iso_3166_1 === region);
-    const cert = row?.release_dates?.map((d) => d.certification).find((c) => c && c.trim());
-    return cert?.trim() || void 0;
-  }
-  function certificationFromContentRatings(data, region = "US") {
-    const results = data?.results;
-    if (!Array.isArray(results))
-      return void 0;
-    const row = results.find((r) => r.iso_3166_1 === region);
-    return row?.rating?.trim() || void 0;
-  }
-  var GUIDE_LEVELS = ["None", "Mild", "Moderate", "Severe"];
-  var CATEGORY_RULES = [
-    {
-      category: "Sex and nudity",
-      keywords: [/nudity/, /\bnude\b/, /\bsex\b/, /sex scene/, /sexual/, /erotic/, /topless/, /strip/, /prostitut/, /seduc/, /affair/, /lust/],
-      floor: [0, 0, 0, 1, 2, 3]
-    },
-    {
-      category: "Violence and gore",
-      keywords: [/violence/, /violent/, /gore\b/, /gory/, /brutal/, /torture/, /massacre/, /murder/, /serial killer/, /shootout/, /war crime/, /dismember/, /decapitat/, /mutilat/, /splatter/, /blood/],
-      genres: ["War", "Crime", "Action"],
-      floor: [0, 0, 1, 2, 3, 3]
-    },
-    {
-      category: "Profanity",
-      keywords: [/profan/, /swear/, /\bf-word\b/, /vulgar/, /crude/],
-      floor: [0, 0, 1, 2, 3, 3]
-    },
-    {
-      category: "Alcohol, drugs and smoking",
-      keywords: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/, /alcohol/, /drunk/, /smoking/, /cartel/, /overdose/],
-      floor: [0, 0, 0, 1, 2, 3]
-    },
-    {
-      category: "Frightening and intense scenes",
-      keywords: [/horror/, /slasher/, /haunting/, /demonic/, /zombie/, /supernatural/, /jump scare/, /terror/, /psychological thriller/, /disturbing/],
-      genres: ["Horror", "Thriller"],
-      floor: [0, 0, 1, 2, 2, 3]
-    }
-  ];
-  function estimateGuide(keywords, genres, cert) {
-    const rank2 = certificationRank(cert);
-    const lower2 = keywords.map((k) => k.toLowerCase());
-    const rows2 = [];
-    for (const rule of CATEGORY_RULES) {
-      const hits = lower2.filter((k) => rule.keywords.some((re) => re.test(k)));
-      const genreHits = (rule.genres ?? []).filter((g) => genres.includes(g));
-      let level = rank2 == null ? 0 : rule.floor[Math.min(rank2, rule.floor.length - 1)];
-      const because = [];
-      if (rank2 != null && level > 0 && cert)
-        because.push(`rated ${cert}`);
-      const evidence = hits.length + (genreHits.length ? 0.5 : 0);
-      const fromEvidence = evidence >= 3 ? 3 : evidence >= 1.5 ? 2 : evidence > 0 ? 1 : 0;
-      if (fromEvidence > level)
-        level = fromEvidence;
-      if (hits.length)
-        because.push(`tagged ${hits.slice(0, 3).join(", ")}`);
-      if (genreHits.length)
-        because.push(genreHits.join(", ").toLowerCase());
-      rows2.push({ category: rule.category, level, because });
-    }
-    return rows2;
-  }
-
   // harness/shim.ts
   function applyOptions(el, o = {}) {
     if (o.cls) {
@@ -531,247 +428,6 @@
   var SuggestModal = class extends Modal {
   };
 
-  // harness/fixtures.ts
-  var n = 0;
-  function film(o) {
-    n++;
-    return {
-      path: `Movies/${o.title}.md`,
-      basename: o.title,
-      type: "film",
-      tmdbId: 1e3 + n,
-      director: [],
-      creators: [],
-      genres: [],
-      seasons: [],
-      watched: [],
-      cast: [],
-      characters: [],
-      castIds: [],
-      directorIds: [],
-      productionCompanies: [],
-      providers: [],
-      contentFlags: [],
-      contentTopics: [],
-      lists: [],
-      status: "watched",
-      added: Date.now() - n * 864e5,
-      watchCount: 1,
-      ...o
-    };
-  }
-  var LIBRARY = [
-    film({
-      title: "The Lord of the Rings: The Fellowship of the Ring",
-      year: 2001,
-      rating: 5,
-      runtime: 178,
-      genres: ["Adventure", "Fantasy", "Action"],
-      director: ["Peter Jackson"],
-      cast: ["Elijah Wood", "Ian McKellen", "Viggo Mortensen"],
-      castIds: [1327, 1328, 110],
-      directorIds: [108],
-      certification: "PG-13",
-      imdbRating: 8.9,
-      imdbVotes: 195e4,
-      metacritic: 92,
-      watched: [{ date: "2025-08-16", rating: 5 }],
-      overview: "A meek Hobbit and eight companions set out on a journey to destroy the One Ring and the Dark Lord Sauron.",
-      liked: true,
-      wouldRewatch: true
-    }),
-    film({
-      title: "Heat",
-      year: 1995,
-      rating: 4.5,
-      runtime: 170,
-      genres: ["Action", "Crime", "Drama"],
-      director: ["Michael Mann"],
-      cast: ["Al Pacino", "Robert De Niro"],
-      castIds: [1158, 380],
-      directorIds: [1704],
-      certification: "R",
-      imdbRating: 8.3,
-      watched: [{ date: "2024-08-16", rating: 4.5 }]
-    }),
-    film({ title: "Inside Man", year: 2006, rating: 4, genres: ["Crime", "Thriller"], director: ["Spike Lee"], runtime: 129 }),
-    film({ title: "Sicario", year: 2015, rating: 4.5, genres: ["Action", "Crime"], director: ["Denis Villeneuve"], runtime: 121 }),
-    film({ title: "Dune", year: 2021, rating: 4.5, genres: ["Science Fiction"], director: ["Denis Villeneuve"], runtime: 155 }),
-    film({ title: "Hot Fuzz", year: 2007, rating: 5, genres: ["Action", "Comedy"], director: ["Edgar Wright"], runtime: 121 }),
-    film({ title: "Shaun of the Dead", year: 2004, rating: 4, genres: ["Comedy", "Horror"], director: ["Edgar Wright"] }),
-    film({ title: "The Dark Knight", year: 2008, rating: 5, genres: ["Action", "Crime"], director: ["Christopher Nolan"], runtime: 152 }),
-    film({ title: "Inception", year: 2010, rating: 4.5, genres: ["Action", "Science Fiction"], director: ["Christopher Nolan"] }),
-    film({ title: "Interstellar", year: 2014, rating: 4.5, genres: ["Adventure", "Drama"], director: ["Christopher Nolan"] }),
-    film({ title: "Training Day", year: 2001, rating: 4, genres: ["Crime", "Drama"], director: ["Antoine Fuqua"] }),
-    film({ title: "Remember the Titans", year: 2e3, rating: 3.5, genres: ["Drama"], director: ["Boaz Yakin"] }),
-    film({ title: "Everything Everywhere All at Once", year: 2022, rating: 5, genres: ["Action", "Comedy"], status: "watchlist" }),
-    film({ title: "Parasite", year: 2019, rating: 5, genres: ["Thriller", "Drama"] }),
-    film({ title: "Mad Max: Fury Road", year: 2015, rating: 4.5, genres: ["Action", "Adventure"] }),
-    film({ title: "Arrival", year: 2016, rating: 4, genres: ["Science Fiction", "Drama"], director: ["Denis Villeneuve"] }),
-    film({ title: "Blade Runner 2049", year: 2017, rating: 4.5, genres: ["Science Fiction"], director: ["Denis Villeneuve"] }),
-    film({ title: "No Country for Old Men", year: 2007, rating: 4.5, genres: ["Crime", "Thriller"] }),
-    film({ title: "There Will Be Blood", year: 2007, rating: 4, genres: ["Drama"] }),
-    film({ title: "Whiplash", year: 2014, rating: 5, genres: ["Drama", "Music"] }),
-    film({ title: "The Grand Budapest Hotel", year: 2014, rating: 4, genres: ["Comedy", "Adventure"] }),
-    film({ title: "Knives Out", year: 2019, rating: 4, genres: ["Comedy", "Crime"], status: "watchlist" }),
-    film({ title: "Nightcrawler", year: 2014, rating: 4.5, genres: ["Crime", "Thriller"] }),
-    film({ title: "Prisoners", year: 2013, rating: 4, genres: ["Thriller"], director: ["Denis Villeneuve"] }),
-    film({ title: "Se7en", year: 1995, rating: 4.5, genres: ["Crime", "Thriller"] }),
-    film({ title: "Zodiac", year: 2007, rating: 4, genres: ["Crime", "Drama"] }),
-    film({ title: "The Social Network", year: 2010, rating: 4, genres: ["Drama"] }),
-    film({ title: "Gone Girl", year: 2014, rating: 4, genres: ["Thriller"] }),
-    film({ title: "Baby Driver", year: 2017, rating: 4, genres: ["Action", "Crime"], director: ["Edgar Wright"] }),
-    film({ title: "Drive", year: 2011, rating: 4, genres: ["Crime", "Drama"] })
-  ];
-  var SHOW = {
-    ...film({ title: "The Office", genres: ["Comedy"] }),
-    type: "tv",
-    firstAirYear: 2005,
-    totalEpisodes: 186,
-    episodeRuntime: 22,
-    rating: 3,
-    certification: "TV-14",
-    creators: ["Greg Daniels"],
-    tmdbRating: 8.6,
-    status: "watching",
-    seasons: [
-      { n: 1, watched: "1-6", total: 6 },
-      { n: 2, watched: "1-3", total: 22 },
-      { n: 3, watched: "", total: 23 }
-    ],
-    lastWatched: { season: 2, episode: 3, date: "2026-08-15" },
-    overview: "The everyday lives of office employees in the Scranton, Pennsylvania branch of the fictional Dunder Mifflin Paper Company."
-  };
-  var AWKWARD = [
-    // No poster at all. Common on obscure titles and on everything until the
-    // backfill runs, and it is the case where the placeholder has to hold the
-    // grid's shape by itself.
-    film({ title: "A Film With No Poster", year: 1974, genres: ["Drama"], rating: 3 }),
-    // A title long enough to break a grid track, which is exactly how the
-    // unequal-columns bug got in.
-    film({
-      title: "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb, and Several Other Things Besides",
-      year: 1964,
-      rating: 5,
-      genres: ["Comedy", "War"],
-      director: ["Stanley Kubrick"]
-    }),
-    // Nothing recorded but the title. An import leaves hundreds of these.
-    film({ title: "Untitled Import", status: "watchlist" }),
-    // Non-Latin script, which sizes and wraps differently from English.
-    film({ title: "\u4E03\u4EBA\u306E\u4F8D", year: 1954, rating: 5, genres: ["Drama"], director: ["\u9ED2\u6FA4\u660E"], runtime: 207 }),
-    // A single character, at the other end from the long one.
-    film({ title: "M", year: 1931, rating: 4.5, genres: ["Crime"] }),
-    // Every badge at once: certification, watchlist flag, rating, heart. They
-    // all overlay the same poster corner region.
-    film({
-      title: "Everything At Once",
-      year: 2020,
-      rating: 4.5,
-      liked: true,
-      wouldRewatch: true,
-      status: "watchlist",
-      certification: "NC-17",
-      genres: ["Action", "Comedy", "Drama", "Thriller", "Horror", "Romance"],
-      imdbRating: 9.9,
-      imdbVotes: 24e5,
-      metacritic: 100,
-      rottenTomatoes: 100,
-      tmdbRating: 9.9
-    })
-  ];
-  var LONG_SHOW = {
-    ...film({ title: "A Very Long Running Series Indeed", genres: ["Drama"] }),
-    type: "tv",
-    /*
-     * An air date three days out, computed rather than written down.
-     *
-     * The upcoming rows need a series with something due, and a fixed date
-     * would put this fixture in the past within the week — after which
-     * `paintUpcoming` renders nothing, the screen quietly stops being covered,
-     * and the audit keeps reporting the same number of passing checks. Coverage
-     * that expires without saying so is worse than coverage that was never
-     * there, because the count still looks right.
-     *
-     * This is also deliberately the longest title in the fixtures: the calendar
-     * builds its own version of the Up Next row, and a long name is exactly
-     * what was being cut mid-word there.
-     */
-    nextAirDate: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10),
-    firstAirYear: 1989,
-    totalEpisodes: 750,
-    episodeRuntime: 22,
-    status: "watching",
-    creators: ["Someone With A Considerably Long Name Attached"],
-    seasons: Array.from({ length: 34 }, (_, i) => ({
-      n: i + 1,
-      watched: i < 20 ? `1-${22}` : "",
-      total: 22
-    })),
-    lastWatched: { season: 20, episode: 22, date: "2026-01-01" }
-  };
-  function rng(seed) {
-    let s = seed;
-    return () => {
-      s = s * 1664525 + 1013904223 >>> 0;
-      return s / 4294967296;
-    };
-  }
-  var GENRES = [
-    "Drama",
-    "Comedy",
-    "Thriller",
-    "Science Fiction",
-    "Horror",
-    "Documentary",
-    "Animation",
-    "Romance",
-    "Crime",
-    "Western"
-  ];
-  var DIRECTORS = [
-    "Denis Villeneuve",
-    "Greta Gerwig",
-    "Bong Joon-ho",
-    "C\xE9line Sciamma",
-    "Ryusuke Hamaguchi",
-    "Jordan Peele",
-    "Lynne Ramsay",
-    "Wes Anderson"
-  ];
-  var CERTS = ["PG", "PG-13", "R", "15", "12A"];
-  var PER_MONTH = [14, 9, 4, 3, 6, 8, 11, 7, 5, 22, 16, 13];
-  var YEAR = (() => {
-    const rand = rng(20260820);
-    const out = [];
-    for (let m = 0; m < 12; m++) {
-      for (let i = 0; i < PER_MONTH[m]; i++) {
-        const dayBias = rand();
-        const dom = 1 + Math.floor(rand() * 27);
-        const date = `2025-${String(m + 1).padStart(2, "0")}-${String(dom).padStart(2, "0")}`;
-        const r = rand();
-        const unrated = r > 0.84;
-        const rating = unrated ? void 0 : r > 0.75 ? 3 : r > 0.4 ? 3.5 : r > 0.15 ? 4 : r > 0.04 ? 4.5 : 5;
-        const decade = 1970 + Math.floor(rand() * 6) * 10;
-        out.push(
-          film({
-            title: `Fixture ${m + 1}-${i + 1}${dayBias > 0.7 ? " \u2014 A Considerably Longer Title Than Fits" : ""}`,
-            year: decade + Math.floor(rand() * 10),
-            rating,
-            runtime: 80 + Math.floor(rand() * 90),
-            genres: [GENRES[Math.floor(rand() * GENRES.length)]],
-            director: [DIRECTORS[Math.floor(rand() * DIRECTORS.length)]],
-            certification: CERTS[Math.floor(rand() * CERTS.length)],
-            imdbRating: 5 + rand() * 4,
-            watched: [{ date, rating }],
-            liked: rand() > 0.7
-          })
-        );
-      }
-    }
-    return out;
-  })();
-
   // src/secrets.ts
   var guarded = /* @__PURE__ */ new Set();
   function redact(input) {
@@ -781,22 +437,6 @@
     s = s.replace(/([?&]api_key=)[^&\s]+/gi, "$1\xABapi-key\xBB");
     s = s.replace(/(Bearer\s+)[A-Za-z0-9._-]{16,}/gi, "$1\xABtoken\xBB");
     return s;
-  }
-
-  // src/util/ratings.ts
-  var MAX_STARS = 5;
-  var STEP = 0.5;
-  function clampRating(value) {
-    const snapped = Math.round(value / STEP) * STEP;
-    return Math.min(MAX_STARS, Math.max(0, snapped));
-  }
-  function starString(rating) {
-    if (rating == null || rating <= 0)
-      return "";
-    const r = clampRating(rating);
-    const full = Math.floor(r);
-    const half = r - full >= STEP;
-    return "\u2605".repeat(full) + (half ? "\xBD" : "");
   }
 
   // src/util/haptics.ts
@@ -817,6 +457,22 @@
       navigator.vibrate?.(PATTERNS[kind]);
     } catch {
     }
+  }
+
+  // src/util/ratings.ts
+  var MAX_STARS = 5;
+  var STEP = 0.5;
+  function clampRating(value) {
+    const snapped = Math.round(value / STEP) * STEP;
+    return Math.min(MAX_STARS, Math.max(0, snapped));
+  }
+  function starString(rating) {
+    if (rating == null || rating <= 0)
+      return "";
+    const r = clampRating(rating);
+    const full = Math.floor(r);
+    const half = r - full >= STEP;
+    return "\u2605".repeat(full) + (half ? "\xBD" : "");
   }
 
   // src/ui/stars.ts
@@ -868,125 +524,6 @@
   }
   function renderStarsStatic(parent, value) {
     return renderStars(parent, { value, readonly: true });
-  }
-
-  // src/util/ranges.ts
-  function parseRange(spec) {
-    if (!spec)
-      return [];
-    const out = /* @__PURE__ */ new Set();
-    for (const part of String(spec).split(",")) {
-      const chunk = part.trim();
-      if (!chunk)
-        continue;
-      const m = chunk.match(/^(\d+)\s*-\s*(\d+)$/);
-      if (m) {
-        const lo = parseInt(m[1], 10);
-        const hi = parseInt(m[2], 10);
-        if (Number.isNaN(lo) || Number.isNaN(hi))
-          continue;
-        for (let i = Math.min(lo, hi); i <= Math.max(lo, hi); i++)
-          out.add(i);
-      } else if (/^\d+$/.test(chunk)) {
-        out.add(parseInt(chunk, 10));
-      }
-    }
-    return [...out].sort((a, b) => a - b);
-  }
-  function formatRange(episodes) {
-    const sorted = [...new Set(episodes)].filter((n2) => Number.isFinite(n2) && n2 > 0).sort((a, b) => a - b);
-    if (!sorted.length)
-      return "";
-    const parts = [];
-    let start = sorted[0];
-    let prev = sorted[0];
-    for (let i = 1; i <= sorted.length; i++) {
-      const cur = sorted[i];
-      if (cur !== prev + 1) {
-        parts.push(start === prev ? String(start) : `${start}-${prev}`);
-        start = cur;
-      }
-      prev = cur;
-    }
-    return parts.join(",");
-  }
-  function rangeCount(spec) {
-    return parseRange(spec).length;
-  }
-
-  // src/util/dates.ts
-  function todayISO() {
-    return toISO(/* @__PURE__ */ new Date());
-  }
-  function toISO(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }
-  function yearOf(dateish) {
-    if (!dateish)
-      return void 0;
-    const m = String(dateish).match(/^(\d{4})/);
-    return m ? parseInt(m[1], 10) : void 0;
-  }
-  function prettyDate(iso2) {
-    if (!iso2)
-      return "";
-    const m = iso2.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m)
-      return iso2;
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${parseInt(m[3], 10)} ${months[parseInt(m[2], 10) - 1]} ${m[1]}`;
-  }
-  function daysBetween(aISO, bISO) {
-    const a = Date.parse(aISO + "T00:00:00");
-    const b = Date.parse(bISO + "T00:00:00");
-    if (Number.isNaN(a) || Number.isNaN(b))
-      return NaN;
-    return Math.round((b - a) / 864e5);
-  }
-  function formatMinutes(mins) {
-    if (!Number.isFinite(mins) || mins <= 0)
-      return "\u2014";
-    const h = Math.floor(mins / 60);
-    const m = Math.round(mins % 60);
-    if (!h)
-      return `${m}m`;
-    return m ? `${h}h ${m}m` : `${h}h`;
-  }
-
-  // src/library.ts
-  function unlink(value) {
-    const m = String(value).match(/^\[\[([^\]]+)\]\]$/);
-    if (!m)
-      return String(value).trim();
-    const inner = m[1];
-    const pipe = inner.lastIndexOf("|");
-    const text2 = pipe >= 0 ? inner.slice(pipe + 1) : inner;
-    const slash = text2.lastIndexOf("/");
-    return (slash >= 0 ? text2.slice(slash + 1) : text2).trim();
-  }
-
-  // src/render/query.ts
-  var SYMBOL_OPS = [">=", "<=", "!=", "="];
-  var WORD_OPS = ["contains", "excludes", "includes", "not in", "in"];
-  var OPS = [...SYMBOL_OPS, ">", "<", ...WORD_OPS];
-  function lastWatchDate(e) {
-    if (e.type === "tv")
-      return e.lastWatched?.date;
-    return e.watched.length ? e.watched[e.watched.length - 1].date : void 0;
-  }
-
-  // src/util/format.ts
-  function compactCount(n2) {
-    if (!Number.isFinite(n2) || n2 <= 0)
-      return "";
-    if (n2 >= 1e6)
-      return `${(n2 / 1e6).toFixed(1).replace(/\.0$/, "")}M`;
-    if (n2 >= 1e3)
-      return `${Math.round(n2 / 1e3)}K`;
-    return String(Math.round(n2));
   }
 
   // src/ui/quickRate.ts
@@ -1130,6 +667,48 @@
       this.contentEl.empty();
     }
   };
+
+  // src/util/dates.ts
+  function todayISO() {
+    return toISO(/* @__PURE__ */ new Date());
+  }
+  function toISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  function yearOf(dateish) {
+    if (!dateish)
+      return void 0;
+    const m = String(dateish).match(/^(\d{4})/);
+    return m ? parseInt(m[1], 10) : void 0;
+  }
+  function prettyDate(iso2) {
+    if (!iso2)
+      return "";
+    const m = iso2.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m)
+      return iso2;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${parseInt(m[3], 10)} ${months[parseInt(m[2], 10) - 1]} ${m[1]}`;
+  }
+  function daysBetween(aISO, bISO) {
+    const a = Date.parse(aISO + "T00:00:00");
+    const b = Date.parse(bISO + "T00:00:00");
+    if (Number.isNaN(a) || Number.isNaN(b))
+      return NaN;
+    return Math.round((b - a) / 864e5);
+  }
+  function formatMinutes(mins) {
+    if (!Number.isFinite(mins) || mins <= 0)
+      return "\u2014";
+    const h = Math.floor(mins / 60);
+    const m = Math.round(mins % 60);
+    if (!h)
+      return `${m}m`;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
 
   // src/reviews.ts
   var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -2540,6 +2119,109 @@ ${body}
     }
   };
 
+  // src/content.ts
+  var CONTENT_FLAGS = ["sex", "nudity", "profanity", "violence", "gore", "drugs", "horror"];
+  var FLAG_LABELS = {
+    sex: "Sex",
+    nudity: "Nudity",
+    profanity: "Swearing",
+    violence: "Violence",
+    gore: "Gore",
+    drugs: "Drugs",
+    horror: "Horror"
+  };
+  var CERT_RANK = {
+    G: 0,
+    "TV-Y": 0,
+    "TV-Y7": 0,
+    "TV-G": 0,
+    PG: 1,
+    "TV-PG": 1,
+    "PG-13": 2,
+    "TV-14": 2,
+    R: 3,
+    "TV-MA": 4,
+    "NC-17": 5,
+    X: 5
+  };
+  function certificationRank(cert) {
+    if (!cert)
+      return null;
+    const rank2 = CERT_RANK[cert.toUpperCase().trim()];
+    return rank2 == null ? null : rank2;
+  }
+  function knownCertifications() {
+    return Object.keys(CERT_RANK);
+  }
+  function certificationFromReleaseDates(data, region = "US") {
+    const results = data?.results;
+    if (!Array.isArray(results))
+      return void 0;
+    const row = results.find((r) => r.iso_3166_1 === region);
+    const cert = row?.release_dates?.map((d) => d.certification).find((c) => c && c.trim());
+    return cert?.trim() || void 0;
+  }
+  function certificationFromContentRatings(data, region = "US") {
+    const results = data?.results;
+    if (!Array.isArray(results))
+      return void 0;
+    const row = results.find((r) => r.iso_3166_1 === region);
+    return row?.rating?.trim() || void 0;
+  }
+  var GUIDE_LEVELS = ["None", "Mild", "Moderate", "Severe"];
+  var CATEGORY_RULES = [
+    {
+      category: "Sex and nudity",
+      keywords: [/nudity/, /\bnude\b/, /\bsex\b/, /sex scene/, /sexual/, /erotic/, /topless/, /strip/, /prostitut/, /seduc/, /affair/, /lust/],
+      floor: [0, 0, 0, 1, 2, 3]
+    },
+    {
+      category: "Violence and gore",
+      keywords: [/violence/, /violent/, /gore\b/, /gory/, /brutal/, /torture/, /massacre/, /murder/, /serial killer/, /shootout/, /war crime/, /dismember/, /decapitat/, /mutilat/, /splatter/, /blood/],
+      genres: ["War", "Crime", "Action"],
+      floor: [0, 0, 1, 2, 3, 3]
+    },
+    {
+      category: "Profanity",
+      keywords: [/profan/, /swear/, /\bf-word\b/, /vulgar/, /crude/],
+      floor: [0, 0, 1, 2, 3, 3]
+    },
+    {
+      category: "Alcohol, drugs and smoking",
+      keywords: [/drug/, /cocaine/, /heroin/, /methamphetamine/, /addict/, /narcotic/, /alcohol/, /drunk/, /smoking/, /cartel/, /overdose/],
+      floor: [0, 0, 0, 1, 2, 3]
+    },
+    {
+      category: "Frightening and intense scenes",
+      keywords: [/horror/, /slasher/, /haunting/, /demonic/, /zombie/, /supernatural/, /jump scare/, /terror/, /psychological thriller/, /disturbing/],
+      genres: ["Horror", "Thriller"],
+      floor: [0, 0, 1, 2, 2, 3]
+    }
+  ];
+  function estimateGuide(keywords, genres, cert) {
+    const rank2 = certificationRank(cert);
+    const lower2 = keywords.map((k) => k.toLowerCase());
+    const rows2 = [];
+    for (const rule of CATEGORY_RULES) {
+      const hits = lower2.filter((k) => rule.keywords.some((re) => re.test(k)));
+      const genreHits = (rule.genres ?? []).filter((g) => genres.includes(g));
+      let level = rank2 == null ? 0 : rule.floor[Math.min(rank2, rule.floor.length - 1)];
+      const because = [];
+      if (rank2 != null && level > 0 && cert)
+        because.push(`rated ${cert}`);
+      const evidence = hits.length + (genreHits.length ? 0.5 : 0);
+      const fromEvidence = evidence >= 3 ? 3 : evidence >= 1.5 ? 2 : evidence > 0 ? 1 : 0;
+      if (fromEvidence > level)
+        level = fromEvidence;
+      if (hits.length)
+        because.push(`tagged ${hits.slice(0, 3).join(", ")}`);
+      if (genreHits.length)
+        because.push(genreHits.join(", ").toLowerCase());
+      rows2.push({ category: rule.category, level, because });
+    }
+    return rows2;
+  }
+
   // src/extract.ts
   function trailerUrl(videos) {
     if (!videos?.length)
@@ -3469,6 +3151,448 @@ ${body}
     menu.showAtPosition({ x, y });
   }
 
+  // src/ui/empty.ts
+  function renderEmpty(parent, opts) {
+    const wrap = parent.createDiv({ cls: "reel-empty-state" });
+    const icon = wrap.createDiv({ cls: "reel-empty-icon", attr: { "aria-hidden": "true" } });
+    setIcon(icon, opts.icon);
+    wrap.createDiv({ cls: "reel-empty-title", text: opts.title });
+    if (opts.body)
+      wrap.createDiv({ cls: "reel-empty-body", text: opts.body });
+    if (opts.actions?.length) {
+      const row = wrap.createDiv({ cls: "reel-empty-actions" });
+      for (const action of opts.actions) {
+        const btn = row.createEl("button", {
+          cls: `reel-btn${action.primary ? " mod-cta" : ""}`,
+          text: action.label,
+          attr: { type: "button" }
+        });
+        btn.addEventListener("click", action.onClick);
+      }
+    }
+    return wrap;
+  }
+
+  // src/render/diary.ts
+  function viewings(entries, year2) {
+    const out = [];
+    for (const entry of entries) {
+      for (const w of entry.watched) {
+        if (!w.date)
+          continue;
+        if (year2 && !w.date.startsWith(String(year2)))
+          continue;
+        out.push({ entry, date: w.date, rating: w.rating ?? void 0, rewatch: w.rewatch === true });
+      }
+      if (entry.type === "tv" && entry.lastWatched?.date) {
+        const date = entry.lastWatched.date;
+        if (!year2 || date.startsWith(String(year2))) {
+          out.push({
+            entry,
+            date,
+            rating: entry.rating ?? void 0,
+            rewatch: false,
+            episode: `S${entry.lastWatched.season}E${entry.lastWatched.episode}`
+          });
+        }
+      }
+    }
+    return out.sort((a, b) => b.date.localeCompare(a.date));
+  }
+  var MONTHS2 = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  function paintDiaryRows(plugin2, list2, rows2, onOpen, opts = {}) {
+    let currentMonth = "";
+    let currentDay = "";
+    const months = /* @__PURE__ */ new Map();
+    for (const v of rows2) {
+      const key = v.date.slice(0, 7);
+      const m = months.get(key) ?? { n: 0, rated: 0, sum: 0 };
+      m.n += 1;
+      if (v.rating != null) {
+        m.rated += 1;
+        m.sum += v.rating;
+      }
+      months.set(key, m);
+    }
+    for (const v of rows2) {
+      const month = v.date.slice(0, 7);
+      if (month !== currentMonth) {
+        currentMonth = month;
+        currentDay = "";
+        const [y, m] = month.split("-");
+        const head = list2.createDiv({ cls: "reel-diary-month" });
+        head.createSpan({ cls: "reel-diary-month-name", text: `${MONTHS2[parseInt(m, 10) - 1]} ${y}` });
+        const stat = months.get(month);
+        if (stat) {
+          const avg = stat.rated ? ` \xB7 avg ${(stat.sum / stat.rated).toFixed(1)}\u2605` : "";
+          head.createSpan({ cls: "reel-diary-month-stat", text: `${stat.n} viewing${stat.n === 1 ? "" : "s"}${avg}` });
+        }
+      }
+      const row = list2.createDiv({ cls: "reel-diary-row" });
+      row.setAttr("role", "button");
+      row.setAttr("tabindex", "0");
+      row.setAttr(
+        "aria-label",
+        `${v.entry.title}, watched ${prettyDate(v.date)}${v.rating != null ? `, rated ${v.rating} out of 5` : ""}`
+      );
+      const day = row.createDiv({ cls: "reel-diary-day" });
+      if (v.date !== currentDay) {
+        currentDay = v.date;
+        day.createSpan({ cls: "reel-diary-daynum", text: String(parseInt(v.date.slice(8, 10), 10)) });
+        const [yy, mm, dd] = v.date.split("-").map((x) => parseInt(x, 10));
+        day.createSpan({
+          cls: "reel-diary-weekday",
+          text: new Date(yy, mm - 1, dd).toLocaleDateString(void 0, { weekday: "short" })
+        });
+      } else {
+        row.addClass("is-same-day");
+      }
+      const thumb = row.createDiv({ cls: "reel-diary-thumb" });
+      plugin2.posters.attach(thumb, v.entry);
+      const body = row.createDiv({ cls: "reel-diary-body" });
+      const title = body.createDiv({ cls: "reel-diary-title" });
+      title.createSpan({ text: v.entry.title });
+      if (v.entry.year)
+        title.createSpan({ cls: "reel-dim", text: ` ${v.entry.year}` });
+      const meta = body.createDiv({ cls: "reel-diary-meta" });
+      if (v.episode)
+        meta.createSpan({ cls: "reel-badge", text: v.episode });
+      if (v.rating != null)
+        renderStarsStatic(meta, v.rating);
+      if (v.rewatch)
+        meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
+      if (v.entry.liked)
+        meta.createSpan({ cls: "reel-diary-liked", text: "\u2665", attr: { "aria-label": "Liked" } });
+      opts.extras?.(body, v);
+      onHold(plugin2, row, v.entry);
+      row.addEventListener("click", () => onOpen(v));
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          onOpen(v);
+        }
+      });
+    }
+  }
+
+  // harness/fixtures.ts
+  var n = 0;
+  function film(o) {
+    n++;
+    return {
+      path: `Movies/${o.title}.md`,
+      basename: o.title,
+      type: "film",
+      tmdbId: 1e3 + n,
+      director: [],
+      creators: [],
+      genres: [],
+      seasons: [],
+      watched: [],
+      cast: [],
+      characters: [],
+      castIds: [],
+      directorIds: [],
+      productionCompanies: [],
+      providers: [],
+      contentFlags: [],
+      contentTopics: [],
+      lists: [],
+      status: "watched",
+      added: Date.now() - n * 864e5,
+      watchCount: 1,
+      ...o
+    };
+  }
+  var LIBRARY = [
+    film({
+      title: "The Lord of the Rings: The Fellowship of the Ring",
+      year: 2001,
+      rating: 5,
+      runtime: 178,
+      genres: ["Adventure", "Fantasy", "Action"],
+      director: ["Peter Jackson"],
+      cast: ["Elijah Wood", "Ian McKellen", "Viggo Mortensen"],
+      castIds: [1327, 1328, 110],
+      directorIds: [108],
+      certification: "PG-13",
+      imdbRating: 8.9,
+      imdbVotes: 195e4,
+      metacritic: 92,
+      watched: [{ date: "2025-08-16", rating: 5 }],
+      overview: "A meek Hobbit and eight companions set out on a journey to destroy the One Ring and the Dark Lord Sauron.",
+      liked: true,
+      wouldRewatch: true
+    }),
+    film({
+      title: "Heat",
+      year: 1995,
+      rating: 4.5,
+      runtime: 170,
+      genres: ["Action", "Crime", "Drama"],
+      director: ["Michael Mann"],
+      cast: ["Al Pacino", "Robert De Niro"],
+      castIds: [1158, 380],
+      directorIds: [1704],
+      certification: "R",
+      imdbRating: 8.3,
+      watched: [{ date: "2024-08-16", rating: 4.5 }]
+    }),
+    film({ title: "Inside Man", year: 2006, rating: 4, genres: ["Crime", "Thriller"], director: ["Spike Lee"], runtime: 129 }),
+    film({ title: "Sicario", year: 2015, rating: 4.5, genres: ["Action", "Crime"], director: ["Denis Villeneuve"], runtime: 121 }),
+    film({ title: "Dune", year: 2021, rating: 4.5, genres: ["Science Fiction"], director: ["Denis Villeneuve"], runtime: 155 }),
+    film({ title: "Hot Fuzz", year: 2007, rating: 5, genres: ["Action", "Comedy"], director: ["Edgar Wright"], runtime: 121 }),
+    film({ title: "Shaun of the Dead", year: 2004, rating: 4, genres: ["Comedy", "Horror"], director: ["Edgar Wright"] }),
+    film({ title: "The Dark Knight", year: 2008, rating: 5, genres: ["Action", "Crime"], director: ["Christopher Nolan"], runtime: 152 }),
+    film({ title: "Inception", year: 2010, rating: 4.5, genres: ["Action", "Science Fiction"], director: ["Christopher Nolan"] }),
+    film({ title: "Interstellar", year: 2014, rating: 4.5, genres: ["Adventure", "Drama"], director: ["Christopher Nolan"] }),
+    film({ title: "Training Day", year: 2001, rating: 4, genres: ["Crime", "Drama"], director: ["Antoine Fuqua"] }),
+    film({ title: "Remember the Titans", year: 2e3, rating: 3.5, genres: ["Drama"], director: ["Boaz Yakin"] }),
+    film({ title: "Everything Everywhere All at Once", year: 2022, rating: 5, genres: ["Action", "Comedy"], status: "watchlist" }),
+    film({ title: "Parasite", year: 2019, rating: 5, genres: ["Thriller", "Drama"] }),
+    film({ title: "Mad Max: Fury Road", year: 2015, rating: 4.5, genres: ["Action", "Adventure"] }),
+    film({ title: "Arrival", year: 2016, rating: 4, genres: ["Science Fiction", "Drama"], director: ["Denis Villeneuve"] }),
+    film({ title: "Blade Runner 2049", year: 2017, rating: 4.5, genres: ["Science Fiction"], director: ["Denis Villeneuve"] }),
+    film({ title: "No Country for Old Men", year: 2007, rating: 4.5, genres: ["Crime", "Thriller"] }),
+    film({ title: "There Will Be Blood", year: 2007, rating: 4, genres: ["Drama"] }),
+    film({ title: "Whiplash", year: 2014, rating: 5, genres: ["Drama", "Music"] }),
+    film({ title: "The Grand Budapest Hotel", year: 2014, rating: 4, genres: ["Comedy", "Adventure"] }),
+    film({ title: "Knives Out", year: 2019, rating: 4, genres: ["Comedy", "Crime"], status: "watchlist" }),
+    film({ title: "Nightcrawler", year: 2014, rating: 4.5, genres: ["Crime", "Thriller"] }),
+    film({ title: "Prisoners", year: 2013, rating: 4, genres: ["Thriller"], director: ["Denis Villeneuve"] }),
+    film({ title: "Se7en", year: 1995, rating: 4.5, genres: ["Crime", "Thriller"] }),
+    film({ title: "Zodiac", year: 2007, rating: 4, genres: ["Crime", "Drama"] }),
+    film({ title: "The Social Network", year: 2010, rating: 4, genres: ["Drama"] }),
+    film({ title: "Gone Girl", year: 2014, rating: 4, genres: ["Thriller"] }),
+    film({ title: "Baby Driver", year: 2017, rating: 4, genres: ["Action", "Crime"], director: ["Edgar Wright"] }),
+    film({ title: "Drive", year: 2011, rating: 4, genres: ["Crime", "Drama"] })
+  ];
+  var SHOW = {
+    ...film({ title: "The Office", genres: ["Comedy"] }),
+    type: "tv",
+    firstAirYear: 2005,
+    totalEpisodes: 186,
+    episodeRuntime: 22,
+    rating: 3,
+    certification: "TV-14",
+    creators: ["Greg Daniels"],
+    tmdbRating: 8.6,
+    status: "watching",
+    seasons: [
+      { n: 1, watched: "1-6", total: 6 },
+      { n: 2, watched: "1-3", total: 22 },
+      { n: 3, watched: "", total: 23 }
+    ],
+    lastWatched: { season: 2, episode: 3, date: "2026-08-15" },
+    overview: "The everyday lives of office employees in the Scranton, Pennsylvania branch of the fictional Dunder Mifflin Paper Company."
+  };
+  var AWKWARD = [
+    // No poster at all. Common on obscure titles and on everything until the
+    // backfill runs, and it is the case where the placeholder has to hold the
+    // grid's shape by itself.
+    film({ title: "A Film With No Poster", year: 1974, genres: ["Drama"], rating: 3 }),
+    // A title long enough to break a grid track, which is exactly how the
+    // unequal-columns bug got in.
+    film({
+      title: "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb, and Several Other Things Besides",
+      year: 1964,
+      rating: 5,
+      genres: ["Comedy", "War"],
+      director: ["Stanley Kubrick"]
+    }),
+    // Nothing recorded but the title. An import leaves hundreds of these.
+    film({ title: "Untitled Import", status: "watchlist" }),
+    // Non-Latin script, which sizes and wraps differently from English.
+    film({ title: "\u4E03\u4EBA\u306E\u4F8D", year: 1954, rating: 5, genres: ["Drama"], director: ["\u9ED2\u6FA4\u660E"], runtime: 207 }),
+    // A single character, at the other end from the long one.
+    film({ title: "M", year: 1931, rating: 4.5, genres: ["Crime"] }),
+    // Every badge at once: certification, watchlist flag, rating, heart. They
+    // all overlay the same poster corner region.
+    film({
+      title: "Everything At Once",
+      year: 2020,
+      rating: 4.5,
+      liked: true,
+      wouldRewatch: true,
+      status: "watchlist",
+      certification: "NC-17",
+      genres: ["Action", "Comedy", "Drama", "Thriller", "Horror", "Romance"],
+      imdbRating: 9.9,
+      imdbVotes: 24e5,
+      metacritic: 100,
+      rottenTomatoes: 100,
+      tmdbRating: 9.9
+    })
+  ];
+  var LONG_SHOW = {
+    ...film({ title: "A Very Long Running Series Indeed", genres: ["Drama"] }),
+    type: "tv",
+    /*
+     * An air date three days out, computed rather than written down.
+     *
+     * The upcoming rows need a series with something due, and a fixed date
+     * would put this fixture in the past within the week — after which
+     * `paintUpcoming` renders nothing, the screen quietly stops being covered,
+     * and the audit keeps reporting the same number of passing checks. Coverage
+     * that expires without saying so is worse than coverage that was never
+     * there, because the count still looks right.
+     *
+     * This is also deliberately the longest title in the fixtures: the calendar
+     * builds its own version of the Up Next row, and a long name is exactly
+     * what was being cut mid-word there.
+     */
+    nextAirDate: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10),
+    firstAirYear: 1989,
+    totalEpisodes: 750,
+    episodeRuntime: 22,
+    status: "watching",
+    creators: ["Someone With A Considerably Long Name Attached"],
+    seasons: Array.from({ length: 34 }, (_, i) => ({
+      n: i + 1,
+      watched: i < 20 ? `1-${22}` : "",
+      total: 22
+    })),
+    lastWatched: { season: 20, episode: 22, date: "2026-01-01" }
+  };
+  function rng(seed) {
+    let s = seed;
+    return () => {
+      s = s * 1664525 + 1013904223 >>> 0;
+      return s / 4294967296;
+    };
+  }
+  var GENRES = [
+    "Drama",
+    "Comedy",
+    "Thriller",
+    "Science Fiction",
+    "Horror",
+    "Documentary",
+    "Animation",
+    "Romance",
+    "Crime",
+    "Western"
+  ];
+  var DIRECTORS = [
+    "Denis Villeneuve",
+    "Greta Gerwig",
+    "Bong Joon-ho",
+    "C\xE9line Sciamma",
+    "Ryusuke Hamaguchi",
+    "Jordan Peele",
+    "Lynne Ramsay",
+    "Wes Anderson"
+  ];
+  var CERTS = ["PG", "PG-13", "R", "15", "12A"];
+  var PER_MONTH = [14, 9, 4, 3, 6, 8, 11, 7, 5, 22, 16, 13];
+  var YEAR = (() => {
+    const rand = rng(20260820);
+    const out = [];
+    for (let m = 0; m < 12; m++) {
+      for (let i = 0; i < PER_MONTH[m]; i++) {
+        const dayBias = rand();
+        const dom = 1 + Math.floor(rand() * 27);
+        const date = `2025-${String(m + 1).padStart(2, "0")}-${String(dom).padStart(2, "0")}`;
+        const r = rand();
+        const unrated = r > 0.84;
+        const rating = unrated ? void 0 : r > 0.75 ? 3 : r > 0.4 ? 3.5 : r > 0.15 ? 4 : r > 0.04 ? 4.5 : 5;
+        const decade = 1970 + Math.floor(rand() * 6) * 10;
+        out.push(
+          film({
+            title: `Fixture ${m + 1}-${i + 1}${dayBias > 0.7 ? " \u2014 A Considerably Longer Title Than Fits" : ""}`,
+            year: decade + Math.floor(rand() * 10),
+            rating,
+            runtime: 80 + Math.floor(rand() * 90),
+            genres: [GENRES[Math.floor(rand() * GENRES.length)]],
+            director: [DIRECTORS[Math.floor(rand() * DIRECTORS.length)]],
+            certification: CERTS[Math.floor(rand() * CERTS.length)],
+            imdbRating: 5 + rand() * 4,
+            watched: [{ date, rating }],
+            liked: rand() > 0.7
+          })
+        );
+      }
+    }
+    return out;
+  })();
+
+  // src/util/ranges.ts
+  function parseRange(spec) {
+    if (!spec)
+      return [];
+    const out = /* @__PURE__ */ new Set();
+    for (const part of String(spec).split(",")) {
+      const chunk = part.trim();
+      if (!chunk)
+        continue;
+      const m = chunk.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (m) {
+        const lo = parseInt(m[1], 10);
+        const hi = parseInt(m[2], 10);
+        if (Number.isNaN(lo) || Number.isNaN(hi))
+          continue;
+        for (let i = Math.min(lo, hi); i <= Math.max(lo, hi); i++)
+          out.add(i);
+      } else if (/^\d+$/.test(chunk)) {
+        out.add(parseInt(chunk, 10));
+      }
+    }
+    return [...out].sort((a, b) => a - b);
+  }
+  function formatRange(episodes) {
+    const sorted = [...new Set(episodes)].filter((n2) => Number.isFinite(n2) && n2 > 0).sort((a, b) => a - b);
+    if (!sorted.length)
+      return "";
+    const parts = [];
+    let start = sorted[0];
+    let prev = sorted[0];
+    for (let i = 1; i <= sorted.length; i++) {
+      const cur = sorted[i];
+      if (cur !== prev + 1) {
+        parts.push(start === prev ? String(start) : `${start}-${prev}`);
+        start = cur;
+      }
+      prev = cur;
+    }
+    return parts.join(",");
+  }
+  function rangeCount(spec) {
+    return parseRange(spec).length;
+  }
+
+  // src/library.ts
+  function unlink(value) {
+    const m = String(value).match(/^\[\[([^\]]+)\]\]$/);
+    if (!m)
+      return String(value).trim();
+    const inner = m[1];
+    const pipe = inner.lastIndexOf("|");
+    const text2 = pipe >= 0 ? inner.slice(pipe + 1) : inner;
+    const slash = text2.lastIndexOf("/");
+    return (slash >= 0 ? text2.slice(slash + 1) : text2).trim();
+  }
+
+  // src/render/query.ts
+  var SYMBOL_OPS = [">=", "<=", "!=", "="];
+  var WORD_OPS = ["contains", "excludes", "includes", "not in", "in"];
+  var OPS = [...SYMBOL_OPS, ">", "<", ...WORD_OPS];
+  function lastWatchDate(e) {
+    if (e.type === "tv")
+      return e.lastWatched?.date;
+    return e.watched.length ? e.watched[e.watched.length - 1].date : void 0;
+  }
+
+  // src/util/format.ts
+  function compactCount(n2) {
+    if (!Number.isFinite(n2) || n2 <= 0)
+      return "";
+    if (n2 >= 1e6)
+      return `${(n2 / 1e6).toFixed(1).replace(/\.0$/, "")}M`;
+    if (n2 >= 1e3)
+      return `${Math.round(n2 / 1e3)}K`;
+    return String(Math.round(n2));
+  }
+
   // src/render/grid.ts
   function wireCell(plugin2, cell, entry, onSelect) {
     let timer = null;
@@ -3644,55 +3768,6 @@ ${body}
       }
       wireCell(plugin2, row, entry, onSelect);
     }
-  }
-
-  // src/ui/empty.ts
-  function renderEmpty(parent, opts) {
-    const wrap = parent.createDiv({ cls: "reel-empty-state" });
-    const icon = wrap.createDiv({ cls: "reel-empty-icon", attr: { "aria-hidden": "true" } });
-    setIcon(icon, opts.icon);
-    wrap.createDiv({ cls: "reel-empty-title", text: opts.title });
-    if (opts.body)
-      wrap.createDiv({ cls: "reel-empty-body", text: opts.body });
-    if (opts.actions?.length) {
-      const row = wrap.createDiv({ cls: "reel-empty-actions" });
-      for (const action of opts.actions) {
-        const btn = row.createEl("button", {
-          cls: `reel-btn${action.primary ? " mod-cta" : ""}`,
-          text: action.label,
-          attr: { type: "button" }
-        });
-        btn.addEventListener("click", action.onClick);
-      }
-    }
-    return wrap;
-  }
-
-  // src/render/diary.ts
-  function viewings(entries, year2) {
-    const out = [];
-    for (const entry of entries) {
-      for (const w of entry.watched) {
-        if (!w.date)
-          continue;
-        if (year2 && !w.date.startsWith(String(year2)))
-          continue;
-        out.push({ entry, date: w.date, rating: w.rating ?? void 0, rewatch: w.rewatch === true });
-      }
-      if (entry.type === "tv" && entry.lastWatched?.date) {
-        const date = entry.lastWatched.date;
-        if (!year2 || date.startsWith(String(year2))) {
-          out.push({
-            entry,
-            date,
-            rating: entry.rating ?? void 0,
-            rewatch: false,
-            episode: `S${entry.lastWatched.season}E${entry.lastWatched.episode}`
-          });
-        }
-      }
-    }
-    return out.sort((a, b) => b.date.localeCompare(a.date));
   }
 
   // src/ui/a11y.ts
@@ -14690,6 +14765,16 @@ ${body}
         list2.createEl("li", { text: i });
     }
   }
+  function diarylist(root) {
+    root.addClass("reel-view-body");
+    const list2 = root.createDiv({ cls: "reel-diary" });
+    const base = LIBRARY.filter((e) => e.type === "film").slice(0, 6);
+    const rows2 = base.flatMap((e, i) => [
+      { entry: e, date: i < 3 ? "2026-10-17" : "2026-09-28", rating: 3 + i % 3 * 0.5, rewatch: i === 1 }
+    ]);
+    paintDiaryRows(plugin, list2, rows2, () => {
+    });
+  }
   function titlepage(root) {
     root.addClass("reel-view-body");
     mountSheet(
@@ -15189,6 +15274,7 @@ ${body}
     reviews,
     reviewsheet,
     titlepage,
+    diarylist,
     parentsguide,
     rows,
     rate,

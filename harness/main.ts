@@ -1,3 +1,4 @@
+import { paintDiaryRows } from "../src/render/diary";
 import { estimateGuide, GUIDE_LEVELS } from "../src/content";
 /**
  * The harness: real renderers, real stylesheet, real browser, phone width.
@@ -1532,6 +1533,17 @@ function parentsguide(root: HTMLElement): void {
 	}
 }
 
+function diarylist(root: HTMLElement): void {
+	root.addClass("reel-view-body");
+	const list = root.createDiv({ cls: "reel-diary" });
+	// Several viewings share a night, so the same-day grouping is on screen.
+	const base = LIBRARY.filter((e) => e.type === "film").slice(0, 6) as never[];
+	const rows = (base as unknown as Entry[]).flatMap((e, i) => [
+		{ entry: e, date: i < 3 ? "2026-10-17" : "2026-09-28", rating: 3 + (i % 3) * 0.5, rewatch: i === 1 },
+	]);
+	paintDiaryRows(plugin as never, list, rows, () => {});
+}
+
 function titlepage(root: HTMLElement): void {
 	root.addClass("reel-view-body");
 	mountSheet(
@@ -2382,6 +2394,7 @@ const SCREENS: Record<string, (root: HTMLElement) => void> = {
 	reviews,
 	reviewsheet,
 	titlepage,
+	diarylist,
 	parentsguide,
 	rows,
 	rate,

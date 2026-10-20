@@ -52,6 +52,16 @@ export interface Release {
 /** Newest first. The order here is the order on screen. */
 export const RELEASES: Release[] = [
 	{
+		version: "0.9.68",
+		date: "2026-10-19",
+		headline: "A fresher Diary, and strips that scroll freely.",
+		changes: [
+			{ kind: "better", text: "The Diary's month heading stays at the top as you scroll and says how many viewings it holds and their average rating." },
+			{ kind: "better", text: "Each Diary day shows its number and weekday once. A night with several films reads as one night, and the repeated date on every row is gone. Liked titles show a heart." },
+			{ kind: "fixed", text: "More like this, the cast strip, the tab bar and the season strip scroll freely, with a flick that carries. Snap points were stopping flicks short, so strips needed big swipes." },
+		],
+	},
+	{
 		version: "0.9.67",
 		date: "2026-10-19",
 		headline: "The screen keeps your place.",

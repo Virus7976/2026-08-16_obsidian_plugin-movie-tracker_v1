@@ -20977,3 +20977,93 @@ body:not(.is-phone) .reel-titlepage .reel-money {
 .reel-modal.is-w620 .reel-episodes .reel-episode-stars {
 	justify-self: stretch;
 }
+
+/* ==================================================================== */
+/* Every sideways strip scrolls freely                                    */
+/* ==================================================================== */
+/* Snap points made a flick settle on the nearest card with an animation and cut
+   a long flick short, which read as a strip that needed huge swipes. Free
+   scrolling keeps the finger's momentum, and containing the overscroll stops a
+   hard flick at the end from being taken by the page or the side drawer. */
+.reel-related,
+.reel-caststrip-track,
+.reel-facet-tabs,
+.reel-seasons {
+	scroll-snap-type: none;
+	scroll-behavior: auto;
+	overscroll-behavior-x: contain;
+	-webkit-overflow-scrolling: touch;
+	touch-action: pan-x pan-y;
+}
+.reel-related-card,
+.reel-caststrip-cell,
+.reel-facet-tab {
+	scroll-snap-align: none;
+}
+
+/* ==================================================================== */
+/* Diary, refreshed                                                       */
+/* ==================================================================== */
+/* The month stays at the top while you read it, with what it holds. The day
+   shows once, with its weekday; a second viewing the same day lines up under it. */
+.reel-diary-month {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--reel-space-3, 12px);
+	padding: var(--reel-space-3, 12px) 0 var(--reel-space-2, 8px);
+	background: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.reel-diary-month-name {
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+.reel-diary-month-stat {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	font-variant-numeric: tabular-nums;
+}
+.reel-diary-day {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0;
+	line-height: 1.1;
+}
+.reel-diary-daynum {
+	font-size: var(--font-ui-large, 20px);
+	font-weight: 600;
+	color: var(--text-normal);
+	font-variant-numeric: tabular-nums;
+}
+.reel-diary-weekday {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-muted);
+}
+.reel-diary-row.is-same-day {
+	padding-top: 0;
+}
+.reel-diary-liked {
+	color: var(--color-red, #d9534f);
+	font-size: var(--font-ui-small);
+}
+.reel-diary-day {
+	flex: none;
+	width: 52px;
+	min-width: 52px;
+	box-sizing: border-box;
+}
+.reel-diary-day {
+	width: 40px;
+	min-width: 40px;
+}

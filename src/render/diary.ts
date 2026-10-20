@@ -171,13 +171,35 @@ export function paintDiaryRows(
 	opts: { extras?: (body: HTMLElement, v: Viewing) => void } = {}
 ): void {
 	let currentMonth = "";
+	let currentDay = "";
+
+	// What each month holds, so its header can say so: how many viewings, and
+	// the average of the ones you rated.
+	const months = new Map<string, { n: number; rated: number; sum: number }>();
+	for (const v of rows) {
+		const key = v.date.slice(0, 7);
+		const m = months.get(key) ?? { n: 0, rated: 0, sum: 0 };
+		m.n += 1;
+		if (v.rating != null) {
+			m.rated += 1;
+			m.sum += v.rating;
+		}
+		months.set(key, m);
+	}
 
 	for (const v of rows) {
 		const month = v.date.slice(0, 7);
 		if (month !== currentMonth) {
 			currentMonth = month;
+			currentDay = "";
 			const [y, m] = month.split("-");
-			list.createDiv({ cls: "reel-diary-month", text: `${MONTHS[parseInt(m, 10) - 1]} ${y}` });
+			const head = list.createDiv({ cls: "reel-diary-month" });
+			head.createSpan({ cls: "reel-diary-month-name", text: `${MONTHS[parseInt(m, 10) - 1]} ${y}` });
+			const stat = months.get(month);
+			if (stat) {
+				const avg = stat.rated ? ` · avg ${(stat.sum / stat.rated).toFixed(1)}★` : "";
+				head.createSpan({ cls: "reel-diary-month-stat", text: `${stat.n} viewing${stat.n === 1 ? "" : "s"}${avg}` });
+			}
 		}
 
 		const row = list.createDiv({ cls: "reel-diary-row" });
@@ -190,7 +212,20 @@ export function paintDiaryRows(
 			`${v.entry.title}, watched ${prettyDate(v.date)}${v.rating != null ? `, rated ${v.rating} out of 5` : ""}`
 		);
 
-		row.createDiv({ cls: "reel-diary-day", text: String(parseInt(v.date.slice(8, 10), 10)) });
+		// The day shows once; later viewings the same day line up beneath it, so
+		// a night with three films reads as one night, not three rows to decode.
+		const day = row.createDiv({ cls: "reel-diary-day" });
+		if (v.date !== currentDay) {
+			currentDay = v.date;
+			day.createSpan({ cls: "reel-diary-daynum", text: String(parseInt(v.date.slice(8, 10), 10)) });
+			const [yy, mm, dd] = v.date.split("-").map((x) => parseInt(x, 10));
+			day.createSpan({
+				cls: "reel-diary-weekday",
+				text: new Date(yy, mm - 1, dd).toLocaleDateString(undefined, { weekday: "short" }),
+			});
+		} else {
+			row.addClass("is-same-day");
+		}
 
 		const thumb = row.createDiv({ cls: "reel-diary-thumb" });
 		plugin.posters.attach(thumb, v.entry);
@@ -206,7 +241,7 @@ export function paintDiaryRows(
 		if (v.episode) meta.createSpan({ cls: "reel-badge", text: v.episode });
 		if (v.rating != null) renderStarsStatic(meta, v.rating);
 		if (v.rewatch) meta.createSpan({ cls: "reel-badge subtle", text: "rewatch" });
-		meta.createSpan({ cls: "reel-dim", text: prettyDate(v.date) });
+		if (v.entry.liked) meta.createSpan({ cls: "reel-diary-liked", text: "♥", attr: { "aria-label": "Liked" } });
 
 		opts.extras?.(body, v);
 
